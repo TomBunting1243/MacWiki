@@ -46,19 +46,21 @@ struct WebViewLinkHoverRequest: Equatable, Sendable {
 }
 
 private enum LinkHoverPreviewMetrics {
-    static let width: CGFloat = 460
-    static let height: CGFloat = 336
+    static let width: CGFloat = 476
+    static let height: CGFloat = 348
 }
 
 private enum LinkHoverGlassMetrics {
-    static let cornerRadius: CGFloat = 18
+    static let cornerRadius: CGFloat = 20
     static let borderWidth: CGFloat = 0.7
-    static let contentInset: CGFloat = 8
+    static let contentInset: CGFloat = 10
 }
 
 private enum LinkHoverSummaryPreviewMetrics {
-    static let cornerRadius: CGFloat = 14
-    static let maxExtractCharacters = 520
+    static let cornerRadius: CGFloat = 16
+    static let maxExtractCharacters = 430
+    static let artworkWidth: CGFloat = 152
+    static let artworkHeight: CGFloat = 208
 }
 
 private struct LinkHoverPreviewPane: View {
@@ -81,8 +83,6 @@ private struct LinkHoverPreviewPane: View {
     var body: some View {
         VStack(spacing: 0) {
             header
-            Divider()
-                .overlay(Color.primary.opacity(isDarkMode ? 0.20 : 0.12))
             LinkHoverArticleSummaryPreview(articleTitle: title, fallbackURL: url)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
@@ -101,44 +101,78 @@ private struct LinkHoverPreviewPane: View {
     }
 
     private var header: some View {
-        HStack(alignment: .center, spacing: 12) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.headline)
-                    .lineLimit(1)
-                    .foregroundStyle(.primary)
+        HStack(alignment: .top, spacing: 14) {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 8) {
+                    SwiftUI.Label(hostText, systemImage: "globe.americas.fill")
+                        .font(.system(size: 10.5, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 5)
+                        .background(
+                            Capsule(style: .continuous)
+                                .fill(Color.primary.opacity(isDarkMode ? 0.11 : 0.06))
+                        )
 
-                Text(hostText)
-                    .font(.caption)
-                    .lineLimit(1)
-                    .foregroundStyle(.secondary)
+                    Text("HOVER PREVIEW")
+                        .font(.system(size: 10, weight: .bold, design: .monospaced))
+                        .foregroundStyle(Color.accentColor.opacity(isDarkMode ? 0.92 : 0.82))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 5)
+                        .background(
+                            Capsule(style: .continuous)
+                                .fill(Color.accentColor.opacity(isDarkMode ? 0.18 : 0.10))
+                        )
+                }
+
+                Text(title)
+                    .font(.system(size: 20, weight: .semibold, design: .rounded))
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .foregroundStyle(.primary)
             }
 
             Spacer(minLength: 10)
 
-            LinkHoverActionIcon(
-                systemImage: "arrow.up.forward",
-                helpText: "Open",
-                action: onOpen
-            )
+            HStack(spacing: 8) {
+                LinkHoverActionIcon(
+                    systemImage: "arrow.up.forward",
+                    helpText: "Open",
+                    action: onOpen
+                )
 
-            LinkHoverActionIcon(
-                systemImage: "plus.square.on.square",
-                helpText: "Open in New Tab",
-                action: onOpenInNewTab
-            )
+                LinkHoverActionIcon(
+                    systemImage: "plus.square.on.square",
+                    helpText: "Open in New Tab",
+                    action: onOpenInNewTab
+                )
 
-            LinkHoverActionIcon(
-                systemImage: "bookmark",
-                helpText: "Save Link",
-                action: onSave
-            )
+                LinkHoverActionIcon(
+                    systemImage: "bookmark",
+                    helpText: "Save Link",
+                    action: onSave
+                )
+            }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
+        .padding(.horizontal, 14)
+        .padding(.top, 14)
+        .padding(.bottom, 12)
         .background(
             Rectangle()
                 .fill(.thinMaterial)
+                .overlay(
+                    LinearGradient(
+                        colors: [
+                            Color.accentColor.opacity(isDarkMode ? 0.16 : 0.10),
+                            Color.white.opacity(isDarkMode ? 0.05 : 0.08),
+                            .clear
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                    .blendMode(.screen)
+                )
                 .overlay(alignment: .top) {
                     Rectangle()
                         .fill(Color.white.opacity(isDarkMode ? 0.16 : 0.28))
@@ -157,7 +191,7 @@ private struct LinkHoverPreviewPane: View {
             .fill(.ultraThinMaterial)
             .overlay {
                 RoundedRectangle(cornerRadius: LinkHoverGlassMetrics.cornerRadius, style: .continuous)
-                    .fill(Color(nsColor: .windowBackgroundColor).opacity(isDarkMode ? 0.22 : 0.09))
+                    .fill(Color(nsColor: .windowBackgroundColor).opacity(isDarkMode ? 0.20 : 0.08))
             }
             .overlay(
                 RoundedRectangle(cornerRadius: LinkHoverGlassMetrics.cornerRadius, style: .continuous)
@@ -228,11 +262,11 @@ private struct LinkHoverActionIcon: View {
     var body: some View {
         Button(action: action) {
             Image(systemName: systemImage)
-                .font(.system(size: 14, weight: .semibold))
-                .frame(width: 28, height: 28)
-                .foregroundStyle(.primary)
+                .font(.system(size: 13.5, weight: .semibold))
+                .frame(width: 32, height: 32)
+                .foregroundStyle(isHovered ? Color.accentColor : .primary)
                 .background(iconBackground)
-                .scaleEffect(isHovered ? 1.04 : 1.0)
+                .scaleEffect(isHovered ? 1.05 : 1.0)
         }
         .buttonStyle(.plain)
         .help(helpText)
@@ -246,7 +280,11 @@ private struct LinkHoverActionIcon: View {
 
     private var iconBackground: some View {
         RoundedRectangle(cornerRadius: 8, style: .continuous)
-            .fill(.ultraThinMaterial)
+            .fill(.regularMaterial)
+            .overlay {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(Color.accentColor.opacity(isHovered ? (isDarkMode ? 0.18 : 0.12) : 0))
+            }
             .overlay(
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
                     .fill(
@@ -288,8 +326,11 @@ private struct LinkHoverArticleSummaryPreview: View {
     let fallbackURL: URL
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.colorScheme) private var colorScheme
     @State private var descriptionText: String?
     @State private var extractText: String?
+    @State private var thumbnailURL: URL?
+    @State private var summaryTitle: String?
     @State private var isLoading = false
     @State private var hasLoaded = false
 
@@ -300,6 +341,10 @@ private struct LinkHoverArticleSummaryPreview: View {
     }
 
     private var hasContent: Bool {
+        descriptionText != nil || extractText != nil || thumbnailURL != nil
+    }
+
+    private var hasTextualSummary: Bool {
         descriptionText != nil || extractText != nil
     }
 
@@ -312,6 +357,17 @@ private struct LinkHoverArticleSummaryPreview: View {
             return fallbackURL.absoluteString
         }
         return normalizedTitle
+    }
+
+    private var thumbnailTransaction: Transaction {
+        reduceMotion ? Transaction(animation: nil) : Transaction(animation: .easeOut(duration: 0.18))
+    }
+
+    private var artworkMonogram: String {
+        let source = (summaryTitle ?? articleTitle)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let character = source.first else { return "W" }
+        return String(character).uppercased()
     }
 
     private var presentationState: PresentationState {
@@ -363,55 +419,103 @@ private struct LinkHoverArticleSummaryPreview: View {
     }
 
     private var contentView: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            if let descriptionText {
-                Text(descriptionText)
-                    .font(.subheadline.weight(.semibold))
+        HStack(alignment: .top, spacing: 14) {
+            previewArtwork
+
+            VStack(alignment: .leading, spacing: 10) {
+                SwiftUI.Label("Wikipedia summary", systemImage: "doc.text.image")
+                    .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
-                    .lineLimit(2)
-            }
 
-            if let extractText {
-                Text(extractText)
-                    .font(.callout)
-                    .lineSpacing(2)
-                    .foregroundStyle(.primary)
-                    .lineLimit(8)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+                if let descriptionText {
+                    Text(descriptionText)
+                        .font(.system(size: 13.5, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.primary.opacity(0.78))
+                        .lineLimit(3)
+                }
 
-            Text("Preview from Wikipedia summary")
-                .font(.caption2)
-                .foregroundStyle(.tertiary)
+                if let extractText {
+                    Text(extractText)
+                        .font(.system(size: 13.5))
+                        .lineSpacing(3)
+                        .foregroundStyle(.primary.opacity(0.92))
+                        .lineLimit(9)
+                        .fixedSize(horizontal: false, vertical: true)
+                } else if !hasTextualSummary {
+                    Text("A visual preview is available for this article. Open it to read the full entry.")
+                        .font(.system(size: 13))
+                        .foregroundStyle(.primary.opacity(0.82))
+                        .lineSpacing(2)
+                }
+
+                Spacer(minLength: 0)
+
+                HStack(spacing: 8) {
+                    Text("Live preview")
+                        .font(.caption2.weight(.medium))
+                        .foregroundStyle(.tertiary)
+
+                    Circle()
+                        .fill(Color.accentColor.opacity(0.8))
+                        .frame(width: 4, height: 4)
+
+                    Text("Opens the full article on click")
+                        .font(.caption2.weight(.medium))
+                        .foregroundStyle(.tertiary)
+                        .lineLimit(1)
+                }
+            }
         }
     }
 
     private var loadingStateView: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            AppLoadingInlineLabel(
-                text: "Loading article preview...",
-                tone: .neutral,
-                font: .caption.weight(.medium)
+        HStack(alignment: .top, spacing: 14) {
+            AppLoadingThumbnailPlaceholder(
+                width: LinkHoverSummaryPreviewMetrics.artworkWidth,
+                height: LinkHoverSummaryPreviewMetrics.artworkHeight,
+                cornerRadius: 12,
+                tone: .accent,
+                symbol: "globe.americas.fill"
             )
 
-            VStack(alignment: .leading, spacing: 8) {
-                AppLoadingSkeletonBar(width: 132, height: 10, cornerRadius: 5, tone: .neutral)
-                AppLoadingSkeletonBar(width: nil, height: 12, cornerRadius: 6, tone: .neutral)
-                AppLoadingSkeletonBar(width: nil, height: 12, cornerRadius: 6, tone: .neutral)
-                AppLoadingSkeletonBar(width: 184, height: 12, cornerRadius: 6, tone: .neutral)
+            VStack(alignment: .leading, spacing: 12) {
+                AppLoadingInlineLabel(
+                    text: "Loading article preview...",
+                    tone: .neutral,
+                    font: .caption.weight(.medium)
+                )
+
+                VStack(alignment: .leading, spacing: 8) {
+                    AppLoadingSkeletonBar(width: 118, height: 10, cornerRadius: 5, tone: .neutral)
+                    AppLoadingSkeletonBar(width: nil, height: 12, cornerRadius: 6, tone: .neutral)
+                    AppLoadingSkeletonBar(width: nil, height: 12, cornerRadius: 6, tone: .neutral)
+                    AppLoadingSkeletonBar(width: nil, height: 12, cornerRadius: 6, tone: .neutral)
+                    AppLoadingSkeletonBar(width: 156, height: 12, cornerRadius: 6, tone: .neutral)
+                }
             }
         }
     }
 
     private var unavailableStateView: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Preview unavailable")
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.secondary)
-            Text("Open the article to view full content.")
-                .font(.caption)
-                .foregroundStyle(.tertiary)
-                .lineLimit(2)
+        HStack(alignment: .top, spacing: 14) {
+            fallbackArtwork
+
+            VStack(alignment: .leading, spacing: 10) {
+                SwiftUI.Label("Preview unavailable", systemImage: "questionmark.circle")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+
+                Text("Wikipedia did not return a clean summary for this link, but the full article is still ready.")
+                    .font(.system(size: 13))
+                    .foregroundStyle(.primary.opacity(0.8))
+                    .lineSpacing(2)
+
+                Spacer(minLength: 0)
+
+                Text("Open the article to explore the complete entry.")
+                    .font(.caption2.weight(.medium))
+                    .foregroundStyle(.tertiary)
+            }
         }
     }
 
@@ -422,12 +526,123 @@ private struct LinkHoverArticleSummaryPreview: View {
                 RoundedRectangle(cornerRadius: LinkHoverSummaryPreviewMetrics.cornerRadius, style: .continuous)
                     .fill(Color(nsColor: .textBackgroundColor).opacity(0.16))
             }
+            .overlay {
+                RoundedRectangle(cornerRadius: LinkHoverSummaryPreviewMetrics.cornerRadius, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color.accentColor.opacity(colorScheme == .dark ? 0.12 : 0.08),
+                                Color.white.opacity(colorScheme == .dark ? 0.03 : 0.08),
+                                .clear
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .blendMode(.screen)
+            }
+    }
+
+    private var previewArtwork: some View {
+        Group {
+            if let thumbnailURL {
+                AsyncImage(url: thumbnailURL, transaction: thumbnailTransaction) { phase in
+                    switch phase {
+                    case .empty:
+                        AppLoadingThumbnailPlaceholder(
+                            width: LinkHoverSummaryPreviewMetrics.artworkWidth,
+                            height: LinkHoverSummaryPreviewMetrics.artworkHeight,
+                            cornerRadius: 12,
+                            tone: .accent,
+                            symbol: "globe.americas.fill"
+                        )
+                    case .success(let image):
+                        ZStack {
+                            artworkBackground
+                            image
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                                .transition(.opacity)
+                        }
+                    case .failure:
+                        fallbackArtwork
+                    @unknown default:
+                        fallbackArtwork
+                    }
+                }
+            } else {
+                fallbackArtwork
+            }
+        }
+        .frame(
+            width: LinkHoverSummaryPreviewMetrics.artworkWidth,
+            height: LinkHoverSummaryPreviewMetrics.artworkHeight
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(Color.white.opacity(colorScheme == .dark ? 0.12 : 0.28), lineWidth: 0.7)
+        }
+        .shadow(color: .black.opacity(colorScheme == .dark ? 0.18 : 0.08), radius: 12, y: 6)
+    }
+
+    private var fallbackArtwork: some View {
+        ZStack(alignment: .bottomLeading) {
+            LinearGradient(
+                colors: [
+                    Color.accentColor.opacity(colorScheme == .dark ? 0.70 : 0.60),
+                    Color.blue.opacity(colorScheme == .dark ? 0.58 : 0.48),
+                    Color.primary.opacity(colorScheme == .dark ? 0.24 : 0.14)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+
+            Circle()
+                .fill(Color.white.opacity(colorScheme == .dark ? 0.10 : 0.14))
+                .frame(width: 120, height: 120)
+                .blur(radius: 14)
+                .offset(x: 36, y: -40)
+
+            VStack(alignment: .leading, spacing: 10) {
+                Spacer(minLength: 0)
+
+                Text(artworkMonogram)
+                    .font(.system(size: 54, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.92))
+
+                SwiftUI.Label("Wikipedia article", systemImage: "safari")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.white.opacity(0.78))
+            }
+            .padding(14)
+        }
+    }
+
+    private var artworkBackground: some View {
+        RoundedRectangle(cornerRadius: 12, style: .continuous)
+            .fill(
+                LinearGradient(
+                    colors: [
+                        Color.white.opacity(colorScheme == .dark ? 0.06 : 0.18),
+                        Color.clear
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(Color.black.opacity(colorScheme == .dark ? 0.12 : 0.04))
+            }
     }
 
     @MainActor
     private func loadSummary() async {
         isLoading = true
         hasLoaded = false
+        summaryTitle = nil
+        thumbnailURL = nil
         descriptionText = nil
         extractText = nil
 
@@ -442,8 +657,10 @@ private struct LinkHoverArticleSummaryPreview: View {
             let summary = try await WikipediaService.shared.fetchSummary(trimmedTitle)
             guard !Task.isCancelled else { return }
 
+            summaryTitle = normalize(summary.title)
             let normalizedDescription = normalize(summary.description)
             let normalizedExtract = normalize(summary.extract)
+            thumbnailURL = summary.thumbnailURL
             descriptionText = normalizedDescription
             if let normalizedExtract {
                 extractText = truncatedPreviewText(
