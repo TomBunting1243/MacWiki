@@ -1094,30 +1094,6 @@ private struct DiscoverTimeTravelSkeletonCard: View {
     }
 }
 
-private enum DiscoverCollectionsMode: String, CaseIterable, Identifiable {
-    case all
-    case mostRead
-    case longest
-
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .all: "All"
-        case .mostRead: "Most Read"
-        case .longest: "Longest"
-        }
-    }
-
-    var systemImage: String {
-        switch self {
-        case .all: "square.grid.2x2"
-        case .mostRead: "chart.line.uptrend.xyaxis"
-        case .longest: "text.alignleft"
-        }
-    }
-}
-
 private enum DiscoverCollectionLane: String, CaseIterable {
     case mostRead
     case longest
@@ -1139,7 +1115,6 @@ private struct DiscoverFeedSections: View {
     @State private var featuredSummaryStore = DiscoverFeaturedSummaryStore()
     @State private var visualContextStore = DiscoverVisualContextStore()
     @State private var activePageViewsPopover: DiscoverPageViewsPopoverPayload?
-    @State private var collectionsMode: DiscoverCollectionsMode = .all
     @State private var isCollectionsKeyboardFocusActive = false
     @State private var focusedCollectionLane: DiscoverCollectionLane = .mostRead
     @State private var focusedMostReadRowIndex = 0
@@ -1181,12 +1156,15 @@ private struct DiscoverFeedSections: View {
         return 4
     }
 
-    private var usesEditorialOpeningSplit: Bool {
-        availableWidth >= 930 && !feed.newsStories.isEmpty
+    private var usesOpeningModuleSplit: Bool {
+        availableWidth >= 760 && !feed.newsStories.isEmpty
     }
 
-    private var openingRailWidth: CGFloat {
-        min(max(availableWidth * 0.34, 286), 356)
+    private var openingModuleColumns: [GridItem] {
+        [
+            GridItem(.flexible(minimum: 280), spacing: 14),
+            GridItem(.flexible(minimum: 280), spacing: 14)
+        ]
     }
 
     private var usesMediaSpotlightSplit: Bool {
@@ -1201,28 +1179,8 @@ private struct DiscoverFeedSections: View {
         usesMediaSpotlightSplit ? 4 : (isCompactLayout ? 8 : 12)
     }
 
-    private var isCollectionsStacked: Bool {
-        availableWidth < 900 || collectionsMode != .all
-    }
-
-    private var showsMostReadCollection: Bool {
-        collectionsMode != .longest
-    }
-
-    private var showsLongestCollection: Bool {
-        collectionsMode != .mostRead
-    }
-
-    private var usesSegmentedCollectionsControl: Bool {
-        availableWidth >= 780
-    }
-
-    private var collectionsControlWidth: CGFloat {
-        min(max(availableWidth * 0.32, 220), 320)
-    }
-
     private var playlistColumns: [GridItem] {
-        if isCollectionsStacked {
+        if availableWidth < 900 {
             return [GridItem(.flexible(minimum: 280), spacing: 0)]
         }
         return [
@@ -1244,12 +1202,8 @@ private struct DiscoverFeedSections: View {
     }
 
     private var playlistRowLimit: Int {
-        if collectionsMode == .all {
-            if isUltraCompactLayout { return 6 }
-            return isVeryCompactLayout ? 8 : 10
-        }
-        if isUltraCompactLayout { return 8 }
-        return isVeryCompactLayout ? 10 : 14
+        if isUltraCompactLayout { return 6 }
+        return isVeryCompactLayout ? 8 : 10
     }
 
     private var allTimeMostReadLoadLimit: Int {
@@ -1480,10 +1434,10 @@ private struct DiscoverFeedSections: View {
 
     private var visibleKeyboardLanes: [DiscoverCollectionLane] {
         var lanes: [DiscoverCollectionLane] = []
-        if showsMostReadCollection && !keyboardMostReadResults.isEmpty {
+        if !keyboardMostReadResults.isEmpty {
             lanes.append(.mostRead)
         }
-        if showsLongestCollection && !keyboardLongestResults.isEmpty {
+        if !keyboardLongestResults.isEmpty {
             lanes.append(.longest)
         }
         return lanes
@@ -1492,7 +1446,7 @@ private struct DiscoverFeedSections: View {
     private var collectionsFocusDataKey: String {
         let mostReadKey = keyboardMostReadResults.map(\.title).joined(separator: "|")
         let longestKey = keyboardLongestResults.map(\.title).joined(separator: "|")
-        return "\(collectionsMode.rawValue)|\(mostReadKey)|\(longestKey)"
+        return "\(mostReadKey)|\(longestKey)"
     }
 
     private var canOpenFocusedCollectionItem: Bool {
@@ -1613,31 +1567,7 @@ private struct DiscoverFeedSections: View {
         setFocusedRowIndex(focusedLongestRowIndex, for: .longest)
     }
 
-    private func switchCollectionsModeForLane(direction: MoveCommandDirection) -> Bool {
-        guard visibleKeyboardLanes.count <= 1 else { return false }
-        guard direction == .left || direction == .right else { return false }
-
-        switch (direction, collectionsMode) {
-        case (.left, .longest):
-            collectionsMode = .mostRead
-            focusedCollectionLane = .mostRead
-            normalizeCollectionsKeyboardFocus()
-            return true
-        case (.right, .mostRead):
-            collectionsMode = .longest
-            focusedCollectionLane = .longest
-            normalizeCollectionsKeyboardFocus()
-            return true
-        default:
-            return false
-        }
-    }
-
     private func shiftCollectionsFocusLane(_ direction: MoveCommandDirection) {
-        if switchCollectionsModeForLane(direction: direction) {
-            return
-        }
-
         let lanes = visibleKeyboardLanes
         guard lanes.count > 1 else { return }
         guard let laneIndex = lanes.firstIndex(of: focusedCollectionLane) else {
@@ -1798,14 +1728,10 @@ private struct DiscoverFeedSections: View {
 
     @ViewBuilder
     private var openingEditorialSpread: some View {
-        if usesEditorialOpeningSplit {
-            HStack(alignment: .top, spacing: 16) {
+        if usesOpeningModuleSplit {
+            LazyVGrid(columns: openingModuleColumns, alignment: .leading, spacing: 14) {
                 todayMostReadSection
-                    .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
-                    .layoutPriority(1)
-
                 newsBriefingSection
-                    .frame(width: openingRailWidth, alignment: .leading)
             }
         } else {
             todayMostReadSection
@@ -1816,14 +1742,10 @@ private struct DiscoverFeedSections: View {
     @ViewBuilder
     private var collectionsStage: some View {
         VStack(alignment: .leading, spacing: isCompactLayout ? 12 : 14) {
-            HStack(alignment: .top, spacing: 12) {
-                DiscoverSectionHeader(
-                    title: "Collections",
-                    subtitle: "Two ways through Wikipedia’s canon: the perennial hits and the longer way in"
-                )
-                Spacer(minLength: 8)
-                collectionsModeControl
-            }
+            DiscoverSectionHeader(
+                title: "Collections",
+                subtitle: "Two ways through Wikipedia’s canon: the perennial hits and the longer way in"
+            )
 
             Text("Start with the giants, then drift toward the pieces that reward a longer afternoon.")
                 .font(.system(size: 12.5, weight: .medium))
@@ -1831,109 +1753,80 @@ private struct DiscoverFeedSections: View {
                 .fixedSize(horizontal: false, vertical: true)
 
             LazyVGrid(columns: playlistColumns, spacing: 12) {
-                if showsMostReadCollection {
-                    DiscoverPlaylistColumn(
-                        title: "Most Read",
-                        subtitle: playlistMostReadSubtitle,
-                        meta: mostReadCollectionMeta,
-                        systemImage: "chart.line.uptrend.xyaxis",
-                        tint: .accentColor,
-                        showsLoading: trendPulseStore.isLoading,
-                        isKeyboardFocused: isCollectionsKeyboardFocusActive && focusedCollectionLane == .mostRead,
-                        showsSurface: false
-                    ) {
-                        if playlistMostReadItems.isEmpty {
-                            DiscoverPlaylistPlaceholder(
-                                text: allTimeMostReadStore.isLoading
-                                    ? "Loading all-time most read…"
-                                    : "All-time Most Read is unavailable right now."
+                DiscoverPlaylistColumn(
+                    title: "Most Read",
+                    subtitle: playlistMostReadSubtitle,
+                    meta: mostReadCollectionMeta,
+                    systemImage: "chart.line.uptrend.xyaxis",
+                    tint: .accentColor,
+                    showsLoading: trendPulseStore.isLoading,
+                    isKeyboardFocused: isCollectionsKeyboardFocusActive && focusedCollectionLane == .mostRead,
+                    showsSurface: false
+                ) {
+                    if playlistMostReadItems.isEmpty {
+                        DiscoverPlaylistPlaceholder(
+                            text: allTimeMostReadStore.isLoading
+                                ? "Loading all-time most read…"
+                                : "All-time Most Read is unavailable right now."
+                        )
+                    } else {
+                        ForEach(Array(playlistMostReadItems.enumerated()), id: \.element.id) { index, result in
+                            let rowKey = pageViewsRowKey(section: "collection-most-read", result: result, index: index)
+                            let trendPulse = trendPulseStore.pulse(for: result.title)
+                            DiscoverPlaylistArticleRow(
+                                result: result,
+                                rank: index + 1,
+                                primaryStat: mostReadPrimaryStat(for: result),
+                                secondaryStat: mostReadSecondaryStat(for: result),
+                                statTint: mostReadStatTint(for: result),
+                                isKeyboardFocused: isFocusedCollectionRow(lane: .mostRead, index: index),
+                                onFocus: {
+                                    markCollectionsFocus(lane: .mostRead, index: index)
+                                },
+                                onOpen: onOpen
                             )
-                        } else {
-                            ForEach(Array(playlistMostReadItems.enumerated()), id: \.element.id) { index, result in
-                                let rowKey = pageViewsRowKey(section: "collection-most-read", result: result, index: index)
-                                let trendPulse = trendPulseStore.pulse(for: result.title)
-                                DiscoverPlaylistArticleRow(
-                                    result: result,
-                                    rank: index + 1,
-                                    primaryStat: mostReadPrimaryStat(for: result),
-                                    secondaryStat: mostReadSecondaryStat(for: result),
-                                    statTint: mostReadStatTint(for: result),
-                                    isKeyboardFocused: isFocusedCollectionRow(lane: .mostRead, index: index),
-                                    onFocus: {
-                                        markCollectionsFocus(lane: .mostRead, index: index)
-                                    },
-                                    onOpen: onOpen
-                                )
-                                .contextMenu {
-                                    discoverContextMenu(for: result) {
-                                        presentPageViewsPopover(
-                                            for: result,
-                                            rowKey: rowKey,
-                                            initialPulse: trendPulse
-                                        )
-                                    }
+                            .contextMenu {
+                                discoverContextMenu(for: result) {
+                                    presentPageViewsPopover(
+                                        for: result,
+                                        rowKey: rowKey,
+                                        initialPulse: trendPulse
+                                    )
                                 }
-                                .popover(isPresented: pageViewsPopoverBinding(for: rowKey), arrowEdge: .trailing) {
-                                    pageViewsPopover(for: rowKey)
-                                }
+                            }
+                            .popover(isPresented: pageViewsPopoverBinding(for: rowKey), arrowEdge: .trailing) {
+                                pageViewsPopover(for: rowKey)
                             }
                         }
                     }
-                    .transition(.move(edge: .leading).combined(with: .opacity))
                 }
 
-                if showsLongestCollection {
-                    DiscoverPlaylistColumn(
-                        title: "Longest Reads",
-                        subtitle: playlistLongestSubtitle,
-                        meta: longestCollectionMeta,
-                        systemImage: "text.alignleft",
-                        tint: Color.orange.opacity(0.9),
-                        showsLoading: wordCountStore.isLoading,
-                        isKeyboardFocused: isCollectionsKeyboardFocusActive && focusedCollectionLane == .longest,
-                        showsSurface: false
-                    ) {
-                        if longestReadItems.isEmpty {
-                            if longestFallbackItems.isEmpty {
-                                DiscoverPlaylistPlaceholder(
-                                    text: wordCountStore.isLoading
-                                        ? "Finding long reads…"
-                                        : "No all-time long-read candidates are available yet."
-                                )
-                            } else {
-                                ForEach(Array(longestFallbackItems.enumerated()), id: \.element.id) { index, result in
-                                    let rowKey = pageViewsRowKey(section: "collection-longest-fallback", result: result, index: index)
-                                    DiscoverPlaylistArticleRow(
-                                        result: result,
-                                        rank: index + 1,
-                                        primaryStat: wordCountStore.isLoading ? "Loading words…" : "Word count unavailable",
-                                        secondaryStat: wordCountStore.isLoading ? nil : "Open to inspect",
-                                        statTint: .secondary,
-                                        isKeyboardFocused: isFocusedCollectionRow(lane: .longest, index: index),
-                                        onFocus: {
-                                            markCollectionsFocus(lane: .longest, index: index)
-                                        },
-                                        onOpen: onOpen
-                                    )
-                                    .contextMenu {
-                                        discoverContextMenu(for: result) {
-                                            presentPageViewsPopover(for: result, rowKey: rowKey)
-                                        }
-                                    }
-                                    .popover(isPresented: pageViewsPopoverBinding(for: rowKey), arrowEdge: .trailing) {
-                                        pageViewsPopover(for: rowKey)
-                                    }
-                                }
-                            }
+                DiscoverPlaylistColumn(
+                    title: "Longest Reads",
+                    subtitle: playlistLongestSubtitle,
+                    meta: longestCollectionMeta,
+                    systemImage: "text.alignleft",
+                    tint: Color.orange.opacity(0.9),
+                    showsLoading: wordCountStore.isLoading,
+                    isKeyboardFocused: isCollectionsKeyboardFocusActive && focusedCollectionLane == .longest,
+                    showsSurface: false
+                ) {
+                    if longestReadItems.isEmpty {
+                        if longestFallbackItems.isEmpty {
+                            DiscoverPlaylistPlaceholder(
+                                text: wordCountStore.isLoading
+                                    ? "Finding long reads…"
+                                    : "No all-time long-read candidates are available yet."
+                            )
                         } else {
-                            ForEach(Array(longestReadItems.enumerated()), id: \.element.id) { index, entry in
-                                let rowKey = pageViewsRowKey(section: "collection-longest", result: entry.result, index: index)
+                            ForEach(Array(longestFallbackItems.enumerated()), id: \.element.id) { index, result in
+                                let rowKey = pageViewsRowKey(section: "collection-longest-fallback", result: result, index: index)
                                 DiscoverPlaylistArticleRow(
-                                    result: entry.result,
+                                    result: result,
                                     rank: index + 1,
-                                    primaryStat: formattedWordCount(entry.wordCount),
-                                    secondaryStat: estimatedReadingTimeText(for: entry.wordCount),
-                                    statTint: Color.orange.opacity(0.92),
+                                    primaryStat: wordCountStore.isLoading ? "Loading words…" : "Word count unavailable",
+                                    secondaryStat: wordCountStore.isLoading ? nil : "Open to inspect",
+                                    statTint: .secondary,
                                     isKeyboardFocused: isFocusedCollectionRow(lane: .longest, index: index),
                                     onFocus: {
                                         markCollectionsFocus(lane: .longest, index: index)
@@ -1941,8 +1834,8 @@ private struct DiscoverFeedSections: View {
                                     onOpen: onOpen
                                 )
                                 .contextMenu {
-                                    discoverContextMenu(for: entry.result) {
-                                        presentPageViewsPopover(for: entry.result, rowKey: rowKey)
+                                    discoverContextMenu(for: result) {
+                                        presentPageViewsPopover(for: result, rowKey: rowKey)
                                     }
                                 }
                                 .popover(isPresented: pageViewsPopoverBinding(for: rowKey), arrowEdge: .trailing) {
@@ -1950,14 +1843,33 @@ private struct DiscoverFeedSections: View {
                                 }
                             }
                         }
+                    } else {
+                        ForEach(Array(longestReadItems.enumerated()), id: \.element.id) { index, entry in
+                            let rowKey = pageViewsRowKey(section: "collection-longest", result: entry.result, index: index)
+                            DiscoverPlaylistArticleRow(
+                                result: entry.result,
+                                rank: index + 1,
+                                primaryStat: formattedWordCount(entry.wordCount),
+                                secondaryStat: estimatedReadingTimeText(for: entry.wordCount),
+                                statTint: Color.orange.opacity(0.92),
+                                isKeyboardFocused: isFocusedCollectionRow(lane: .longest, index: index),
+                                onFocus: {
+                                    markCollectionsFocus(lane: .longest, index: index)
+                                },
+                                onOpen: onOpen
+                            )
+                            .contextMenu {
+                                discoverContextMenu(for: entry.result) {
+                                    presentPageViewsPopover(for: entry.result, rowKey: rowKey)
+                                }
+                            }
+                            .popover(isPresented: pageViewsPopoverBinding(for: rowKey), arrowEdge: .trailing) {
+                                pageViewsPopover(for: rowKey)
+                            }
+                        }
                     }
-                    .transition(.move(edge: .trailing).combined(with: .opacity))
                 }
             }
-            .animation(
-                reduceMotion ? nil : .interactiveSpring(response: 0.34, dampingFraction: 0.86),
-                value: collectionsMode
-            )
         }
         .padding(isCompactLayout ? 14 : 18)
         .background(
@@ -2347,43 +2259,6 @@ private struct DiscoverFeedSections: View {
             return "\(hours)h"
         }
         return "\(hours)h \(remainderMinutes)m"
-    }
-
-    @ViewBuilder
-    private var collectionsModeControl: some View {
-        if usesSegmentedCollectionsControl {
-            Picker("Collection focus", selection: $collectionsMode) {
-                ForEach(DiscoverCollectionsMode.allCases) { mode in
-                    Text(mode.title).tag(mode)
-                }
-            }
-            .pickerStyle(.segmented)
-            .controlSize(.small)
-            .frame(width: collectionsControlWidth)
-            .accessibilityLabel("Collection focus")
-        } else {
-            Menu {
-                ForEach(DiscoverCollectionsMode.allCases) { mode in
-                    Button {
-                        collectionsMode = mode
-                    } label: {
-                        SwiftUI.Label(mode.title, systemImage: mode.systemImage)
-                    }
-                }
-            } label: {
-                SwiftUI.Label(collectionsMode.title, systemImage: collectionsMode.systemImage)
-                    .font(.system(size: 12, weight: .semibold))
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(.regularMaterial, in: Capsule())
-                    .overlay {
-                        Capsule()
-                            .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.8)
-                    }
-            }
-            .menuStyle(.borderlessButton)
-            .fixedSize()
-        }
     }
 
     private static let featuredFeedDateFormatter: DateFormatter = {
