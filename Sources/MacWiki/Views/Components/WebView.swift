@@ -47,7 +47,7 @@ struct WebViewLinkHoverRequest: Equatable, Sendable {
 
 private enum LinkHoverPreviewMetrics {
     static let width: CGFloat = 476
-    static let height: CGFloat = 348
+    static let height: CGFloat = 364
 }
 
 private enum LinkHoverGlassMetrics {
@@ -58,9 +58,8 @@ private enum LinkHoverGlassMetrics {
 
 private enum LinkHoverSummaryPreviewMetrics {
     static let cornerRadius: CGFloat = 16
-    static let maxExtractCharacters = 430
-    static let artworkWidth: CGFloat = 152
-    static let artworkHeight: CGFloat = 208
+    static let maxExtractCharacters = 360
+    static let artworkHeight: CGFloat = 152
 }
 
 private struct LinkHoverPreviewPane: View {
@@ -71,6 +70,7 @@ private struct LinkHoverPreviewPane: View {
     let onOpen: () -> Void
     let onOpenInNewTab: () -> Void
     let onSave: () -> Void
+    var onHoverStateChange: (Bool) -> Void = { _ in }
 
     private var isDarkMode: Bool {
         colorScheme == .dark
@@ -94,22 +94,22 @@ private struct LinkHoverPreviewPane: View {
         .padding(LinkHoverGlassMetrics.contentInset)
         .frame(width: LinkHoverPreviewMetrics.width, height: LinkHoverPreviewMetrics.height)
         .background(Color.clear)
+        .contentShape(RoundedRectangle(cornerRadius: LinkHoverGlassMetrics.cornerRadius, style: .continuous))
+        .onHover(perform: onHoverStateChange)
     }
 
     private var header: some View {
-        HStack(alignment: .top, spacing: 14) {
-            VStack(alignment: .leading, spacing: 6) {
-                Text(title)
-                    .font(.system(size: 19, weight: .semibold, design: .rounded))
-                    .lineLimit(4)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .foregroundStyle(.primary)
-                    .layoutPriority(1)
-            }
-
-            Spacer(minLength: 10)
+        VStack(alignment: .leading, spacing: 12) {
+            Text(title)
+                .font(.system(size: 19, weight: .semibold, design: .rounded))
+                .lineLimit(4)
+                .fixedSize(horizontal: false, vertical: true)
+                .foregroundStyle(.primary)
+                .layoutPriority(1)
 
             HStack(spacing: 8) {
+                Spacer(minLength: 0)
+
                 LinkHoverActionIcon(
                     systemImage: "arrow.up.forward",
                     helpText: "Open",
@@ -131,7 +131,7 @@ private struct LinkHoverPreviewPane: View {
         }
         .padding(.horizontal, 14)
         .padding(.top, 12)
-        .padding(.bottom, 10)
+        .padding(.bottom, 12)
         .background(
             Rectangle()
                 .fill(.thinMaterial)
@@ -393,78 +393,63 @@ private struct LinkHoverArticleSummaryPreview: View {
     }
 
     private var contentView: some View {
-        HStack(alignment: .top, spacing: 14) {
+        VStack(alignment: .leading, spacing: 12) {
             previewArtwork
 
-            VStack(alignment: .leading, spacing: 10) {
-                if let descriptionText {
-                    Text(descriptionText)
-                        .font(.system(size: 13.5, weight: .semibold, design: .rounded))
-                        .foregroundStyle(.primary.opacity(0.78))
-                        .lineLimit(3)
-                }
+            if let descriptionText {
+                Text(descriptionText)
+                    .font(.system(size: 13.5, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.primary.opacity(0.78))
+                    .lineLimit(2)
+            }
 
-                if let extractText {
-                    Text(extractText)
-                        .font(.system(size: 13.5))
-                        .lineSpacing(3)
-                        .foregroundStyle(.primary.opacity(0.92))
-                        .lineLimit(9)
-                        .fixedSize(horizontal: false, vertical: true)
-                } else if !hasTextualSummary {
-                    Text("A visual preview is available for this link.")
-                        .font(.system(size: 13))
-                        .foregroundStyle(.primary.opacity(0.82))
-                        .lineSpacing(2)
-                }
-
-                Spacer(minLength: 0)
+            if let extractText {
+                Text(extractText)
+                    .font(.system(size: 13.5))
+                    .lineSpacing(3)
+                    .foregroundStyle(.primary.opacity(0.92))
+                    .lineLimit(6)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else if !hasTextualSummary {
+                Text("A visual preview is available for this link.")
+                    .font(.system(size: 13))
+                    .foregroundStyle(.primary.opacity(0.82))
+                    .lineSpacing(2)
             }
         }
     }
 
     private var loadingStateView: some View {
-        HStack(alignment: .top, spacing: 14) {
-            AppLoadingThumbnailPlaceholder(
-                width: LinkHoverSummaryPreviewMetrics.artworkWidth,
-                height: LinkHoverSummaryPreviewMetrics.artworkHeight,
-                cornerRadius: 12,
-                tone: .accent,
-                symbol: "globe.americas.fill"
+        VStack(alignment: .leading, spacing: 12) {
+            loadingArtwork
+
+            AppLoadingInlineLabel(
+                text: "Loading preview...",
+                tone: .neutral,
+                font: .caption.weight(.medium)
             )
 
-            VStack(alignment: .leading, spacing: 12) {
-                AppLoadingInlineLabel(
-                    text: "Loading article preview...",
-                    tone: .neutral,
-                    font: .caption.weight(.medium)
-                )
-
-                VStack(alignment: .leading, spacing: 8) {
-                    AppLoadingSkeletonBar(width: 118, height: 10, cornerRadius: 5, tone: .neutral)
-                    AppLoadingSkeletonBar(width: nil, height: 12, cornerRadius: 6, tone: .neutral)
-                    AppLoadingSkeletonBar(width: nil, height: 12, cornerRadius: 6, tone: .neutral)
-                    AppLoadingSkeletonBar(width: nil, height: 12, cornerRadius: 6, tone: .neutral)
-                    AppLoadingSkeletonBar(width: 156, height: 12, cornerRadius: 6, tone: .neutral)
-                }
+            VStack(alignment: .leading, spacing: 8) {
+                AppLoadingSkeletonBar(width: 140, height: 10, cornerRadius: 5, tone: .neutral)
+                AppLoadingSkeletonBar(width: nil, height: 12, cornerRadius: 6, tone: .neutral)
+                AppLoadingSkeletonBar(width: nil, height: 12, cornerRadius: 6, tone: .neutral)
+                AppLoadingSkeletonBar(width: 208, height: 12, cornerRadius: 6, tone: .neutral)
             }
         }
     }
 
     private var unavailableStateView: some View {
-        HStack(alignment: .top, spacing: 14) {
+        VStack(alignment: .leading, spacing: 12) {
             fallbackArtwork
 
-            VStack(alignment: .leading, spacing: 10) {
-                Text("Summary unavailable")
-                    .font(.system(size: 13.5, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.secondary)
+            Text("Summary unavailable")
+                .font(.system(size: 13.5, weight: .semibold, design: .rounded))
+                .foregroundStyle(.secondary)
 
-                Text("A clean preview was not available for this link right now.")
-                    .font(.system(size: 13))
-                    .foregroundStyle(.primary.opacity(0.8))
-                    .lineSpacing(2)
-            }
+            Text("A clean preview was not available for this link right now.")
+                .font(.system(size: 13))
+                .foregroundStyle(.primary.opacity(0.8))
+                .lineSpacing(2)
         }
     }
 
@@ -498,13 +483,7 @@ private struct LinkHoverArticleSummaryPreview: View {
                 AsyncImage(url: thumbnailURL, transaction: thumbnailTransaction) { phase in
                     switch phase {
                     case .empty:
-                        AppLoadingThumbnailPlaceholder(
-                            width: LinkHoverSummaryPreviewMetrics.artworkWidth,
-                            height: LinkHoverSummaryPreviewMetrics.artworkHeight,
-                            cornerRadius: 12,
-                            tone: .accent,
-                            symbol: "globe.americas.fill"
-                        )
+                        loadingArtwork
                     case .success(let image):
                         ZStack {
                             artworkBackground
@@ -523,10 +502,8 @@ private struct LinkHoverArticleSummaryPreview: View {
                 fallbackArtwork
             }
         }
-        .frame(
-            width: LinkHoverSummaryPreviewMetrics.artworkWidth,
-            height: LinkHoverSummaryPreviewMetrics.artworkHeight
-        )
+        .frame(maxWidth: .infinity)
+        .frame(height: LinkHoverSummaryPreviewMetrics.artworkHeight)
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 12, style: .continuous)
@@ -562,6 +539,23 @@ private struct LinkHoverArticleSummaryPreview: View {
             }
             .padding(14)
         }
+    }
+
+    private var loadingArtwork: some View {
+        ZStack {
+            AppLoadingSkeletonBar(
+                width: nil,
+                height: LinkHoverSummaryPreviewMetrics.artworkHeight,
+                cornerRadius: 12,
+                tone: .accent
+            )
+
+            Image(systemName: "globe.americas.fill")
+                .font(.system(size: 28, weight: .medium))
+                .foregroundStyle(.tertiary)
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: LinkHoverSummaryPreviewMetrics.artworkHeight)
     }
 
     private var artworkBackground: some View {
@@ -1792,6 +1786,8 @@ struct WebView: NSViewRepresentable {
         private var linkHoverHostingController: NSHostingController<LinkHoverPreviewPane>?
         private var pendingLinkHoverHideWorkItem: DispatchWorkItem?
         private var activeLinkHoverSignature: String?
+        private var isHoveringLinkPreviewSource = false
+        private var isHoveringLinkPreviewPopover = false
         private let maxRecoveryHTMLBytes = 420_000
         private let eagerImageCountForInitialLoad = 3
         private let findRequestTimeoutSeconds: TimeInterval = 1.6
@@ -2472,21 +2468,26 @@ struct WebView: NSViewRepresentable {
         private func handleLinkHoverRequest(_ data: [String: Any]) {
             let state = (data["state"] as? String) ?? "show"
             if state == "hide" {
+                isHoveringLinkPreviewSource = false
                 dismissLinkHoverPreview(immediate: false)
                 return
             }
 
             guard let urlString = data["url"] as? String,
                   let url = URL(string: urlString) else {
+                isHoveringLinkPreviewSource = false
                 dismissLinkHoverPreview(immediate: false)
                 return
             }
 
             let hoverTitle = hoverPreviewTitle(from: data, url: url)
             guard shouldPresentHoverPreview(for: url, previewTitle: hoverTitle) else {
+                isHoveringLinkPreviewSource = false
                 dismissLinkHoverPreview(immediate: false)
                 return
             }
+
+            isHoveringLinkPreviewSource = true
 
             let request = WebViewLinkHoverRequest(
                 url: url,
@@ -2537,6 +2538,9 @@ struct WebView: NSViewRepresentable {
                 },
                 onSave: { [weak self] in
                     self?.saveLinkFromHoverPreview(request.url)
+                },
+                onHoverStateChange: { [weak self] hovering in
+                    self?.handleLinkHoverPreviewHoverChanged(hovering)
                 }
             )
             showLinkHoverPopover(with: pane, at: request.point, in: webView)
@@ -2574,6 +2578,7 @@ struct WebView: NSViewRepresentable {
             }
             popover.contentViewController = linkHoverHostingController
             popover.contentSize = NSSize(width: LinkHoverPreviewMetrics.width, height: LinkHoverPreviewMetrics.height)
+            isHoveringLinkPreviewPopover = false
 
             let anchorPoint = contextMenuPoint(point, in: webView)
             let anchorRect = NSRect(x: anchorPoint.x, y: anchorPoint.y, width: 1, height: 1)
@@ -2583,32 +2588,57 @@ struct WebView: NSViewRepresentable {
             popover.show(relativeTo: anchorRect, of: webView, preferredEdge: .maxY)
         }
 
+        private func handleLinkHoverPreviewHoverChanged(_ hovering: Bool) {
+            isHoveringLinkPreviewPopover = hovering
+            if hovering {
+                pendingLinkHoverHideWorkItem?.cancel()
+                pendingLinkHoverHideWorkItem = nil
+            } else if !isHoveringLinkPreviewSource {
+                dismissLinkHoverPreview(immediate: false)
+            }
+        }
+
         private func dismissLinkHoverPreview(immediate: Bool) {
             pendingLinkHoverHideWorkItem?.cancel()
             pendingLinkHoverHideWorkItem = nil
 
-            let closeAction = { [weak self] in
+            let forceClose = { [weak self] in
                 guard let self else { return }
                 self.activeLinkHoverSignature = nil
+                self.isHoveringLinkPreviewSource = false
+                self.isHoveringLinkPreviewPopover = false
+                if let popover = self.linkHoverPopover, popover.isShown {
+                    popover.performClose(nil)
+                }
+            }
+
+            let closeAction = { [weak self] in
+                guard let self else { return }
+                guard !self.isHoveringLinkPreviewSource, !self.isHoveringLinkPreviewPopover else { return }
+                self.activeLinkHoverSignature = nil
+                self.isHoveringLinkPreviewSource = false
+                self.isHoveringLinkPreviewPopover = false
                 if let popover = self.linkHoverPopover, popover.isShown {
                     popover.performClose(nil)
                 }
             }
 
             if immediate {
-                closeAction()
+                forceClose()
                 return
             }
 
             let workItem = DispatchWorkItem(block: closeAction)
             pendingLinkHoverHideWorkItem = workItem
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.11, execute: workItem)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.16, execute: workItem)
         }
 
         func popoverDidClose(_ notification: Notification) {
             guard let popover = notification.object as? NSPopover else { return }
             guard popover === linkHoverPopover else { return }
             activeLinkHoverSignature = nil
+            isHoveringLinkPreviewSource = false
+            isHoveringLinkPreviewPopover = false
         }
         
         private func handleLinkContextRequest(_ data: [String: Any]) {
