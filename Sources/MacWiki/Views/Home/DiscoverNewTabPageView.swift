@@ -1278,102 +1278,27 @@ private struct DiscoverFeedSections: View {
     }
 
     private var todayMostReadSubtitle: String {
-        if !todayMostReadItems.isEmpty {
-            return "Today’s live ranking across Wikipedia"
-        }
-        if todayMostReadStore.isLoading {
-            return "Loading today’s chart…"
-        }
-        if todayMostReadStore.errorMessage != nil {
-            return "Today’s ranking is unavailable right now"
-        }
-        return "Today’s ranking is waiting for data"
+        "PLACEHOLDER"
     }
 
     private var playlistMostReadSubtitle: String {
-        if !allTimeMostReadEntries.isEmpty {
-            return "All-time leaders from Wikipedia’s monthly charts"
-        }
-        if allTimeMostReadStore.isLoading {
-            return "Building all-time ranking…"
-        }
-        if allTimeMostReadStore.errorMessage != nil {
-            return "All-time ranking unavailable right now"
-        }
-        return "All-time ranking is waiting for data"
+        "PLACEHOLDER"
     }
 
     private var playlistLongestSubtitle: String {
-        "Longest deep dives from all-time popular reads"
+        "PLACEHOLDER"
     }
 
     private var mostReadCollectionMeta: String {
-        let trackCount = playlistMostReadItems.count
-        guard trackCount > 0 else {
-            if allTimeMostReadStore.isLoading {
-                return "Loading all-time tracks…"
-            }
-            return allTimeMostReadStore.errorMessage == nil
-                ? "All-time tracks unavailable"
-                : "All-time data unavailable"
-        }
-
-        let totalAllTimeViews = playlistMostReadItems.reduce(0) { partialResult, result in
-            partialResult + (allTimeMostReadEntry(for: result)?.totalViews ?? 0)
-        }
-        let pulses = playlistMostReadItems.compactMap { mostReadPulse(for: $0) }
-        var summary = "\(trackCount) tracks"
-        if totalAllTimeViews > 0 {
-            summary += " • \(abbreviatedViewCount(totalAllTimeViews)) all-time views"
-        } else {
-            summary += " • all-time views pending"
-        }
-
-        guard !pulses.isEmpty else {
-            return trendPulseStore.isLoading ? "\(summary) • loading recent pulse" : summary
-        }
-
-        let risingCount = pulses.filter { (trendDeltaFraction(for: $0) ?? 0) > 0 }.count
-        if risingCount > 0 {
-            return "\(summary) • \(risingCount) rising now"
-        }
-        return summary
+        "PLACEHOLDER"
     }
 
     private var longestCollectionMeta: String {
-        let trackCount = max(min(longestReadCandidates.count, playlistRowLimit), longestReadItems.count)
-        guard !longestReadItems.isEmpty else {
-            return wordCountStore.isLoading
-                ? "\(trackCount) tracks • loading words"
-                : "\(trackCount) tracks • metadata partial"
-        }
-
-        let averageWords = longestReadItems.reduce(0) { $0 + $1.wordCount } / max(longestReadItems.count, 1)
-        let totalMinutes = longestReadItems.reduce(0) { partialResult, entry in
-            partialResult + estimatedReadingMinutes(for: entry.wordCount)
-        }
-        return "\(longestReadItems.count) tracks • avg \(abbreviatedViewCount(averageWords)) words • \(formattedReadingDuration(minutes: totalMinutes)) total"
+        "PLACEHOLDER"
     }
 
     private var todayMostReadMeta: String {
-        let trackCount = todayMostReadItems.count
-        guard trackCount > 0 else {
-            return todayMostReadStore.isLoading ? "Loading today’s tracks…" : "Today’s tracks unavailable"
-        }
-
-        let pulses = todayMostReadItems.compactMap { todayMostReadPulse(for: $0) }
-        guard !pulses.isEmpty else {
-            return todayTrendPulseStore.isLoading
-                ? "\(trackCount) tracks • loading views"
-                : "\(trackCount) tracks • views pending"
-        }
-
-        let totalViews = pulses.reduce(0) { $0 + $1.latestViews }
-        let risingCount = pulses.filter { (trendDeltaFraction(for: $0) ?? 0) > 0 }.count
-        if risingCount > 0 {
-            return "\(trackCount) tracks • \(abbreviatedViewCount(totalViews)) today • \(risingCount) rising"
-        }
-        return "\(trackCount) tracks • \(abbreviatedViewCount(totalViews)) today"
+        "PLACEHOLDER"
     }
 
     private var remainingNewsItems: [WikipediaService.SearchResult] {
@@ -1656,7 +1581,7 @@ private struct DiscoverFeedSections: View {
         VStack(alignment: .leading, spacing: 10) {
             DiscoverSectionHeader(
                 title: "Today’s Most Read",
-                subtitle: "The live chart across Wikipedia right now"
+                subtitle: "PLACEHOLDER"
             )
             DiscoverPlaylistColumn(
                 title: "Today",
@@ -1711,7 +1636,7 @@ private struct DiscoverFeedSections: View {
             VStack(alignment: .leading, spacing: 10) {
                 DiscoverSectionHeader(
                     title: "News Briefing",
-                    subtitle: "The day’s storylines, stitched together from the feed"
+                    subtitle: "PLACEHOLDER"
                 )
                 VStack(spacing: 10) {
                     ForEach(feed.newsStories.prefix(newsBriefingLimit)) { story in
@@ -1744,10 +1669,10 @@ private struct DiscoverFeedSections: View {
         VStack(alignment: .leading, spacing: isCompactLayout ? 12 : 14) {
             DiscoverSectionHeader(
                 title: "Collections",
-                subtitle: "Two ways through Wikipedia’s canon: the perennial hits and the longer way in"
+                subtitle: "PLACEHOLDER"
             )
 
-            Text("Start with the giants, then drift toward the pieces that reward a longer afternoon.")
+            Text("PLACEHOLDER")
                 .font(.system(size: 12.5, weight: .medium))
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -1895,7 +1820,7 @@ private struct DiscoverFeedSections: View {
         if usesMediaSpotlightSplit, let featuredImage = feed.featuredImage {
             HStack(alignment: .top, spacing: 16) {
                 VStack(alignment: .leading, spacing: 10) {
-                    DiscoverSectionHeader(title: "Image of the Day", subtitle: "A gallery-style pause from Wikimedia Commons")
+                    DiscoverSectionHeader(title: "Image of the Day", subtitle: "PLACEHOLDER")
                     DiscoverFeaturedImageCard(
                         image: featuredImage,
                         prefersHorizontalLayout: true
@@ -1904,7 +1829,7 @@ private struct DiscoverFeedSections: View {
                 .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
 
                 VStack(alignment: .leading, spacing: 10) {
-                    DiscoverSectionHeader(title: "In the News", subtitle: "The live wire, condensed")
+                    DiscoverSectionHeader(title: "In the News", subtitle: "PLACEHOLDER")
                     VStack(spacing: 10) {
                         ForEach(remainingNewsItems.prefix(inTheNewsRailLimit)) { result in
                             let rowKey = pageViewsRowKey(section: "in-news", result: result)
@@ -1928,12 +1853,12 @@ private struct DiscoverFeedSections: View {
             }
         } else {
             if let featuredImage = feed.featuredImage {
-                DiscoverSectionHeader(title: "Image of the Day", subtitle: "From Wikimedia Commons")
+                DiscoverSectionHeader(title: "Image of the Day", subtitle: "PLACEHOLDER")
                 DiscoverFeaturedImageCard(image: featuredImage)
             }
 
             if !remainingNewsItems.isEmpty {
-                DiscoverSectionHeader(title: "In the News", subtitle: "Live events across Wikipedia")
+                DiscoverSectionHeader(title: "In the News", subtitle: "PLACEHOLDER")
                 ScrollView(.horizontal) {
                     LazyHStack(spacing: 12) {
                         ForEach(remainingNewsItems.prefix(inTheNewsRailLimit)) { result in
@@ -1996,7 +1921,7 @@ private struct DiscoverFeedSections: View {
 
             mediaSpotlightSection
 
-            DiscoverSectionHeader(title: "Time Capsule", subtitle: "Anniversaries and curious facts")
+            DiscoverSectionHeader(title: "Time Capsule", subtitle: "PLACEHOLDER")
             HStack(alignment: .top, spacing: isCompactLayout ? 10 : 12) {
                 if !primaryTimelineEvents.isEmpty {
                     VStack(alignment: .leading, spacing: 8) {
@@ -2036,7 +1961,7 @@ private struct DiscoverFeedSections: View {
             }
 
             if hasTimeMachineDetails {
-                DiscoverSectionHeader(title: "Time Machine", subtitle: "Births, deaths, and observances on this date")
+                DiscoverSectionHeader(title: "Time Machine", subtitle: "PLACEHOLDER")
                 VStack(alignment: .leading, spacing: 12) {
                     if !feed.onThisDayBirths.isEmpty || !feed.onThisDayDeaths.isEmpty {
                         HStack(alignment: .top, spacing: isCompactLayout ? 10 : 12) {
@@ -2345,7 +2270,7 @@ private struct DiscoverMasthead: View {
                     .multilineTextAlignment(.trailing)
             }
 
-            Text("A front page drawn from featured writing, the live chart, and whatever history wants back.")
+            Text("PLACEHOLDER")
                 .font(.system(size: isCompactLayout ? 12.5 : 13.5, weight: .medium))
                 .foregroundStyle(.secondary)
                 .lineLimit(isCompactLayout ? 2 : 1)
@@ -2677,7 +2602,7 @@ private struct DiscoverFeatureModule: View {
                     )
                     .padding(12)
                 } else {
-                    Text("Visual context isn’t available for this article yet.")
+                    Text("PLACEHOLDER")
                         .font(.system(size: 12.5, weight: .medium))
                         .foregroundStyle(.secondary)
                         .padding(.horizontal, 12)
@@ -2732,7 +2657,7 @@ private struct DiscoverFeatureCard: View {
                 .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
 
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Featured Story")
+                    Text("PLACEHOLDER")
                         .font(.system(size: 10.5, weight: .semibold, design: .rounded))
                         .textCase(.uppercase)
                         .tracking(0.9)
@@ -3270,9 +3195,9 @@ private struct DiscoverVisualContextStrip: View {
     var body: some View {
         let content = VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
-                Text("Visual Context")
+                Text("PLACEHOLDER")
                     .font(.system(size: 13.5, weight: .semibold, design: .rounded))
-                Text("From this article’s media")
+                Text("PLACEHOLDER")
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(.secondary)
             }
@@ -3614,7 +3539,7 @@ private struct DiscoverFeaturedImageCard: View {
     private var detailsPanel: some View {
         VStack(alignment: .leading, spacing: prefersHorizontalLayout ? 10 : 6) {
             if prefersHorizontalLayout {
-                Text("Gallery")
+                Text("PLACEHOLDER")
                     .font(.system(size: 10.5, weight: .semibold, design: .rounded))
                     .textCase(.uppercase)
                     .tracking(0.9)
