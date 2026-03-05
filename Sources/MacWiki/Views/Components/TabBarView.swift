@@ -57,15 +57,15 @@ enum TabBarChromeStyle {
 
 private enum TabChromeHierarchy {
     static func titleActiveOpacity(darkMode: Bool) -> Double {
-        darkMode ? 0.94 : 0.88
+        darkMode ? 0.92 : 0.86
     }
 
     static func titleHoverOpacity(darkMode: Bool) -> Double {
-        darkMode ? 0.74 : 0.66
+        darkMode ? 0.68 : 0.60
     }
 
     static func titleInactiveOpacity(darkMode: Bool) -> Double {
-        darkMode ? 0.58 : 0.50
+        darkMode ? 0.54 : 0.46
     }
 
     static func iconPrimaryOpacity(darkMode: Bool) -> Double {
@@ -73,11 +73,11 @@ private enum TabChromeHierarchy {
     }
 
     static func progressTrackOpacity(darkMode: Bool) -> Double {
-        darkMode ? 0.20 : 0.14
+        darkMode ? 0.14 : 0.10
     }
 
     static func progressFillOpacity(darkMode: Bool) -> Double {
-        darkMode ? 0.88 : 0.76
+        darkMode ? 0.72 : 0.62
     }
 
     static func activeLiftYOffset() -> CGFloat {
@@ -85,31 +85,31 @@ private enum TabChromeHierarchy {
     }
 
     static func activeShadowOpacity(darkMode: Bool) -> Double {
-        darkMode ? 0.22 : 0.10
+        darkMode ? 0.12 : 0.05
     }
 
     static func activeShadowRadius() -> CGFloat {
-        1.9
+        1.2
     }
 
     static func activeShadowYOffset() -> CGFloat {
-        1.0
+        0.5
     }
 
     static func activeRimOpacity(darkMode: Bool) -> Double {
-        darkMode ? 0.20 : 0.14
+        darkMode ? 0.14 : 0.10
     }
 
     static func activeGlassTintOpacity(darkMode: Bool) -> Double {
-        darkMode ? 0.10 : 0.08
+        darkMode ? 0.06 : 0.05
     }
 
     static func activeGlassSheenOpacity(darkMode: Bool) -> Double {
-        darkMode ? 0.11 : 0.16
+        darkMode ? 0.08 : 0.11
     }
 
     static func activeGlassDepthOpacity(darkMode: Bool) -> Double {
-        darkMode ? 0.10 : 0.03
+        darkMode ? 0.07 : 0.02
     }
 }
 
@@ -1024,6 +1024,7 @@ private struct DraggableTabItemView: View {
         !tab.isNewTab &&
         (chromeStyle == .strip || chromeStyle == .toolbar) &&
         tabWidth >= 118 &&
+        (isActive || isHovered) &&
         (showsSavedMarker || showsHighlightMarker || showsReadMarker)
     }
 
@@ -1032,6 +1033,7 @@ private struct DraggableTabItemView: View {
         !tab.isNewTab &&
         (chromeStyle == .strip || chromeStyle == .toolbar) &&
         tabWidth >= 110 &&
+        isActive &&
         (normalizedProgress > 0.01 || isReadComplete)
     }
 
@@ -1220,19 +1222,19 @@ private struct DraggableTabItemView: View {
         if tabBarLiquidGlass {
             let sheenTop = isActive
                 ? TabChromeHierarchy.activeGlassSheenOpacity(darkMode: darkMode)
-                : (darkMode ? 0.045 : 0.09)
+                : (darkMode ? 0.03 : 0.06)
             let sheenMid = isActive
-                ? (darkMode ? 0.015 : 0.04)
-                : (darkMode ? 0.0 : 0.02)
+                ? (darkMode ? 0.01 : 0.025)
+                : (darkMode ? 0.0 : 0.01)
             let edgeOpacity = darkMode
-                ? (isActive ? 0.21 : (isHovered ? 0.11 : 0.08))
-                : (isActive ? 0.18 : (isHovered ? 0.10 : 0.08))
+                ? (isActive ? 0.14 : (isHovered ? 0.08 : 0.05))
+                : (isActive ? 0.12 : (isHovered ? 0.08 : 0.05))
             let tintOpacity = darkMode
-                ? (isActive ? 0.14 : (isHovered ? 0.06 : 0.03))
-                : (isActive ? 0.08 : (isHovered ? 0.04 : 0.02))
+                ? (isActive ? 0.08 : (isHovered ? 0.04 : 0.02))
+                : (isActive ? 0.05 : (isHovered ? 0.03 : 0.015))
             let depthOpacity = isActive
                 ? TabChromeHierarchy.activeGlassDepthOpacity(darkMode: darkMode)
-                : (darkMode ? 0.20 : 0.05)
+                : (darkMode ? 0.12 : 0.03)
 
             RoundedRectangle(cornerRadius: tabCornerRadius, style: .continuous)
                 .fill(AnyShapeStyle(.thinMaterial))
@@ -1267,15 +1269,15 @@ private struct DraggableTabItemView: View {
                         .blendMode(.multiply)
                 )
                 .overlay(
-                    RoundedRectangle(cornerRadius: tabCornerRadius, style: .continuous)
-                        .strokeBorder(Color.primary.opacity(edgeOpacity), lineWidth: isActive ? 0.70 : 0.48)
+                        RoundedRectangle(cornerRadius: tabCornerRadius, style: .continuous)
+                            .strokeBorder(Color.primary.opacity(edgeOpacity), lineWidth: isActive ? 0.62 : 0.44)
                 )
                 .overlay {
                     if isActive {
                         RoundedRectangle(cornerRadius: tabCornerRadius, style: .continuous)
                             .strokeBorder(
-                                Color.accentColor.opacity(darkMode ? 0.24 : 0.20),
-                                lineWidth: 0.72
+                                Color.accentColor.opacity(darkMode ? 0.16 : 0.14),
+                                lineWidth: 0.60
                             )
                     }
                 }

@@ -3,16 +3,16 @@ import SwiftUI
 struct InspectorColumnView: View {
     @Environment(AppState.self) private var appState
     @Environment(\.colorScheme) private var colorScheme
-    @AppStorage("inspectorWidth") private var inspectorWidth: Double = 260
+    @AppStorage("inspectorWidth") private var inspectorWidth: Double = 240
 
     @Binding var showNewLabelSheet: Bool
     @Binding var articleForNewLabel: SavedArticle?
     let isExpanded: Bool
 
     private let expandedMinInspectorWidth: CGFloat = 220
-    private let expandedMaxInspectorWidth: CGFloat = 420
+    private let expandedMaxInspectorWidth: CGFloat = 380
     private let collapsedInspectorWidth: CGFloat = 0
-    private let inspectorBackgroundOpacity: Double = 0.72
+    private let inspectorBackgroundOpacity: Double = 0.62
 
     private var clampedInspectorWidth: CGFloat {
         CGFloat(min(max(inspectorWidth, Double(expandedMinInspectorWidth)), Double(expandedMaxInspectorWidth)))
@@ -31,11 +31,11 @@ struct InspectorColumnView: View {
     }
 
     private var glassSheenOpacity: Double {
-        colorScheme == .dark ? 0.18 : 0.24
+        colorScheme == .dark ? 0.14 : 0.18
     }
 
     private var glassTintOpacity: Double {
-        colorScheme == .dark ? 0.08 : 0.035
+        colorScheme == .dark ? 0.05 : 0.02
     }
 
     var body: some View {

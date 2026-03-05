@@ -100,6 +100,7 @@ struct ReaderToolbar: View {
     }
 
     private enum ToolbarOverflowAction: String, Hashable {
+        case pageViews
         case openInBrowser
         case inspector
     }
@@ -129,11 +130,20 @@ struct ReaderToolbar: View {
             true
         }
 
-        var showsOpenInBrowserInline: Bool {
+        var showsStatsInline: Bool {
             switch self {
             case .spacious, .regular:
                 return true
             case .compact, .ultraCompact:
+                return false
+            }
+        }
+
+        var showsOpenInBrowserInline: Bool {
+            switch self {
+            case .spacious:
+                return true
+            case .regular, .compact, .ultraCompact:
                 return false
             }
         }
@@ -148,9 +158,9 @@ struct ReaderToolbar: View {
 
         var showsInspectorInline: Bool {
             switch self {
-            case .spacious, .regular, .compact:
+            case .spacious, .regular:
                 return true
-            case .ultraCompact:
+            case .compact, .ultraCompact:
                 return false
             }
         }
@@ -182,8 +192,8 @@ struct ReaderToolbar: View {
     private func toolbarContent(for tier: ToolbarPriorityTier) -> some View {
         let overflowActions = overflowActions(for: tier)
 
-        HStack(spacing: 12) {
-            HStack(spacing: 8) {
+        HStack(spacing: 10) {
+            HStack(spacing: 6) {
                 toolbarMicroPill(
                     id: "left-sidebar",
                     isEnabled: !navigationLocked,
@@ -286,7 +296,7 @@ struct ReaderToolbar: View {
 
             Spacer(minLength: 0)
 
-            HStack(spacing: 8) {
+            HStack(spacing: 6) {
                 if tier.showsFocusModeInline {
                     toolbarMicroPill(
                         id: "right-focus",
@@ -305,28 +315,30 @@ struct ReaderToolbar: View {
                     }
                 }
 
-                toolbarMicroPill(
-                    id: "right-stats",
-                    isEnabled: hasArticle,
-                    isActive: hasArticle && showStatsPopover
-                ) {
-                    toolbarButton(
-                        symbol: "chart.xyaxis.line",
-                        label: "Show Page Views",
-                        enabled: hasArticle,
-                        isActive: hasArticle && showStatsPopover,
-                        isHovered: hoveredPillID == "right-stats"
+                if tier.showsStatsInline {
+                    toolbarMicroPill(
+                        id: "right-stats",
+                        isEnabled: hasArticle,
+                        isActive: hasArticle && showStatsPopover
                     ) {
-                        guard hasArticle else { return }
-                        showStatsPopover.toggle()
+                        toolbarButton(
+                            symbol: "chart.xyaxis.line",
+                            label: "Show Page Views",
+                            enabled: hasArticle,
+                            isActive: hasArticle && showStatsPopover,
+                            isHovered: hoveredPillID == "right-stats"
+                        ) {
+                            guard hasArticle else { return }
+                            showStatsPopover.toggle()
+                        }
                     }
-                }
-                .popover(isPresented: $showStatsPopover, arrowEdge: .bottom) {
-                    if let article = currentArticle {
-                        SidebarPageViewsPopoverContent(
-                            title: article.title,
-                            referenceDate: Date()
-                        )
+                    .popover(isPresented: $showStatsPopover, arrowEdge: .bottom) {
+                        if let article = currentArticle {
+                            SidebarPageViewsPopoverContent(
+                                title: article.title,
+                                referenceDate: Date()
+                            )
+                        }
                     }
                 }
 
@@ -693,6 +705,10 @@ struct ReaderToolbar: View {
     private func overflowActions(for tier: ToolbarPriorityTier) -> [ToolbarOverflowAction] {
         var actions: [ToolbarOverflowAction] = []
 
+        if !tier.showsStatsInline {
+            actions.append(.pageViews)
+        }
+
         if !tier.showsOpenInBrowserInline {
             actions.append(.openInBrowser)
         }
@@ -712,6 +728,14 @@ struct ReaderToolbar: View {
         Menu {
             ForEach(Array(actions.enumerated()), id: \.offset) { _, action in
                 switch action {
+                case .pageViews:
+                    Button {
+                        guard hasArticle else { return }
+                        showStatsPopover = true
+                    } label: {
+                        SwiftUI.Label("Show Page Views", systemImage: "chart.xyaxis.line")
+                    }
+                    .disabled(!hasArticle)
                 case .openInBrowser:
                     Button {
                         openCurrentArticleInBrowser()

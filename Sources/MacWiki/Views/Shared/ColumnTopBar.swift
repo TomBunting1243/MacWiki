@@ -1,8 +1,8 @@
 import SwiftUI
 
 enum ColumnChromeMetrics {
-    static let topBarHeight: CGFloat = 34
-    static let readerTabToolbarGap: CGFloat = 7
+    static let topBarHeight: CGFloat = 32
+    static let readerTabToolbarGap: CGFloat = 6
     /// Tiny downward optical nudge so grouped toolbar controls appear centered
     /// against the lane highlight/divider stack.
     static let readerToolbarOpticalYOffset: CGFloat = 0.6
@@ -10,16 +10,16 @@ enum ColumnChromeMetrics {
     static let trafficLightsClearance: CGFloat = 38
     /// Minimum title-bar height when content (text) sits below traffic lights.
     static let titleBarClearance: CGFloat = 52
-    static let horizontalPadding: CGFloat = 12
-    static let dividerOpacity: CGFloat = 0.12
-    static let internalDividerOpacity: CGFloat = 0.07
-    static let highlightStrongOpacity: CGFloat = 0.14
-    static let highlightSoftOpacity: CGFloat = 0.04
-    static let darkDividerOpacity: CGFloat = 0.06
-    static let darkInternalDividerOpacity: CGFloat = 0.035
-    static let darkHighlightStrongOpacity: CGFloat = 0.032
-    static let darkHighlightSoftOpacity: CGFloat = 0.012
-    static let darkBaseTintOpacity: CGFloat = 0.11
+    static let horizontalPadding: CGFloat = 10
+    static let dividerOpacity: CGFloat = 0.08
+    static let internalDividerOpacity: CGFloat = 0.05
+    static let highlightStrongOpacity: CGFloat = 0.10
+    static let highlightSoftOpacity: CGFloat = 0.025
+    static let darkDividerOpacity: CGFloat = 0.045
+    static let darkInternalDividerOpacity: CGFloat = 0.025
+    static let darkHighlightStrongOpacity: CGFloat = 0.024
+    static let darkHighlightSoftOpacity: CGFloat = 0.009
+    static let darkBaseTintOpacity: CGFloat = 0.08
 
     static func dividerOpacity(for colorScheme: ColorScheme) -> CGFloat {
         colorScheme == .dark ? darkDividerOpacity : dividerOpacity
@@ -55,12 +55,12 @@ enum ChromeIconMetrics {
 }
 
 enum TopChromeControlMetrics {
-    static let groupHeight: CGFloat = 28
-    static let groupButtonSize: CGFloat = 27
-    static let groupInnerSpacing: CGFloat = 2
-    static let groupHorizontalPadding: CGFloat = 6
-    static let groupCornerRadius: CGFloat = 10
-    static let activePlateCornerRadius: CGFloat = 7
+    static let groupHeight: CGFloat = 26
+    static let groupButtonSize: CGFloat = 25
+    static let groupInnerSpacing: CGFloat = 1
+    static let groupHorizontalPadding: CGFloat = 5
+    static let groupCornerRadius: CGFloat = 9
+    static let activePlateCornerRadius: CGFloat = 6
 
     static func accessoryCornerRadius(compact: Bool) -> CGFloat {
         compact ? 9 : groupCornerRadius
@@ -70,36 +70,36 @@ enum TopChromeControlMetrics {
 enum TopChromeControlSurface {
     static func tintOpacity(darkMode: Bool, compactAccessory: Bool = false) -> Double {
         if darkMode {
-            return compactAccessory ? 0.29 : 0.26
+            return compactAccessory ? 0.22 : 0.20
         }
-        return compactAccessory ? 0.16 : 0.14
+        return compactAccessory ? 0.12 : 0.10
     }
 
     static func sheenOpacity(darkMode: Bool, compactAccessory: Bool = false) -> Double {
         if darkMode {
-            return compactAccessory ? 0.06 : 0.05
+            return compactAccessory ? 0.05 : 0.04
         }
-        return compactAccessory ? 0.11 : 0.10
+        return compactAccessory ? 0.08 : 0.07
     }
 
     static func depthMultiplyOpacity(darkMode: Bool, compactAccessory: Bool = false) -> Double {
         if darkMode {
-            return compactAccessory ? 0.12 : 0.10
+            return compactAccessory ? 0.08 : 0.07
         }
-        return compactAccessory ? 0.03 : 0.025
+        return compactAccessory ? 0.02 : 0.018
     }
 
     static func borderOpacity(darkMode: Bool, liquid: Bool, compactAccessory: Bool = false) -> Double {
         if liquid {
             if darkMode {
-                return compactAccessory ? 0.12 : 0.11
+                return compactAccessory ? 0.10 : 0.09
             }
-            return compactAccessory ? 0.11 : 0.10
+            return compactAccessory ? 0.08 : 0.07
         }
         if darkMode {
-            return compactAccessory ? 0.18 : 0.17
+            return compactAccessory ? 0.14 : 0.13
         }
-        return compactAccessory ? 0.11 : 0.10
+        return compactAccessory ? 0.08 : 0.07
     }
 }
 
@@ -261,7 +261,7 @@ struct ColumnChromeBackground: View {
             .fill(.ultraThinMaterial)
             .overlay {
                 Color(nsColor: .windowBackgroundColor)
-                    .opacity(isDark ? ColumnChromeMetrics.darkBaseTintOpacity : 0.06)
+                    .opacity(isDark ? ColumnChromeMetrics.darkBaseTintOpacity : 0.04)
             }
             .overlay(
                 LinearGradient(
@@ -293,7 +293,7 @@ struct SidebarPaneBackground: View {
             .fill(.ultraThinMaterial)
             .overlay {
                 Color(nsColor: .windowBackgroundColor)
-                    .opacity(isDark ? 0.15 : 0.055)
+                    .opacity(isDark ? 0.11 : 0.04)
             }
             .overlay(
                 LinearGradient(

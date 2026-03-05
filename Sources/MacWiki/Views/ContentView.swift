@@ -30,7 +30,7 @@ struct ContentView: View {
     @State private var showNewTagSheet = false
     @State private var articleForNewTag: Article?
     @AppStorage("tabBarLiquidGlass") private var tabBarLiquidGlass = true
-    @AppStorage("listsSidebarWidth") private var listsSidebarWidth: Double = 220
+    @AppStorage("listsSidebarWidth") private var listsSidebarWidth: Double = 204
     @AppStorage("searchPresentationMode") private var searchPresentationMode: SearchPresentationMode = .overlay
     @AppStorage(ExperimentFlag.wikiHopPOCEnabled.key) private var wikiHopPOCEnabled = false
     @AppStorage("features.wikiHopPostV1Enabled") private var wikiHopPostV1Enabled = false
@@ -63,7 +63,7 @@ struct ContentView: View {
     }
 
     private var resolvedListsSidebarWidth: CGFloat {
-        CGFloat(min(max(listsSidebarWidth, 180), 280))
+        CGFloat(min(max(listsSidebarWidth, 176), 260))
     }
 
     /// Sidebar toggle collapses all navigation columns in reader mode.
@@ -219,7 +219,7 @@ struct ContentView: View {
         .onPreferenceChange(ListsSidebarWidthPreferenceKey.self) { newWidth in
             guard appState.sidebarVisible else { return }
             guard newWidth > 1 else { return }
-            let clamped = min(max(newWidth, 180), 280)
+            let clamped = min(max(newWidth, 176), 260)
             if abs(resolvedListsSidebarWidth - clamped) > 0.5 {
                 listsSidebarWidth = Double(clamped)
             }
@@ -255,13 +255,13 @@ struct ContentView: View {
                 let clampedHeight = min(QuickSearchView.idealSize.height, containerSize.height * 0.92)
                 let modalSize = CGSize(width: clampedWidth, height: clampedHeight)
 
-                Color.black.opacity(0.15)
-                .ignoresSafeArea()
-                .onTapGesture {
-                    performAnimation(PanelMotion.searchOverlayToggle) {
-                        appState.showSearch = false
+                Color.black.opacity(0.10)
+                    .ignoresSafeArea()
+                    .onTapGesture {
+                        performAnimation(PanelMotion.searchOverlayToggle) {
+                            appState.showSearch = false
+                        }
                     }
-                }
 
                 QuickSearchView(modalSize: modalSize)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)

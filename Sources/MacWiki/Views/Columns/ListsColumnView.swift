@@ -20,6 +20,6 @@ struct ListsColumnView: View {
             onAddNewLabel: onAddNewLabel
         )
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .navigationSplitViewColumnWidth(min: 180, ideal: preferredWidth, max: 280)
+        .navigationSplitViewColumnWidth(min: 176, ideal: preferredWidth, max: 260)
     }
 }
