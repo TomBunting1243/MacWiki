@@ -49,14 +49,14 @@ struct QuickSearchView: View {
     var body: some View {
         VStack(spacing: 0) {
             // Search field with liquid glass style
-            HStack(spacing: 10) {
+            HStack(spacing: 9) {
                 Image(systemName: "magnifyingglass")
-                    .font(.system(size: 17, weight: .medium))
+                    .font(.system(size: 16, weight: .medium))
                     .foregroundStyle(.secondary)
 
                 TextField("Search Wikipedia...", text: $searchCoordinator.searchText)
                     .textFieldStyle(.plain)
-                    .font(.system(size: 16))
+                    .font(.system(size: 15))
                     .focused($isSearchFieldFocused)
                     .onSubmit {
                         if searchCoordinator.hasQuery,
@@ -297,11 +297,11 @@ struct QuickSearchView: View {
                                     isHovered: index == hoveredIndex
                                 )
                                     .id(index)
-                                    .padding(.horizontal, 10)
+                                    .padding(.horizontal, 9)
                                     .padding(.vertical, 3)
                                     .background {
                                         RoundedRectangle(cornerRadius: 8)
-                                            .fill(index == searchCoordinator.selectedIndex ? Color.accentColor.opacity(0.15) : (index == hoveredIndex ? Color.primary.opacity(0.05) : .clear))
+                                            .fill(index == searchCoordinator.selectedIndex ? Color.accentColor.opacity(0.10) : (index == hoveredIndex ? Color.primary.opacity(0.035) : .clear))
                                     }
                                     .contentShape(RoundedRectangle(cornerRadius: 8))
                             }
@@ -434,12 +434,12 @@ struct SearchResultRow: View {
             // Title and description
             VStack(alignment: .leading, spacing: 3) {
                 Text(result.title)
-                    .font(.system(size: 14.5, weight: .semibold))
+                    .font(.system(size: 14, weight: .semibold))
                     .lineLimit(2)
 
                 if let description = result.description {
                     Text(description)
-                        .font(.system(size: 12.5))
+                        .font(.system(size: 12))
                         .foregroundStyle(.secondary)
                         .lineLimit(2)
                 }
@@ -466,7 +466,7 @@ struct SearchResultRow: View {
                     )
             }
         }
-        .padding(.vertical, 5)
+        .padding(.vertical, 4)
     }
 }
 

@@ -20,41 +20,41 @@ private enum SidebarSearchLayoutClass {
 private enum SidebarSearchMetrics {
     static let compactWidthThreshold: CGFloat = 252
     static let wideWidthThreshold: CGFloat = 320
-    static let titleBottomPadding: CGFloat = 7
-    static let fieldHeight: CGFloat = 30
-    static let fieldCornerRadius: CGFloat = 11
+    static let titleBottomPadding: CGFloat = 6
+    static let fieldHeight: CGFloat = 29
+    static let fieldCornerRadius: CGFloat = 10
     static let badgeCornerRadius: CGFloat = 5
 
     static func rowSpacing(for layoutClass: SidebarSearchLayoutClass) -> CGFloat {
         switch layoutClass {
         case .compact:
-            return 3
+            return 2
         case .regular:
-            return 4
+            return 3
         case .wide:
-            return 5
+            return 4
         }
     }
 
     static func rowInsetHorizontal(for layoutClass: SidebarSearchLayoutClass) -> CGFloat {
         switch layoutClass {
         case .compact:
-            return 7
+            return 6
         case .regular:
-            return 9
+            return 8
         case .wide:
-            return 11
+            return 10
         }
     }
 
     static func sectionLabelSize(for layoutClass: SidebarSearchLayoutClass) -> CGFloat {
         switch layoutClass {
         case .compact:
-            return 11
+            return 10.5
         case .regular:
-            return 11.5
+            return 11
         case .wide:
-            return 12
+            return 11.5
         }
     }
 
@@ -72,22 +72,22 @@ private enum SidebarSearchMetrics {
     static func fieldHorizontalPadding(for layoutClass: SidebarSearchLayoutClass) -> CGFloat {
         switch layoutClass {
         case .compact:
-            return 9
+            return 8
         case .regular:
-            return 11
+            return 10
         case .wide:
-            return 13
+            return 12
         }
     }
 
     static func searchFieldFontSize(for layoutClass: SidebarSearchLayoutClass) -> CGFloat {
         switch layoutClass {
         case .compact:
-            return 13
+            return 12.5
         case .regular:
-            return 14
+            return 13.5
         case .wide:
-            return 14.5
+            return 14
         }
     }
 

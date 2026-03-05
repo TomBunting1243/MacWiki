@@ -25,13 +25,13 @@ fileprivate enum SidebarMetrics {
     }
 
     static var itemFontSize: CGFloat {
-        densityPreset == .music ? 12.75 : 13.5
+        densityPreset == .music ? 12.6 : 13
     }
 
     static var sectionHeaderFont: Font {
         densityPreset == .music
-            ? Font.system(size: 10.5, weight: .semibold)
-            : Font.system(size: 11.5, weight: .semibold)
+            ? Font.system(size: 10.25, weight: .semibold)
+            : Font.system(size: 11, weight: .semibold)
     }
 
     static var itemFont: Font {
@@ -43,7 +43,7 @@ fileprivate enum SidebarMetrics {
     }
 
     static var sectionHeaderHeight: CGFloat {
-        densityPreset == .music ? 25 : 30
+        densityPreset == .music ? 24 : 28
     }
 
     static var itemIconWidth: CGFloat {
@@ -51,11 +51,11 @@ fileprivate enum SidebarMetrics {
     }
 
     static var trailingControlSize: CGFloat {
-        densityPreset == .music ? 22 : 27
+        densityPreset == .music ? 22 : 26
     }
 
     static var rowSpacing: CGFloat {
-        densityPreset == .music ? 6 : 8
+        densityPreset == .music ? 6 : 7
     }
 
     static var rowCornerRadius: CGFloat {
@@ -63,17 +63,17 @@ fileprivate enum SidebarMetrics {
     }
 
     static var rowMinimumHitHeight: CGFloat {
-        densityPreset == .music ? 27 : 30
+        densityPreset == .music ? 26 : 28
     }
 
     static var rowInsets: EdgeInsets {
         densityPreset == .music
             ? EdgeInsets(top: 2, leading: 11, bottom: 2, trailing: 11)
-            : EdgeInsets(top: 4, leading: 13, bottom: 4, trailing: 13)
+            : EdgeInsets(top: 3, leading: 12, bottom: 3, trailing: 12)
     }
 
     static var emptyStateVerticalPadding: CGFloat {
-        densityPreset == .music ? 4 : 7
+        densityPreset == .music ? 4 : 6
     }
 
     static func iconPrimaryOpacity(darkMode: Bool) -> Double {
@@ -81,7 +81,7 @@ fileprivate enum SidebarMetrics {
     }
 
     static func iconSelectedOpacity(darkMode: Bool) -> Double {
-        darkMode ? 0.94 : 0.88
+        darkMode ? 0.90 : 0.84
     }
 
     static func iconHoverOpacity(darkMode: Bool) -> Double {
@@ -133,39 +133,39 @@ private struct SidebarRowSurface: View {
     var isDropTarget: Bool = false
 
     private var dropTargetFill: Color {
-        Color.accentColor.opacity(0.16)
+        Color.accentColor.opacity(0.14)
     }
 
     private var selectedFill: Color {
         let isKeyWindow = controlActiveState == .key
         return Color.accentColor.opacity(
             colorScheme == .dark
-                ? (isKeyWindow ? 0.24 : 0.18)
-                : (isKeyWindow ? 0.18 : 0.14)
+                ? (isKeyWindow ? 0.18 : 0.14)
+                : (isKeyWindow ? 0.13 : 0.10)
         )
     }
 
     private var hoverFill: Color {
         let isKeyWindow = controlActiveState == .key
         return colorScheme == .dark
-            ? Color.white.opacity(isKeyWindow ? 0.070 : 0.050)
-            : Color.black.opacity(isKeyWindow ? 0.038 : 0.024)
+            ? Color.white.opacity(isKeyWindow ? 0.060 : 0.042)
+            : Color.black.opacity(isKeyWindow ? 0.030 : 0.020)
     }
 
     private var selectedStroke: Color {
         let isKeyWindow = controlActiveState == .key
         return Color.accentColor.opacity(
             colorScheme == .dark
-                ? (isKeyWindow ? 0.42 : 0.30)
-                : (isKeyWindow ? 0.30 : 0.22)
+                ? (isKeyWindow ? 0.30 : 0.22)
+                : (isKeyWindow ? 0.22 : 0.16)
         )
     }
 
     private var hoverStroke: Color {
         let isKeyWindow = controlActiveState == .key
         return colorScheme == .dark
-            ? Color.white.opacity(isKeyWindow ? 0.11 : 0.075)
-            : Color.black.opacity(isKeyWindow ? 0.070 : 0.045)
+            ? Color.white.opacity(isKeyWindow ? 0.095 : 0.068)
+            : Color.black.opacity(isKeyWindow ? 0.055 : 0.036)
     }
 
     var body: some View {
@@ -184,7 +184,7 @@ private struct SidebarRowSurface: View {
                     RoundedRectangle(cornerRadius: SidebarMetrics.rowCornerRadius, style: .continuous)
                         .strokeBorder(
                             isDropTarget
-                                ? Color.accentColor.opacity(0.24)
+                                ? Color.accentColor.opacity(0.20)
                                 : (isSelected ? selectedStroke : hoverStroke),
                             lineWidth: 0.75
                         )
