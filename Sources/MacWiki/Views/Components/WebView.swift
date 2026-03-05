@@ -72,10 +72,6 @@ private struct LinkHoverPreviewPane: View {
     let onOpenInNewTab: () -> Void
     let onSave: () -> Void
 
-    private var hostText: String {
-        url.host ?? "en.wikipedia.org"
-    }
-
     private var isDarkMode: Bool {
         colorScheme == .dark
     }
@@ -102,35 +98,13 @@ private struct LinkHoverPreviewPane: View {
 
     private var header: some View {
         HStack(alignment: .top, spacing: 14) {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(spacing: 8) {
-                    SwiftUI.Label(hostText, systemImage: "globe.americas.fill")
-                        .font(.system(size: 10.5, weight: .semibold, design: .rounded))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .padding(.horizontal, 9)
-                        .padding(.vertical, 5)
-                        .background(
-                            Capsule(style: .continuous)
-                                .fill(Color.primary.opacity(isDarkMode ? 0.11 : 0.06))
-                        )
-
-                    Text("HOVER PREVIEW")
-                        .font(.system(size: 10, weight: .bold, design: .monospaced))
-                        .foregroundStyle(Color.accentColor.opacity(isDarkMode ? 0.92 : 0.82))
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 5)
-                        .background(
-                            Capsule(style: .continuous)
-                                .fill(Color.accentColor.opacity(isDarkMode ? 0.18 : 0.10))
-                        )
-                }
-
+            VStack(alignment: .leading, spacing: 6) {
                 Text(title)
-                    .font(.system(size: 20, weight: .semibold, design: .rounded))
-                    .lineLimit(2)
+                    .font(.system(size: 19, weight: .semibold, design: .rounded))
+                    .lineLimit(4)
                     .fixedSize(horizontal: false, vertical: true)
                     .foregroundStyle(.primary)
+                    .layoutPriority(1)
             }
 
             Spacer(minLength: 10)
@@ -156,8 +130,8 @@ private struct LinkHoverPreviewPane: View {
             }
         }
         .padding(.horizontal, 14)
-        .padding(.top, 14)
-        .padding(.bottom, 12)
+        .padding(.top, 12)
+        .padding(.bottom, 10)
         .background(
             Rectangle()
                 .fill(.thinMaterial)
@@ -423,10 +397,6 @@ private struct LinkHoverArticleSummaryPreview: View {
             previewArtwork
 
             VStack(alignment: .leading, spacing: 10) {
-                SwiftUI.Label("Wikipedia summary", systemImage: "doc.text.image")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
-
                 if let descriptionText {
                     Text(descriptionText)
                         .font(.system(size: 13.5, weight: .semibold, design: .rounded))
@@ -442,28 +412,13 @@ private struct LinkHoverArticleSummaryPreview: View {
                         .lineLimit(9)
                         .fixedSize(horizontal: false, vertical: true)
                 } else if !hasTextualSummary {
-                    Text("A visual preview is available for this article. Open it to read the full entry.")
+                    Text("A visual preview is available for this link.")
                         .font(.system(size: 13))
                         .foregroundStyle(.primary.opacity(0.82))
                         .lineSpacing(2)
                 }
 
                 Spacer(minLength: 0)
-
-                HStack(spacing: 8) {
-                    Text("Live preview")
-                        .font(.caption2.weight(.medium))
-                        .foregroundStyle(.tertiary)
-
-                    Circle()
-                        .fill(Color.accentColor.opacity(0.8))
-                        .frame(width: 4, height: 4)
-
-                    Text("Opens the full article on click")
-                        .font(.caption2.weight(.medium))
-                        .foregroundStyle(.tertiary)
-                        .lineLimit(1)
-                }
             }
         }
     }
@@ -501,20 +456,14 @@ private struct LinkHoverArticleSummaryPreview: View {
             fallbackArtwork
 
             VStack(alignment: .leading, spacing: 10) {
-                SwiftUI.Label("Preview unavailable", systemImage: "questionmark.circle")
-                    .font(.caption.weight(.semibold))
+                Text("Summary unavailable")
+                    .font(.system(size: 13.5, weight: .semibold, design: .rounded))
                     .foregroundStyle(.secondary)
 
-                Text("Wikipedia did not return a clean summary for this link, but the full article is still ready.")
+                Text("A clean preview was not available for this link right now.")
                     .font(.system(size: 13))
                     .foregroundStyle(.primary.opacity(0.8))
                     .lineSpacing(2)
-
-                Spacer(minLength: 0)
-
-                Text("Open the article to explore the complete entry.")
-                    .font(.caption2.weight(.medium))
-                    .foregroundStyle(.tertiary)
             }
         }
     }
@@ -610,10 +559,6 @@ private struct LinkHoverArticleSummaryPreview: View {
                 Text(artworkMonogram)
                     .font(.system(size: 54, weight: .bold, design: .rounded))
                     .foregroundStyle(.white.opacity(0.92))
-
-                SwiftUI.Label("Wikipedia article", systemImage: "safari")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.white.opacity(0.78))
             }
             .padding(14)
         }
