@@ -26,9 +26,11 @@ struct WikiHopLobbyView: View {
                 startNewGame()
             } label: {
                 if isLoading {
-                    ProgressView()
-                        .controlSize(.small)
-                        .frame(width: 100)
+                    HStack(spacing: 8) {
+                        AppLoadingActivityMark(tone: .accent)
+                        Text("Starting")
+                    }
+                    .frame(width: 100)
                 } else {
                     Text("Start Run")
                         .frame(width: 100)

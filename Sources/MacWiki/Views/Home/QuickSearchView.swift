@@ -70,8 +70,7 @@ struct QuickSearchView: View {
                     }
 
                 if searchCoordinator.isLoading {
-                    ProgressView()
-                        .scaleEffect(0.8)
+                    AppLoadingActivityMark(tone: .accent)
                         .frame(width: 20, height: 20)
                 } else if searchCoordinator.hasInput {
                     Button {
@@ -121,7 +120,7 @@ struct QuickSearchView: View {
         .scaleEffect(isAppeared ? 1 : 0.985)
         .opacity(isAppeared ? 1 : 0)
         .onAppear {
-            withAnimation(.spring(response: 0.24, dampingFraction: 0.92)) {
+            withAnimation(AppLoadingMotion.overlaySettle) {
                 isAppeared = true
             }
             DispatchQueue.main.async {
@@ -161,14 +160,16 @@ struct QuickSearchView: View {
             .frame(maxHeight: .infinity)
         } else if !searchCoordinator.hasQuery {
             if searchCoordinator.isTrendingLoading {
-                VStack {
-                    ProgressView()
-                        .padding()
-                    Text("Loading Top Read Articles...")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                }
-                .frame(maxHeight: .infinity)
+                AppLoadingListPlaceholder(
+                    title: "Top Reads",
+                    message: "Fetching today's most-read articles from Wikipedia.",
+                    detail: "Quick Search",
+                    symbol: "chart.line.uptrend.xyaxis",
+                    tone: .accent,
+                    rowCount: 6
+                )
+                .padding(14)
+                .frame(maxHeight: .infinity, alignment: .top)
             } else if !searchCoordinator.trendingArticles.isEmpty {
                 let savedTitles = savedArticleTitlesNormalized
                 let columnCount = modalSize.width >= 820 ? 2 : 1
@@ -278,6 +279,17 @@ struct QuickSearchView: View {
                 description: Text("No articles found for \"\(searchCoordinator.searchText)\"")
             )
             .frame(maxHeight: .infinity)
+        } else if searchCoordinator.isLoading && searchCoordinator.searchResults.isEmpty {
+            AppLoadingListPlaceholder(
+                title: "Searching Wikipedia",
+                message: "Matching titles and summaries for \"\(searchCoordinator.searchText)\".",
+                detail: "Live results",
+                symbol: "magnifyingglass",
+                tone: .accent,
+                rowCount: 5
+            )
+            .padding(14)
+            .frame(maxHeight: .infinity, alignment: .top)
         } else {
             let savedTitles = savedArticleTitlesNormalized
             ScrollViewReader { proxy in
@@ -395,12 +407,13 @@ struct SearchResultRow: View {
                     ) { phase in
                         switch phase {
                         case .empty:
-                            Rectangle()
-                                .fill(.quaternary)
-                                .overlay {
-                                    ProgressView()
-                                        .scaleEffect(0.5)
-                                }
+                            AppLoadingThumbnailPlaceholder(
+                                width: 62,
+                                height: 62,
+                                cornerRadius: 8,
+                                tone: .neutral,
+                                symbol: "doc.text"
+                            )
                         case .success(let image):
                             image
                                 .resizable()
@@ -491,12 +504,16 @@ struct TrendingCard: View {
                         ) { phase in
                             switch phase {
                             case .empty:
-                                Rectangle()
-                                    .fill(.quaternary)
-                                    .overlay {
-                                        ProgressView()
-                                            .scaleEffect(0.5)
-                                    }
+                                ZStack {
+                                    AppLoadingSkeletonBar(
+                                        width: nil,
+                                        height: imageHeight,
+                                        cornerRadius: 0,
+                                        tone: .accent
+                                    )
+                                    Image(systemName: "photo")
+                                        .foregroundStyle(.tertiary)
+                                }
                             case .success(let image):
                                 image
                                     .resizable()

@@ -670,8 +670,7 @@ struct SidebarSearchView: View {
                 }
 
             if searchCoordinator.isLoading {
-                ProgressView()
-                    .controlSize(.small)
+                AppLoadingActivityMark(tone: .accent)
                     .frame(width: 14, height: 14)
             } else if searchCoordinator.hasInput {
                 Button {
@@ -730,7 +729,20 @@ struct SidebarSearchView: View {
                 layoutClass: layoutClass
             )
         } else if searchCoordinator.hasQuery {
-            if searchCoordinator.searchResults.isEmpty && !searchCoordinator.isLoading {
+            if searchCoordinator.isLoading && searchCoordinator.searchResults.isEmpty {
+                AppLoadingListPlaceholder(
+                    title: "Searching Wikipedia",
+                    message: "Matching titles and summaries for \"\(searchCoordinator.searchText)\".",
+                    detail: "Sidebar search",
+                    symbol: "magnifyingglass",
+                    tone: .accent,
+                    rowCount: layoutClass == .compact ? 4 : 5,
+                    showsThumbnails: layoutClass != .compact,
+                    compact: layoutClass == .compact
+                )
+                .padding(.horizontal, SidebarSearchMetrics.sectionHeaderHorizontalPadding(for: layoutClass))
+                .padding(.top, 8)
+            } else if searchCoordinator.searchResults.isEmpty && !searchCoordinator.isLoading {
                 SidebarSearchStateBanner(
                     title: "No Results",
                     message: "No articles found for \"\(searchCoordinator.searchText)\"",
@@ -756,14 +768,19 @@ struct SidebarSearchView: View {
                 )
             }
         } else if searchCoordinator.isTrendingLoading {
-            VStack(spacing: 10) {
-                ProgressView()
-                    .padding(.top, 8)
-                Text("Loading Trending…")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            AppLoadingListPlaceholder(
+                title: "Top Reads",
+                message: "Pulling today's live ranking from Wikipedia.",
+                detail: "Sidebar search",
+                symbol: "chart.line.uptrend.xyaxis",
+                tone: .accent,
+                rowCount: layoutClass == .compact ? 4 : 5,
+                showsThumbnails: layoutClass != .compact,
+                compact: layoutClass == .compact
+            )
+            .padding(.horizontal, SidebarSearchMetrics.sectionHeaderHorizontalPadding(for: layoutClass))
+            .padding(.top, 8)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         } else if searchCoordinator.trendingArticles.isEmpty {
             SidebarSearchStateBanner(
                 title: "Search Wikipedia",

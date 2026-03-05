@@ -5,8 +5,8 @@ private enum ReaderMotion {
     static let surfaceSwap = Animation.easeOut(duration: 0.22)
     static let surfaceInsertionScale: CGFloat = 0.995
     static let webRevealDuration: Double = 0.20
-    static let skeletonRevealDuration: Double = 0.12
-    static let skeletonHideDuration: Double = 0.16
+    static let skeletonRevealDuration: Double = AppLoadingMotion.skeletonRevealDuration
+    static let skeletonHideDuration: Double = AppLoadingMotion.skeletonHideDuration
     static let promptSpring = Animation.spring(response: 0.3, dampingFraction: 0.8)
     static let promptShowResponse: Double = 0.30
     static let promptShowDamping: Double = 0.82
@@ -272,7 +272,7 @@ struct ArticleView: View {
     }
 
     private var loadingTransition: AnyTransition {
-        reduceMotion ? .identity : .opacity
+        AppLoadingMotion.overlayTransition(reduceMotion: reduceMotion, anchor: .top)
     }
 
     private var findTransition: AnyTransition {
@@ -885,7 +885,7 @@ struct ArticleView: View {
     private func hideLoadingSkeletonIfNeeded() {
         guard isLoadingSkeletonVisible else { return }
         let now = Date().timeIntervalSinceReferenceDate
-        let minVisibleDuration: TimeInterval = 0.16
+        let minVisibleDuration = AppLoadingMotion.skeletonMinimumVisibleDuration
         let elapsed = now - loadingSkeletonShownAt
         let remaining = max(0, minVisibleDuration - elapsed)
         let ticket = skeletonVisibilityTicket

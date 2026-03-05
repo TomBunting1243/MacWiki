@@ -16,8 +16,7 @@ struct HighlightRehydrateBarView: View {
     var body: some View {
         HStack(spacing: 10) {
             if isRefreshing {
-                ProgressView()
-                    .controlSize(.mini)
+                AppLoadingActivityMark(tone: .accent)
             } else {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .font(.system(size: 11, weight: .semibold))

@@ -687,8 +687,12 @@ struct InspectorPanel: View {
                                 .font(.system(size: 17, weight: .semibold))
                                 .foregroundStyle(.secondary)
                         case .empty:
-                            ProgressView()
-                                .controlSize(.small)
+                            AppLoadingThumbnailPlaceholder(
+                                width: 220,
+                                height: 118,
+                                cornerRadius: 10,
+                                tone: .accent
+                            )
                         @unknown default:
                             EmptyView()
                         }
@@ -1190,8 +1194,7 @@ private struct HighlightToastView: View {
     var body: some View {
         HStack(spacing: 8) {
             if showsSpinner {
-                ProgressView()
-                    .controlSize(.mini)
+                AppLoadingActivityMark(tone: .accent)
             } else {
                 Image(systemName: toast.isSuccess ? "checkmark.circle.fill" : "xmark.octagon.fill")
                     .font(.system(size: 12, weight: .semibold))

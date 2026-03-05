@@ -155,8 +155,7 @@ struct DiscoverNewTabPageView: View {
                 }
 
             if searchCoordinator.isLoading {
-                ProgressView()
-                    .controlSize(.small)
+                AppLoadingActivityMark(tone: .accent)
             } else if !searchCoordinator.hasQuery {
                 Button {
                     queueDiscoverLoadDebounced(forceRefresh: true, delayNanoseconds: 0)
@@ -164,8 +163,7 @@ struct DiscoverNewTabPageView: View {
                 } label: {
                     Group {
                         if discoverFeedStore.isLoading {
-                            ProgressView()
-                                .controlSize(.small)
+                            AppLoadingActivityMark(tone: .accent)
                         } else {
                             Image(systemName: "arrow.clockwise")
                                 .font(.system(size: 13, weight: .semibold))
@@ -586,7 +584,16 @@ struct DiscoverNewTabPageView: View {
         let savedTitles = savedArticleTitlesNormalized
         VStack(alignment: .leading, spacing: 10) {
             DiscoverSectionHeader(title: "Search Results", subtitle: "\(searchCoordinator.searchResults.count) matches")
-            if searchCoordinator.searchResults.isEmpty && !searchCoordinator.isLoading {
+            if searchCoordinator.isLoading && searchCoordinator.searchResults.isEmpty {
+                AppLoadingListPlaceholder(
+                    title: "Searching Wikipedia",
+                    message: "Matching titles, summaries, and context for \"\(searchCoordinator.searchText)\".",
+                    detail: "Discover search",
+                    symbol: "magnifyingglass",
+                    tone: .accent,
+                    rowCount: 5
+                )
+            } else if searchCoordinator.searchResults.isEmpty && !searchCoordinator.isLoading {
                 Text("No matching articles")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
@@ -655,10 +662,8 @@ struct DiscoverNewTabPageView: View {
     @ViewBuilder
     private var discoverSurface: some View {
         if discoverFeedStore.isLoading && discoverFeedStore.feed == nil {
-            ProgressView("Loading today’s discover feed…")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity, minHeight: 220)
+            DiscoverIntroLoadingView(referenceDate: discoverReferenceDate)
+                .frame(maxWidth: .infinity, minHeight: 260)
         } else if let discoverError = discoverFeedStore.errorMessage, discoverFeedStore.feed == nil {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Discover feed unavailable")
@@ -692,7 +697,7 @@ struct DiscoverNewTabPageView: View {
                         targetDate: discoverReferenceDate,
                         availableWidth: discoverContentWidth
                     )
-                    .transition(.opacity.combined(with: .scale(scale: 0.985, anchor: .top)))
+                    .transition(AppLoadingMotion.overlayTransition(reduceMotion: reduceMotion, anchor: .top))
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -786,14 +791,141 @@ private struct DiscoverInlinePageViewsPopoverPayload {
     let title: String
 }
 
+private struct DiscoverIntroLoadingView: View {
+    let referenceDate: Date
+
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var dateLabel: String {
+        Self.dateFormatter.string(from: referenceDate)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .center, spacing: 10) {
+                AppLoadingStatusCapsule(
+                    title: "Discover",
+                    detail: dateLabel,
+                    symbol: "newspaper.fill",
+                    tone: .accent
+                )
+
+                Spacer(minLength: 0)
+
+                AppLoadingInlineLabel(
+                    text: "Warming featured stories",
+                    tone: .accent,
+                    font: .caption.weight(.semibold)
+                )
+            }
+
+            ViewThatFits {
+                HStack(alignment: .top, spacing: 12) {
+                    heroColumn
+                    supportColumn
+                        .frame(width: 280)
+                }
+
+                VStack(alignment: .leading, spacing: 12) {
+                    heroColumn
+                    supportColumn
+                }
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color.accentColor.opacity(colorScheme == .dark ? 0.10 : 0.08),
+                            Color.white.opacity(colorScheme == .dark ? 0.02 : 0.10),
+                            .clear
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .strokeBorder(Color.accentColor.opacity(colorScheme == .dark ? 0.18 : 0.14), lineWidth: 0.9)
+        }
+        .shadow(color: .black.opacity(colorScheme == .dark ? 0.22 : 0.08), radius: 18, y: 6)
+    }
+
+    private static let dateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale.autoupdatingCurrent
+        formatter.setLocalizedDateFormatFromTemplate("EEE, MMM d")
+        return formatter
+    }()
+
+    private var heroColumn: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            AppLoadingSkeletonBar(
+                width: nil,
+                height: 188,
+                cornerRadius: 18,
+                tone: .accent
+            )
+
+            AppLoadingSkeletonBar(
+                width: 220,
+                height: 16,
+                cornerRadius: 8,
+                tone: .accent
+            )
+
+            AppLoadingSkeletonBar(
+                width: nil,
+                height: 12,
+                cornerRadius: 6,
+                tone: .neutral
+            )
+
+            AppLoadingSkeletonBar(
+                width: 240,
+                height: 10,
+                cornerRadius: 5,
+                tone: .neutral
+            )
+        }
+    }
+
+    private var supportColumn: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            DiscoverIntroLoadingCard(tone: .accent)
+            DiscoverIntroLoadingCard(tone: .neutral)
+        }
+    }
+}
+
+private struct DiscoverIntroLoadingCard: View {
+    let tone: AppLoadingTone
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            AppLoadingSkeletonBar(width: 128, height: 10, cornerRadius: 5, tone: tone)
+            AppLoadingSkeletonBar(width: nil, height: 52, cornerRadius: 12, tone: tone)
+            AppLoadingSkeletonBar(width: 172, height: 10, cornerRadius: 5, tone: .neutral)
+        }
+        .padding(12)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.8)
+        }
+    }
+}
+
 private struct DiscoverTimeTravelSkeletonView: View {
     let targetDate: Date
     let availableWidth: CGFloat
 
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.colorScheme) private var colorScheme
-    @State private var shimmerPhase: CGFloat = -1.1
-    @State private var isShimmerAnimating = false
 
     private var cardColumns: [GridItem] {
         if availableWidth < 840 {
@@ -811,40 +943,41 @@ private struct DiscoverTimeTravelSkeletonView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 8) {
-                Image(systemName: "timeline.selection")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(Color.accentColor.opacity(0.9))
-                    .frame(width: 22, height: 22)
-                    .background(Color.accentColor.opacity(0.16), in: RoundedRectangle(cornerRadius: 7, style: .continuous))
-
-                Text("Time traveling to \(targetDateLabel)")
-                    .font(.system(size: 12.5, weight: .semibold, design: .rounded))
-                    .lineLimit(1)
+            HStack(alignment: .center, spacing: 10) {
+                AppLoadingStatusCapsule(
+                    title: "Time Machine",
+                    detail: "Locking to \(targetDateLabel)",
+                    symbol: "clock.arrow.trianglehead.counterclockwise.rotate.90",
+                    tone: .retro
+                )
 
                 Spacer(minLength: 0)
 
-                Text("Loading archive")
+                Text("SCANNING")
                     .font(.system(size: 10.5, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color(red: 0.58, green: 0.80, blue: 1.0).opacity(0.9))
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
-                    .background(Color.primary.opacity(colorScheme == .dark ? 0.16 : 0.08), in: Capsule(style: .continuous))
+                    .background(
+                        LinearGradient(
+                            colors: [
+                                Color(red: 0.36, green: 0.46, blue: 0.86).opacity(colorScheme == .dark ? 0.22 : 0.14),
+                                Color(red: 0.78, green: 0.47, blue: 0.94).opacity(colorScheme == .dark ? 0.18 : 0.10)
+                            ],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        ),
+                        in: Capsule(style: .continuous)
+                    )
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 8)
-            .background(Color.primary.opacity(colorScheme == .dark ? 0.14 : 0.06), in: RoundedRectangle(cornerRadius: 11, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 11, style: .continuous)
-                    .strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.17 : 0.10), lineWidth: 0.7)
-            )
 
             HStack(alignment: .center, spacing: 7) {
                 ForEach(0..<8, id: \.self) { index in
-                    DiscoverTimeTravelPulsePip(
-                        index: index,
-                        shimmerPhase: shimmerPhase,
-                        shimmerEnabled: !reduceMotion
+                    AppLoadingSkeletonBar(
+                        width: nil,
+                        height: 6 + CGFloat((index % 3) * 3),
+                        cornerRadius: 4.5,
+                        tone: .retro
                     )
                 }
             }
@@ -852,11 +985,7 @@ private struct DiscoverTimeTravelSkeletonView: View {
 
             LazyVGrid(columns: cardColumns, spacing: 10) {
                 ForEach(0..<6, id: \.self) { index in
-                    DiscoverTimeTravelSkeletonCard(
-                        index: index,
-                        shimmerPhase: shimmerPhase,
-                        shimmerEnabled: !reduceMotion
-                    )
+                    DiscoverTimeTravelSkeletonCard(index: index)
                 }
             }
         }
@@ -865,45 +994,30 @@ private struct DiscoverTimeTravelSkeletonView: View {
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.16 : 0.10), lineWidth: 0.8)
+                .strokeBorder(Color(red: 0.58, green: 0.80, blue: 1.0).opacity(colorScheme == .dark ? 0.28 : 0.20), lineWidth: 0.9)
         )
         .overlay {
-            DiscoverGlitchScanlineOverlay(lineOpacity: colorScheme == .dark ? 0.12 : 0.08)
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color(red: 0.36, green: 0.46, blue: 0.86).opacity(colorScheme == .dark ? 0.16 : 0.12),
+                            Color(red: 0.78, green: 0.47, blue: 0.94).opacity(colorScheme == .dark ? 0.10 : 0.08),
+                            .clear
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+        }
+        .overlay {
+            AppLoadingScanlineOverlay(lineOpacity: colorScheme == .dark ? 0.026 : 0.018)
                 .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
                 .blendMode(.screen)
-                .opacity(reduceMotion ? 0.35 : 0.72)
         }
         .shadow(color: .black.opacity(colorScheme == .dark ? 0.24 : 0.09), radius: 12, y: 5)
         .allowsHitTesting(false)
         .accessibilityHidden(true)
-        .onAppear {
-            updateShimmerAnimation()
-        }
-        .onChange(of: reduceMotion) { _, _ in
-            updateShimmerAnimation()
-        }
-        .onDisappear {
-            isShimmerAnimating = false
-        }
-    }
-
-    private func updateShimmerAnimation() {
-        if reduceMotion {
-            isShimmerAnimating = false
-            var transaction = Transaction()
-            transaction.animation = nil
-            withTransaction(transaction) {
-                shimmerPhase = -1.1
-            }
-            return
-        }
-
-        guard !isShimmerAnimating else { return }
-        isShimmerAnimating = true
-        shimmerPhase = -1.1
-        withAnimation(.linear(duration: 1.1).repeatForever(autoreverses: false)) {
-            shimmerPhase = 1.1
-        }
     }
 
     private static let targetDateFormatter: DateFormatter = {
@@ -914,37 +1028,8 @@ private struct DiscoverTimeTravelSkeletonView: View {
     }()
 }
 
-private struct DiscoverTimeTravelPulsePip: View {
-    let index: Int
-    let shimmerPhase: CGFloat
-    let shimmerEnabled: Bool
-
-    @Environment(\.colorScheme) private var colorScheme
-
-    private var pipHeight: CGFloat {
-        6 + CGFloat((index % 3) * 3)
-    }
-
-    var body: some View {
-        DiscoverTimeTravelSkeletonBar(
-            width: nil,
-            height: pipHeight,
-            cornerRadius: 4.5,
-            shimmerPhase: shimmerPhase,
-            shimmerEnabled: shimmerEnabled,
-            tiltDegrees: index.isMultiple(of: 2) ? -13 : 13
-        )
-        .frame(maxWidth: .infinity)
-        .opacity(colorScheme == .dark ? 0.95 : 1)
-    }
-}
-
 private struct DiscoverTimeTravelSkeletonCard: View {
     let index: Int
-    let shimmerPhase: CGFloat
-    let shimmerEnabled: Bool
-
-    @Environment(\.colorScheme) private var colorScheme
 
     private var titleWidth: CGFloat {
         120 + CGFloat((index % 3) * 28)
@@ -958,171 +1043,54 @@ private struct DiscoverTimeTravelSkeletonCard: View {
         160 - CGFloat((index % 3) * 16)
     }
 
-    private var glitchOffset: CGFloat {
-        guard shimmerEnabled else { return 0 }
-        let wave = sin((Double(shimmerPhase) * .pi * 5.2) + Double(index) * 0.9)
-        let gate = max(0, sin((Double(shimmerPhase) * .pi * 13.0) + Double(index) * 0.55))
-        return CGFloat(wave * gate) * 1.35
-    }
-
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
-                DiscoverTimeTravelSkeletonBar(
+                AppLoadingSkeletonBar(
                     width: 22,
                     height: 22,
                     cornerRadius: 7,
-                    shimmerPhase: shimmerPhase,
-                    shimmerEnabled: shimmerEnabled,
-                    tiltDegrees: -14
+                    tone: .retro
                 )
 
                 VStack(alignment: .leading, spacing: 5) {
-                    DiscoverTimeTravelSkeletonBar(
+                    AppLoadingSkeletonBar(
                         width: titleWidth,
                         height: 10,
                         cornerRadius: 5,
-                        shimmerPhase: shimmerPhase,
-                        shimmerEnabled: shimmerEnabled
+                        tone: .retro
                     )
-                    DiscoverTimeTravelSkeletonBar(
+                    AppLoadingSkeletonBar(
                         width: subtitleWidth,
                         height: 9,
                         cornerRadius: 5,
-                        shimmerPhase: shimmerPhase,
-                        shimmerEnabled: shimmerEnabled
+                        tone: .neutral
                     )
                 }
 
                 Spacer(minLength: 0)
             }
 
-            DiscoverTimeTravelSkeletonBar(
+            AppLoadingSkeletonBar(
                 width: nil,
                 height: 12,
                 cornerRadius: 6,
-                shimmerPhase: shimmerPhase,
-                shimmerEnabled: shimmerEnabled
+                tone: .retro
             )
-            DiscoverTimeTravelSkeletonBar(
+            AppLoadingSkeletonBar(
                 width: lineWidth,
                 height: 10,
                 cornerRadius: 5,
-                shimmerPhase: shimmerPhase,
-                shimmerEnabled: shimmerEnabled
+                tone: .neutral
             )
         }
         .padding(10)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.primary.opacity(colorScheme == .dark ? 0.12 : 0.04), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.14 : 0.08), lineWidth: 0.7)
-        )
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         .overlay {
-            if shimmerEnabled {
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .strokeBorder(Color.red.opacity(colorScheme == .dark ? 0.16 : 0.11), lineWidth: 0.55)
-                    .offset(x: glitchOffset * 0.75)
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .strokeBorder(Color.cyan.opacity(colorScheme == .dark ? 0.16 : 0.11), lineWidth: 0.55)
-                    .offset(x: -glitchOffset * 0.75)
-            }
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.8)
         }
-        .offset(x: glitchOffset)
-    }
-}
-
-private struct DiscoverTimeTravelSkeletonBar: View {
-    let width: CGFloat?
-    let height: CGFloat
-    let cornerRadius: CGFloat
-    let shimmerPhase: CGFloat
-    let shimmerEnabled: Bool
-    var tiltDegrees: Double = 14
-
-    @Environment(\.colorScheme) private var colorScheme
-
-    private var baseGradient: LinearGradient {
-        LinearGradient(
-            colors: [
-                Color.primary.opacity(colorScheme == .dark ? 0.17 : 0.10),
-                Color.primary.opacity(colorScheme == .dark ? 0.10 : 0.06)
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-    }
-
-    private var glitchOffset: CGFloat {
-        guard shimmerEnabled else { return 0 }
-        let wave = sin((Double(shimmerPhase) * .pi * 4.6) + (tiltDegrees / 9))
-        let gate = max(0, sin((Double(shimmerPhase) * .pi * 14.0) + (tiltDegrees / 5)))
-        return CGFloat(wave * gate) * 1.2
-    }
-
-    var body: some View {
-        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-            .fill(baseGradient)
-            .overlay {
-                if shimmerEnabled {
-                    GeometryReader { proxy in
-                        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                            .fill(
-                                LinearGradient(
-                                    colors: [
-                                        .clear,
-                                        Color.white.opacity(colorScheme == .dark ? 0.28 : 0.50),
-                                        .clear
-                                    ],
-                                    startPoint: .top,
-                                    endPoint: .bottom
-                                )
-                            )
-                            .rotationEffect(.degrees(tiltDegrees))
-                            .offset(x: shimmerPhase * max(proxy.size.width, 1))
-                    }
-                    .clipped()
-                }
-            }
-            .overlay(
-                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .strokeBorder(Color.white.opacity(colorScheme == .dark ? 0.07 : 0.12), lineWidth: 0.7)
-            )
-            .overlay {
-                if shimmerEnabled {
-                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                        .strokeBorder(Color.red.opacity(colorScheme == .dark ? 0.18 : 0.12), lineWidth: 0.55)
-                        .offset(x: glitchOffset)
-                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                        .strokeBorder(Color.cyan.opacity(colorScheme == .dark ? 0.18 : 0.12), lineWidth: 0.55)
-                        .offset(x: -glitchOffset)
-                    DiscoverGlitchScanlineOverlay(lineOpacity: colorScheme == .dark ? 0.14 : 0.10)
-                        .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-                        .blendMode(.screen)
-                }
-            }
-            .frame(width: width, height: height)
-            .frame(maxWidth: width == nil ? .infinity : nil, alignment: .leading)
-    }
-}
-
-private struct DiscoverGlitchScanlineOverlay: View {
-    let lineOpacity: Double
-
-    var body: some View {
-        GeometryReader { proxy in
-            Path { path in
-                var y: CGFloat = 0
-                while y < proxy.size.height {
-                    path.move(to: CGPoint(x: 0, y: y))
-                    path.addLine(to: CGPoint(x: proxy.size.width, y: y))
-                    y += 3
-                }
-            }
-            .stroke(Color.white.opacity(lineOpacity), lineWidth: 0.45)
-        }
-        .allowsHitTesting(false)
     }
 }
 
@@ -2421,8 +2389,7 @@ private struct DiscoverPlaylistColumn<Content: View>: View {
                 Spacer(minLength: 6)
 
                 if showsLoading {
-                    ProgressView()
-                        .controlSize(.small)
+                    AppLoadingActivityMark(tone: .accent, tint: tint)
                         .padding(.top, 1)
                 }
             }
@@ -2631,13 +2598,11 @@ private struct DiscoverFeatureModule: View {
 
             Group {
                 if isVisualContextLoading {
-                    HStack(spacing: 8) {
-                        ProgressView()
-                            .controlSize(.small)
-                        Text("Loading visual context…")
-                            .font(.system(size: 12.5, weight: .medium))
-                            .foregroundStyle(.secondary)
-                    }
+                    AppLoadingInlineLabel(
+                        text: "Loading visual context…",
+                        tone: .accent,
+                        font: .system(size: 12.5, weight: .medium)
+                    )
                     .padding(.horizontal, 12)
                     .padding(.vertical, 10)
                 } else if !visualContextImages.isEmpty {
@@ -2737,14 +2702,11 @@ private struct DiscoverFeatureCard: View {
                     }
 
                     if isTeaserLoading {
-                        HStack(spacing: 8) {
-                            ProgressView()
-                                .controlSize(.small)
-                            Text("Loading article teaser…")
-                                .font(.system(size: 11.5, weight: .medium))
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
-                        }
+                        AppLoadingInlineLabel(
+                            text: "Loading article teaser…",
+                            tone: .accent,
+                            font: .system(size: 11.5, weight: .medium)
+                        )
                         .padding(.top, 2)
                     } else if let teaserText, !teaserText.isEmpty {
                         VStack(alignment: .leading, spacing: 2) {
@@ -2855,12 +2817,12 @@ private struct DiscoverNewsCard: View {
                     ) { phase in
                         switch phase {
                         case .empty:
-                            Rectangle()
-                                .fill(.quaternary)
-                                .overlay {
-                                    ProgressView()
-                                        .controlSize(.small)
-                                }
+                            AppLoadingThumbnailPlaceholder(
+                                width: 220,
+                                height: 116,
+                                cornerRadius: 10,
+                                tone: .accent
+                            )
                         case .success(let image):
                             ZStack {
                                 Rectangle()
@@ -3090,13 +3052,11 @@ private struct DiscoverPageViewsPopoverContent: View {
                     Text(title)
                         .font(.system(size: 16, weight: .semibold))
                         .lineLimit(2)
-                    HStack(spacing: 8) {
-                        ProgressView()
-                            .controlSize(.small)
-                        Text("Loading page views…")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(.secondary)
-                    }
+                    AppLoadingInlineLabel(
+                        text: "Loading page views…",
+                        tone: .accent,
+                        font: .system(size: 12, weight: .medium)
+                    )
                 }
                 .padding(14)
                 .frame(width: 300, alignment: .leading)
@@ -3288,12 +3248,12 @@ private struct DiscoverVisualContextCard: View {
                 AsyncImage(url: image.thumbnailURL, transaction: imageTransaction) { phase in
                     switch phase {
                     case .empty:
-                        Rectangle()
-                            .fill(.quaternary)
-                            .overlay {
-                                ProgressView()
-                                    .controlSize(.small)
-                            }
+                        AppLoadingThumbnailPlaceholder(
+                            width: 180,
+                            height: 108,
+                            cornerRadius: 10,
+                            tone: .accent
+                        )
                     case .success(let loadedImage):
                         loadedImage
                             .resizable()
@@ -3356,12 +3316,12 @@ private struct DiscoverThumbnailSlot: View {
                 AsyncImage(url: thumbnailURL, transaction: imageTransaction) { phase in
                     switch phase {
                     case .empty:
-                        Rectangle()
-                            .fill(.quaternary)
-                            .overlay {
-                                ProgressView()
-                                    .controlSize(.small)
-                            }
+                        AppLoadingThumbnailPlaceholder(
+                            width: size,
+                            height: size,
+                            cornerRadius: cornerRadius,
+                            tone: .accent
+                        )
                     case .success(let image):
                         ZStack {
                             Rectangle()
@@ -3472,12 +3432,12 @@ private struct DiscoverFeaturedImageCard: View {
                     ) { phase in
                         switch phase {
                         case .empty:
-                            Rectangle()
-                                .fill(.quaternary)
-                                .overlay {
-                                    ProgressView()
-                                        .controlSize(.small)
-                                }
+                            AppLoadingThumbnailPlaceholder(
+                                width: 300,
+                                height: 180,
+                                cornerRadius: 12,
+                                tone: .accent
+                            )
                         case .success(let loadedImage):
                             ZStack {
                                 Rectangle()

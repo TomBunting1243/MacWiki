@@ -521,8 +521,11 @@ struct SettingsView: View {
             if let cacheMetrics {
                 cacheMetricsCard(cacheMetrics)
             } else {
-                ProgressView("Loading cache stats…")
-                    .controlSize(.small)
+                AppLoadingInlineLabel(
+                    text: "Loading cache stats…",
+                    tone: .accent,
+                    font: .footnote.weight(.medium)
+                )
             }
 
             HStack(spacing: 8) {
@@ -534,8 +537,7 @@ struct SettingsView: View {
                 .disabled(isCacheActionRunning)
 
                 if isCacheActionRunning {
-                    ProgressView()
-                        .controlSize(.small)
+                    AppLoadingActivityMark(tone: .accent)
                 }
 
                 Spacer()

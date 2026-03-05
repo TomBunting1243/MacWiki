@@ -2420,13 +2420,11 @@ struct TrendPulsePopoverView: View {
 
             if isLoadingPeakDays {
                 Divider().opacity(0.45)
-                HStack(spacing: 6) {
-                    ProgressView()
-                        .controlSize(.small)
-                    Text("Loading all-time highs…")
-                        .font(.system(size: 10.5, weight: .medium))
-                        .foregroundStyle(.secondary)
-                }
+                AppLoadingInlineLabel(
+                    text: "Loading all-time highs…",
+                    tone: .accent,
+                    font: .system(size: 10.5, weight: .medium)
+                )
             } else if !peakDays.isEmpty {
                 Divider().opacity(0.45)
                 VStack(alignment: .leading, spacing: 6) {
@@ -2705,13 +2703,11 @@ struct SidebarPageViewsPopoverContent: View {
                     Text(title)
                         .font(.system(size: 16, weight: .semibold))
                         .lineLimit(2)
-                    HStack(spacing: 8) {
-                        ProgressView()
-                            .controlSize(.small)
-                        Text("Loading page views…")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(.secondary)
-                    }
+                    AppLoadingInlineLabel(
+                        text: "Loading page views…",
+                        tone: .accent,
+                        font: .system(size: 12, weight: .medium)
+                    )
                 }
                 .padding(14)
                 .frame(width: 300, alignment: .leading)
@@ -4007,13 +4003,11 @@ extension DirectoryView {
 
         if discoverFeedStore.isLoading && discoverFeedStore.feed == nil {
             Section {
-                HStack(spacing: 8) {
-                    ProgressView()
-                        .controlSize(.small)
-                    Text("Loading discover feed…")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
+                AppLoadingInlineLabel(
+                    text: "Loading discover feed…",
+                    tone: .accent,
+                    font: .subheadline.weight(.medium)
+                )
                 .padding(.vertical, 8)
             }
         } else if let discoverError = discoverFeedStore.errorMessage, discoverFeedStore.feed == nil {

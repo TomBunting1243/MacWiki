@@ -361,13 +361,11 @@ private struct LinkHoverArticleSummaryPreview: View {
     }
 
     private var loadingStateView: some View {
-        HStack(spacing: 8) {
-            ProgressView()
-                .controlSize(.small)
-            Text("Loading article preview...")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        }
+        AppLoadingInlineLabel(
+            text: "Loading article preview...",
+            tone: .neutral,
+            font: .caption
+        )
     }
 
     private var unavailableStateView: some View {
