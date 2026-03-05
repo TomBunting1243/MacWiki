@@ -2781,8 +2781,12 @@ private struct DiscoverFeatureCard: View {
                             .foregroundStyle(.white.opacity(0.55))
                     }
                 default:
-                    Rectangle()
-                        .fill(.quaternary)
+                    AppLoadingThumbnailPlaceholder(
+                        width: 320,
+                        height: heroImageHeight,
+                        cornerRadius: 14,
+                        tone: .accent
+                    )
                 }
             }
         } else {

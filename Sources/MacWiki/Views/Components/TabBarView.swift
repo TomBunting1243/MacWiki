@@ -1366,11 +1366,31 @@ private struct DraggableTabItemView: View {
     }
     
     private var faviconView: some View {
-        AsyncImage(url: tab.article.thumbnailURL) { image in
-            image.resizable().aspectRatio(contentMode: .fill)
-        } placeholder: {
-            Image(systemName: "doc.text.fill")
-                .foregroundStyle(.tertiary)
+        AsyncImage(
+            url: tab.article.thumbnailURL,
+            transaction: Transaction(animation: .easeOut(duration: 0.16))
+        ) { phase in
+            switch phase {
+            case .empty:
+                AppLoadingThumbnailPlaceholder(
+                    width: 16,
+                    height: 16,
+                    cornerRadius: 3,
+                    tone: .neutral,
+                    symbol: "doc.text.fill"
+                )
+            case .success(let image):
+                image
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .transition(.opacity)
+            case .failure:
+                Image(systemName: "doc.text.fill")
+                    .foregroundStyle(.tertiary)
+            @unknown default:
+                Image(systemName: "doc.text.fill")
+                    .foregroundStyle(.tertiary)
+            }
         }
         .frame(width: chromeStyle == .strip ? 16 : 16, height: chromeStyle == .strip ? 16 : 16)
         .clipShape(RoundedRectangle(cornerRadius: 3))

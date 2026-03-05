@@ -273,7 +273,7 @@ struct ContentView: View {
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                 }
-                .transition(.opacity.combined(with: .scale(scale: 0.985, anchor: .top)))
+                .transition(AppLoadingMotion.overlayTransition(reduceMotion: reduceMotion, anchor: .top))
             }
         }
     }

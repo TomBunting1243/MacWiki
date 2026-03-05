@@ -543,7 +543,7 @@ struct DirectoryView: View {
                         ? directoryTopChromeHeight
                         : ColumnChromeMetrics.trafficLightsClearance
                 )
-                .transition(.opacity.combined(with: .scale(scale: 0.995, anchor: .top)))
+                .transition(AppLoadingMotion.overlayTransition(reduceMotion: reduceMotion, anchor: .top))
                 .zIndex(1)
             }
         }
