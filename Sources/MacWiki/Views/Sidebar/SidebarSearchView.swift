@@ -20,41 +20,41 @@ private enum SidebarSearchLayoutClass {
 private enum SidebarSearchMetrics {
     static let compactWidthThreshold: CGFloat = 252
     static let wideWidthThreshold: CGFloat = 320
-    static let titleBottomPadding: CGFloat = 6
-    static let fieldHeight: CGFloat = 28
-    static let fieldCornerRadius: CGFloat = 10
+    static let titleBottomPadding: CGFloat = 7
+    static let fieldHeight: CGFloat = 30
+    static let fieldCornerRadius: CGFloat = 11
     static let badgeCornerRadius: CGFloat = 5
 
     static func rowSpacing(for layoutClass: SidebarSearchLayoutClass) -> CGFloat {
         switch layoutClass {
         case .compact:
-            return 2
-        case .regular:
             return 3
-        case .wide:
+        case .regular:
             return 4
+        case .wide:
+            return 5
         }
     }
 
     static func rowInsetHorizontal(for layoutClass: SidebarSearchLayoutClass) -> CGFloat {
         switch layoutClass {
         case .compact:
-            return 6
+            return 7
         case .regular:
-            return 8
+            return 9
         case .wide:
-            return 10
+            return 11
         }
     }
 
     static func sectionLabelSize(for layoutClass: SidebarSearchLayoutClass) -> CGFloat {
         switch layoutClass {
         case .compact:
-            return 10.5
-        case .regular:
             return 11
-        case .wide:
+        case .regular:
             return 11.5
+        case .wide:
+            return 12
         }
     }
 
@@ -72,22 +72,22 @@ private enum SidebarSearchMetrics {
     static func fieldHorizontalPadding(for layoutClass: SidebarSearchLayoutClass) -> CGFloat {
         switch layoutClass {
         case .compact:
-            return 8
+            return 9
         case .regular:
-            return 10
+            return 11
         case .wide:
-            return 12
+            return 13
         }
     }
 
     static func searchFieldFontSize(for layoutClass: SidebarSearchLayoutClass) -> CGFloat {
         switch layoutClass {
         case .compact:
-            return 12.5
+            return 13
         case .regular:
-            return 13.5
-        case .wide:
             return 14
+        case .wide:
+            return 14.5
         }
     }
 
@@ -233,7 +233,7 @@ struct SidebarSearchView: View {
     }
 
     private var resultsSectionTitle: String {
-        searchCoordinator.hasQuery ? "Results" : "Trending Today"
+        searchCoordinator.hasQuery ? "Results" : "Top Reads"
     }
 
     private func articleState(for title: String) -> ArticleState? {
@@ -689,11 +689,11 @@ struct SidebarSearchView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: SidebarSearchMetrics.fieldCornerRadius, style: .continuous)
-                .fill(Color.primary.opacity(colorScheme == .dark ? 0.16 : 0.055))
+                .fill(Color.primary.opacity(colorScheme == .dark ? 0.14 : 0.05))
         )
         .overlay {
             RoundedRectangle(cornerRadius: SidebarSearchMetrics.fieldCornerRadius, style: .continuous)
-                .strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.18 : 0.10), lineWidth: 0.6)
+                .strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.16 : 0.09), lineWidth: 0.6)
         }
     }
 
@@ -713,7 +713,7 @@ struct SidebarSearchView: View {
             return "Trending"
         }
         if !searchCoordinator.trendingArticles.isEmpty {
-            return "Trending Today"
+            return "Top Reads"
         }
         return "Wikipedia"
     }
@@ -769,7 +769,7 @@ struct SidebarSearchView: View {
                 title: "Search Wikipedia",
                 message: "Ask for a person, place, event, or idea.",
                 symbol: "sparkles",
-                footnote: "Type to search • ↑↓ navigate • ↩ open",
+                footnote: "Type to search • ↓ browse • ↩ open",
                 tone: .search,
                 layoutClass: layoutClass
             )

@@ -423,7 +423,7 @@ struct SettingsView: View {
             }
             .pickerStyle(.menu)
 
-            settingDescription("Choose whether Wikipedia search appears as a centered floating overlay or directly inside the List Contents sidebar.")
+            settingDescription("Choose whether Wikipedia search appears as a floating command palette near the top of the window or directly inside the List Contents sidebar.")
 
             settingDescription("Discover start surface and tab chrome details are grouped under Advanced > Chrome.")
 

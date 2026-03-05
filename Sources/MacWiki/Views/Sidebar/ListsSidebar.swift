@@ -8,7 +8,7 @@ fileprivate enum SidebarDensityPreset: String, CaseIterable {
     var title: String {
         switch self {
         case .music:
-            return "Music (Dense)"
+            return "Compact"
         case .comfortable:
             return "Comfortable"
         }
@@ -21,17 +21,17 @@ fileprivate enum SidebarMetrics {
            let preset = SidebarDensityPreset(rawValue: raw) {
             return preset
         }
-        return .music
+        return .comfortable
     }
 
     static var itemFontSize: CGFloat {
-        densityPreset == .music ? 12.5 : 13
+        densityPreset == .music ? 12.75 : 13.5
     }
 
     static var sectionHeaderFont: Font {
         densityPreset == .music
-            ? Font.system(size: 10, weight: .semibold)
-            : Font.system(size: 11, weight: .semibold)
+            ? Font.system(size: 10.5, weight: .semibold)
+            : Font.system(size: 11.5, weight: .semibold)
     }
 
     static var itemFont: Font {
@@ -43,7 +43,7 @@ fileprivate enum SidebarMetrics {
     }
 
     static var sectionHeaderHeight: CGFloat {
-        densityPreset == .music ? 24 : 28
+        densityPreset == .music ? 25 : 30
     }
 
     static var itemIconWidth: CGFloat {
@@ -51,11 +51,11 @@ fileprivate enum SidebarMetrics {
     }
 
     static var trailingControlSize: CGFloat {
-        densityPreset == .music ? 22 : 26
+        densityPreset == .music ? 22 : 27
     }
 
     static var rowSpacing: CGFloat {
-        densityPreset == .music ? 6 : 7
+        densityPreset == .music ? 6 : 8
     }
 
     static var rowCornerRadius: CGFloat {
@@ -63,17 +63,17 @@ fileprivate enum SidebarMetrics {
     }
 
     static var rowMinimumHitHeight: CGFloat {
-        densityPreset == .music ? 26 : 28
+        densityPreset == .music ? 27 : 30
     }
 
     static var rowInsets: EdgeInsets {
         densityPreset == .music
             ? EdgeInsets(top: 2, leading: 11, bottom: 2, trailing: 11)
-            : EdgeInsets(top: 3, leading: 12, bottom: 3, trailing: 12)
+            : EdgeInsets(top: 4, leading: 13, bottom: 4, trailing: 13)
     }
 
     static var emptyStateVerticalPadding: CGFloat {
-        densityPreset == .music ? 4 : 6
+        densityPreset == .music ? 4 : 7
     }
 
     static func iconPrimaryOpacity(darkMode: Bool) -> Double {
@@ -235,7 +235,7 @@ struct ListsSidebar: View {
     @State private var sidebarSelection: SidebarSelectionID?
     @State private var selectedAreaIDs: Set<UUID> = []
     @AppStorage("sidebarSortOrder") private var sortOrder: ListSortOrder = .updatedDate
-    @AppStorage("sidebarDensityPreset") private var sidebarDensityPreset: SidebarDensityPreset = .music
+    @AppStorage("sidebarDensityPreset") private var sidebarDensityPreset: SidebarDensityPreset = .comfortable
     
     // Editing state for lists
     @State private var editingList: ReadingList?

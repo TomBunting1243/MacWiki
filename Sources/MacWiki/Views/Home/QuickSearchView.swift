@@ -3,7 +3,7 @@ import SwiftData
 
 // Quick search overlay with live Wikipedia search
 struct QuickSearchView: View {
-    static let idealSize = CGSize(width: 1440, height: 1080)
+    static let idealSize = CGSize(width: 1040, height: 720)
 
     @Environment(AppState.self) private var appState
     @Environment(\.colorScheme) private var colorScheme
@@ -49,14 +49,14 @@ struct QuickSearchView: View {
     var body: some View {
         VStack(spacing: 0) {
             // Search field with liquid glass style
-            HStack(spacing: 12) {
+            HStack(spacing: 10) {
                 Image(systemName: "magnifyingglass")
-                    .font(.system(size: 18, weight: .medium))
+                    .font(.system(size: 17, weight: .medium))
                     .foregroundStyle(.secondary)
 
                 TextField("Search Wikipedia...", text: $searchCoordinator.searchText)
                     .textFieldStyle(.plain)
-                    .font(.system(size: 17))
+                    .font(.system(size: 16))
                     .focused($isSearchFieldFocused)
                     .onSubmit {
                         if searchCoordinator.hasQuery,
@@ -98,8 +98,8 @@ struct QuickSearchView: View {
                             .fill(.quaternary)
                     )
             }
-            .padding(.horizontal, 22)
-            .padding(.vertical, 18)
+            .padding(.horizontal, 18)
+            .padding(.vertical, 14)
 
             Divider()
                 .opacity(0.35)
@@ -108,20 +108,20 @@ struct QuickSearchView: View {
             resultsContent
         }
         .frame(width: modalSize.width, height: modalSize.height)
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         .background {
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .fill(.ultraThinMaterial)
                 .overlay {
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.16 : 0.08), lineWidth: 0.8)
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.14 : 0.07), lineWidth: 0.8)
                 }
-                .shadow(color: .black.opacity(colorScheme == .dark ? 0.22 : 0.12), radius: 22, y: 8)
+                .shadow(color: .black.opacity(colorScheme == .dark ? 0.18 : 0.10), radius: 18, y: 6)
         }
-        .scaleEffect(isAppeared ? 1 : 0.95)
+        .scaleEffect(isAppeared ? 1 : 0.985)
         .opacity(isAppeared ? 1 : 0)
         .onAppear {
-            withAnimation(.spring(response: 0.32, dampingFraction: 0.9)) {
+            withAnimation(.spring(response: 0.24, dampingFraction: 0.92)) {
                 isAppeared = true
             }
             DispatchQueue.main.async {
@@ -171,29 +171,30 @@ struct QuickSearchView: View {
                 .frame(maxHeight: .infinity)
             } else if !searchCoordinator.trendingArticles.isEmpty {
                 let savedTitles = savedArticleTitlesNormalized
-                let columnCount = modalSize.width >= 1100 ? 3 : 2
+                let columnCount = modalSize.width >= 820 ? 2 : 1
                 VStack(alignment: .leading, spacing: 0) {
                     HStack {
                         Image(systemName: "chart.line.uptrend.xyaxis")
-                            .foregroundStyle(.blue)
-                        Text("Trending Today")
-                            .font(.headline)
+                            .foregroundStyle(.secondary)
+                        Text("Top Reads Today")
+                            .font(.subheadline.weight(.semibold))
                             .foregroundStyle(.secondary)
                         Spacer()
 
                         // Context hint
                         let openAction = appState.searchContext == .newTab ? "New Tab" : "Open"
-                        Text("Click to \(openAction.lowercased())")
+                        Text("\(openAction) with return")
                             .font(.caption)
                             .foregroundStyle(.tertiary)
                     }
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 8)
+                    .padding(.horizontal, 18)
+                    .padding(.top, 12)
+                    .padding(.bottom, 6)
 
                     ScrollView {
                         LazyVGrid(
-                            columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: columnCount),
-                            spacing: 12
+                            columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: columnCount),
+                            spacing: 10
                         ) {
                             ForEach(Array(searchCoordinator.trendingArticles.enumerated()), id: \.element.id) { index, result in
                                 let rowKey = "quick-trending:\(index):\(result.id):\(ReadStateSync.normalizedTitle(result.title))"
@@ -206,7 +207,7 @@ struct QuickSearchView: View {
                                         result: result,
                                         isHovered: index == hoveredIndex,
                                         isSaved: isSaved,
-                                        isLarge: columnCount == 3
+                                        isLarge: false
                                     )
                                 }
                                 .buttonStyle(.plain)
@@ -247,7 +248,9 @@ struct QuickSearchView: View {
                                 }
                             }
                         }
-                        .padding(12)
+                        .padding(.horizontal, 12)
+                        .padding(.top, 6)
+                        .padding(.bottom, 12)
                     }
                 }
             } else {
@@ -279,7 +282,7 @@ struct QuickSearchView: View {
             let savedTitles = savedArticleTitlesNormalized
             ScrollViewReader { proxy in
                 ScrollView {
-                    LazyVStack(spacing: 2) {
+                    LazyVStack(spacing: 0) {
                         ForEach(Array(searchCoordinator.searchResults.enumerated()), id: \.element.id) { index, result in
                             let rowKey = "quick-results:\(index):\(result.id):\(ReadStateSync.normalizedTitle(result.title))"
                             let isSaved = savedTitles.contains(ReadStateSync.normalizedTitle(result.title))
@@ -294,8 +297,8 @@ struct QuickSearchView: View {
                                     isHovered: index == hoveredIndex
                                 )
                                     .id(index)
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 4)
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 3)
                                     .background {
                                         RoundedRectangle(cornerRadius: 8)
                                             .fill(index == searchCoordinator.selectedIndex ? Color.accentColor.opacity(0.15) : (index == hoveredIndex ? Color.primary.opacity(0.05) : .clear))
@@ -339,7 +342,8 @@ struct QuickSearchView: View {
                             }
                         }
                     }
-                    .padding(8)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 10)
                 }
                 .onChange(of: searchCoordinator.selectedIndex) { _, newIndex in
                     withAnimation(.easeOut(duration: 0.15)) {
@@ -423,19 +427,19 @@ struct SearchResultRow: View {
                         }
                 }
             }
-            .frame(width: 76, height: 76)
+            .frame(width: 62, height: 62)
             .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
             .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
 
             // Title and description
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text(result.title)
-                    .font(.headline)
-                    .lineLimit(1)
+                    .font(.system(size: 14.5, weight: .semibold))
+                    .lineLimit(2)
 
                 if let description = result.description {
                     Text(description)
-                        .font(.subheadline)
+                        .font(.system(size: 12.5))
                         .foregroundStyle(.secondary)
                         .lineLimit(2)
                 }
@@ -462,7 +466,7 @@ struct SearchResultRow: View {
                     )
             }
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 5)
     }
 }
 
@@ -477,7 +481,7 @@ struct TrendingCard: View {
         VStack(spacing: 0) {
             // Expanded Thumbnail
             ZStack(alignment: .topTrailing) {
-                let imageHeight: CGFloat = isLarge ? 132 : 110
+                let imageHeight: CGFloat = isLarge ? 118 : 96
 
                 Group {
                     if let url = result.thumbnailURL {
@@ -521,7 +525,7 @@ struct TrendingCard: View {
                 }
                 .frame(height: imageHeight)
                 .frame(maxWidth: .infinity)
-                .background(.quaternary.opacity(0.22))
+                .background(.quaternary.opacity(0.20))
 
                 if isSaved {
                     Image(systemName: "bookmark.fill")
@@ -561,16 +565,16 @@ struct TrendingCard: View {
             }
             .padding(10)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(.thinMaterial)
+            .background(.regularMaterial)
         }
-        .frame(height: isLarge ? 210 : 190)
+        .frame(height: isLarge ? 182 : 168)
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .background {
             RoundedRectangle(cornerRadius: 12)
-                .fill(isHovered ? Color.primary.opacity(0.05) : Color.primary.opacity(0.02))
-                .shadow(color: .black.opacity(isHovered ? 0.1 : 0.05), radius: 8, y: 4)
+                .fill(isHovered ? Color.primary.opacity(0.04) : Color.primary.opacity(0.018))
+                .shadow(color: .black.opacity(isHovered ? 0.08 : 0.04), radius: 6, y: 3)
         }
-        .scaleEffect(isHovered ? 1.02 : 1)
-        .animation(.interactiveSpring(response: 0.26, dampingFraction: 0.9), value: isHovered)
+        .scaleEffect(isHovered ? 1.01 : 1)
+        .animation(.interactiveSpring(response: 0.22, dampingFraction: 0.92), value: isHovered)
     }
 }

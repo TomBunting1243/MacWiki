@@ -251,21 +251,29 @@ struct ContentView: View {
         if appState.showSearch && searchPresentationMode == .overlay {
             GeometryReader { proxy in
                 let containerSize = proxy.size
-                let clampedWidth = min(QuickSearchView.idealSize.width, containerSize.width * 0.94)
-                let clampedHeight = min(QuickSearchView.idealSize.height, containerSize.height * 0.92)
+                let clampedWidth = min(QuickSearchView.idealSize.width, containerSize.width * 0.82)
+                let clampedHeight = min(QuickSearchView.idealSize.height, containerSize.height * 0.78)
                 let modalSize = CGSize(width: clampedWidth, height: clampedHeight)
 
-                Color.black.opacity(0.10)
-                    .ignoresSafeArea()
-                    .onTapGesture {
-                        performAnimation(PanelMotion.searchOverlayToggle) {
-                            appState.showSearch = false
-                        }
-                    }
+                let topInset = max(appState.windowTopObscuredHeight + 18, 28)
 
-                QuickSearchView(modalSize: modalSize)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-                    .transition(.opacity.combined(with: .scale(scale: 0.95)))
+                ZStack(alignment: .top) {
+                    Color.black.opacity(0.08)
+                        .ignoresSafeArea()
+                        .onTapGesture {
+                            performAnimation(PanelMotion.searchOverlayToggle) {
+                                appState.showSearch = false
+                            }
+                        }
+
+                    VStack(spacing: 0) {
+                        QuickSearchView(modalSize: modalSize)
+                            .padding(.top, topInset)
+                        Spacer(minLength: 0)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                }
+                .transition(.opacity.combined(with: .scale(scale: 0.985, anchor: .top)))
             }
         }
     }
