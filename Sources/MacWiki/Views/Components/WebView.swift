@@ -287,10 +287,17 @@ private struct LinkHoverArticleSummaryPreview: View {
     let articleTitle: String
     let fallbackURL: URL
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var descriptionText: String?
     @State private var extractText: String?
     @State private var isLoading = false
     @State private var hasLoaded = false
+
+    private enum PresentationState {
+        case loading
+        case content
+        case unavailable
+    }
 
     private var hasContent: Bool {
         descriptionText != nil || extractText != nil
@@ -307,19 +314,22 @@ private struct LinkHoverArticleSummaryPreview: View {
         return normalizedTitle
     }
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            if isLoading {
-                loadingStateView
-            } else if hasContent {
-                contentView
-            } else if hasLoaded {
-                unavailableStateView
-            } else {
-                loadingStateView
-            }
+    private var presentationState: PresentationState {
+        if isLoading {
+            return .loading
+        }
+        if hasContent {
+            return .content
+        }
+        if hasLoaded {
+            return .unavailable
+        }
+        return .loading
+    }
 
-            Spacer(minLength: 0)
+    var body: some View {
+        ZStack(alignment: .topLeading) {
+            currentStateView
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .padding(14)
@@ -331,8 +341,24 @@ private struct LinkHoverArticleSummaryPreview: View {
         )
         .padding(.horizontal, 10)
         .padding(.vertical, 10)
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.16), value: presentationState)
         .task(id: requestKey) {
             await loadSummary()
+        }
+    }
+
+    @ViewBuilder
+    private var currentStateView: some View {
+        switch presentationState {
+        case .loading:
+            loadingStateView
+                .transition(.opacity)
+        case .content:
+            contentView
+                .transition(.opacity)
+        case .unavailable:
+            unavailableStateView
+                .transition(.opacity)
         }
     }
 
@@ -361,11 +387,20 @@ private struct LinkHoverArticleSummaryPreview: View {
     }
 
     private var loadingStateView: some View {
-        AppLoadingInlineLabel(
-            text: "Loading article preview...",
-            tone: .neutral,
-            font: .caption
-        )
+        VStack(alignment: .leading, spacing: 12) {
+            AppLoadingInlineLabel(
+                text: "Loading article preview...",
+                tone: .neutral,
+                font: .caption.weight(.medium)
+            )
+
+            VStack(alignment: .leading, spacing: 8) {
+                AppLoadingSkeletonBar(width: 132, height: 10, cornerRadius: 5, tone: .neutral)
+                AppLoadingSkeletonBar(width: nil, height: 12, cornerRadius: 6, tone: .neutral)
+                AppLoadingSkeletonBar(width: nil, height: 12, cornerRadius: 6, tone: .neutral)
+                AppLoadingSkeletonBar(width: 184, height: 12, cornerRadius: 6, tone: .neutral)
+            }
+        }
     }
 
     private var unavailableStateView: some View {

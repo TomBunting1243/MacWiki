@@ -122,7 +122,7 @@ enum AppLoadingMotion {
         reduceMotion: Bool,
         anchor: UnitPoint = .center
     ) -> AnyTransition {
-        guard !reduceMotion else { return .identity }
+        guard !reduceMotion else { return .opacity }
         return .opacity.combined(with: .scale(scale: overlayScale, anchor: anchor))
     }
 }

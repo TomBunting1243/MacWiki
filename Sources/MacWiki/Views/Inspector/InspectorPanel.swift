@@ -682,6 +682,7 @@ struct InspectorPanel: View {
                                 .aspectRatio(contentMode: .fit)
                                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                                 .padding(8)
+                                .transition(.opacity)
                         case .failure:
                             Image(systemName: "photo")
                                 .font(.system(size: 17, weight: .semibold))
@@ -694,7 +695,12 @@ struct InspectorPanel: View {
                                 tone: .accent
                             )
                         @unknown default:
-                            EmptyView()
+                            AppLoadingThumbnailPlaceholder(
+                                width: 220,
+                                height: 118,
+                                cornerRadius: 10,
+                                tone: .accent
+                            )
                         }
                     }
                 }
