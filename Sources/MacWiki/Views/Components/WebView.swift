@@ -57,7 +57,6 @@ private enum LinkHoverGlassMetrics {
 }
 
 private enum LinkHoverSummaryPreviewMetrics {
-    static let cornerRadius: CGFloat = 16
     static let maxExtractCharacters = 360
     static let artworkHeight: CGFloat = 152
 }
@@ -132,32 +131,11 @@ private struct LinkHoverPreviewPane: View {
         .padding(.horizontal, 14)
         .padding(.top, 12)
         .padding(.bottom, 12)
-        .background(
+        .overlay(alignment: .bottom) {
             Rectangle()
-                .fill(.thinMaterial)
-                .overlay(
-                    LinearGradient(
-                        colors: [
-                            Color.accentColor.opacity(isDarkMode ? 0.16 : 0.10),
-                            Color.white.opacity(isDarkMode ? 0.05 : 0.08),
-                            .clear
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                    .blendMode(.screen)
-                )
-                .overlay(alignment: .top) {
-                    Rectangle()
-                        .fill(Color.white.opacity(isDarkMode ? 0.16 : 0.28))
-                        .frame(height: 0.7)
-                }
-                .overlay(alignment: .bottom) {
-                    Rectangle()
-                        .fill(Color.primary.opacity(isDarkMode ? 0.18 : 0.08))
-                        .frame(height: 0.6)
-                }
-        )
+                .fill(Color.primary.opacity(isDarkMode ? 0.18 : 0.08))
+                .frame(height: 0.6)
+        }
     }
 
     private var glassPlane: some View {
@@ -362,15 +340,9 @@ private struct LinkHoverArticleSummaryPreview: View {
             currentStateView
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .padding(14)
-        .background(previewBackground)
-        .clipShape(RoundedRectangle(cornerRadius: LinkHoverSummaryPreviewMetrics.cornerRadius, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: LinkHoverSummaryPreviewMetrics.cornerRadius, style: .continuous)
-                .strokeBorder(Color.primary.opacity(0.10), lineWidth: 0.6)
-        )
-        .padding(.horizontal, 10)
-        .padding(.vertical, 10)
+        .padding(.horizontal, 14)
+        .padding(.top, 12)
+        .padding(.bottom, 14)
         .animation(reduceMotion ? nil : .easeOut(duration: 0.16), value: presentationState)
         .task(id: requestKey) {
             await loadSummary()
@@ -451,30 +423,6 @@ private struct LinkHoverArticleSummaryPreview: View {
                 .foregroundStyle(.primary.opacity(0.8))
                 .lineSpacing(2)
         }
-    }
-
-    private var previewBackground: some View {
-        RoundedRectangle(cornerRadius: LinkHoverSummaryPreviewMetrics.cornerRadius, style: .continuous)
-            .fill(.thinMaterial)
-            .overlay {
-                RoundedRectangle(cornerRadius: LinkHoverSummaryPreviewMetrics.cornerRadius, style: .continuous)
-                    .fill(Color(nsColor: .textBackgroundColor).opacity(0.16))
-            }
-            .overlay {
-                RoundedRectangle(cornerRadius: LinkHoverSummaryPreviewMetrics.cornerRadius, style: .continuous)
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                Color.accentColor.opacity(colorScheme == .dark ? 0.12 : 0.08),
-                                Color.white.opacity(colorScheme == .dark ? 0.03 : 0.08),
-                                .clear
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .blendMode(.screen)
-            }
     }
 
     private var previewArtwork: some View {
@@ -2630,7 +2578,7 @@ struct WebView: NSViewRepresentable {
 
             let workItem = DispatchWorkItem(block: closeAction)
             pendingLinkHoverHideWorkItem = workItem
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.16, execute: workItem)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.22, execute: workItem)
         }
 
         func popoverDidClose(_ notification: Notification) {
