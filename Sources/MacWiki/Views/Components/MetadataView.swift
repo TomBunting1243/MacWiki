@@ -9,7 +9,7 @@ struct MetadataView: View {
     }
     
     var body: some View {
-        LazyVStack(alignment: .leading, spacing: 16) {
+        LazyVStack(alignment: .leading, spacing: 12) {
             if items.isEmpty {
                 ContentUnavailableView(
                     "No Data",
@@ -20,14 +20,13 @@ struct MetadataView: View {
             } else {
                 ForEach(Array(items.enumerated()), id: \.offset) { index, item in
                     VStack(alignment: .leading, spacing: 0) {
-                        VStack(alignment: .leading, spacing: 5) {
+                        VStack(alignment: .leading, spacing: 4) {
                             Text(item.label)
-                                .font(.caption)
-                                .fontWeight(.medium)
-                                .foregroundStyle(.tertiary)
+                                .font(.caption2.weight(.semibold))
+                                .foregroundStyle(.secondary)
 
                             metadataValueText(item.value)
-                                .font(.subheadline)
+                                .font(.footnote)
                                 .foregroundStyle(.primary)
                                 .multilineTextAlignment(.leading)
                                 .fixedSize(horizontal: false, vertical: true)
@@ -35,8 +34,8 @@ struct MetadataView: View {
 
                         if item.id != items.last?.id {
                             Divider()
-                                .opacity(0.5)
-                                .padding(.top, 16)
+                                .opacity(0.38)
+                                .padding(.top, 12)
                         }
                     }
                     .background {
@@ -59,7 +58,8 @@ struct MetadataView: View {
                 .filter { $0.isFinite && $0 > 0 }
             onRowBottomsChange(rowBottoms)
         }
-        .padding(12)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
     }
 
     private func metadataValueText(_ value: String) -> Text {

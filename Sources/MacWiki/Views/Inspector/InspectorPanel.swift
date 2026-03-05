@@ -85,6 +85,8 @@ struct InspectorPanel: View {
 
     private enum InspectorLayout {
         static let contentTopPadding: CGFloat = 2
+        static let sectionSpacing: CGFloat = 14
+        static let sectionCornerRadius: CGFloat = 12
         static let modeSelectorSymbolPointSize: CGFloat = 14.5
         static let tocHeightRange: ClosedRange<CGFloat> = 72...560
         static let metadataHeightRange: ClosedRange<CGFloat> = 56...520
@@ -308,6 +310,14 @@ struct InspectorPanel: View {
         reduceMotion ? Transaction(animation: nil) : Transaction(animation: .easeOut(duration: 0.18))
     }
 
+    private var sectionFillOpacity: Double {
+        colorScheme == .dark ? 0.22 : 0.30
+    }
+
+    private var sectionStrokeOpacity: Double {
+        colorScheme == .dark ? 0.10 : 0.08
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             // Spacer fills the toolbar/titlebar region
@@ -426,86 +436,30 @@ struct InspectorPanel: View {
     }
     
     private var infoContent: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 0) {
             if let article = appState.currentArticle {
-                // Article info
-                VStack(alignment: .leading, spacing: 12) {
-                    if let thumbnailURL = article.thumbnailURL {
-                        AsyncImage(
-                            url: thumbnailURL,
-                            transaction: thumbnailTransaction
-                        ) { phase in
-                            ZStack {
-                                RoundedRectangle(cornerRadius: 10)
-                                    .fill(.quaternary.opacity(colorScheme == .dark ? 0.24 : 0.44))
-
-                                switch phase {
-                                case .success(let image):
-                                    image
-                                        .resizable()
-                                        .aspectRatio(contentMode: .fit)
-                                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                                        .padding(6)
-                                case .failure:
-                                    Image(systemName: "photo")
-                                        .font(.system(size: 18, weight: .semibold))
-                                        .foregroundStyle(.secondary)
-                                case .empty:
-                                    ProgressView()
-                                        .controlSize(.small)
-                                @unknown default:
-                                    EmptyView()
-                                }
-                            }
-                        }
-                        .frame(height: 140)
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
-                    }
-                    
-                    Text(article.title)
-                        .font(.headline)
-                    
-                    if let description = article.description {
-                        Text(description)
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
-
-                    Divider()
-                        .opacity(0.5)
-                        .padding(.vertical, 4)
+                VStack(alignment: .leading, spacing: InspectorLayout.sectionSpacing) {
+                    articleSummaryHeader(article)
 
                     InspectorLabelSection(
                         article: article,
                         allLabels: allLabels
                     )
 
-                    Divider()
-                        .opacity(0.5)
-                        .padding(.vertical, 4)
-
                     InspectorTagStatusBox(article: article, tags: cachedCurrentArticleTags, allTags: allTags)
 
                     if !appState.currentArticleMetadata.isEmpty {
-                        Divider()
-                            .opacity(0.5)
-                            .padding(.vertical, 4)
-
                         metadataSection
                     }
 
                     if tocPresentation == .standard, !appState.currentArticleTableOfContents.isEmpty {
-                        VStack(alignment: .leading, spacing: 12) {
-                            Divider()
-                                .opacity(0.5)
-                                .padding(.vertical, 4)
-
-                            tableOfContentsSection
-                        }
-                        .transition(standardTOCTransition)
+                        tableOfContentsSection
+                            .transition(standardTOCTransition)
                     }
                 }
-                .padding()
+                .padding(.horizontal, 14)
+                .padding(.top, 12)
+                .padding(.bottom, 18)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 .animation(.easeInOut(duration: 0.25), value: appState.currentArticleMetadata.isEmpty)
             } else {
@@ -634,12 +588,16 @@ struct InspectorPanel: View {
             }
             .frame(height: tableOfContentsSectionHeight)
         }
+        .padding(12)
+        .background {
+            inspectorSectionBackground()
+        }
     }
 
     private var metadataSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Metadata")
-                .font(.headline)
+                .font(.caption.weight(.semibold))
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
@@ -670,6 +628,10 @@ struct InspectorPanel: View {
                 .padding(.top, InspectorLayout.resizeHandleTopPadding)
             }
         }
+        .padding(12)
+        .background {
+            inspectorSectionBackground()
+        }
     }
 
     private var metadataScrollContent: some View {
@@ -699,6 +661,64 @@ struct InspectorPanel: View {
         withAnimation(tocPresentationAnimation) {
             tocPresentation = newValue
         }
+    }
+
+    @ViewBuilder
+    private func articleSummaryHeader(_ article: Article) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            if let thumbnailURL = article.thumbnailURL {
+                AsyncImage(
+                    url: thumbnailURL,
+                    transaction: thumbnailTransaction
+                ) { phase in
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 10)
+                            .fill(.quaternary.opacity(colorScheme == .dark ? 0.18 : 0.28))
+
+                        switch phase {
+                        case .success(let image):
+                            image
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                .padding(8)
+                        case .failure:
+                            Image(systemName: "photo")
+                                .font(.system(size: 17, weight: .semibold))
+                                .foregroundStyle(.secondary)
+                        case .empty:
+                            ProgressView()
+                                .controlSize(.small)
+                        @unknown default:
+                            EmptyView()
+                        }
+                    }
+                }
+                .frame(height: 118)
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(article.title)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(.primary)
+
+                if let description = article.description, !description.isEmpty {
+                    Text(description)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
+    private func inspectorSectionBackground() -> some View {
+        RoundedRectangle(cornerRadius: InspectorLayout.sectionCornerRadius, style: .continuous)
+            .fill(.quaternary.opacity(sectionFillOpacity))
+            .overlay {
+                RoundedRectangle(cornerRadius: InspectorLayout.sectionCornerRadius, style: .continuous)
+                    .strokeBorder(Color.primary.opacity(sectionStrokeOpacity), lineWidth: 0.8)
+            }
     }
 
     private func clampTOCHeight(_ value: CGFloat) -> CGFloat {

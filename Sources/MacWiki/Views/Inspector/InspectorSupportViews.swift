@@ -99,16 +99,16 @@ struct InspectorLabelSection: View {
                 .foregroundStyle(.tertiary)
         }
         .padding(.horizontal, 12)
-        .frame(height: 31)
+        .frame(height: 29)
         .contentShape(Capsule())
         .background(
             Capsule()
-                .fill(color?.opacity(0.12) ?? Color.secondary.opacity(0.08))
+                .fill(color?.opacity(0.09) ?? Color.secondary.opacity(0.05))
         )
         .overlay {
             Capsule()
                 .strokeBorder(
-                    color?.opacity(isHovered ? 0.5 : 0.32) ?? Color.primary.opacity(isHovered ? 0.22 : 0.12),
+                    color?.opacity(isHovered ? 0.36 : 0.22) ?? Color.primary.opacity(isHovered ? 0.16 : 0.08),
                     lineWidth: isHovered ? 1.0 : 0.8
                 )
         }
@@ -247,7 +247,7 @@ struct InspectorTagStatusBox: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 10) {
             // Header
             HStack {
                 Text("Tags")
@@ -328,12 +328,12 @@ struct InspectorTagStatusBox: View {
                     .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .top)))
             }
         }
-        .padding(16)
+        .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .background(.quaternary.opacity(0.24), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(Color.white.opacity(0.08), lineWidth: 0.8)
+                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.8)
         }
         .onTapGesture {
             withAnimation(.easeInOut(duration: 0.15)) {
@@ -403,11 +403,11 @@ struct InspectorTagStatusBox: View {
             .padding(.vertical, 8)
             .background(
                 Capsule()
-                    .fill(.quaternary.opacity(0.5))
+                    .fill(.quaternary.opacity(0.32))
             )
             .overlay {
                 Capsule()
-                    .strokeBorder(Color.white.opacity(0.08), lineWidth: 0.8)
+                    .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.8)
             }
 
             // "Create" row for new tag names
@@ -427,12 +427,12 @@ struct InspectorTagStatusBox: View {
                     .padding(.horizontal, 12)
                     .padding(.vertical, 4)
                     .background(
-                        Color.accentColor.opacity(0.12),
+                        Color.accentColor.opacity(0.08),
                         in: Capsule()
                     )
                     .overlay {
                         Capsule()
-                            .strokeBorder(Color.accentColor.opacity(0.3), lineWidth: 0.8)
+                            .strokeBorder(Color.accentColor.opacity(0.18), lineWidth: 0.8)
                     }
                 }
                 .buttonStyle(.plain)
@@ -458,12 +458,12 @@ struct InspectorTagStatusBox: View {
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 4)
                                 .background(
-                                    Color.gray.opacity(0.08),
+                                    Color.gray.opacity(0.05),
                                     in: Capsule()
                                 )
                                 .overlay {
                                     Capsule()
-                                        .strokeBorder(Color.white.opacity(0.08), lineWidth: 0.8)
+                                        .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.8)
                                 }
                             }
                             .buttonStyle(.plain)
