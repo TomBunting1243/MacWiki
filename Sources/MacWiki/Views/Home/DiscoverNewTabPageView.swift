@@ -1163,10 +1163,30 @@ private struct DiscoverFeedSections: View {
     }
 
     private var heroImageHeight: CGFloat {
-        if isUltraCompactLayout { return 162 }
-        if isVeryCompactLayout { return 178 }
-        if isCompactLayout { return 198 }
-        return 224
+        if isUltraCompactLayout { return 172 }
+        if isVeryCompactLayout { return 190 }
+        if isCompactLayout { return 214 }
+        return 252
+    }
+
+    private var leadStoryTitleLineLimit: Int {
+        if isUltraCompactLayout { return 3 }
+        if isVeryCompactLayout { return 4 }
+        return 5
+    }
+
+    private var leadStoryDescriptionLineLimit: Int {
+        if isUltraCompactLayout { return 2 }
+        if isVeryCompactLayout { return 3 }
+        return 4
+    }
+
+    private var usesEditorialOpeningSplit: Bool {
+        availableWidth >= 930 && !feed.newsStories.isEmpty
+    }
+
+    private var openingRailWidth: CGFloat {
+        min(max(availableWidth * 0.34, 286), 356)
     }
 
     private var isCollectionsStacked: Bool {
@@ -1689,39 +1709,12 @@ private struct DiscoverFeedSections: View {
         .disabled(!canOpenFocusedCollectionItem || isSearchFieldFocused)
     }
 
-    var body: some View {
-        LazyVStack(alignment: .leading, spacing: sectionSpacing) {
-            if let featured = feed.featuredArticle {
-                DiscoverSectionHeader(title: "Discover", subtitle: feed.dateLabel)
-                let featuredRowKey = pageViewsRowKey(section: "featured", result: featured)
-                DiscoverFeatureModule(
-                    result: featured,
-                    teaserText: featuredTeaserText,
-                    isTeaserLoading: isFeaturedTeaserLoading,
-                    visualContextImages: visualContextStore.images,
-                    isVisualContextLoading: visualContextStore.isLoading && visualContextStore.images.isEmpty,
-                    heroImageHeight: heroImageHeight,
-                    titleLineLimit: isVeryCompactLayout ? 1 : 2,
-                    descriptionLineLimit: isVeryCompactLayout ? 1 : 2,
-                    isCompactLayout: isCompactLayout,
-                    onOpen: onOpen,
-                    onOpenURL: { url in
-                        openURL(url)
-                    }
-                )
-                .contextMenu {
-                    discoverContextMenu(for: featured) {
-                        presentPageViewsPopover(for: featured, rowKey: featuredRowKey)
-                    }
-                }
-                .popover(isPresented: pageViewsPopoverBinding(for: featuredRowKey), arrowEdge: .trailing) {
-                    pageViewsPopover(for: featuredRowKey)
-                }
-            }
-
+    @ViewBuilder
+    private var todayMostReadSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
             DiscoverSectionHeader(
                 title: "Today’s Most Read",
-                subtitle: "Daily chart kept separate from all-time collections"
+                subtitle: "The live chart across Wikipedia right now"
             )
             DiscoverPlaylistColumn(
                 title: "Today",
@@ -1767,9 +1760,17 @@ private struct DiscoverFeedSections: View {
                     }
                 }
             }
+        }
+    }
 
-            if !feed.newsStories.isEmpty {
-                DiscoverSectionHeader(title: "News Briefing", subtitle: "Editorial context from today’s feed")
+    @ViewBuilder
+    private var newsBriefingSection: some View {
+        if !feed.newsStories.isEmpty {
+            VStack(alignment: .leading, spacing: 10) {
+                DiscoverSectionHeader(
+                    title: "News Briefing",
+                    subtitle: "The day’s storylines, stitched together from the feed"
+                )
                 VStack(spacing: 10) {
                     ForEach(feed.newsStories.prefix(newsBriefingLimit)) { story in
                         DiscoverNewsStoryCard(
@@ -1780,12 +1781,66 @@ private struct DiscoverFeedSections: View {
                     }
                 }
             }
+        }
+    }
+
+    @ViewBuilder
+    private var openingEditorialSpread: some View {
+        if usesEditorialOpeningSplit {
+            HStack(alignment: .top, spacing: 16) {
+                todayMostReadSection
+                    .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
+                    .layoutPriority(1)
+
+                newsBriefingSection
+                    .frame(width: openingRailWidth, alignment: .leading)
+            }
+        } else {
+            todayMostReadSection
+            newsBriefingSection
+        }
+    }
+
+    var body: some View {
+        LazyVStack(alignment: .leading, spacing: sectionSpacing) {
+            if let featured = feed.featuredArticle {
+                DiscoverMasthead(
+                    dateLabel: feed.dateLabel,
+                    isCompactLayout: isCompactLayout
+                )
+                let featuredRowKey = pageViewsRowKey(section: "featured", result: featured)
+                DiscoverFeatureModule(
+                    result: featured,
+                    teaserText: featuredTeaserText,
+                    isTeaserLoading: isFeaturedTeaserLoading,
+                    visualContextImages: visualContextStore.images,
+                    isVisualContextLoading: visualContextStore.isLoading && visualContextStore.images.isEmpty,
+                    heroImageHeight: heroImageHeight,
+                    titleLineLimit: leadStoryTitleLineLimit,
+                    descriptionLineLimit: leadStoryDescriptionLineLimit,
+                    isCompactLayout: isCompactLayout,
+                    onOpen: onOpen,
+                    onOpenURL: { url in
+                        openURL(url)
+                    }
+                )
+                .contextMenu {
+                    discoverContextMenu(for: featured) {
+                        presentPageViewsPopover(for: featured, rowKey: featuredRowKey)
+                    }
+                }
+                .popover(isPresented: pageViewsPopoverBinding(for: featuredRowKey), arrowEdge: .trailing) {
+                    pageViewsPopover(for: featuredRowKey)
+                }
+            }
+
+            openingEditorialSpread
 
             VStack(alignment: .leading, spacing: 4) {
                 HStack(alignment: .top, spacing: 12) {
                     DiscoverSectionHeader(
                         title: "Collections",
-                        subtitle: "A playful pair: what everyone reads and what rewards a long sit"
+                        subtitle: "Two ways through Wikipedia’s canon: the perennial hits and the longer way in"
                     )
                     Spacer(minLength: 8)
                     collectionsModeControl
@@ -2306,12 +2361,47 @@ private struct DiscoverFeedSections: View {
     }
 }
 
+private struct DiscoverMasthead: View {
+    let dateLabel: String
+    let isCompactLayout: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Today’s Edition")
+                        .font(.system(size: 10.5, weight: .semibold, design: .rounded))
+                        .textCase(.uppercase)
+                        .tracking(1.0)
+                        .foregroundStyle(.tertiary)
+
+                    Text("Discover")
+                        .font(.system(size: isCompactLayout ? 31 : 38, weight: .semibold, design: .serif))
+                        .foregroundStyle(.primary)
+                }
+
+                Spacer(minLength: 8)
+
+                Text(dateLabel)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.trailing)
+            }
+
+            Text("A front page drawn from featured writing, the live chart, and whatever history wants back.")
+                .font(.system(size: isCompactLayout ? 12.5 : 13.5, weight: .medium))
+                .foregroundStyle(.secondary)
+                .lineLimit(isCompactLayout ? 2 : 1)
+        }
+    }
+}
+
 private struct DiscoverSectionHeader: View {
     let title: String
     let subtitle: String
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: 3) {
             Text(title)
                 .font(DiscoverTypography.sectionTitle)
             Text(subtitle)
@@ -2551,16 +2641,16 @@ private struct DiscoverPlaylistArticleRow: View {
 }
 
 private enum DiscoverTypography {
-    static let sectionTitle = Font.system(size: 17, weight: .semibold, design: .rounded)
-    static let sectionSubtitle = Font.system(size: 11, weight: .regular)
-    static let featureTitle = Font.system(size: 20, weight: .semibold, design: .rounded)
-    static let featureDescription = Font.system(size: 12.5, weight: .regular)
+    static let sectionTitle = Font.system(size: 18.5, weight: .semibold)
+    static let sectionSubtitle = Font.system(size: 11.5, weight: .medium)
+    static let featureTitle = Font.system(size: 29, weight: .semibold, design: .serif)
+    static let featureDescription = Font.system(size: 13.5, weight: .regular)
     static let newsCardTitle = Font.system(size: 13.5, weight: .semibold, design: .rounded)
     static let newsCardDescription = Font.system(size: 11.5, weight: .regular)
     static let compactRank = Font.system(size: 14.5, weight: .semibold, design: .rounded)
     static let compactTitle = Font.system(size: 12.5, weight: .medium)
     static let compactDescription = Font.system(size: 11, weight: .regular)
-    static let storyBody = Font.system(size: 12.5, weight: .regular)
+    static let storyBody = Font.system(size: 13, weight: .regular)
     static let mediaTitle = Font.system(size: 16.5, weight: .semibold, design: .rounded)
     static let mediaDescription = Font.system(size: 12.5, weight: .regular)
     static let mediaMeta = Font.system(size: 11.5, weight: .medium)
@@ -2622,10 +2712,10 @@ private struct DiscoverFeatureModule: View {
                 }
             }
         }
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.9)
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.07), lineWidth: 0.9)
         }
     }
 }
@@ -2663,42 +2753,30 @@ private struct DiscoverFeatureCard: View {
             onOpen(result, SystemBridge.isCommandPressed)
         } label: {
             VStack(alignment: .leading, spacing: 0) {
-                ZStack(alignment: .topLeading) {
-                    featureImage
-                    LinearGradient(
-                        colors: [
-                            Color.black.opacity(0.05),
-                            Color.black.opacity(0.24)
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-
-                    Text("Featured")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(.white.opacity(0.85))
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(Color.white.opacity(0.18), in: Capsule())
-                        .padding(14)
-                }
+                featureImage
                 .frame(maxWidth: .infinity)
                 .frame(height: heroImageHeight)
                 .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
 
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Featured Story")
+                        .font(.system(size: 10.5, weight: .semibold, design: .rounded))
+                        .textCase(.uppercase)
+                        .tracking(0.9)
+                        .foregroundStyle(.tertiary)
+
                     Text(displayTitle)
                         .font(DiscoverTypography.featureTitle)
                         .foregroundStyle(.primary)
                         .lineLimit(titleLineLimit)
-                        .lineSpacing(1.4)
+                        .lineSpacing(2)
 
                     if let displayDescription {
                         Text(displayDescription)
                             .font(DiscoverTypography.featureDescription)
                             .foregroundStyle(.secondary)
                             .lineLimit(descriptionLineLimit)
-                            .lineSpacing(1.2)
+                            .lineSpacing(1.5)
                     }
 
                     if isTeaserLoading {
@@ -2711,15 +2789,15 @@ private struct DiscoverFeatureCard: View {
                     } else if let teaserText, !teaserText.isEmpty {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(teaserText)
-                                .font(.system(size: 12.5, weight: .regular))
+                                .font(.system(size: 13.5, weight: .regular))
                                 .foregroundStyle(.secondary)
-                                .lineLimit(8)
-                                .lineSpacing(1.25)
+                                .lineLimit(9)
+                                .lineSpacing(1.45)
                         }
-                        .padding(.top, 2)
+                        .padding(.top, 4)
                     }
                 }
-                .padding(12)
+                .padding(16)
             }
         }
         .buttonStyle(DiscoverInteractivePressStyle())
@@ -2739,10 +2817,10 @@ private struct DiscoverFeatureCard: View {
         .overlay {
             if showsSurface {
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .strokeBorder(Color.primary.opacity(isHovered ? 0.16 : 0.08), lineWidth: 1)
+                    .strokeBorder(Color.primary.opacity(isHovered ? 0.13 : 0.07), lineWidth: 1)
             } else {
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .strokeBorder(Color.primary.opacity(isHovered ? 0.12 : 0.04), lineWidth: 0.8)
+                    .strokeBorder(Color.primary.opacity(isHovered ? 0.1 : 0.04), lineWidth: 0.8)
             }
         }
         .scaleEffect(reduceMotion ? 1 : (isHovered ? 1.005 : 1))
@@ -2765,8 +2843,7 @@ private struct DiscoverFeatureCard: View {
                             .fill(Color.primary.opacity(0.04))
                         image
                             .resizable()
-                            .aspectRatio(contentMode: .fit)
-                            .padding(.horizontal, 8)
+                            .aspectRatio(contentMode: .fill)
                     }
                     .transition(.opacity)
                 case .failure:
@@ -2833,8 +2910,7 @@ private struct DiscoverNewsCard: View {
                                     .fill(Color.primary.opacity(0.04))
                                 image
                                     .resizable()
-                                    .aspectRatio(contentMode: .fit)
-                                    .padding(6)
+                                    .aspectRatio(contentMode: .fill)
                             }
                             .transition(.opacity)
                         case .failure:
