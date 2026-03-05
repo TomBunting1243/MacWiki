@@ -57,59 +57,59 @@ enum TabBarChromeStyle {
 
 private enum TabChromeHierarchy {
     static func titleActiveOpacity(darkMode: Bool) -> Double {
-        darkMode ? 0.92 : 0.86
+        darkMode ? 0.88 : 0.82
     }
 
     static func titleHoverOpacity(darkMode: Bool) -> Double {
-        darkMode ? 0.68 : 0.60
+        darkMode ? 0.62 : 0.56
     }
 
     static func titleInactiveOpacity(darkMode: Bool) -> Double {
-        darkMode ? 0.54 : 0.46
+        darkMode ? 0.50 : 0.44
     }
 
     static func iconPrimaryOpacity(darkMode: Bool) -> Double {
-        darkMode ? 0.70 : 0.64
+        darkMode ? 0.62 : 0.56
     }
 
     static func progressTrackOpacity(darkMode: Bool) -> Double {
-        darkMode ? 0.14 : 0.10
+        darkMode ? 0.09 : 0.07
     }
 
     static func progressFillOpacity(darkMode: Bool) -> Double {
-        darkMode ? 0.72 : 0.62
+        darkMode ? 0.54 : 0.46
     }
 
     static func activeLiftYOffset() -> CGFloat {
-        -0.35
+        -0.12
     }
 
     static func activeShadowOpacity(darkMode: Bool) -> Double {
-        darkMode ? 0.12 : 0.05
+        darkMode ? 0.05 : 0.025
     }
 
     static func activeShadowRadius() -> CGFloat {
-        1.2
+        0.8
     }
 
     static func activeShadowYOffset() -> CGFloat {
-        0.5
+        0.35
     }
 
     static func activeRimOpacity(darkMode: Bool) -> Double {
-        darkMode ? 0.14 : 0.10
+        darkMode ? 0.07 : 0.05
     }
 
     static func activeGlassTintOpacity(darkMode: Bool) -> Double {
-        darkMode ? 0.06 : 0.05
+        darkMode ? 0.035 : 0.03
     }
 
     static func activeGlassSheenOpacity(darkMode: Bool) -> Double {
-        darkMode ? 0.08 : 0.11
+        darkMode ? 0.04 : 0.06
     }
 
     static func activeGlassDepthOpacity(darkMode: Bool) -> Double {
-        darkMode ? 0.07 : 0.02
+        darkMode ? 0.02 : 0.0
     }
 }
 
@@ -181,7 +181,7 @@ struct TabBarView: View {
             return 8
         }
         if chromeStyle == .strip {
-            return 6
+            return 4
         }
         return interactionProfile.tabSpacing
     }
@@ -426,16 +426,15 @@ struct TabBarView: View {
             let compactAccessory = chromeStyle == .strip
             if tabBarLiquidGlass {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .fill(.thinMaterial)
+                    .fill(.ultraThinMaterial)
                     .overlay(
                         RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                             .fill(
                                 Color(nsColor: .windowBackgroundColor)
                                     .opacity(
-                                        TopChromeControlSurface.tintOpacity(
-                                            darkMode: darkMode,
-                                            compactAccessory: compactAccessory
-                                        )
+                                        darkMode
+                                            ? (compactAccessory ? 0.16 : 0.18)
+                                            : (compactAccessory ? 0.09 : 0.11)
                                     )
                             )
                     )
@@ -444,12 +443,7 @@ struct TabBarView: View {
                             .fill(
                                 LinearGradient(
                                     colors: [
-                                        Color.white.opacity(
-                                            TopChromeControlSurface.sheenOpacity(
-                                                darkMode: darkMode,
-                                                compactAccessory: compactAccessory
-                                            )
-                                        ),
+                                        Color.white.opacity(darkMode ? 0.05 : 0.08),
                                         Color.clear
                                     ],
                                     startPoint: .top,
@@ -461,42 +455,18 @@ struct TabBarView: View {
                     .overlay(
                         RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                             .strokeBorder(
-                                Color.primary.opacity(
-                                    TopChromeControlSurface.borderOpacity(
-                                        darkMode: darkMode,
-                                        liquid: true,
-                                        compactAccessory: compactAccessory
-                                    )
-                                ),
-                                lineWidth: 0.52
+                                Color.primary.opacity(darkMode ? 0.09 : 0.07),
+                                lineWidth: 0.48
                             )
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                            .fill(
-                                Color.black.opacity(
-                                    TopChromeControlSurface.depthMultiplyOpacity(
-                                        darkMode: darkMode,
-                                        compactAccessory: compactAccessory
-                                    )
-                                )
-                            )
-                            .blendMode(.multiply)
                     )
             } else {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .fill(Color(nsColor: .controlBackgroundColor))
+                    .fill(Color(nsColor: .controlBackgroundColor).opacity(darkMode ? 0.68 : 0.82))
                     .overlay(
                         RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                             .strokeBorder(
-                                Color.primary.opacity(
-                                    TopChromeControlSurface.borderOpacity(
-                                        darkMode: darkMode,
-                                        liquid: false,
-                                        compactAccessory: compactAccessory
-                                    )
-                                ),
-                                lineWidth: 0.60
+                                Color.primary.opacity(darkMode ? 0.08 : 0.06),
+                                lineWidth: 0.50
                             )
                     )
             }
@@ -1023,8 +993,8 @@ private struct DraggableTabItemView: View {
     private var showsSemanticStatusCluster: Bool {
         !tab.isNewTab &&
         (chromeStyle == .strip || chromeStyle == .toolbar) &&
-        tabWidth >= 118 &&
-        (isActive || isHovered) &&
+        tabWidth >= 132 &&
+        isActive &&
         (showsSavedMarker || showsHighlightMarker || showsReadMarker)
     }
 
@@ -1032,9 +1002,9 @@ private struct DraggableTabItemView: View {
         showProgressTrack &&
         !tab.isNewTab &&
         (chromeStyle == .strip || chromeStyle == .toolbar) &&
-        tabWidth >= 110 &&
+        tabWidth >= 132 &&
         isActive &&
-        (normalizedProgress > 0.01 || isReadComplete)
+        (normalizedProgress > 0.12 || isReadComplete)
     }
 
     private var tabHeight: CGFloat {
@@ -1049,7 +1019,7 @@ private struct DraggableTabItemView: View {
     }
 
     private var tabCornerRadius: CGFloat {
-        (chromeStyle == .strip || chromeStyle == .toolbar) ? 7 : 9
+        (chromeStyle == .strip || chromeStyle == .toolbar) ? 6 : 9
     }
 
     private var closeButtonSize: CGFloat {
@@ -1210,37 +1180,34 @@ private struct DraggableTabItemView: View {
     }
 
     private var showsStripDivider: Bool {
-        (chromeStyle == .strip || chromeStyle == .toolbar) &&
-        !isActive &&
-        !isDragged &&
-        tabIndex < (appState.openTabs.count - 1)
+        false
     }
 
     @ViewBuilder
     private var stripGlassCellBackground: some View {
         let darkMode = colorScheme == .dark
         if tabBarLiquidGlass {
-            let sheenTop = isActive
+            let sheenOpacity = isActive
                 ? TabChromeHierarchy.activeGlassSheenOpacity(darkMode: darkMode)
-                : (darkMode ? 0.03 : 0.06)
-            let sheenMid = isActive
-                ? (darkMode ? 0.01 : 0.025)
-                : (darkMode ? 0.0 : 0.01)
+                : (darkMode ? 0.02 : 0.04)
             let edgeOpacity = darkMode
-                ? (isActive ? 0.14 : (isHovered ? 0.08 : 0.05))
-                : (isActive ? 0.12 : (isHovered ? 0.08 : 0.05))
+                ? (isActive ? 0.11 : (isHovered ? 0.07 : 0.045))
+                : (isActive ? 0.10 : (isHovered ? 0.07 : 0.045))
             let tintOpacity = darkMode
-                ? (isActive ? 0.08 : (isHovered ? 0.04 : 0.02))
-                : (isActive ? 0.05 : (isHovered ? 0.03 : 0.015))
+                ? (isActive ? 0.07 : (isHovered ? 0.035 : 0.018))
+                : (isActive ? 0.045 : (isHovered ? 0.026 : 0.012))
             let depthOpacity = isActive
                 ? TabChromeHierarchy.activeGlassDepthOpacity(darkMode: darkMode)
-                : (darkMode ? 0.12 : 0.03)
+                : (darkMode ? 0.05 : 0.0)
 
             RoundedRectangle(cornerRadius: tabCornerRadius, style: .continuous)
-                .fill(AnyShapeStyle(.thinMaterial))
+                .fill(AnyShapeStyle(.ultraThinMaterial))
                 .overlay {
                     RoundedRectangle(cornerRadius: tabCornerRadius, style: .continuous)
-                        .fill(Color(nsColor: .windowBackgroundColor).opacity(darkMode ? (tintOpacity + 0.08) : (tintOpacity + 0.04)))
+                        .fill(
+                            Color(nsColor: .windowBackgroundColor)
+                                .opacity(darkMode ? (tintOpacity + 0.05) : (tintOpacity + 0.025))
+                        )
                 }
                 .overlay {
                     if isActive {
@@ -1253,8 +1220,7 @@ private struct DraggableTabItemView: View {
                         .fill(
                             LinearGradient(
                                 colors: [
-                                    Color.white.opacity(sheenTop),
-                                    Color.white.opacity(sheenMid),
+                                    Color.white.opacity(sheenOpacity),
                                     Color.clear
                                 ],
                                 startPoint: .top,
@@ -1269,38 +1235,29 @@ private struct DraggableTabItemView: View {
                         .blendMode(.multiply)
                 )
                 .overlay(
-                        RoundedRectangle(cornerRadius: tabCornerRadius, style: .continuous)
-                            .strokeBorder(Color.primary.opacity(edgeOpacity), lineWidth: isActive ? 0.62 : 0.44)
+                    RoundedRectangle(cornerRadius: tabCornerRadius, style: .continuous)
+                        .strokeBorder(Color.primary.opacity(edgeOpacity), lineWidth: isActive ? 0.52 : 0.42)
                 )
-                .overlay {
-                    if isActive {
-                        RoundedRectangle(cornerRadius: tabCornerRadius, style: .continuous)
-                            .strokeBorder(
-                                Color.accentColor.opacity(darkMode ? 0.16 : 0.14),
-                                lineWidth: 0.60
-                            )
-                    }
-                }
         } else {
             let fillOpacity: CGFloat = {
                 if darkMode {
-                    if isActive { return 0.055 }
-                    if isHovered { return 0.014 }
+                    if isActive { return 0.042 }
+                    if isHovered { return 0.012 }
                     return 0.0
                 } else {
-                    if isActive { return 0.09 }
-                    if isHovered { return 0.025 }
+                    if isActive { return 0.065 }
+                    if isHovered { return 0.02 }
                     return 0.0
                 }
             }()
             let strokeOpacity: CGFloat = {
                 if darkMode {
-                    if isActive { return 0.038 }
-                    if isHovered { return 0.022 }
+                    if isActive { return 0.03 }
+                    if isHovered { return 0.018 }
                     return 0.012
                 } else {
-                    if isActive { return 0.10 }
-                    if isHovered { return 0.055 }
+                    if isActive { return 0.075 }
+                    if isHovered { return 0.04 }
                     return 0.028
                 }
             }()
@@ -1321,12 +1278,12 @@ private struct DraggableTabItemView: View {
             return Color(nsColor: .controlBackgroundColor)
         } else if isActive {
             if chromeStyle == .strip {
-                return Color(nsColor: .controlBackgroundColor).opacity(colorScheme == .dark ? 0.70 : 0.90)
+                return Color(nsColor: .controlBackgroundColor).opacity(colorScheme == .dark ? 0.62 : 0.78)
             }
             return Color.accentColor.opacity(chromeStyle == .standalone ? 0.10 : 0.14)
         } else if isHovered {
             if chromeStyle == .strip {
-                return Color.white.opacity(colorScheme == .dark ? 0.07 : 0.18)
+                return Color.white.opacity(colorScheme == .dark ? 0.05 : 0.12)
             }
             return Color.primary.opacity(chromeStyle == .standalone ? 0.05 : 0.07)
         }
@@ -1397,23 +1354,23 @@ private struct DraggableTabItemView: View {
     }
 
     private var semanticStatusCluster: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: 3) {
             if showsHighlightMarker {
                 Circle()
                     .fill(Color.yellow.opacity(colorScheme == .dark ? 0.78 : 0.70))
-                    .frame(width: 5, height: 5)
+                    .frame(width: 4.5, height: 4.5)
             }
 
             if showsSavedMarker {
                 Image(systemName: "bookmark.fill")
-                    .font(.system(size: 8, weight: .semibold))
-                    .foregroundStyle(Color.primary.opacity(colorScheme == .dark ? 0.58 : 0.50))
+                    .font(.system(size: 7.5, weight: .semibold))
+                    .foregroundStyle(Color.primary.opacity(colorScheme == .dark ? 0.48 : 0.42))
             }
 
             if showsReadMarker {
                 Image(systemName: "checkmark")
-                    .font(.system(size: 8, weight: .semibold))
-                    .foregroundStyle(Color.primary.opacity(colorScheme == .dark ? 0.56 : 0.48))
+                    .font(.system(size: 7.5, weight: .semibold))
+                    .foregroundStyle(Color.primary.opacity(colorScheme == .dark ? 0.46 : 0.40))
             }
         }
         .padding(.trailing, 1)
@@ -1436,7 +1393,7 @@ private struct DraggableTabItemView: View {
                     )
                     .frame(width: fillWidth)
             }
-            .frame(width: trackWidth, height: 1.5, alignment: .leading)
+            .frame(width: trackWidth, height: 1.0, alignment: .leading)
             .offset(x: horizontalPadding, y: -2)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
             .allowsHitTesting(false)
