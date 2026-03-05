@@ -1,0 +1,31 @@
+# macOS filesystem noise
+.DS_Store
+
+# Swift Package Manager
+.build/
+.swiftpm/
+Package.resolved
+
+# Xcode user and build data
+DerivedData/
+*.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/
+xcuserdata/
+
+# Local tool/editor state
+.claude/
+.agent/
+AGENTS.md
+CLAUDE.md
+GEMINI.md
+ANTIGRAVITY.md
+
+# App runtime cache and profiling artifacts
+MacWikiURLCache/
+default.profraw
+*.profraw
+*.profdata
+
+# Temporary logs/artifacts
+*.log
+dist/
