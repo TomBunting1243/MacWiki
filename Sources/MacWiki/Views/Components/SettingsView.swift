@@ -465,7 +465,7 @@ struct SettingsView: View {
             Toggle("Liquid Glass Tab Bar", isOn: $tabBarLiquidGlass)
             settingDescription("Use translucent liquid-glass treatment for the reader tab bar and article toolbar controls. Disable for a more solid chrome look.")
 
-            GroupBox("Tab Accompaniments") {
+            GroupBox("Tab Accompaniments (Pro)") {
                 VStack(alignment: .leading, spacing: compact ? 8 : 10) {
                     Toggle("Saved Marker", isOn: $showSavedTabMarker)
                     Toggle("Highlight Marker", isOn: $showHighlightTabMarker)
@@ -475,7 +475,7 @@ struct SettingsView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
-            settingDescription("Control which tab-level markers and depth cues appear in the reader tab strip.")
+            settingDescription("Optional power-user markers and depth cues for people who want more state visible in the reader tab strip.")
 
             GroupBox("Highlight Behavior") {
                 VStack(alignment: .leading, spacing: compact ? 8 : 10) {
