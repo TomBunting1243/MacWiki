@@ -1879,12 +1879,7 @@ private struct DiscoverFeedSections: View {
 
     @ViewBuilder
     private var openingEditorialSpread: some View {
-        if usesOpeningModuleSplit {
-            LazyVGrid(columns: openingModuleColumns, alignment: .leading, spacing: 18) {
-                todayMostReadSection
-                newsBriefingSection
-            }
-        } else {
+        VStack(alignment: .leading, spacing: 18) {
             todayMostReadSection
             newsBriefingSection
         }
@@ -1898,48 +1893,34 @@ private struct DiscoverFeedSections: View {
                 subtitle: "PLACEHOLDER"
             )
 
-            if usesCollectionsExplorationSplit {
-                HStack(alignment: .top, spacing: 18) {
-                    mostReadCollectionModule
-                        .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
-                    longestReadsCollectionModule
-                        .frame(width: collectionsExplorationRailWidth, alignment: .leading)
-                }
-            } else {
-                LazyVGrid(columns: playlistColumns, spacing: 16) {
-                    mostReadCollectionModule
-                    longestReadsCollectionModule
-                }
+            VStack(alignment: .leading, spacing: 16) {
+                mostReadCollectionModule
+                longestReadsCollectionModule
             }
         }
     }
 
     @ViewBuilder
     private var mediaSpotlightSection: some View {
-        if usesMediaSpotlightSplit, let featuredImage = feed.featuredImage {
-            HStack(alignment: .top, spacing: 16) {
+        if let featuredImage = feed.featuredImage {
+            VStack(alignment: .leading, spacing: 16) {
                 DiscoverEditorialPanel(accent: Color.indigo.opacity(0.82), tone: .feature) {
                     VStack(alignment: .leading, spacing: 12) {
                         DiscoverSectionHeader(title: "Image of the Day", subtitle: "PLACEHOLDER")
-                        DiscoverFeaturedImageCard(
-                            image: featuredImage,
-                            prefersHorizontalLayout: true
-                        )
+                        DiscoverFeaturedImageCard(image: featuredImage)
                     }
                 }
-                .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
+            }
+        }
 
-                DiscoverEditorialPanel(accent: Color.red.opacity(0.78), tone: .notebook) {
-                    VStack(alignment: .leading, spacing: 12) {
-                        DiscoverSectionHeader(title: "In the News", subtitle: "PLACEHOLDER")
-                        VStack(spacing: 10) {
-                            ForEach(remainingNewsItems.prefix(inTheNewsRailLimit)) { result in
-                                let rowKey = pageViewsRowKey(section: "in-news", result: result)
-                                DiscoverNewsCard(
-                                    result: result,
-                                    style: .rail,
-                                    onOpen: onOpen
-                                )
+        if !remainingNewsItems.isEmpty {
+            DiscoverEditorialPanel(accent: Color.red.opacity(0.78), tone: .notebook) {
+                VStack(alignment: .leading, spacing: 12) {
+                    DiscoverSectionHeader(title: "In the News", subtitle: "PLACEHOLDER")
+                    VStack(spacing: 10) {
+                        ForEach(remainingNewsItems.prefix(inTheNewsRailLimit)) { result in
+                            let rowKey = pageViewsRowKey(section: "in-news", result: result)
+                            DiscoverNewsCard(result: result, onOpen: onOpen)
                                 .contextMenu {
                                     discoverContextMenu(for: result) {
                                         presentPageViewsPopover(for: result, rowKey: rowKey)
@@ -1948,45 +1929,7 @@ private struct DiscoverFeedSections: View {
                                 .popover(isPresented: pageViewsPopoverBinding(for: rowKey), arrowEdge: .trailing) {
                                     pageViewsPopover(for: rowKey)
                                 }
-                            }
                         }
-                    }
-                }
-                .frame(width: mediaSpotlightRailWidth, alignment: .leading)
-            }
-        } else {
-            if let featuredImage = feed.featuredImage {
-                DiscoverEditorialPanel(accent: Color.indigo.opacity(0.82), tone: .feature) {
-                    VStack(alignment: .leading, spacing: 12) {
-                        DiscoverSectionHeader(title: "Image of the Day", subtitle: "PLACEHOLDER")
-                        DiscoverFeaturedImageCard(image: featuredImage)
-                    }
-                }
-            }
-
-            if !remainingNewsItems.isEmpty {
-                DiscoverEditorialPanel(accent: Color.red.opacity(0.78), tone: .notebook) {
-                    VStack(alignment: .leading, spacing: 12) {
-                        DiscoverSectionHeader(title: "In the News", subtitle: "PLACEHOLDER")
-                        ScrollView(.horizontal) {
-                            LazyHStack(spacing: 12) {
-                                ForEach(remainingNewsItems.prefix(inTheNewsRailLimit)) { result in
-                                    let rowKey = pageViewsRowKey(section: "in-news", result: result)
-                                    DiscoverNewsCard(result: result, onOpen: onOpen)
-                                        .frame(width: 230)
-                                        .contextMenu {
-                                            discoverContextMenu(for: result) {
-                                                presentPageViewsPopover(for: result, rowKey: rowKey)
-                                            }
-                                        }
-                                        .popover(isPresented: pageViewsPopoverBinding(for: rowKey), arrowEdge: .trailing) {
-                                            pageViewsPopover(for: rowKey)
-                                        }
-                                }
-                            }
-                            .padding(.vertical, 2)
-                        }
-                        .scrollIndicators(.hidden)
                     }
                 }
             }
@@ -2061,21 +2004,8 @@ private struct DiscoverFeedSections: View {
             ) {
                 VStack(alignment: .leading, spacing: isCompactLayout ? 14 : 18) {
                     DiscoverSectionHeader(title: "Time Capsule", subtitle: "PLACEHOLDER")
-
-                    if usesTimeCapsuleSpread {
-                        HStack(alignment: .top, spacing: 18) {
-                            timeCapsuleHistoryModule
-                                .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
-
-                            if !feed.didYouKnow.isEmpty {
-                                timeCapsuleDidYouKnowModule
-                                    .frame(width: timeCapsuleRailWidth, alignment: .leading)
-                            }
-                        }
-                    } else {
-                        timeCapsuleHistoryModule
-                        timeCapsuleDidYouKnowModule
-                    }
+                    timeCapsuleHistoryModule
+                    timeCapsuleDidYouKnowModule
                 }
             }
         }
@@ -2179,17 +2109,8 @@ private struct DiscoverFeedSections: View {
                     }
 
                     if !feed.onThisDayBirths.isEmpty || !feed.onThisDayDeaths.isEmpty {
-                        if usesTimeMachineTwinColumns {
-                            HStack(alignment: .top, spacing: 14) {
-                                timeMachineBirthsModule
-                                    .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
-                                timeMachineDeathsModule
-                                    .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
-                            }
-                        } else {
-                            timeMachineBirthsModule
-                            timeMachineDeathsModule
-                        }
+                        timeMachineBirthsModule
+                        timeMachineDeathsModule
                     }
 
                     timeMachineHolidaysModule
@@ -2200,14 +2121,7 @@ private struct DiscoverFeedSections: View {
 
     @ViewBuilder
     private var temporalExplorationStage: some View {
-        if usesTemporalExplorationSpread {
-            HStack(alignment: .top, spacing: 18) {
-                timeCapsuleStage
-                    .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
-                timeMachineStage
-                    .frame(width: temporalExplorationRailWidth, alignment: .leading)
-            }
-        } else {
+        VStack(alignment: .leading, spacing: 18) {
             timeCapsuleStage
             timeMachineStage
         }
@@ -2453,7 +2367,7 @@ private struct DiscoverMasthead: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .firstTextBaseline, spacing: 12) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Today’s Edition")
@@ -2483,6 +2397,7 @@ private struct DiscoverMasthead: View {
             Rectangle()
                 .fill(Color.primary.opacity(0.08))
                 .frame(height: 1)
+                .padding(.top, 2)
         }
     }
 }
@@ -2686,7 +2601,7 @@ private struct DiscoverTemporalSubsectionHeader: View {
     let accent: Color
 
     var body: some View {
-        HStack(alignment: .center, spacing: 8) {
+        VStack(alignment: .leading, spacing: 8) {
             SwiftUI.Label(title, systemImage: systemImage)
                 .font(.system(size: 11.5, weight: .semibold, design: .rounded))
                 .foregroundStyle(.secondary)
@@ -2694,6 +2609,7 @@ private struct DiscoverTemporalSubsectionHeader: View {
             Rectangle()
                 .fill(accent.opacity(0.18))
                 .frame(height: 1)
+                .padding(.leading, 2)
         }
     }
 }
