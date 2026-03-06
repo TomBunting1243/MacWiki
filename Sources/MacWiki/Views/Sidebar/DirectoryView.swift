@@ -1074,12 +1074,42 @@ struct DirectoryView: View {
     }
 
     private var directoryHeaderControls: some View {
-        HStack(spacing: 4) {
+        let darkMode = colorScheme == .dark
+
+        return HStack(spacing: 0) {
             directoryUnreadFilterButton
+
+            directoryHeaderControlDivider
+
             directorySortMenu
+
+            directoryHeaderControlDivider
+
             directoryBatchActionsMenu
         }
-        .padding(.vertical, 1)
+        .padding(.horizontal, TopChromeControlMetrics.groupHorizontalPadding)
+        .frame(height: TopChromeControlMetrics.groupHeight)
+        .background {
+            RoundedRectangle(cornerRadius: TopChromeControlMetrics.groupCornerRadius, style: .continuous)
+                .fill(.thinMaterial)
+                .overlay {
+                    RoundedRectangle(cornerRadius: TopChromeControlMetrics.groupCornerRadius, style: .continuous)
+                        .fill(Color(nsColor: .controlBackgroundColor).opacity(darkMode ? 0.18 : 0.10))
+                }
+                .overlay {
+                    RoundedRectangle(cornerRadius: TopChromeControlMetrics.groupCornerRadius, style: .continuous)
+                        .strokeBorder(
+                            Color.primary.opacity(TopChromeControlSurface.borderOpacity(darkMode: darkMode, liquid: true, compactAccessory: true)),
+                            lineWidth: 0.44
+                        )
+                }
+        }
+    }
+
+    private var directoryHeaderControlDivider: some View {
+        Rectangle()
+            .fill(Color.primary.opacity(ColumnChromeMetrics.internalDividerOpacity(for: colorScheme) * 1.45))
+            .frame(width: 0.5, height: 13)
     }
 
     private func syncSidebarChromeChoreography(sidebarVisible: Bool) {
@@ -1111,7 +1141,7 @@ struct DirectoryView: View {
                 .font(.system(size: ChromeIconMetrics.symbolPointSize, weight: ChromeIconMetrics.regularWeight))
                 .imageScale(.medium)
                 .foregroundStyle(unreadFilterEnabled ? Color.accentColor : .secondary)
-                .frame(width: ChromeIconMetrics.buttonSize, height: ChromeIconMetrics.buttonSize)
+                .frame(width: TopChromeControlMetrics.groupButtonSize, height: TopChromeControlMetrics.groupButtonSize)
         }
         .buttonStyle(.plain)
         .help(unreadFilterEnabled ? "Show all articles" : "Show unread only")
@@ -1139,7 +1169,7 @@ struct DirectoryView: View {
                 .font(.system(size: ChromeIconMetrics.symbolPointSize, weight: ChromeIconMetrics.regularWeight))
                 .imageScale(.medium)
                 .foregroundStyle(.secondary)
-                .frame(width: ChromeIconMetrics.buttonSize, height: ChromeIconMetrics.buttonSize)
+                .frame(width: TopChromeControlMetrics.groupButtonSize, height: TopChromeControlMetrics.groupButtonSize)
         }
         .menuStyle(.borderlessButton)
         .help("Sort")
@@ -1224,7 +1254,7 @@ struct DirectoryView: View {
                 .font(.system(size: ChromeIconMetrics.symbolPointSize, weight: ChromeIconMetrics.regularWeight))
                 .imageScale(.medium)
                 .foregroundStyle(.secondary)
-                .frame(width: ChromeIconMetrics.buttonSize, height: ChromeIconMetrics.buttonSize)
+                .frame(width: TopChromeControlMetrics.groupButtonSize, height: TopChromeControlMetrics.groupButtonSize)
         }
         .menuStyle(.borderlessButton)
         .help("Batch actions")
