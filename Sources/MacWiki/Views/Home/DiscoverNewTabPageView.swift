@@ -1179,6 +1179,30 @@ private struct DiscoverFeedSections: View {
         usesMediaSpotlightSplit ? 4 : (isCompactLayout ? 8 : 12)
     }
 
+    private var usesTimeCapsuleSpread: Bool {
+        availableWidth >= 940 && !primaryTimelineEvents.isEmpty && !feed.didYouKnow.isEmpty
+    }
+
+    private var timeCapsuleRailWidth: CGFloat {
+        min(max(availableWidth * 0.33, 292), 356)
+    }
+
+    private var hasTimeCapsuleDetails: Bool {
+        !primaryTimelineEvents.isEmpty || !feed.didYouKnow.isEmpty
+    }
+
+    private var usesTemporalExplorationSpread: Bool {
+        availableWidth >= 1120 && hasTimeCapsuleDetails && hasTimeMachineDetails
+    }
+
+    private var temporalExplorationRailWidth: CGFloat {
+        min(max(availableWidth * 0.39, 352), 424)
+    }
+
+    private var usesTimeMachineTwinColumns: Bool {
+        availableWidth >= 900 && !feed.onThisDayBirths.isEmpty && !feed.onThisDayDeaths.isEmpty
+    }
+
     private var playlistColumns: [GridItem] {
         if availableWidth < 900 {
             return [GridItem(.flexible(minimum: 280), spacing: 0)]
@@ -1310,6 +1334,14 @@ private struct DiscoverFeedSections: View {
             return Array(feed.onThisDaySelected.prefix(8))
         }
         return Array(feed.onThisDay.prefix(8))
+    }
+
+    private var leadTimelineEvent: WikipediaService.DiscoverFeed.OnThisDayEvent? {
+        primaryTimelineEvents.first
+    }
+
+    private var supportingTimelineEvents: [WikipediaService.DiscoverFeed.OnThisDayEvent] {
+        Array(primaryTimelineEvents.dropFirst())
     }
 
     private var hasTimeMachineDetails: Bool {
@@ -1877,6 +1909,226 @@ private struct DiscoverFeedSections: View {
         }
     }
 
+    @ViewBuilder
+    private var timeCapsuleHistoryModule: some View {
+        if leadTimelineEvent != nil || !supportingTimelineEvents.isEmpty {
+            VStack(alignment: .leading, spacing: 12) {
+                DiscoverTemporalSubsectionHeader(
+                    title: "This Day in History",
+                    systemImage: "clock.arrow.trianglehead.counterclockwise.rotate.90",
+                    accent: Color.mint.opacity(0.82)
+                )
+
+                if let leadTimelineEvent {
+                    DiscoverOnThisDayFeatureCard(
+                        event: leadTimelineEvent,
+                        accent: Color.mint.opacity(0.82),
+                        onOpen: onOpen
+                    )
+                }
+
+                if !supportingTimelineEvents.isEmpty {
+                    VStack(spacing: 8) {
+                        ForEach(supportingTimelineEvents) { event in
+                            DiscoverOnThisDayRow(
+                                event: event,
+                                onOpen: onOpen,
+                                referenceDate: trendReferenceDate,
+                                showsSurface: false
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var timeCapsuleDidYouKnowModule: some View {
+        if !feed.didYouKnow.isEmpty {
+            DiscoverInsetPanel(accent: Color.yellow.opacity(0.76)) {
+                VStack(alignment: .leading, spacing: 10) {
+                    DiscoverTemporalSubsectionHeader(
+                        title: "Did You Know?",
+                        systemImage: "lightbulb.max",
+                        accent: Color.yellow.opacity(0.76)
+                    )
+
+                    ForEach(feed.didYouKnow.prefix(8)) { fact in
+                        DiscoverDidYouKnowRow(
+                            fact: fact,
+                            onOpen: onOpen,
+                            referenceDate: trendReferenceDate,
+                            showsSurface: false
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var timeCapsuleStage: some View {
+        if hasTimeCapsuleDetails {
+            DiscoverEditorialPanel(
+                accent: Color.mint.opacity(0.84),
+                tone: .archive,
+                contentPadding: isCompactLayout ? 14 : 18
+            ) {
+                VStack(alignment: .leading, spacing: isCompactLayout ? 14 : 18) {
+                    DiscoverSectionHeader(title: "Time Capsule", subtitle: "PLACEHOLDER")
+
+                    if usesTimeCapsuleSpread {
+                        HStack(alignment: .top, spacing: 18) {
+                            timeCapsuleHistoryModule
+                                .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
+
+                            if !feed.didYouKnow.isEmpty {
+                                timeCapsuleDidYouKnowModule
+                                    .frame(width: timeCapsuleRailWidth, alignment: .leading)
+                            }
+                        }
+                    } else {
+                        timeCapsuleHistoryModule
+                        timeCapsuleDidYouKnowModule
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var timeMachineBirthsModule: some View {
+        if !feed.onThisDayBirths.isEmpty {
+            DiscoverInsetPanel(accent: Color.green.opacity(0.78)) {
+                VStack(alignment: .leading, spacing: 10) {
+                    DiscoverTemporalSubsectionHeader(
+                        title: "Born",
+                        systemImage: "sparkles",
+                        accent: Color.green.opacity(0.78)
+                    )
+
+                    ForEach(feed.onThisDayBirths.prefix(6)) { event in
+                        DiscoverOnThisDayRow(
+                            event: event,
+                            onOpen: onOpen,
+                            referenceDate: trendReferenceDate,
+                            showsSurface: false
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var timeMachineDeathsModule: some View {
+        if !feed.onThisDayDeaths.isEmpty {
+            DiscoverInsetPanel(accent: Color.pink.opacity(0.72)) {
+                VStack(alignment: .leading, spacing: 10) {
+                    DiscoverTemporalSubsectionHeader(
+                        title: "Died",
+                        systemImage: "moon.stars",
+                        accent: Color.pink.opacity(0.72)
+                    )
+
+                    ForEach(feed.onThisDayDeaths.prefix(6)) { event in
+                        DiscoverOnThisDayRow(
+                            event: event,
+                            onOpen: onOpen,
+                            referenceDate: trendReferenceDate,
+                            showsSurface: false
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var timeMachineHolidaysModule: some View {
+        if !feed.holidays.isEmpty {
+            DiscoverInsetPanel(accent: Color.orange.opacity(0.74)) {
+                VStack(alignment: .leading, spacing: 10) {
+                    DiscoverTemporalSubsectionHeader(
+                        title: "Holidays & Observances",
+                        systemImage: "calendar",
+                        accent: Color.orange.opacity(0.74)
+                    )
+
+                    ForEach(feed.holidays.prefix(8)) { holiday in
+                        DiscoverHolidayRow(
+                            holiday: holiday,
+                            onOpen: onOpen,
+                            referenceDate: trendReferenceDate,
+                            showsSurface: false
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var timeMachineStage: some View {
+        if hasTimeMachineDetails {
+            DiscoverEditorialPanel(
+                accent: Color.indigo.opacity(0.84),
+                tone: .timewarp,
+                contentPadding: isCompactLayout ? 14 : 18
+            ) {
+                VStack(alignment: .leading, spacing: isCompactLayout ? 14 : 18) {
+                    HStack(alignment: .firstTextBaseline, spacing: 12) {
+                        DiscoverSectionHeader(title: "Time Machine", subtitle: "PLACEHOLDER")
+
+                        Spacer(minLength: 0)
+
+                        if !feed.dateLabel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                            Text(feed.dateLabel)
+                                .font(.system(size: 11, weight: .semibold, design: .rounded))
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 6)
+                                .background(Color.primary.opacity(0.055), in: Capsule())
+                        }
+                    }
+
+                    if !feed.onThisDayBirths.isEmpty || !feed.onThisDayDeaths.isEmpty {
+                        if usesTimeMachineTwinColumns {
+                            HStack(alignment: .top, spacing: 14) {
+                                timeMachineBirthsModule
+                                    .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
+                                timeMachineDeathsModule
+                                    .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
+                            }
+                        } else {
+                            timeMachineBirthsModule
+                            timeMachineDeathsModule
+                        }
+                    }
+
+                    timeMachineHolidaysModule
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var temporalExplorationStage: some View {
+        if usesTemporalExplorationSpread {
+            HStack(alignment: .top, spacing: 18) {
+                timeCapsuleStage
+                    .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
+                timeMachineStage
+                    .frame(width: temporalExplorationRailWidth, alignment: .leading)
+            }
+        } else {
+            timeCapsuleStage
+            timeMachineStage
+        }
+    }
+
     var body: some View {
         LazyVStack(alignment: .leading, spacing: sectionSpacing) {
             if let featured = feed.featuredArticle {
@@ -1916,106 +2168,7 @@ private struct DiscoverFeedSections: View {
 
             mediaSpotlightSection
 
-            DiscoverSectionHeader(title: "Time Capsule", subtitle: "PLACEHOLDER")
-            HStack(alignment: .top, spacing: isCompactLayout ? 10 : 12) {
-                if !primaryTimelineEvents.isEmpty {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("This Day in History")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(.secondary)
-                            .padding(.horizontal, 4)
-
-                        ForEach(primaryTimelineEvents) { event in
-                            DiscoverOnThisDayRow(
-                                event: event,
-                                onOpen: onOpen,
-                                referenceDate: trendReferenceDate
-                            )
-                        }
-                    }
-                    .frame(maxWidth: .infinity, alignment: .topLeading)
-                }
-
-                if !feed.didYouKnow.isEmpty {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Did You Know?")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(.secondary)
-                            .padding(.horizontal, 4)
-
-                        ForEach(feed.didYouKnow.prefix(8)) { fact in
-                            DiscoverDidYouKnowRow(
-                                fact: fact,
-                                onOpen: onOpen,
-                                referenceDate: trendReferenceDate
-                            )
-                        }
-                    }
-                    .frame(maxWidth: .infinity, alignment: .topLeading)
-                }
-            }
-
-            if hasTimeMachineDetails {
-                DiscoverSectionHeader(title: "Time Machine", subtitle: "PLACEHOLDER")
-                VStack(alignment: .leading, spacing: 12) {
-                    if !feed.onThisDayBirths.isEmpty || !feed.onThisDayDeaths.isEmpty {
-                        HStack(alignment: .top, spacing: isCompactLayout ? 10 : 12) {
-                            if !feed.onThisDayBirths.isEmpty {
-                                VStack(alignment: .leading, spacing: 8) {
-                                    Text("Born")
-                                        .font(.system(size: 13, weight: .semibold))
-                                        .foregroundStyle(.secondary)
-                                        .padding(.horizontal, 4)
-
-                                    ForEach(feed.onThisDayBirths.prefix(6)) { event in
-                                        DiscoverOnThisDayRow(
-                                            event: event,
-                                            onOpen: onOpen,
-                                            referenceDate: trendReferenceDate
-                                        )
-                                    }
-                                }
-                                .frame(maxWidth: .infinity, alignment: .topLeading)
-                            }
-
-                            if !feed.onThisDayDeaths.isEmpty {
-                                VStack(alignment: .leading, spacing: 8) {
-                                    Text("Died")
-                                        .font(.system(size: 13, weight: .semibold))
-                                        .foregroundStyle(.secondary)
-                                        .padding(.horizontal, 4)
-
-                                    ForEach(feed.onThisDayDeaths.prefix(6)) { event in
-                                        DiscoverOnThisDayRow(
-                                            event: event,
-                                            onOpen: onOpen,
-                                            referenceDate: trendReferenceDate
-                                        )
-                                    }
-                                }
-                                .frame(maxWidth: .infinity, alignment: .topLeading)
-                            }
-                        }
-                    }
-
-                    if !feed.holidays.isEmpty {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Holidays & Observances")
-                                .font(.system(size: 13, weight: .semibold))
-                                .foregroundStyle(.secondary)
-                                .padding(.horizontal, 4)
-
-                            ForEach(feed.holidays.prefix(8)) { holiday in
-                                DiscoverHolidayRow(
-                                    holiday: holiday,
-                                    onOpen: onOpen,
-                                    referenceDate: trendReferenceDate
-                                )
-                            }
-                        }
-                    }
-                }
-            }
+            temporalExplorationStage
         }
         .background {
             collectionsKeyboardShortcutHost
@@ -2304,6 +2457,158 @@ private struct DiscoverSectionHeader: View {
             }
             Text(title)
                 .font(DiscoverTypography.sectionTitle)
+        }
+    }
+}
+
+private enum DiscoverEditorialPanelTone {
+    case archive
+    case timewarp
+
+    func backgroundColors(accent: Color) -> [Color] {
+        switch self {
+        case .archive:
+            return [accent.opacity(0.08), Color.orange.opacity(0.05), Color.white.opacity(0.14)]
+        case .timewarp:
+            return [accent.opacity(0.12), Color.primary.opacity(0.026), Color.white.opacity(0.16)]
+        }
+    }
+
+    var topRuleHeight: CGFloat {
+        switch self {
+        case .archive: return 2
+        case .timewarp: return 2.5
+        }
+    }
+
+    var cornerRadius: CGFloat {
+        switch self {
+        case .archive: return 20
+        case .timewarp: return 24
+        }
+    }
+
+    var borderOpacity: Double {
+        switch self {
+        case .archive: return 0.11
+        case .timewarp: return 0.16
+        }
+    }
+
+    var shadowOpacity: Double {
+        switch self {
+        case .archive: return 0.04
+        case .timewarp: return 0.07
+        }
+    }
+}
+
+private struct DiscoverEditorialPanel<Content: View>: View {
+    let accent: Color
+    var tone: DiscoverEditorialPanelTone = .archive
+    var contentPadding: CGFloat = 16
+    let content: Content
+
+    init(
+        accent: Color,
+        tone: DiscoverEditorialPanelTone = .archive,
+        contentPadding: CGFloat = 16,
+        @ViewBuilder content: () -> Content
+    ) {
+        self.accent = accent
+        self.tone = tone
+        self.contentPadding = contentPadding
+        self.content = content()
+    }
+
+    var body: some View {
+        let cornerRadius = tone.cornerRadius
+
+        VStack(alignment: .leading, spacing: 0) {
+            LinearGradient(
+                colors: [accent.opacity(0.8), accent.opacity(0.18)],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+            .frame(height: tone.topRuleHeight)
+
+            content
+                .padding(contentPadding)
+        }
+        .background(
+            LinearGradient(
+                colors: tone.backgroundColors(accent: accent),
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ),
+            in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                .strokeBorder(accent.opacity(tone.borderOpacity), lineWidth: 0.9)
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                .strokeBorder(Color.white.opacity(0.18), lineWidth: 0.6)
+                .blendMode(.screen)
+        }
+        .shadow(color: accent.opacity(tone.shadowOpacity), radius: 18, y: 8)
+    }
+}
+
+private struct DiscoverInsetPanel<Content: View>: View {
+    let accent: Color
+    var contentPadding: CGFloat = 12
+    let content: Content
+
+    init(
+        accent: Color,
+        contentPadding: CGFloat = 12,
+        @ViewBuilder content: () -> Content
+    ) {
+        self.accent = accent
+        self.contentPadding = contentPadding
+        self.content = content()
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            content
+                .padding(contentPadding)
+        }
+        .background(
+            LinearGradient(
+                colors: [
+                    accent.opacity(0.055),
+                    Color.primary.opacity(0.018),
+                    Color.white.opacity(0.08)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ),
+            in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .strokeBorder(accent.opacity(0.1), lineWidth: 0.8)
+        }
+    }
+}
+
+private struct DiscoverTemporalSubsectionHeader: View {
+    let title: String
+    let systemImage: String
+    let accent: Color
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 8) {
+            SwiftUI.Label(title, systemImage: systemImage)
+                .font(.system(size: 11.5, weight: .semibold, design: .rounded))
+                .foregroundStyle(.secondary)
+
+            Rectangle()
+                .fill(accent.opacity(0.18))
+                .frame(height: 1)
         }
     }
 }
@@ -3836,10 +4141,78 @@ private struct DiscoverStoryLinkChip: View {
     }
 }
 
+private struct DiscoverOnThisDayFeatureCard: View {
+    let event: WikipediaService.DiscoverFeed.OnThisDayEvent
+    let accent: Color
+    let onOpen: (WikipediaService.SearchResult, Bool) -> Void
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var isHovered = false
+
+    var body: some View {
+        Button {
+            if let article = event.article {
+                onOpen(article, SystemBridge.isCommandPressed)
+            }
+        } label: {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(alignment: .top, spacing: 12) {
+                    Text(event.year)
+                        .font(.system(size: 28, weight: .bold, design: .serif))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+
+                    Spacer(minLength: 0)
+
+                    if let article = event.article {
+                        Text(article.title)
+                            .font(.system(size: 10.5, weight: .semibold, design: .rounded))
+                            .foregroundStyle(accent)
+                            .lineLimit(1)
+                            .padding(.horizontal, 9)
+                            .padding(.vertical, 5)
+                            .background(accent.opacity(0.12), in: Capsule())
+                    }
+                }
+
+                Text(event.text)
+                    .font(.system(size: 15, weight: .medium, design: .serif))
+                    .foregroundStyle(.primary)
+                    .lineLimit(4)
+                    .multilineTextAlignment(.leading)
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                LinearGradient(
+                    colors: [
+                        accent.opacity(isHovered ? 0.12 : 0.09),
+                        Color.primary.opacity(0.025),
+                        Color.white.opacity(0.10)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ),
+                in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .strokeBorder(accent.opacity(isHovered ? 0.22 : 0.12), lineWidth: 0.9)
+            }
+        }
+        .buttonStyle(DiscoverInteractivePressStyle(pressedScale: 0.992, pressedOpacity: 0.95))
+        .disabled(event.article == nil)
+        .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .scaleEffect(reduceMotion ? 1 : (isHovered ? 1.006 : 1))
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.14), value: isHovered)
+        .onHover { isHovered = $0 }
+    }
+}
+
 private struct DiscoverOnThisDayRow: View {
     let event: WikipediaService.DiscoverFeed.OnThisDayEvent
     let onOpen: (WikipediaService.SearchResult, Bool) -> Void
     let referenceDate: Date
+    var showsSurface: Bool = true
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var showingPageViewsPopover = false
     @State private var isHovered = false
@@ -3872,12 +4245,22 @@ private struct DiscoverOnThisDayRow: View {
         .buttonStyle(DiscoverInteractivePressStyle())
         .accessibilityLabel(event.article?.title ?? event.text)
         .padding(10)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .background(
+            Group {
+                if showsSurface {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(.regularMaterial)
+                } else {
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(Color.primary.opacity(isHovered ? 0.048 : 0.026))
+                }
+            }
+        )
         .overlay {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(Color.primary.opacity(isHovered ? 0.15 : 0.08), lineWidth: 0.8)
+            RoundedRectangle(cornerRadius: showsSurface ? 12 : 14, style: .continuous)
+                .strokeBorder(Color.primary.opacity(isHovered ? 0.15 : (showsSurface ? 0.08 : 0.05)), lineWidth: 0.8)
         }
-        .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: showsSurface ? 12 : 14, style: .continuous))
         .scaleEffect(reduceMotion ? 1 : (isHovered ? 1.004 : 1))
         .animation(reduceMotion ? nil : .easeOut(duration: 0.13), value: isHovered)
         .onHover { isHovered = $0 }
@@ -3939,6 +4322,7 @@ private struct DiscoverDidYouKnowRow: View {
     let fact: WikipediaService.DiscoverFeed.DidYouKnowFact
     let onOpen: (WikipediaService.SearchResult, Bool) -> Void
     let referenceDate: Date
+    var showsSurface: Bool = true
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var showingPageViewsPopover = false
     @State private var isHovered = false
@@ -3971,12 +4355,22 @@ private struct DiscoverDidYouKnowRow: View {
         .buttonStyle(DiscoverInteractivePressStyle())
         .accessibilityLabel(fact.article?.title ?? fact.text)
         .padding(10)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .background(
+            Group {
+                if showsSurface {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(.regularMaterial)
+                } else {
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(Color.primary.opacity(isHovered ? 0.048 : 0.026))
+                }
+            }
+        )
         .overlay {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(Color.primary.opacity(isHovered ? 0.15 : 0.08), lineWidth: 0.8)
+            RoundedRectangle(cornerRadius: showsSurface ? 12 : 14, style: .continuous)
+                .strokeBorder(Color.primary.opacity(isHovered ? 0.15 : (showsSurface ? 0.08 : 0.05)), lineWidth: 0.8)
         }
-        .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: showsSurface ? 12 : 14, style: .continuous))
         .scaleEffect(reduceMotion ? 1 : (isHovered ? 1.004 : 1))
         .animation(reduceMotion ? nil : .easeOut(duration: 0.13), value: isHovered)
         .onHover { isHovered = $0 }
@@ -4038,6 +4432,7 @@ private struct DiscoverHolidayRow: View {
     let holiday: WikipediaService.DiscoverFeed.HolidayItem
     let onOpen: (WikipediaService.SearchResult, Bool) -> Void
     let referenceDate: Date
+    var showsSurface: Bool = true
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var showingPageViewsPopover = false
     @State private var isHovered = false
@@ -4070,12 +4465,22 @@ private struct DiscoverHolidayRow: View {
         .buttonStyle(DiscoverInteractivePressStyle())
         .accessibilityLabel(holiday.article?.title ?? holiday.text)
         .padding(10)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .background(
+            Group {
+                if showsSurface {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(.regularMaterial)
+                } else {
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(Color.primary.opacity(isHovered ? 0.048 : 0.026))
+                }
+            }
+        )
         .overlay {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(Color.primary.opacity(isHovered ? 0.15 : 0.08), lineWidth: 0.8)
+            RoundedRectangle(cornerRadius: showsSurface ? 12 : 14, style: .continuous)
+                .strokeBorder(Color.primary.opacity(isHovered ? 0.15 : (showsSurface ? 0.08 : 0.05)), lineWidth: 0.8)
         }
-        .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: showsSurface ? 12 : 14, style: .continuous))
         .scaleEffect(reduceMotion ? 1 : (isHovered ? 1.004 : 1))
         .animation(reduceMotion ? nil : .easeOut(duration: 0.13), value: isHovered)
         .onHover { isHovered = $0 }
