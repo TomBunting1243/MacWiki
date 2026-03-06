@@ -86,6 +86,9 @@ struct ContentView: View {
         }
         .toolbar(removing: .title)
         .toolbar(removing: .sidebarToggle)
+        .toolbar {
+            MainWindowToolbar()
+        }
         .toolbarBackground(.hidden, for: .windowToolbar)
         .animation(reduceMotion ? nil : PanelMotion.searchOverlayToggle, value: appState.showSearch)
         .contentSheets(

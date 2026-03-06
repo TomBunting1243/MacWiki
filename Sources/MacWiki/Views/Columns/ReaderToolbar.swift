@@ -48,8 +48,9 @@ private enum ToolbarHierarchy {
     }
 }
 
-/// Fixed toolbar rendered as a SwiftUI HStack inside the reader column's
-/// top chrome lane.  Replaces the former native NSToolbar items.
+/// Contextual article toolbar rendered inside the reader column's top chrome lane.
+/// Window-level controls live in the native toolbar; this strip keeps document
+/// actions local to the reader.
 struct ReaderToolbar: View {
     @Environment(AppState.self) private var appState
     @Environment(\.colorScheme) private var colorScheme
@@ -91,14 +92,9 @@ struct ReaderToolbar: View {
         }
     }
 
-    private var navigationLocked: Bool {
-        appState.isWikiHopNavigationLocked
-    }
-
     private enum ToolbarOverflowAction: String, Hashable {
         case pageViews
         case openInBrowser
-        case inspector
     }
 
     private enum ToolbarPriorityTier {
@@ -148,18 +144,6 @@ struct ReaderToolbar: View {
             true
         }
 
-        var showsFocusModeInline: Bool {
-            true
-        }
-
-        var showsInspectorInline: Bool {
-            switch self {
-            case .spacious, .regular:
-                return true
-            case .compact, .ultraCompact:
-                return false
-            }
-        }
     }
 
     private let groupedControlHeight: CGFloat = TopChromeControlMetrics.groupHeight
@@ -190,24 +174,6 @@ struct ReaderToolbar: View {
 
         HStack(spacing: 8) {
             HStack(spacing: 4) {
-                toolbarMicroPill(
-                    id: "left-sidebar",
-                    isEnabled: !navigationLocked,
-                    isActive: appState.sidebarVisible && !navigationLocked
-                ) {
-                    toolbarButton(
-                        symbol: "sidebar.leading",
-                        label: appState.sidebarVisible ? "Hide Navigation Columns" : "Show Navigation Columns",
-                        enabled: !navigationLocked,
-                        isActive: appState.sidebarVisible && !navigationLocked,
-                        isHovered: hoveredPillID == "left-sidebar"
-                    ) {
-                        performAnimation(ColumnMotion.sidebarVisibility) {
-                            appState.sidebarVisible.toggle()
-                        }
-                    }
-                }
-
                 toolbarMicroPill(id: "left-back", isEnabled: currentTab?.canGoBack ?? false) {
                     toolbarButton(
                         symbol: "chevron.left",
@@ -293,24 +259,6 @@ struct ReaderToolbar: View {
             Spacer(minLength: 0)
 
             HStack(spacing: 4) {
-                if tier.showsFocusModeInline {
-                    toolbarMicroPill(
-                        id: "right-focus",
-                        isEnabled: hasArticle && !navigationLocked,
-                        isActive: appState.isFocusModeEnabled
-                    ) {
-                        toolbarButton(
-                            symbol: "viewfinder",
-                            label: appState.isFocusModeEnabled ? "Exit Focus Mode" : "Enter Focus Mode",
-                            enabled: hasArticle && !navigationLocked,
-                            isActive: appState.isFocusModeEnabled,
-                            isHovered: hoveredPillID == "right-focus"
-                        ) {
-                            appState.toggleFocusMode()
-                        }
-                    }
-                }
-
                 if tier.showsStatsInline {
                     toolbarMicroPill(
                         id: "right-stats",
@@ -379,20 +327,6 @@ struct ReaderToolbar: View {
                     }
                 }
 
-                if tier.showsInspectorInline {
-                    toolbarMicroPill(id: "right-inspector", isActive: appState.inspectorVisible) {
-                        toolbarButton(
-                            symbol: "sidebar.trailing",
-                            label: appState.inspectorVisible ? "Hide Inspector" : "Show Inspector",
-                            enabled: true,
-                            isActive: appState.inspectorVisible,
-                            isHovered: hoveredPillID == "right-inspector"
-                        ) {
-                            toggleInspector()
-                        }
-                    }
-                }
-
                 if !overflowActions.isEmpty {
                     toolbarMicroPill(id: "right-overflow") {
                         overflowMenuButton(
@@ -416,12 +350,6 @@ struct ReaderToolbar: View {
     private func openCurrentArticleInBrowser() {
         guard let article = currentArticle else { return }
         openURL(article.url)
-    }
-
-    private func toggleInspector() {
-        performAnimation(ColumnMotion.inspectorVisibility) {
-            appState.toggleInspectorVisibility()
-        }
     }
 
     private func toggleFindOnPage() {
@@ -689,10 +617,6 @@ struct ReaderToolbar: View {
             actions.append(.openInBrowser)
         }
 
-        if !tier.showsInspectorInline {
-            actions.append(.inspector)
-        }
-
         return actions
     }
 
@@ -719,15 +643,6 @@ struct ReaderToolbar: View {
                         SwiftUI.Label("Open in Browser", systemImage: "safari")
                     }
                     .disabled(!hasArticle)
-                case .inspector:
-                    Button {
-                        toggleInspector()
-                    } label: {
-                        SwiftUI.Label(
-                            appState.inspectorVisible ? "Hide Inspector" : "Show Inspector",
-                            systemImage: "sidebar.trailing"
-                        )
-                    }
                 }
             }
         } label: {
