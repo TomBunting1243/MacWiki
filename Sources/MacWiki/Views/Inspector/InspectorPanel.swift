@@ -305,6 +305,14 @@ struct InspectorPanel: View {
         max(0, inspectorTopBarHeight - ColumnChromeMetrics.topBarHeight)
     }
 
+    private var showsReaderCompanionLane: Bool {
+        !appState.isWikiHopNavigationLocked && !appState.isFocusModeEnabled
+    }
+
+    private var inspectorChromeHeight: CGFloat {
+        inspectorTopBarHeight + (showsReaderCompanionLane ? ColumnChromeMetrics.topBarHeight : 0)
+    }
+
     private var sectionFillOpacity: Double {
         colorScheme == .dark ? 0.22 : 0.30
     }
@@ -324,6 +332,10 @@ struct InspectorPanel: View {
             // Icon tab bar
             inspectorTabBar
 
+            if showsReaderCompanionLane {
+                inspectorCompanionLane
+            }
+
             // Content area
             inspectorContent
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -336,7 +348,7 @@ struct InspectorPanel: View {
                         .fill(Color.primary.opacity(ColumnChromeMetrics.dividerOpacity(for: colorScheme)))
                         .frame(height: 0.5)
                 }
-                .frame(height: inspectorTopBarHeight)
+                .frame(height: inspectorChromeHeight)
         }
         .overlay(alignment: .bottom) {
             if appState.isHighlightRehydrateInProgress {
@@ -393,6 +405,18 @@ struct InspectorPanel: View {
         .frame(height: ColumnChromeMetrics.topBarHeight)
         .animation(.interactiveSpring(response: 0.22, dampingFraction: 0.90), value: appState.inspectorMode)
         .zIndex(1)
+    }
+
+    private var inspectorCompanionLane: some View {
+        WindowDragHandle(minLength: 80)
+            .frame(maxWidth: .infinity)
+            .frame(height: ColumnChromeMetrics.topBarHeight)
+            .overlay(alignment: .top) {
+                Rectangle()
+                    .fill(Color.primary.opacity(ColumnChromeMetrics.internalDividerOpacity(for: colorScheme)))
+                    .frame(height: 0.5)
+                    .allowsHitTesting(false)
+            }
     }
 
     private var inspectorModeSelector: some View {

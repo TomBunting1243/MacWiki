@@ -86,7 +86,8 @@ struct ContentView: View {
         }
         .toolbar(removing: .title)
         .toolbar(removing: .sidebarToggle)
-        .toolbar {
+        .toolbarRole(.editor)
+        .toolbar(id: "main-window-toolbar") {
             MainWindowToolbar()
         }
         .toolbarBackground(.visible, for: .windowToolbar)
