@@ -32,8 +32,8 @@ struct SettingsView: View {
     @State private var isCacheActionRunning = false
     @State private var cacheStatusMessage: String?
     @State private var pendingCacheAction: CacheAction?
-    @State private var showAdvancedSettings = false
     @State private var showReaderFineTuning = false
+    @State private var selectedSettingsSection: SettingsSection? = .reading
     @State private var selectedAdvancedPanel: AdvancedPanel = .chrome
 
     private static let cacheByteFormatter: ByteCountFormatter = {
@@ -145,18 +145,60 @@ struct SettingsView: View {
         }
     }
 
+    private enum SettingsSection: String, CaseIterable, Identifiable {
+        case reading
+        case highlights
+        case navigation
+        case advanced
+
+        var id: String { rawValue }
+
+        var title: String {
+            switch self {
+            case .reading:
+                return "Reading"
+            case .highlights:
+                return "Highlights"
+            case .navigation:
+                return "Navigation"
+            case .advanced:
+                return "Advanced"
+            }
+        }
+
+        var systemImage: String {
+            switch self {
+            case .reading:
+                return "textformat.size"
+            case .highlights:
+                return "highlighter"
+            case .navigation:
+                return "point.topleft.down.curvedto.point.bottomright.up"
+            case .advanced:
+                return "slider.horizontal.3"
+            }
+        }
+    }
+
     var body: some View {
         GeometryReader { proxy in
             let compact = proxy.size.height < 720
-            ScrollView {
-                settingsContent(compact: compact)
-                    .controlSize(compact ? .small : .regular)
-                    .padding(compact ? 16 : 20)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+            NavigationSplitView {
+                settingsSidebar
+                    .frame(minWidth: 180, idealWidth: 200, maxWidth: 220)
+            } detail: {
+                ScrollView {
+                    settingsContent(compact: compact)
+                        .controlSize(compact ? .small : .regular)
+                        .padding(compact ? 16 : 20)
+                        .frame(maxWidth: 720, alignment: .leading)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .frame(minHeight: proxy.size.height)
             }
-            .frame(minHeight: proxy.size.height)
+            .navigationSplitViewStyle(.balanced)
         }
-        .frame(minWidth: 560, idealWidth: 620, maxWidth: 740, minHeight: 720, idealHeight: 780)
+        .frame(minWidth: 720, idealWidth: 860, maxWidth: 980, minHeight: 720, idealHeight: 780)
         .task {
             await refreshCacheMetrics()
         }
@@ -185,12 +227,25 @@ struct SettingsView: View {
 
     @ViewBuilder
     private func settingsContent(compact: Bool) -> some View {
-        VStack(alignment: .leading, spacing: compact ? 12 : 16) {
+        switch selectedSettingsSection ?? .reading {
+        case .reading:
             readingExperienceSection(compact: compact)
+        case .highlights:
             highlightsAndLabelsSection(compact: compact)
+        case .navigation:
             navigationAndDiscoverSection(compact: compact)
+        case .advanced:
             advancedControlsSection(compact: compact)
         }
+    }
+
+    private var settingsSidebar: some View {
+        List(SettingsSection.allCases, selection: $selectedSettingsSection) { section in
+            Label(section.title, systemImage: section.systemImage)
+                .tag(Optional(section))
+        }
+        .listStyle(.sidebar)
+        .scrollContentBackground(.hidden)
     }
 
     @ViewBuilder
@@ -356,45 +411,35 @@ struct SettingsView: View {
         settingsSection(
             title: "Advanced",
             systemImage: "slider.horizontal.3",
-            footer: "Keep this collapsed for a simpler default setup. Expand when you need cache controls, experiment flags, or deeper chrome tuning.",
+            footer: "Chrome, experiments, and storage controls live here.",
             compact: compact
         ) {
-            DisclosureGroup(isExpanded: $showAdvancedSettings) {
-                VStack(alignment: .leading, spacing: compact ? 10 : 12) {
-                    if compact {
-                        Picker("Advanced Area", selection: $selectedAdvancedPanel) {
-                            ForEach(AdvancedPanel.allCases) { panel in
-                                Text(panel.title).tag(panel)
-                            }
+            VStack(alignment: .leading, spacing: compact ? 10 : 12) {
+                if compact {
+                    Picker("Advanced Area", selection: $selectedAdvancedPanel) {
+                        ForEach(AdvancedPanel.allCases) { panel in
+                            Text(panel.title).tag(panel)
                         }
-                        .pickerStyle(.menu)
-                    } else {
-                        Picker("Advanced Area", selection: $selectedAdvancedPanel) {
-                            ForEach(AdvancedPanel.allCases) { panel in
-                                Text(panel.title).tag(panel)
-                            }
+                    }
+                    .pickerStyle(.menu)
+                } else {
+                    Picker("Advanced Area", selection: $selectedAdvancedPanel) {
+                        ForEach(AdvancedPanel.allCases) { panel in
+                            Text(panel.title).tag(panel)
                         }
-                        .pickerStyle(.segmented)
                     }
-
-                    settingDescription(selectedAdvancedPanel.subtitle)
-
-                    GroupBox {
-                        advancedPanelContent(compact: compact)
-                    }
-                    .animation(
-                        reduceMotion ? nil : .easeOut(duration: 0.18),
-                        value: selectedAdvancedPanel
-                    )
+                    .pickerStyle(.segmented)
                 }
-                .padding(.top, compact ? 6 : 8)
-            } label: {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Show Advanced Controls")
-                    Text("Choose one area at a time: Chrome, Experiments, or Storage.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+
+                settingDescription(selectedAdvancedPanel.subtitle)
+
+                GroupBox {
+                    advancedPanelContent(compact: compact)
                 }
+                .animation(
+                    reduceMotion ? nil : .easeOut(duration: 0.18),
+                    value: selectedAdvancedPanel
+                )
             }
         }
     }
