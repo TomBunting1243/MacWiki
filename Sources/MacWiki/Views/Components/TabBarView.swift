@@ -17,8 +17,8 @@ enum TabBarChromeStyle {
     var horizontalPadding: CGFloat {
         switch self {
         case .standalone: return 16
-        case .toolbar: return ColumnChromeMetrics.horizontalPadding
-        case .strip: return 12
+        case .toolbar: return 14
+        case .strip: return 14
         }
     }
 
