@@ -282,17 +282,21 @@ struct SidebarPaneBackground: View {
     var body: some View {
         let isDark = colorScheme == .dark
         let strongHighlight = isDark
-            ? ColumnChromeMetrics.darkHighlightStrongOpacity * 0.75
-            : ColumnChromeMetrics.highlightStrongOpacity * 0.70
+            ? ColumnChromeMetrics.darkHighlightStrongOpacity * 0.55
+            : ColumnChromeMetrics.highlightStrongOpacity * 0.48
         let softHighlight = isDark
-            ? ColumnChromeMetrics.darkHighlightSoftOpacity * 0.85
-            : ColumnChromeMetrics.highlightSoftOpacity * 0.75
+            ? ColumnChromeMetrics.darkHighlightSoftOpacity * 0.60
+            : ColumnChromeMetrics.highlightSoftOpacity * 0.52
 
         Rectangle()
-            .fill(.ultraThinMaterial)
+            .fill(.thinMaterial)
             .overlay {
                 Color(nsColor: .windowBackgroundColor)
-                    .opacity(isDark ? 0.08 : 0.03)
+                    .opacity(isDark ? 0.14 : 0.07)
+            }
+            .overlay {
+                Color(nsColor: .controlBackgroundColor)
+                    .opacity(isDark ? 0.12 : 0.10)
             }
             .overlay(
                 LinearGradient(
