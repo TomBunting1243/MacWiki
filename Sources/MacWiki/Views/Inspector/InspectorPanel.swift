@@ -75,14 +75,11 @@ struct InspectorPanel: View {
     }
 
     private enum InspectorLayout {
-        static let contentTopPadding: CGFloat = 10
+        static let contentTopPadding: CGFloat = 8
         static let sectionSpacing: CGFloat = 14
         static let sectionCornerRadius: CGFloat = 12
-        static let headerBarHeight: CGFloat = 60
+        static let headerBarHeight: CGFloat = 44
         static let headerHorizontalPadding: CGFloat = 14
-        static let headerTopPadding: CGFloat = 6
-        static let headerBottomPadding: CGFloat = 8
-        static let headerRowSpacing: CGFloat = 6
         static let modeSelectorLabelPointSize: CGFloat = 11.5
         static let tocHeightRange: ClosedRange<CGFloat> = 72...560
         static let metadataHeightRange: ClosedRange<CGFloat> = 56...520
@@ -383,32 +380,17 @@ struct InspectorPanel: View {
             WindowDragHandle(minLength: 80)
                 .frame(maxWidth: .infinity)
 
-            VStack(alignment: .leading, spacing: InspectorLayout.headerRowSpacing) {
-                inspectorHeaderIdentity
-
-                HStack(spacing: 0) {
-                    inspectorModeSelector
-                    Spacer(minLength: 0)
-                }
+            HStack(spacing: 0) {
+                Spacer(minLength: 0)
+                inspectorModeSelector
+                Spacer(minLength: 0)
             }
             .padding(.horizontal, InspectorLayout.headerHorizontalPadding)
-            .padding(.top, InspectorLayout.headerTopPadding)
-            .padding(.bottom, InspectorLayout.headerBottomPadding)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
         }
         .frame(height: InspectorLayout.headerBarHeight)
         .animation(.interactiveSpring(response: 0.22, dampingFraction: 0.90), value: appState.inspectorMode)
         .zIndex(1)
-    }
-
-    private var inspectorHeaderIdentity: some View {
-        let title = appState.currentArticle?.title ?? appState.inspectorMode.rawValue
-
-        return Text(title)
-            .font(.system(size: 13, weight: .semibold))
-            .foregroundStyle(.primary)
-            .lineLimit(1)
-            .truncationMode(.tail)
     }
 
     private var inspectorModeSelector: some View {
