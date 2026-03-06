@@ -1858,8 +1858,10 @@ struct ArticleListItem<Content: View>: View {
             HStack(alignment: .top, spacing: 4) {
                 // Clickable read/unread indicator
                 let labelColor = label?.color.swiftUIColor
-                let indicatorTint = (labelDisplayMode == .coloredDot ? labelColor : nil) ?? Color.accentColor
-                let indicatorTrack = (labelDisplayMode == .coloredDot ? labelColor?.opacity(0.35) : nil) ?? Color.secondary.opacity(0.35)
+                let defaultIndicatorTint = Color.accentColor.opacity(isSelected ? 0.78 : (isCurrent ? 0.72 : 0.86))
+                let indicatorTint = (labelDisplayMode == .coloredDot ? labelColor?.opacity(isSelected ? 0.72 : 0.82) : nil) ?? defaultIndicatorTint
+                let defaultIndicatorTrack = Color.primary.opacity(isSelected ? 0.18 : 0.14)
+                let indicatorTrack = (labelDisplayMode == .coloredDot ? labelColor?.opacity(isSelected ? 0.16 : 0.22) : nil) ?? defaultIndicatorTrack
                 if let toggle = onToggleRead {
                     Button(action: toggle) {
                         ReadProgressIndicator(
@@ -1950,14 +1952,15 @@ struct ArticleRow: View {
         VStack(alignment: .leading, spacing: 3) {
             // Title
             Text(article.title)
-                .font(.system(size: 13, weight: .semibold))
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(.primary)
                 .lineLimit(2)
 
             // Description
             HStack(spacing: 6) {
                 Text(article.description ?? " ")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(article.description != nil ? AnyShapeStyle(.secondary) : AnyShapeStyle(.clear))
+                    .font(.system(size: 11))
+                    .foregroundStyle(article.description != nil ? AnyShapeStyle(Color(nsColor: .secondaryLabelColor)) : AnyShapeStyle(.clear))
                     .lineLimit(subheadLineLimit)
 
                 Spacer(minLength: 0)
@@ -1966,7 +1969,7 @@ struct ArticleRow: View {
             // Extract preview - always reserve 2 lines of space
             Text(extract ?? " \n ")
                 .font(.system(size: 11))
-                .foregroundStyle(extract != nil ? AnyShapeStyle(Color(nsColor: .tertiaryLabelColor)) : AnyShapeStyle(.clear))
+                .foregroundStyle(extract != nil ? AnyShapeStyle(Color(nsColor: .quaternaryLabelColor)) : AnyShapeStyle(.clear))
                 .lineLimit(2)
             
             // Footer metadata line has a reserved height so async updates don't change row size.
@@ -1986,12 +1989,12 @@ struct ArticleRow: View {
                                 .padding(.horizontal, 6)
                                 .padding(.vertical, 2)
                                 .background(
-                                    label.color.swiftUIColor.opacity(0.12),
+                                    label.color.swiftUIColor.opacity(0.08),
                                     in: Capsule()
                                 )
                                 .overlay(
                                     Capsule()
-                                        .stroke(label.color.swiftUIColor.opacity(0.3), lineWidth: 0.5)
+                                        .stroke(label.color.swiftUIColor.opacity(0.18), lineWidth: 0.5)
                                 )
                         }
                         .buttonStyle(.plain)
@@ -2092,7 +2095,8 @@ struct ArticleRowWithFetch: View {
         VStack(alignment: .leading, spacing: 5) {
             // Title
             Text(article.title)
-                .font(.system(size: 13, weight: .semibold))
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(.primary)
                 .lineLimit(2)
 
             if let trendPulse {
@@ -2109,8 +2113,8 @@ struct ArticleRowWithFetch: View {
             // Description
             HStack(spacing: 6) {
                 Text(displayedDescription)
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(hasDescription ? AnyShapeStyle(.secondary) : AnyShapeStyle(.clear))
+                    .font(.system(size: 11))
+                    .foregroundStyle(hasDescription ? AnyShapeStyle(Color(nsColor: .secondaryLabelColor)) : AnyShapeStyle(.clear))
                     .lineLimit(subheadLineLimit)
 
                 Spacer(minLength: 0)
@@ -2119,7 +2123,7 @@ struct ArticleRowWithFetch: View {
             // Extract preview - always reserve 2 lines of space
             Text(displayedExtract)
                 .font(.system(size: 11))
-                .foregroundStyle(hasExtract ? AnyShapeStyle(Color(nsColor: .tertiaryLabelColor)) : AnyShapeStyle(.clear))
+                .foregroundStyle(hasExtract ? AnyShapeStyle(Color(nsColor: .quaternaryLabelColor)) : AnyShapeStyle(.clear))
                 .lineLimit(2)
 
             // Footer metadata line has a reserved height so async updates don't change row size.
@@ -2139,12 +2143,12 @@ struct ArticleRowWithFetch: View {
                                 .padding(.horizontal, 6)
                                 .padding(.vertical, 2)
                                 .background(
-                                    label.color.swiftUIColor.opacity(0.12),
+                                    label.color.swiftUIColor.opacity(0.08),
                                     in: Capsule()
                                 )
                                 .overlay(
                                     Capsule()
-                                        .stroke(label.color.swiftUIColor.opacity(0.3), lineWidth: 0.5)
+                                        .stroke(label.color.swiftUIColor.opacity(0.18), lineWidth: 0.5)
                                 )
                         }
                         .buttonStyle(.plain)
