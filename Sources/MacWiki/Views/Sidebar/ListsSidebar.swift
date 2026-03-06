@@ -136,29 +136,11 @@ private struct SidebarRowSurface: View {
         Color.accentColor.opacity(0.14)
     }
 
-    private var selectedFill: Color {
-        let isKeyWindow = controlActiveState == .key
-        return Color.accentColor.opacity(
-            colorScheme == .dark
-                ? (isKeyWindow ? 0.13 : 0.10)
-                : (isKeyWindow ? 0.095 : 0.072)
-        )
-    }
-
     private var hoverFill: Color {
         let isKeyWindow = controlActiveState == .key
         return colorScheme == .dark
             ? Color.white.opacity(isKeyWindow ? 0.045 : 0.030)
             : Color.black.opacity(isKeyWindow ? 0.022 : 0.014)
-    }
-
-    private var selectedStroke: Color {
-        let isKeyWindow = controlActiveState == .key
-        return Color.accentColor.opacity(
-            colorScheme == .dark
-                ? (isKeyWindow ? 0.20 : 0.15)
-                : (isKeyWindow ? 0.15 : 0.10)
-        )
     }
 
     private var hoverStroke: Color {
@@ -173,19 +155,15 @@ private struct SidebarRowSurface: View {
             .fill(
                 isDropTarget
                     ? dropTargetFill
-                    : (
-                        isSelected
-                            ? selectedFill
-                            : ((isHovered && !isSelected) ? hoverFill : Color.clear)
-                    )
+                    : ((isHovered && !isSelected) ? hoverFill : Color.clear)
             )
             .overlay {
-                if isDropTarget || (isHovered && !isSelected) || isSelected {
+                if isDropTarget || (isHovered && !isSelected) {
                     RoundedRectangle(cornerRadius: SidebarMetrics.rowCornerRadius, style: .continuous)
                         .strokeBorder(
                             isDropTarget
                                 ? Color.accentColor.opacity(0.20)
-                                : (isSelected ? selectedStroke : hoverStroke),
+                                : hoverStroke,
                             lineWidth: 0.60
                         )
                 }
