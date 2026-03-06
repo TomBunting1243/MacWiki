@@ -96,20 +96,12 @@ private enum TabChromeHierarchy {
         0.35
     }
 
-    static func activeRimOpacity(darkMode: Bool) -> Double {
-        darkMode ? 0.07 : 0.05
-    }
-
     static func activeGlassTintOpacity(darkMode: Bool) -> Double {
         darkMode ? 0.035 : 0.03
     }
 
     static func activeGlassSheenOpacity(darkMode: Bool) -> Double {
         darkMode ? 0.04 : 0.06
-    }
-
-    static func activeGlassDepthOpacity(darkMode: Bool) -> Double {
-        darkMode ? 0.02 : 0.0
     }
 }
 
@@ -956,18 +948,18 @@ private struct DraggableTabItemView: View {
     }
 
     private var showsFavicon: Bool {
-        tabWidth >= 92 || isActive
+        tabWidth >= 98 || isActive
     }
 
     private var contentSpacing: CGFloat {
         if !showsFavicon && !showCloseButton {
             return 0
         }
-        return tabWidth < 95 ? 6 : ((chromeStyle == .strip || chromeStyle == .toolbar) ? 7 : 8)
+        return tabWidth < 95 ? 5 : ((chromeStyle == .strip || chromeStyle == .toolbar) ? 6 : 8)
     }
 
     private var horizontalPadding: CGFloat {
-        tabWidth < 95 ? 8 : ((chromeStyle == .strip || chromeStyle == .toolbar) ? 11 : 11)
+        tabWidth < 95 ? 8 : ((chromeStyle == .strip || chromeStyle == .toolbar) ? 9 : 11)
     }
 
     private var normalizedProgress: Double {
@@ -1012,9 +1004,9 @@ private struct DraggableTabItemView: View {
         case .standalone:
             return 34
         case .toolbar:
-            return 30
+            return 28
         case .strip:
-            return 30
+            return 28
         }
     }
 
@@ -1023,11 +1015,11 @@ private struct DraggableTabItemView: View {
     }
 
     private var closeButtonSize: CGFloat {
-        (chromeStyle == .strip || chromeStyle == .toolbar) ? 20 : 18
+        (chromeStyle == .strip || chromeStyle == .toolbar) ? 18 : 18
     }
 
     private var closeGlyphSize: CGFloat {
-        (chromeStyle == .strip || chromeStyle == .toolbar) ? 10 : 10
+        (chromeStyle == .strip || chromeStyle == .toolbar) ? 9 : 10
     }
 
     private var closeButtonBackgroundOpacity: CGFloat {
@@ -1092,16 +1084,6 @@ private struct DraggableTabItemView: View {
                     if isActive && !isDragged {
                         RoundedRectangle(cornerRadius: tabCornerRadius)
                             .strokeBorder(activeTabStroke, lineWidth: activeStrokeWidth)
-                    }
-                    if hasMicroLift {
-                        RoundedRectangle(cornerRadius: tabCornerRadius)
-                            .strokeBorder(
-                                Color.white.opacity(
-                                    TabChromeHierarchy.activeRimOpacity(darkMode: colorScheme == .dark)
-                                ),
-                                lineWidth: 0.5
-                            )
-                            .blendMode(.screen)
                     }
                     if isDragged {
                         RoundedRectangle(cornerRadius: tabCornerRadius)
@@ -1196,10 +1178,6 @@ private struct DraggableTabItemView: View {
             let tintOpacity = darkMode
                 ? (isActive ? 0.07 : (isHovered ? 0.035 : 0.018))
                 : (isActive ? 0.045 : (isHovered ? 0.026 : 0.012))
-            let depthOpacity = isActive
-                ? TabChromeHierarchy.activeGlassDepthOpacity(darkMode: darkMode)
-                : (darkMode ? 0.05 : 0.0)
-
             RoundedRectangle(cornerRadius: tabCornerRadius, style: .continuous)
                 .fill(AnyShapeStyle(.ultraThinMaterial))
                 .overlay {
@@ -1228,11 +1206,6 @@ private struct DraggableTabItemView: View {
                             )
                         )
                         .blendMode(.screen)
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: tabCornerRadius, style: .continuous)
-                        .fill(Color.black.opacity(depthOpacity))
-                        .blendMode(.multiply)
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: tabCornerRadius, style: .continuous)
@@ -1404,8 +1377,8 @@ private struct DraggableTabItemView: View {
         Text(tab.article.title)
             .font(
                 .system(
-                    size: tabWidth < 95 ? 12 : 13,
-                    weight: chromeStyle == .strip ? (isActive ? .semibold : .regular) : (isActive ? .medium : .regular)
+                    size: chromeStyle == .strip ? (tabWidth < 95 ? 12 : 12.5) : (tabWidth < 95 ? 12 : 13),
+                    weight: chromeStyle == .strip ? (isActive ? .medium : .regular) : (isActive ? .medium : .regular)
                 )
             )
             .foregroundStyle(titleForegroundStyle)
@@ -1458,7 +1431,12 @@ private struct DraggableTabItemView: View {
     }
 
     private func syncCloseButton(animated: Bool = true) {
-        let shouldShow = (isHovered || isActive) && !isDragged
+        let shouldShow: Bool
+        if chromeStyle == .strip || chromeStyle == .toolbar {
+            shouldShow = isHovered && !isDragged
+        } else {
+            shouldShow = (isHovered || isActive) && !isDragged
+        }
         guard shouldShow != showCloseButton else { return }
         if animated {
             let animation = shouldShow ? interactionProfile.closeButtonShow : interactionProfile.closeButtonHide
