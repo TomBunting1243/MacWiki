@@ -740,10 +740,9 @@ struct DirectoryView: View {
         }
     }
 
-    /// Total height of the pinned directory chrome (title + divider + controls).
+    /// Total height of the pinned directory chrome.
     private var directoryTopChromeHeight: CGFloat {
-        // title bar height + 0.5 divider + controls bar height (same as topBarHeight)
-        directoryTitleBarHeight + 0.5 + ColumnChromeMetrics.topBarHeight
+        directoryTitleBarHeight
     }
 
     private var directoryList: some View {
@@ -990,21 +989,13 @@ struct DirectoryView: View {
     }
 
     /// When sidebar is collapsed, this column becomes leftmost near traffic lights.
-    /// Keep title-to-controls rhythm consistent with the expanded-sidebar state.
-    private var directoryTitleBottomPadding: CGFloat {
-        6
+    /// Keep the title-and-tools cluster anchored to the lower edge of the titlebar.
+    private var directoryHeaderBottomPadding: CGFloat {
+        7
     }
 
     private var directoryTopChrome: some View {
-        VStack(spacing: 0) {
-            directoryTitleBar
-
-            Rectangle()
-                .fill(Color.primary.opacity(ColumnChromeMetrics.internalDividerOpacity(for: colorScheme)))
-                .frame(height: 0.5)
-
-            directoryControlsBar
-        }
+        directoryHeaderBar
         .background {
             ColumnChromeBackground()
         }
@@ -1015,21 +1006,80 @@ struct DirectoryView: View {
         }
     }
 
-    private var directoryTitleBar: some View {
+    private var directoryHeaderBar: some View {
         ZStack(alignment: .bottomLeading) {
             WindowDragHandle(minLength: 140)
                 .frame(maxWidth: .infinity)
 
-            HStack(spacing: 10) {
-                Text(topDirectoryTitle)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(.primary)
-                Spacer(minLength: 0)
+            HStack(alignment: .bottom, spacing: 12) {
+                directoryHeaderIdentity
+
+                Spacer(minLength: 12)
+
+                directoryHeaderControls
             }
             .padding(.horizontal, 12)
-            .padding(.bottom, directoryTitleBottomPadding)
+            .padding(.bottom, directoryHeaderBottomPadding)
         }
         .frame(height: directoryTitleBarHeight)
+    }
+
+    private var directoryHeaderIdentity: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(topDirectoryTitle)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(.primary)
+                .lineLimit(1)
+
+            directoryHeaderMetadataLine
+        }
+    }
+
+    @ViewBuilder
+    private var directoryHeaderMetadataLine: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 6) {
+                directoryCountLabel
+
+                if hasSelectedSavedArticles {
+                    Text("·")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(.tertiary)
+
+                    directorySelectionLabel
+                }
+            }
+
+            directoryCountLabel
+        }
+    }
+
+    private var directoryCountLabel: some View {
+        HStack(spacing: 3) {
+            Text("\(directoryVisibleArticleCount)")
+                .font(.system(size: 12, weight: .semibold))
+                .monospacedDigit()
+                .foregroundStyle(.secondary)
+
+            Text(directoryVisibleArticleCount == 1 ? "article" : "articles")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(.tertiary)
+        }
+    }
+
+    private var directorySelectionLabel: some View {
+        Text("\(selectedSavedArticleCount) selected")
+            .font(.system(size: 11, weight: .medium))
+            .foregroundStyle(.secondary)
+    }
+
+    private var directoryHeaderControls: some View {
+        HStack(spacing: 4) {
+            directoryUnreadFilterButton
+            directorySortMenu
+            directoryBatchActionsMenu
+        }
+        .padding(.vertical, 1)
     }
 
     private func syncSidebarChromeChoreography(sidebarVisible: Bool) {
@@ -1051,158 +1101,133 @@ struct DirectoryView: View {
         }
     }
 
-    private var directoryControlsBar: some View {
-        let count = directoryVisibleArticleCount
+    private var directoryUnreadFilterButton: some View {
         let unreadFilterEnabled = isUnreadFilterEnabled
+
+        return Button {
+            toggleUnreadFilter()
+        } label: {
+            Image(systemName: unreadFilterEnabled ? "circle.inset.filled" : "circle")
+                .font(.system(size: ChromeIconMetrics.symbolPointSize, weight: ChromeIconMetrics.regularWeight))
+                .imageScale(.medium)
+                .foregroundStyle(unreadFilterEnabled ? Color.accentColor : .secondary)
+                .frame(width: ChromeIconMetrics.buttonSize, height: ChromeIconMetrics.buttonSize)
+        }
+        .buttonStyle(.plain)
+        .help(unreadFilterEnabled ? "Show all articles" : "Show unread only")
+    }
+
+    private var directorySortMenu: some View {
         let sortMode = activeDirectorySortMode
 
-        return ZStack {
-            WindowDragHandle(minLength: 80)
-                .frame(maxWidth: .infinity)
-
-            HStack(spacing: 12) {
+        return Menu {
+            ForEach(DirectorySupplementalSortMode.allCases, id: \.self) { mode in
                 Button {
-                    toggleUnreadFilter()
+                    setDirectorySortMode(mode)
                 } label: {
-                    Image(systemName: unreadFilterEnabled ? "circle.inset.filled" : "circle")
-                        .font(.system(size: ChromeIconMetrics.symbolPointSize, weight: ChromeIconMetrics.regularWeight))
-                        .imageScale(.medium)
-                        .foregroundStyle(unreadFilterEnabled ? Color.accentColor : .secondary)
-                        .frame(width: ChromeIconMetrics.buttonSize, height: ChromeIconMetrics.buttonSize)
+                    HStack {
+                        Text(mode.rawValue)
+                        if sortMode == mode {
+                            Image(systemName: "checkmark")
                         }
-                .buttonStyle(.plain)
-                .help(unreadFilterEnabled ? "Show all articles" : "Show unread only")
-
-                Spacer(minLength: 0)
-
-                Text("\(count)")
-                    .font(.system(size: 13, weight: .semibold))
-                    .monospacedDigit()
-                    .foregroundStyle(.secondary)
-                + Text(" ")
-                + Text(count == 1 ? "article" : "articles")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(.tertiary)
-
-                if hasSelectedSavedArticles {
-                    Text("·")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(.tertiary)
-                    Text("\(selectedSavedArticleCount) selected")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(.secondary)
+                    }
                 }
-
-                Menu {
-                    ForEach(DirectorySupplementalSortMode.allCases, id: \.self) { mode in
-                        Button {
-                            setDirectorySortMode(mode)
-                        } label: {
-                            HStack {
-                                Text(mode.rawValue)
-                                if sortMode == mode {
-                                    Image(systemName: "checkmark")
-                                }
-                            }
-                        }
-                    }
-                } label: {
-                    SwiftUI.Label("Sort Articles", systemImage: "arrow.up.arrow.down")
-                        .labelStyle(.iconOnly)
-                        .font(.system(size: ChromeIconMetrics.symbolPointSize, weight: ChromeIconMetrics.regularWeight))
-                        .imageScale(.medium)
-                        .foregroundStyle(.secondary)
-                        .frame(width: ChromeIconMetrics.buttonSize, height: ChromeIconMetrics.buttonSize)
-                }
-                .menuStyle(.borderlessButton)
-                .help("Sort")
-
-                Menu {
-                    if hasSelectedSavedArticles {
-                        Button("Clear Selection") {
-                            clearSavedArticleSelection()
-                        }
-
-                        if !labels.isEmpty {
-                            Menu("Set Label on Selected") {
-                                Button("None") {
-                                    applyLabelToSelectedSavedArticles(nil)
-                                }
-                                Divider()
-                                ForEach(labels) { label in
-                                    Button(label.name) {
-                                        applyLabelToSelectedSavedArticles(label.id)
-                                    }
-                                }
-                            }
-                        }
-
-                        if !tags.isEmpty {
-                            Menu("Add Tag to Selected") {
-                                ForEach(tags) { tag in
-                                    Button(tag.name) {
-                                        addTagToSelectedSavedArticles(tag)
-                                    }
-                                }
-                            }
-
-                            Menu("Remove Tag from Selected") {
-                                ForEach(tags) { tag in
-                                    Button(tag.name) {
-                                        removeTagFromSelectedSavedArticles(tag)
-                                    }
-                                }
-                            }
-                        }
-
-                        if !selectionEligibleTargetLists.isEmpty {
-                            Menu("Add Selected to List") {
-                                ForEach(selectionEligibleTargetLists) { list in
-                                    Button(list.name) {
-                                        addSelectedSavedArticles(to: list)
-                                    }
-                                }
-                            }
-                        }
-
-                        Divider()
-
-                        Button(role: .destructive) {
-                            showDeleteSelectedConfirmation = true
-                        } label: {
-                            SwiftUI.Label("Delete Selected", systemImage: "trash")
-                        }
-
-                        Divider()
-                    }
-
-                    Button {
-                        batchMarkVisibleArticles(asRead: true)
-                    } label: {
-                        SwiftUI.Label("Mark Visible as Read", systemImage: "checkmark.circle")
-                    }
-                    .disabled(visibleUnreadCount == 0)
-
-                    Button {
-                        batchMarkVisibleArticles(asRead: false)
-                    } label: {
-                        SwiftUI.Label("Mark Visible as Unread", systemImage: "circle")
-                    }
-                    .disabled(visibleReadCount == 0)
-                } label: {
-                    SwiftUI.Label("Batch Actions", systemImage: "ellipsis.circle")
-                        .labelStyle(.iconOnly)
-                        .font(.system(size: ChromeIconMetrics.symbolPointSize, weight: ChromeIconMetrics.regularWeight))
-                        .imageScale(.medium)
-                        .foregroundStyle(.secondary)
-                        .frame(width: ChromeIconMetrics.buttonSize, height: ChromeIconMetrics.buttonSize)
-                }
-                .menuStyle(.borderlessButton)
-                .help("Batch actions")
             }
-            .padding(.horizontal, 12)
+        } label: {
+            SwiftUI.Label("Sort Articles", systemImage: "arrow.up.arrow.down")
+                .labelStyle(.iconOnly)
+                .font(.system(size: ChromeIconMetrics.symbolPointSize, weight: ChromeIconMetrics.regularWeight))
+                .imageScale(.medium)
+                .foregroundStyle(.secondary)
+                .frame(width: ChromeIconMetrics.buttonSize, height: ChromeIconMetrics.buttonSize)
         }
-        .frame(height: ColumnChromeMetrics.topBarHeight - 2)
+        .menuStyle(.borderlessButton)
+        .help("Sort")
+    }
+
+    private var directoryBatchActionsMenu: some View {
+        Menu {
+            if hasSelectedSavedArticles {
+                Button("Clear Selection") {
+                    clearSavedArticleSelection()
+                }
+
+                if !labels.isEmpty {
+                    Menu("Set Label on Selected") {
+                        Button("None") {
+                            applyLabelToSelectedSavedArticles(nil)
+                        }
+                        Divider()
+                        ForEach(labels) { label in
+                            Button(label.name) {
+                                applyLabelToSelectedSavedArticles(label.id)
+                            }
+                        }
+                    }
+                }
+
+                if !tags.isEmpty {
+                    Menu("Add Tag to Selected") {
+                        ForEach(tags) { tag in
+                            Button(tag.name) {
+                                addTagToSelectedSavedArticles(tag)
+                            }
+                        }
+                    }
+
+                    Menu("Remove Tag from Selected") {
+                        ForEach(tags) { tag in
+                            Button(tag.name) {
+                                removeTagFromSelectedSavedArticles(tag)
+                            }
+                        }
+                    }
+                }
+
+                if !selectionEligibleTargetLists.isEmpty {
+                    Menu("Add Selected to List") {
+                        ForEach(selectionEligibleTargetLists) { list in
+                            Button(list.name) {
+                                addSelectedSavedArticles(to: list)
+                            }
+                        }
+                    }
+                }
+
+                Divider()
+
+                Button(role: .destructive) {
+                    showDeleteSelectedConfirmation = true
+                } label: {
+                    SwiftUI.Label("Delete Selected", systemImage: "trash")
+                }
+
+                Divider()
+            }
+
+            Button {
+                batchMarkVisibleArticles(asRead: true)
+            } label: {
+                SwiftUI.Label("Mark Visible as Read", systemImage: "checkmark.circle")
+            }
+            .disabled(visibleUnreadCount == 0)
+
+            Button {
+                batchMarkVisibleArticles(asRead: false)
+            } label: {
+                SwiftUI.Label("Mark Visible as Unread", systemImage: "circle")
+            }
+            .disabled(visibleReadCount == 0)
+        } label: {
+            SwiftUI.Label("Batch Actions", systemImage: "ellipsis.circle")
+                .labelStyle(.iconOnly)
+                .font(.system(size: ChromeIconMetrics.symbolPointSize, weight: ChromeIconMetrics.regularWeight))
+                .imageScale(.medium)
+                .foregroundStyle(.secondary)
+                .frame(width: ChromeIconMetrics.buttonSize, height: ChromeIconMetrics.buttonSize)
+        }
+        .menuStyle(.borderlessButton)
+        .help("Batch actions")
     }
 
     private var isUnreadFilterEnabled: Bool {
