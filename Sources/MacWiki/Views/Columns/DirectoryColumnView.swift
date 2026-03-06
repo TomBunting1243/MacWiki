@@ -18,6 +18,6 @@ struct DirectoryColumnView: View {
             onNewLabelWithArticle: onNewLabelWithArticle,
             onNewTagWithArticle: onNewTagWithArticle
         )
-        .navigationSplitViewColumnWidth(min: 196, ideal: 240, max: 320)
+        .navigationSplitViewColumnWidth(min: 212, ideal: 272, max: 360)
     }
 }

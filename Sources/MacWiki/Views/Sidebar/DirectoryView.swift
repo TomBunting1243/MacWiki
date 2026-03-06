@@ -1969,7 +1969,7 @@ struct ArticleRow: View {
             // Extract preview - always reserve 2 lines of space
             Text(extract ?? " \n ")
                 .font(.system(size: 11))
-                .foregroundStyle(extract != nil ? AnyShapeStyle(Color(nsColor: .quaternaryLabelColor)) : AnyShapeStyle(.clear))
+                .foregroundStyle(extract != nil ? AnyShapeStyle(Color(nsColor: .tertiaryLabelColor)) : AnyShapeStyle(.clear))
                 .lineLimit(2)
             
             // Footer metadata line has a reserved height so async updates don't change row size.
@@ -2123,7 +2123,7 @@ struct ArticleRowWithFetch: View {
             // Extract preview - always reserve 2 lines of space
             Text(displayedExtract)
                 .font(.system(size: 11))
-                .foregroundStyle(hasExtract ? AnyShapeStyle(Color(nsColor: .quaternaryLabelColor)) : AnyShapeStyle(.clear))
+                .foregroundStyle(hasExtract ? AnyShapeStyle(Color(nsColor: .tertiaryLabelColor)) : AnyShapeStyle(.clear))
                 .lineLimit(2)
 
             // Footer metadata line has a reserved height so async updates don't change row size.
