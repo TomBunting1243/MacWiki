@@ -366,10 +366,9 @@ struct SidebarSearchView: View {
             }
             .background {
                 SidebarPaneBackground()
-                    .ignoresSafeArea(.container, edges: [.top, .bottom])
+                    .ignoresSafeArea(.container, edges: .bottom)
             }
         }
-        .ignoresSafeArea(.container, edges: .top)
         .onAppear {
             refreshArticleLookupSnapshot()
             if let launchQuery = appState.consumeLaunchSidebarSearchQuery() {

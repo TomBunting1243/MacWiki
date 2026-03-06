@@ -71,7 +71,7 @@ struct InspectorColumnView: View {
                     Color(nsColor: .windowBackgroundColor)
                         .opacity(glassTintOpacity)
                 }
-                .ignoresSafeArea(.container, edges: [.top, .bottom])
+                .ignoresSafeArea(.container, edges: .bottom)
         }
         .background {
             GeometryReader { proxy in
@@ -84,7 +84,6 @@ struct InspectorColumnView: View {
                     }
             }
         }
-        .ignoresSafeArea(.container, edges: .top)
         .zIndex(30)
         .onAppear {
             inspectorWidth = Double(clampedInspectorWidth)

@@ -788,7 +788,6 @@ struct DirectoryView: View {
         .background {
             SidebarPaneBackground()
         }
-        .ignoresSafeArea(.container, edges: .top)
         .task(id: rootSelection) {
             if rootSelection == .discover {
                 discoverFeedStore.queueLoad(referenceDate: discoverReferenceDate, forceRefresh: false)
