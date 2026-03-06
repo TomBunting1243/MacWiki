@@ -10,16 +10,16 @@ enum ColumnChromeMetrics {
     static let trafficLightsClearance: CGFloat = 38
     /// Minimum title-bar height when content (text) sits below traffic lights.
     static let titleBarClearance: CGFloat = 52
-    static let horizontalPadding: CGFloat = 10
-    static let dividerOpacity: CGFloat = 0.08
-    static let internalDividerOpacity: CGFloat = 0.05
-    static let highlightStrongOpacity: CGFloat = 0.10
-    static let highlightSoftOpacity: CGFloat = 0.025
-    static let darkDividerOpacity: CGFloat = 0.045
-    static let darkInternalDividerOpacity: CGFloat = 0.025
-    static let darkHighlightStrongOpacity: CGFloat = 0.024
-    static let darkHighlightSoftOpacity: CGFloat = 0.009
-    static let darkBaseTintOpacity: CGFloat = 0.08
+    static let horizontalPadding: CGFloat = 9
+    static let dividerOpacity: CGFloat = 0.065
+    static let internalDividerOpacity: CGFloat = 0.035
+    static let highlightStrongOpacity: CGFloat = 0.072
+    static let highlightSoftOpacity: CGFloat = 0.018
+    static let darkDividerOpacity: CGFloat = 0.038
+    static let darkInternalDividerOpacity: CGFloat = 0.020
+    static let darkHighlightStrongOpacity: CGFloat = 0.018
+    static let darkHighlightSoftOpacity: CGFloat = 0.006
+    static let darkBaseTintOpacity: CGFloat = 0.06
 
     static func dividerOpacity(for colorScheme: ColorScheme) -> CGFloat {
         colorScheme == .dark ? darkDividerOpacity : dividerOpacity
@@ -70,36 +70,36 @@ enum TopChromeControlMetrics {
 enum TopChromeControlSurface {
     static func tintOpacity(darkMode: Bool, compactAccessory: Bool = false) -> Double {
         if darkMode {
-            return compactAccessory ? 0.22 : 0.20
-        }
-        return compactAccessory ? 0.12 : 0.10
-    }
-
-    static func sheenOpacity(darkMode: Bool, compactAccessory: Bool = false) -> Double {
-        if darkMode {
-            return compactAccessory ? 0.05 : 0.04
+            return compactAccessory ? 0.18 : 0.16
         }
         return compactAccessory ? 0.08 : 0.07
     }
 
+    static func sheenOpacity(darkMode: Bool, compactAccessory: Bool = false) -> Double {
+        if darkMode {
+            return compactAccessory ? 0.035 : 0.030
+        }
+        return compactAccessory ? 0.055 : 0.050
+    }
+
     static func depthMultiplyOpacity(darkMode: Bool, compactAccessory: Bool = false) -> Double {
         if darkMode {
-            return compactAccessory ? 0.08 : 0.07
+            return compactAccessory ? 0.050 : 0.045
         }
-        return compactAccessory ? 0.02 : 0.018
+        return compactAccessory ? 0.012 : 0.010
     }
 
     static func borderOpacity(darkMode: Bool, liquid: Bool, compactAccessory: Bool = false) -> Double {
         if liquid {
             if darkMode {
-                return compactAccessory ? 0.10 : 0.09
+                return compactAccessory ? 0.082 : 0.075
             }
-            return compactAccessory ? 0.08 : 0.07
+            return compactAccessory ? 0.060 : 0.055
         }
         if darkMode {
-            return compactAccessory ? 0.14 : 0.13
+            return compactAccessory ? 0.10 : 0.095
         }
-        return compactAccessory ? 0.08 : 0.07
+        return compactAccessory ? 0.060 : 0.055
     }
 }
 
@@ -261,7 +261,7 @@ struct ColumnChromeBackground: View {
             .fill(.ultraThinMaterial)
             .overlay {
                 Color(nsColor: .windowBackgroundColor)
-                    .opacity(isDark ? ColumnChromeMetrics.darkBaseTintOpacity : 0.04)
+                    .opacity(isDark ? ColumnChromeMetrics.darkBaseTintOpacity : 0.03)
             }
             .overlay(
                 LinearGradient(
@@ -293,7 +293,7 @@ struct SidebarPaneBackground: View {
             .fill(.ultraThinMaterial)
             .overlay {
                 Color(nsColor: .windowBackgroundColor)
-                    .opacity(isDark ? 0.11 : 0.04)
+                    .opacity(isDark ? 0.08 : 0.03)
             }
             .overlay(
                 LinearGradient(
@@ -347,7 +347,7 @@ struct ColumnTopBar<Leading: View, Trailing: View>: View {
 
     var body: some View {
         ColumnTopChrome {
-            HStack(spacing: 10) {
+            HStack(spacing: 8) {
                 leading
                 Spacer(minLength: 0)
                 trailing
