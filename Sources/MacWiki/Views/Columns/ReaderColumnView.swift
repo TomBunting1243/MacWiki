@@ -7,14 +7,9 @@ struct ReaderColumnView: View {
     let tabBarLiquidGlass: Bool
     let onNewLabelWithArticle: (SavedArticle) -> Void
 
-    /// Height reserved by titlebar/toolbar when full-size content is enabled.
+    /// Height reserved by the native titlebar/toolbar when full-size content is enabled.
     private var readerTopBarHeight: CGFloat {
-        max(appState.windowTopObscuredHeight, ColumnChromeMetrics.titleBarClearance)
-    }
-
-    /// Additional spacer needed above custom reader chrome to avoid top clipping.
-    private var readerTopSpacerHeight: CGFloat {
-        max(0, readerTopBarHeight - ColumnChromeMetrics.topBarHeight)
+        ColumnChromeMetrics.readerTitleBarHeight(windowTopObscuredHeight: appState.windowTopObscuredHeight)
     }
 
     private var topTabLaneHeight: CGFloat {
@@ -91,40 +86,34 @@ struct ReaderColumnView: View {
 
     private var topToolbarLaneContent: some View {
         VStack(spacing: 0) {
-            if readerTopSpacerHeight > 0 {
-                Color.clear
-                    .frame(height: readerTopSpacerHeight)
-                    .allowsHitTesting(false)
-            }
+            WindowDragHandle(minLength: 180)
+                .frame(height: readerTopBarHeight)
 
             ReaderToolbar()
                 .frame(height: ColumnChromeMetrics.topBarHeight)
                 .offset(y: ColumnChromeMetrics.readerToolbarOpticalYOffset)
                 .frame(maxWidth: .infinity)
-            .frame(height: ColumnChromeMetrics.topBarHeight)
+                .frame(height: ColumnChromeMetrics.topBarHeight)
 
             Color.clear
                 .frame(height: ColumnChromeMetrics.readerTabToolbarGap)
                 .allowsHitTesting(false)
         }
-        .frame(height: readerTopSpacerHeight + ColumnChromeMetrics.topBarHeight + ColumnChromeMetrics.readerTabToolbarGap)
+        .frame(height: readerTopBarHeight + ColumnChromeMetrics.topBarHeight + ColumnChromeMetrics.readerTabToolbarGap)
     }
 
     private var topToolbarLaneSolid: some View {
         VStack(spacing: 0) {
-            if readerTopSpacerHeight > 0 {
-                Color.clear
-                    .frame(height: readerTopSpacerHeight)
-                    .allowsHitTesting(false)
-            }
+            WindowDragHandle(minLength: 180)
+                .frame(height: readerTopBarHeight)
 
             ReaderToolbar()
                 .frame(height: ColumnChromeMetrics.topBarHeight)
                 .offset(y: ColumnChromeMetrics.readerToolbarOpticalYOffset)
                 .frame(maxWidth: .infinity)
-            .frame(height: ColumnChromeMetrics.topBarHeight)
+                .frame(height: ColumnChromeMetrics.topBarHeight)
         }
-        .frame(height: readerTopSpacerHeight + ColumnChromeMetrics.topBarHeight)
+        .frame(height: readerTopBarHeight + ColumnChromeMetrics.topBarHeight)
         .background {
             Rectangle()
                 .fill(Color(nsColor: .windowBackgroundColor))
