@@ -89,7 +89,7 @@ struct ContentView: View {
         .toolbar {
             MainWindowToolbar()
         }
-        .toolbarBackground(.hidden, for: .windowToolbar)
+        .toolbarBackground(.visible, for: .windowToolbar)
         .animation(reduceMotion ? nil : PanelMotion.searchOverlayToggle, value: appState.showSearch)
         .contentSheets(
             editingLabel: $editingLabel, 
