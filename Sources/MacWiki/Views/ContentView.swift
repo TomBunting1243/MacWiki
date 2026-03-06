@@ -91,6 +91,9 @@ struct ContentView: View {
         }
         .toolbarBackground(.visible, for: .windowToolbar)
         .animation(reduceMotion ? nil : PanelMotion.searchOverlayToggle, value: appState.showSearch)
+        .background {
+            WindowTopObscuredHeightReader()
+        }
         .contentSheets(
             editingLabel: $editingLabel, 
             showNewLabelSheet: $showNewLabelSheet, 
@@ -98,6 +101,12 @@ struct ContentView: View {
             showNewTagSheet: $showNewTagSheet,
             articleForNewTag: $articleForNewTag
         )
+        .onPreferenceChange(WindowTopObscuredHeightPreferenceKey.self) { newValue in
+            let resolved = max(0, newValue)
+            if abs(appState.windowTopObscuredHeight - resolved) > 0.5 {
+                appState.windowTopObscuredHeight = resolved
+            }
+        }
         .onAppear {
             applyLaunchQAHarnessOverridesIfNeeded()
             enforceWikiHopAvailabilityIfNeeded()
@@ -228,7 +237,6 @@ struct ContentView: View {
         } detail: {
             mainDetailView
         }
-        .ignoresSafeArea(.container, edges: .top)
         .onPreferenceChange(ListsSidebarWidthPreferenceKey.self) { newWidth in
             guard appState.sidebarVisible else { return }
             guard newWidth > 1 else { return }
