@@ -7,35 +7,35 @@ private enum InspectorModePillStyle {
     }
 
     static func iconSelectedOpacity(darkMode: Bool) -> Double {
-        darkMode ? 0.90 : 0.86
+        darkMode ? 0.84 : 0.78
     }
 
     static func iconHoverOpacity(darkMode: Bool) -> Double {
-        darkMode ? 0.88 : 0.82
+        darkMode ? 0.78 : 0.72
     }
 
     static func activeFillOpacity(darkMode: Bool) -> Double {
-        darkMode ? 0.09 : 0.055
+        darkMode ? 0.055 : 0.035
     }
 
     static func activeStrokeOpacity(darkMode: Bool) -> Double {
-        darkMode ? 0.17 : 0.11
+        darkMode ? 0.10 : 0.075
     }
 
     static func activeSheenOpacity(darkMode: Bool) -> Double {
-        darkMode ? 0.11 : 0.18
+        darkMode ? 0.06 : 0.10
     }
 
     static func activeDepthOpacity(darkMode: Bool) -> Double {
-        darkMode ? 0.035 : 0.012
+        darkMode ? 0.018 : 0.006
     }
 
     static func hoverFillOpacity(darkMode: Bool) -> Double {
-        darkMode ? 0.09 : 0.06
+        darkMode ? 0.05 : 0.035
     }
 
     static func hoverStrokeOpacity(darkMode: Bool) -> Double {
-        darkMode ? 0.17 : 0.12
+        darkMode ? 0.10 : 0.075
     }
 }
 
@@ -947,9 +947,9 @@ private struct InspectorModeControl: View {
     @Namespace private var activeModeNamespace
 
     private enum Metrics {
-        static let pillWidth: CGFloat = 34
+        static let pillWidth: CGFloat = 32
         static let pillHeight: CGFloat = TopChromeControlMetrics.groupButtonSize
-        static let pillSpacing: CGFloat = 6
+        static let pillSpacing: CGFloat = 4
         static let pillCornerRadius: CGFloat = TopChromeControlMetrics.groupCornerRadius
         static let railHorizontalPadding: CGFloat = 2
         static let railVerticalPadding: CGFloat = 1
@@ -1034,7 +1034,7 @@ private struct InspectorModeControl: View {
     private func basePillBackground(darkMode: Bool) -> some View {
         if useLiquidGlass {
             RoundedRectangle(cornerRadius: Metrics.pillCornerRadius, style: .continuous)
-                .fill(.thinMaterial)
+                .fill(.ultraThinMaterial)
                 .overlay {
                     RoundedRectangle(cornerRadius: Metrics.pillCornerRadius, style: .continuous)
                         .fill(
@@ -1102,7 +1102,7 @@ private struct InspectorModeControl: View {
                     RoundedRectangle(cornerRadius: Metrics.pillCornerRadius, style: .continuous)
                         .strokeBorder(
                             Color.accentColor.opacity(InspectorModePillStyle.activeStrokeOpacity(darkMode: darkMode)),
-                            lineWidth: 0.70
+                            lineWidth: 0.58
                         )
                 }
         } else {
@@ -1118,7 +1118,7 @@ private struct InspectorModeControl: View {
                 RoundedRectangle(cornerRadius: Metrics.pillCornerRadius, style: .continuous)
                     .strokeBorder(
                         Color.primary.opacity(InspectorModePillStyle.hoverStrokeOpacity(darkMode: darkMode)),
-                        lineWidth: 0.65
+                        lineWidth: 0.56
                     )
             }
     }

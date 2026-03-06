@@ -81,11 +81,11 @@ fileprivate enum SidebarMetrics {
     }
 
     static func iconSelectedOpacity(darkMode: Bool) -> Double {
-        darkMode ? 0.90 : 0.84
+        darkMode ? 0.84 : 0.78
     }
 
     static func iconHoverOpacity(darkMode: Bool) -> Double {
-        darkMode ? 0.83 : 0.76
+        darkMode ? 0.76 : 0.70
     }
 
     static func iconColor(
@@ -118,7 +118,7 @@ fileprivate enum SidebarMetrics {
         isSelected: Bool
     ) -> Color {
         if isSelected {
-            return Color.primary.opacity(colorScheme == .dark ? 0.84 : 0.76)
+            return Color.primary.opacity(colorScheme == .dark ? 0.78 : 0.72)
         }
         return Color(nsColor: .tertiaryLabelColor)
     }
@@ -140,32 +140,32 @@ private struct SidebarRowSurface: View {
         let isKeyWindow = controlActiveState == .key
         return Color.accentColor.opacity(
             colorScheme == .dark
-                ? (isKeyWindow ? 0.18 : 0.14)
-                : (isKeyWindow ? 0.13 : 0.10)
+                ? (isKeyWindow ? 0.13 : 0.10)
+                : (isKeyWindow ? 0.095 : 0.072)
         )
     }
 
     private var hoverFill: Color {
         let isKeyWindow = controlActiveState == .key
         return colorScheme == .dark
-            ? Color.white.opacity(isKeyWindow ? 0.060 : 0.042)
-            : Color.black.opacity(isKeyWindow ? 0.030 : 0.020)
+            ? Color.white.opacity(isKeyWindow ? 0.045 : 0.030)
+            : Color.black.opacity(isKeyWindow ? 0.022 : 0.014)
     }
 
     private var selectedStroke: Color {
         let isKeyWindow = controlActiveState == .key
         return Color.accentColor.opacity(
             colorScheme == .dark
-                ? (isKeyWindow ? 0.30 : 0.22)
-                : (isKeyWindow ? 0.22 : 0.16)
+                ? (isKeyWindow ? 0.20 : 0.15)
+                : (isKeyWindow ? 0.15 : 0.10)
         )
     }
 
     private var hoverStroke: Color {
         let isKeyWindow = controlActiveState == .key
         return colorScheme == .dark
-            ? Color.white.opacity(isKeyWindow ? 0.095 : 0.068)
-            : Color.black.opacity(isKeyWindow ? 0.055 : 0.036)
+            ? Color.white.opacity(isKeyWindow ? 0.068 : 0.048)
+            : Color.black.opacity(isKeyWindow ? 0.038 : 0.024)
     }
 
     var body: some View {
@@ -186,7 +186,7 @@ private struct SidebarRowSurface: View {
                             isDropTarget
                                 ? Color.accentColor.opacity(0.20)
                                 : (isSelected ? selectedStroke : hoverStroke),
-                            lineWidth: 0.75
+                            lineWidth: 0.60
                         )
                 }
             }
