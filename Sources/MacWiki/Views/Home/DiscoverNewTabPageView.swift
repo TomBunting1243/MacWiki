@@ -1672,11 +1672,6 @@ private struct DiscoverFeedSections: View {
                 subtitle: "PLACEHOLDER"
             )
 
-            Text("PLACEHOLDER")
-                .font(.system(size: 12.5, weight: .medium))
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-
             LazyVGrid(columns: playlistColumns, spacing: 12) {
                 DiscoverPlaylistColumn(
                     title: "Most Read",
@@ -2247,8 +2242,12 @@ private struct DiscoverMasthead: View {
     let dateLabel: String
     let isCompactLayout: Bool
 
+    private var trimmedDateLabel: String {
+        dateLabel.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .firstTextBaseline, spacing: 12) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Today’s Edition")
@@ -2264,16 +2263,20 @@ private struct DiscoverMasthead: View {
 
                 Spacer(minLength: 8)
 
-                Text(dateLabel)
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.trailing)
+                if !trimmedDateLabel.isEmpty {
+                    Text(trimmedDateLabel)
+                        .font(.system(size: 11.5, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(Color.primary.opacity(0.045), in: Capsule())
+                        .multilineTextAlignment(.trailing)
+                }
             }
 
-            Text("PLACEHOLDER")
-                .font(.system(size: isCompactLayout ? 12.5 : 13.5, weight: .medium))
-                .foregroundStyle(.secondary)
-                .lineLimit(isCompactLayout ? 2 : 1)
+            Rectangle()
+                .fill(Color.primary.opacity(0.08))
+                .frame(height: 1)
         }
     }
 }
@@ -2282,13 +2285,25 @@ private struct DiscoverSectionHeader: View {
     let title: String
     let subtitle: String
 
+    private var normalizedSubtitle: String {
+        subtitle.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var showsSubtitle: Bool {
+        !normalizedSubtitle.isEmpty && normalizedSubtitle != "PLACEHOLDER"
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 3) {
+        VStack(alignment: .leading, spacing: showsSubtitle ? 3 : 0) {
+            if showsSubtitle {
+                Text(normalizedSubtitle)
+                    .font(DiscoverTypography.sectionSubtitle)
+                    .textCase(.uppercase)
+                    .tracking(0.75)
+                    .foregroundStyle(.tertiary)
+            }
             Text(title)
                 .font(DiscoverTypography.sectionTitle)
-            Text(subtitle)
-                .font(DiscoverTypography.sectionSubtitle)
-                .foregroundStyle(.secondary)
         }
     }
 }
@@ -2338,6 +2353,8 @@ private struct DiscoverPlaylistColumn<Content: View>: View {
     }
 
     var body: some View {
+        let cornerRadius = showsSurface ? 18.0 : 20.0
+
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .top, spacing: 9) {
                 Image(systemName: systemImage)
@@ -2373,20 +2390,30 @@ private struct DiscoverPlaylistColumn<Content: View>: View {
                 content
             }
         }
-        .padding(12)
+        .padding(13)
         .background(
             Group {
                 if showsSurface {
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .fill(.regularMaterial)
+                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color.primary.opacity(0.028),
+                                    tint.opacity(0.035),
+                                    Color.white.opacity(0.08)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
                 } else {
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                         .fill(Color.primary.opacity(isHovered || isKeyboardFocused ? 0.045 : 0.025))
                 }
             }
         )
         .overlay {
-            RoundedRectangle(cornerRadius: showsSurface ? 16 : 18, style: .continuous)
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                 .strokeBorder(
                     isKeyboardFocused
                         ? tint.opacity(0.48)
@@ -2396,10 +2423,10 @@ private struct DiscoverPlaylistColumn<Content: View>: View {
         }
         .overlay {
             if showsSurface {
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                     .strokeBorder(
                         LinearGradient(
-                            colors: [tint.opacity(0.18), Color.primary.opacity(0.02)],
+                            colors: [Color.white.opacity(0.18), tint.opacity(0.12), Color.primary.opacity(0.015)],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         ),

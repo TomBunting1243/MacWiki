@@ -241,7 +241,7 @@ struct SettingsView: View {
 
     private var settingsSidebar: some View {
         List(SettingsSection.allCases, selection: $selectedSettingsSection) { section in
-            Label(section.title, systemImage: section.systemImage)
+            SwiftUI.Label(section.title, systemImage: section.systemImage)
                 .tag(Optional(section))
         }
         .listStyle(.sidebar)
