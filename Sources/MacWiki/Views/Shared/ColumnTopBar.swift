@@ -30,7 +30,7 @@ enum ColumnChromeMetrics {
 
     /// Titlebar/toolbar clearance that the reader should treat as native chrome.
     static func readerTitleBarHeight(windowTopObscuredHeight: CGFloat) -> CGFloat {
-        max(windowTopObscuredHeight, topBarHeight)
+        max(windowTopObscuredHeight, titleBarClearance)
     }
 
     /// Combined overlay height of native toolbar clearance + reader tab lane in liquid-glass mode.
