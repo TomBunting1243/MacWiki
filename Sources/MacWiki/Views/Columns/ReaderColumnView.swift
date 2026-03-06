@@ -54,14 +54,24 @@ struct ReaderColumnView: View {
     private var topChromeStack: some View {
         if shouldShowReaderTopChrome {
             VStack(spacing: 0) {
-                topToolbarLane
-                topTabLane
+                topToolbarLaneContent
+                topTabLaneContent
             }
             .frame(maxWidth: .infinity, alignment: .top)
+            .background {
+                ColumnChromeBackground()
+                    .allowsHitTesting(false)
+            }
+            .overlay(alignment: .bottom) {
+                Rectangle()
+                    .fill(Color.primary.opacity(ColumnChromeMetrics.dividerOpacity(for: colorScheme)))
+                    .frame(height: 0.5)
+                    .allowsHitTesting(false)
+            }
         }
     }
 
-    private var topTabLane: some View {
+    private var topTabLaneContent: some View {
         VStack(spacing: 0) {
             Color.clear
                 .frame(height: topTabLaneInset)
@@ -71,19 +81,15 @@ struct ReaderColumnView: View {
                 .frame(height: ColumnChromeMetrics.topBarHeight)
         }
         .frame(height: topTabLaneHeight)
-        .background {
-            ColumnChromeBackground()
-                .allowsHitTesting(false)
-        }
-        .overlay(alignment: .bottom) {
+        .overlay(alignment: .top) {
             Rectangle()
-                .fill(Color.primary.opacity(ColumnChromeMetrics.dividerOpacity(for: colorScheme)))
+                .fill(Color.primary.opacity(ColumnChromeMetrics.internalDividerOpacity(for: colorScheme)))
                 .frame(height: 0.5)
                 .allowsHitTesting(false)
         }
     }
 
-    private var topToolbarLane: some View {
+    private var topToolbarLaneContent: some View {
         VStack(spacing: 0) {
             if readerTopSpacerHeight > 0 {
                 Color.clear
@@ -102,16 +108,6 @@ struct ReaderColumnView: View {
                 .allowsHitTesting(false)
         }
         .frame(height: readerTopSpacerHeight + ColumnChromeMetrics.topBarHeight + ColumnChromeMetrics.readerTabToolbarGap)
-        .background {
-            ColumnChromeBackground()
-                .allowsHitTesting(false)
-        }
-        .overlay(alignment: .bottom) {
-            Rectangle()
-                .fill(Color.primary.opacity(ColumnChromeMetrics.dividerOpacity(for: colorScheme)))
-                .frame(height: 0.5)
-                .allowsHitTesting(false)
-        }
     }
 
     private var topToolbarLaneSolid: some View {
