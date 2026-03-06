@@ -509,7 +509,7 @@ struct SettingsView: View {
             }
 
             Toggle("Liquid Glass Tab Bar", isOn: $tabBarLiquidGlass)
-            settingDescription("Use translucent liquid-glass treatment for the reader tab bar and article toolbar controls. Disable for a more solid chrome look.")
+            settingDescription("Use translucent liquid-glass treatment for the reader tab bar and top chrome. Disable for a more solid chrome look.")
 
             GroupBox("Tab Accompaniments (Pro)") {
                 VStack(alignment: .leading, spacing: compact ? 8 : 10) {

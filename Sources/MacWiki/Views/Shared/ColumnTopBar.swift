@@ -2,7 +2,6 @@ import SwiftUI
 
 enum ColumnChromeMetrics {
     static let topBarHeight: CGFloat = 32
-    static let readerTabToolbarGap: CGFloat = 4
     /// Tiny downward optical nudge so grouped toolbar controls appear centered
     /// against the lane highlight/divider stack.
     static let readerToolbarOpticalYOffset: CGFloat = 0.6
@@ -34,11 +33,10 @@ enum ColumnChromeMetrics {
         max(windowTopObscuredHeight, topBarHeight)
     }
 
-    /// Combined overlay height of native toolbar clearance + reader toolbar lane
-    /// + tab lane in liquid-glass mode.
+    /// Combined overlay height of native toolbar clearance + reader tab lane in liquid-glass mode.
     static func readerChromeOverlayHeight(windowTopObscuredHeight: CGFloat) -> CGFloat {
         let resolvedTitleBarHeight = readerTitleBarHeight(windowTopObscuredHeight: windowTopObscuredHeight)
-        return resolvedTitleBarHeight + topBarHeight + readerTabToolbarGap + topBarHeight
+        return resolvedTitleBarHeight + topBarHeight
     }
 
     /// Suggested content inset that clears reader overlay chrome with comfortable breathing room.

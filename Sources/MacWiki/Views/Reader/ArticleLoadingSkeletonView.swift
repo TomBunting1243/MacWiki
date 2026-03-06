@@ -31,7 +31,7 @@ struct ArticleLoadingSkeletonView: View {
     @Environment(AppState.self) private var appState
 
     private func resolvedTopPadding(for availableWidth: CGFloat) -> CGFloat {
-        // In liquid-glass mode, the reader content underlaps the tab strip + toolbar lane.
+        // In liquid-glass mode, the reader content underlaps the titlebar clearance + tab lane.
         // Keep the skeleton status capsule clear of the chrome and add a compact-width bump.
         guard tabBarLiquidGlass, !appState.isWikiHopNavigationLocked else {
             switch availableWidth {

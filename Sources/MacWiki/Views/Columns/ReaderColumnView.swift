@@ -49,7 +49,7 @@ struct ReaderColumnView: View {
     private var topChromeStack: some View {
         if shouldShowReaderTopChrome {
             VStack(spacing: 0) {
-                topToolbarLaneContent
+                nativeTitlebarSpacer
                 topTabLaneContent
             }
             .frame(maxWidth: .infinity, alignment: .top)
@@ -84,36 +84,14 @@ struct ReaderColumnView: View {
         }
     }
 
-    private var topToolbarLaneContent: some View {
-        VStack(spacing: 0) {
-            WindowDragHandle(minLength: 180)
-                .frame(height: readerTopBarHeight)
-
-            ReaderToolbar()
-                .frame(height: ColumnChromeMetrics.topBarHeight)
-                .offset(y: ColumnChromeMetrics.readerToolbarOpticalYOffset)
-                .frame(maxWidth: .infinity)
-                .frame(height: ColumnChromeMetrics.topBarHeight)
-
-            Color.clear
-                .frame(height: ColumnChromeMetrics.readerTabToolbarGap)
-                .allowsHitTesting(false)
-        }
-        .frame(height: readerTopBarHeight + ColumnChromeMetrics.topBarHeight + ColumnChromeMetrics.readerTabToolbarGap)
+    private var nativeTitlebarSpacer: some View {
+        WindowDragHandle(minLength: 180)
+            .frame(height: readerTopBarHeight)
     }
 
     private var topToolbarLaneSolid: some View {
-        VStack(spacing: 0) {
-            WindowDragHandle(minLength: 180)
-                .frame(height: readerTopBarHeight)
-
-            ReaderToolbar()
-                .frame(height: ColumnChromeMetrics.topBarHeight)
-                .offset(y: ColumnChromeMetrics.readerToolbarOpticalYOffset)
-                .frame(maxWidth: .infinity)
-                .frame(height: ColumnChromeMetrics.topBarHeight)
-        }
-        .frame(height: readerTopBarHeight + ColumnChromeMetrics.topBarHeight)
+        nativeTitlebarSpacer
+            .frame(height: readerTopBarHeight)
         .background {
             Rectangle()
                 .fill(Color(nsColor: .windowBackgroundColor))
