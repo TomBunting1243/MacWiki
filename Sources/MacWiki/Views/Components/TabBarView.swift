@@ -97,11 +97,7 @@ private enum TabChromeHierarchy {
     }
 
     static func activeGlassTintOpacity(darkMode: Bool) -> Double {
-        darkMode ? 0.035 : 0.03
-    }
-
-    static func activeGlassSheenOpacity(darkMode: Bool) -> Double {
-        darkMode ? 0.04 : 0.06
+        darkMode ? 0.020 : 0.016
     }
 }
 
@@ -417,40 +413,22 @@ struct TabBarView: View {
             let cornerRadius = stripAccessoryCornerRadius
             let compactAccessory = chromeStyle == .strip
             if tabBarLiquidGlass {
+                let fillOpacity = darkMode
+                    ? (compactAccessory ? 0.18 : 0.20)
+                    : (compactAccessory ? 0.11 : 0.13)
+                let edgeOpacity = darkMode
+                    ? (compactAccessory ? 0.065 : 0.075)
+                    : (compactAccessory ? 0.055 : 0.065)
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .fill(.ultraThinMaterial)
-                    .overlay(
+                    .fill(.thinMaterial)
+                    .overlay {
                         RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                            .fill(
-                                Color(nsColor: .windowBackgroundColor)
-                                    .opacity(
-                                        darkMode
-                                            ? (compactAccessory ? 0.16 : 0.18)
-                                            : (compactAccessory ? 0.09 : 0.11)
-                                    )
-                            )
-                    )
-                    .overlay(
+                            .fill(Color(nsColor: .controlBackgroundColor).opacity(fillOpacity))
+                    }
+                    .overlay {
                         RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                            .fill(
-                                LinearGradient(
-                                    colors: [
-                                        Color.white.opacity(darkMode ? 0.05 : 0.08),
-                                        Color.clear
-                                    ],
-                                    startPoint: .top,
-                                    endPoint: .bottom
-                                )
-                            )
-                            .blendMode(.screen)
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                            .strokeBorder(
-                                Color.primary.opacity(darkMode ? 0.09 : 0.07),
-                                lineWidth: 0.48
-                            )
-                    )
+                            .strokeBorder(Color.primary.opacity(edgeOpacity), lineWidth: 0.44)
+                    }
             } else {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                     .fill(Color(nsColor: .controlBackgroundColor).opacity(darkMode ? 0.68 : 0.82))
@@ -1188,23 +1166,17 @@ private struct DraggableTabItemView: View {
     private var stripGlassCellBackground: some View {
         let darkMode = colorScheme == .dark
         if tabBarLiquidGlass {
-            let sheenOpacity = isActive
-                ? TabChromeHierarchy.activeGlassSheenOpacity(darkMode: darkMode)
-                : (darkMode ? 0.02 : 0.04)
             let edgeOpacity = darkMode
-                ? (isActive ? 0.11 : (isHovered ? 0.07 : 0.045))
-                : (isActive ? 0.10 : (isHovered ? 0.07 : 0.045))
-            let tintOpacity = darkMode
-                ? (isActive ? 0.07 : (isHovered ? 0.035 : 0.018))
-                : (isActive ? 0.045 : (isHovered ? 0.026 : 0.012))
+                ? (isActive ? 0.085 : (isHovered ? 0.055 : 0.036))
+                : (isActive ? 0.078 : (isHovered ? 0.052 : 0.034))
+            let neutralFillOpacity = darkMode
+                ? (isActive ? 0.22 : (isHovered ? 0.12 : 0.075))
+                : (isActive ? 0.14 : (isHovered ? 0.08 : 0.045))
             RoundedRectangle(cornerRadius: tabCornerRadius, style: .continuous)
-                .fill(AnyShapeStyle(.ultraThinMaterial))
+                .fill(AnyShapeStyle(.thinMaterial))
                 .overlay {
                     RoundedRectangle(cornerRadius: tabCornerRadius, style: .continuous)
-                        .fill(
-                            Color(nsColor: .windowBackgroundColor)
-                                .opacity(darkMode ? (tintOpacity + 0.05) : (tintOpacity + 0.025))
-                        )
+                        .fill(Color(nsColor: .controlBackgroundColor).opacity(neutralFillOpacity))
                 }
                 .overlay {
                     if isActive {
@@ -1214,21 +1186,7 @@ private struct DraggableTabItemView: View {
                 }
                 .overlay(
                     RoundedRectangle(cornerRadius: tabCornerRadius, style: .continuous)
-                        .fill(
-                            LinearGradient(
-                                colors: [
-                                    Color.white.opacity(sheenOpacity),
-                                    Color.clear
-                                ],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
-                        )
-                        .blendMode(.screen)
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: tabCornerRadius, style: .continuous)
-                        .strokeBorder(Color.primary.opacity(edgeOpacity), lineWidth: isActive ? 0.52 : 0.42)
+                        .strokeBorder(Color.primary.opacity(edgeOpacity), lineWidth: isActive ? 0.46 : 0.38)
                 )
         } else {
             let fillOpacity: CGFloat = {
