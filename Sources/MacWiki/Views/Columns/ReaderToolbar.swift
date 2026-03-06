@@ -4,15 +4,15 @@ import AppKit
 
 private enum ToolbarHierarchy {
     static func iconPrimaryOpacity(darkMode: Bool) -> Double {
-        darkMode ? 0.76 : 0.70
+        darkMode ? 0.68 : 0.62
     }
 
     static func iconSelectedOpacity(darkMode: Bool) -> Double {
-        darkMode ? 0.90 : 0.86
+        darkMode ? 0.84 : 0.78
     }
 
     static func iconHoverOpacity(darkMode: Bool) -> Double {
-        darkMode ? 0.88 : 0.82
+        darkMode ? 0.78 : 0.72
     }
 
     static func iconDisabledOpacity() -> Double {
@@ -28,27 +28,23 @@ private enum ToolbarHierarchy {
     }
 
     static func groupSelectedFillOpacity(darkMode: Bool) -> Double {
-        darkMode ? 0.09 : 0.055
+        darkMode ? 0.055 : 0.035
     }
 
     static func groupSelectedStrokeOpacity(darkMode: Bool) -> Double {
-        darkMode ? 0.17 : 0.11
+        darkMode ? 0.10 : 0.075
     }
 
     static func groupSelectedGlassSheenOpacity(darkMode: Bool) -> Double {
-        darkMode ? 0.11 : 0.18
-    }
-
-    static func groupSelectedGlassDepthOpacity(darkMode: Bool) -> Double {
-        darkMode ? 0.035 : 0.012
+        darkMode ? 0.06 : 0.10
     }
 
     static func groupHoverFillOpacity(darkMode: Bool) -> Double {
-        darkMode ? 0.09 : 0.06
+        darkMode ? 0.05 : 0.035
     }
 
     static func groupHoverStrokeOpacity(darkMode: Bool) -> Double {
-        darkMode ? 0.17 : 0.12
+        darkMode ? 0.10 : 0.075
     }
 }
 
@@ -132,9 +128,9 @@ struct ReaderToolbar: View {
 
         var showsStatsInline: Bool {
             switch self {
-            case .spacious, .regular:
+            case .spacious:
                 return true
-            case .compact, .ultraCompact:
+            case .regular, .compact, .ultraCompact:
                 return false
             }
         }
@@ -184,7 +180,7 @@ struct ReaderToolbar: View {
         GeometryReader { proxy in
             toolbarContent(for: ToolbarPriorityTier.resolve(for: proxy.size.width))
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-                .padding(.horizontal, 12)
+                .padding(.horizontal, 10)
         }
     }
 
@@ -192,8 +188,8 @@ struct ReaderToolbar: View {
     private func toolbarContent(for tier: ToolbarPriorityTier) -> some View {
         let overflowActions = overflowActions(for: tier)
 
-        HStack(spacing: 10) {
-            HStack(spacing: 6) {
+        HStack(spacing: 8) {
+            HStack(spacing: 4) {
                 toolbarMicroPill(
                     id: "left-sidebar",
                     isEnabled: !navigationLocked,
@@ -296,7 +292,7 @@ struct ReaderToolbar: View {
 
             Spacer(minLength: 0)
 
-            HStack(spacing: 6) {
+            HStack(spacing: 4) {
                 if tier.showsFocusModeInline {
                     toolbarMicroPill(
                         id: "right-focus",
@@ -519,12 +515,12 @@ struct ReaderToolbar: View {
             ZStack {
                 if tabBarLiquidGlass {
                     RoundedRectangle(cornerRadius: TopChromeControlMetrics.groupCornerRadius, style: .continuous)
-                        .fill(.thinMaterial)
+                        .fill(.ultraThinMaterial)
                         .overlay {
                             RoundedRectangle(cornerRadius: TopChromeControlMetrics.groupCornerRadius, style: .continuous)
                                 .fill(
                                     Color(nsColor: .windowBackgroundColor)
-                                        .opacity(TopChromeControlSurface.tintOpacity(darkMode: darkMode))
+                                        .opacity(darkMode ? 0.16 : 0.09)
                                 )
                                 .allowsHitTesting(false)
                         }
@@ -533,8 +529,7 @@ struct ReaderToolbar: View {
                                 .fill(
                                     LinearGradient(
                                         colors: [
-                                            Color.white.opacity(TopChromeControlSurface.sheenOpacity(darkMode: darkMode)),
-                                            Color.clear,
+                                            Color.white.opacity(darkMode ? 0.05 : 0.08),
                                             Color.clear
                                         ],
                                         startPoint: .top,
@@ -544,31 +539,21 @@ struct ReaderToolbar: View {
                                 .blendMode(.screen)
                                 .allowsHitTesting(false)
                         }
-                        .overlay {
-                            RoundedRectangle(cornerRadius: TopChromeControlMetrics.groupCornerRadius, style: .continuous)
-                                .fill(
-                                    Color.black.opacity(
-                                        TopChromeControlSurface.depthMultiplyOpacity(darkMode: darkMode)
-                                    )
-                                )
-                                .blendMode(.multiply)
-                                .allowsHitTesting(false)
-                        }
                 } else {
                     RoundedRectangle(cornerRadius: TopChromeControlMetrics.groupCornerRadius, style: .continuous)
-                        .fill(Color(nsColor: .controlBackgroundColor))
+                        .fill(Color(nsColor: .controlBackgroundColor).opacity(darkMode ? 0.70 : 0.84))
                         .overlay {
                             RoundedRectangle(cornerRadius: TopChromeControlMetrics.groupCornerRadius, style: .continuous)
                                 .fill(
                                     LinearGradient(
                                         colors: darkMode
                                             ? [
-                                                Color.white.opacity(0.08),
+                                                Color.white.opacity(0.05),
                                                 Color.clear
                                             ]
                                             : [
-                                                Color.white.opacity(0.44),
-                                                Color.white.opacity(0.18)
+                                                Color.white.opacity(0.26),
+                                                Color.white.opacity(0.10)
                                             ],
                                         startPoint: .top,
                                         endPoint: .bottom
@@ -606,22 +591,13 @@ struct ReaderToolbar: View {
                                     )
                                     .blendMode(.screen)
                             }
-                            .overlay {
-                                RoundedRectangle(cornerRadius: TopChromeControlMetrics.groupCornerRadius, style: .continuous)
-                                    .fill(
-                                        Color.black.opacity(
-                                            ToolbarHierarchy.groupSelectedGlassDepthOpacity(darkMode: darkMode)
-                                        )
-                                    )
-                                    .blendMode(.multiply)
-                            }
                             .overlay(
                                 RoundedRectangle(cornerRadius: TopChromeControlMetrics.groupCornerRadius, style: .continuous)
                                     .strokeBorder(
                                         Color.accentColor.opacity(
                                             ToolbarHierarchy.groupSelectedStrokeOpacity(darkMode: darkMode)
                                         ),
-                                        lineWidth: 0.70
+                                        lineWidth: 0.58
                                     )
                             )
                             .allowsHitTesting(false)
@@ -634,7 +610,7 @@ struct ReaderToolbar: View {
                                         Color.accentColor.opacity(
                                             ToolbarHierarchy.groupSelectedStrokeOpacity(darkMode: darkMode)
                                         ),
-                                        lineWidth: 0.65
+                                        lineWidth: 0.56
                                     )
                             )
                             .allowsHitTesting(false)
@@ -651,7 +627,7 @@ struct ReaderToolbar: View {
                             liquid: tabBarLiquidGlass
                         )
                     ),
-                    lineWidth: tabBarLiquidGlass ? 0.52 : 0.60
+                    lineWidth: tabBarLiquidGlass ? 0.48 : 0.54
                 )
                 .allowsHitTesting(false)
         )
@@ -665,7 +641,7 @@ struct ReaderToolbar: View {
                                 Color.primary.opacity(
                                     ToolbarHierarchy.groupHoverStrokeOpacity(darkMode: darkMode)
                                 ),
-                                lineWidth: 0.65
+                                lineWidth: 0.56
                             )
                     )
                     .allowsHitTesting(false)
@@ -695,7 +671,7 @@ struct ReaderToolbar: View {
     ) -> some View {
         toolbarPill(
             id: id,
-            horizontalPadding: max(4, TopChromeControlMetrics.groupHorizontalPadding - 4),
+            horizontalPadding: max(3, TopChromeControlMetrics.groupHorizontalPadding - 5),
             isEnabled: isEnabled,
             isActive: isActive,
             content: content
