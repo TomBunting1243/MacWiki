@@ -8,6 +8,7 @@ struct MainWindowToolbar: CustomizableToolbarContent {
         static let forward = "forward"
         static let search = "search"
         static let find = "find"
+        static let principal = "principal"
         static let newTab = "new-tab"
         static let save = "save"
         static let markRead = "mark-read"
@@ -39,6 +40,31 @@ struct MainWindowToolbar: CustomizableToolbarContent {
 
     private var hasArticle: Bool {
         currentArticle != nil
+    }
+
+    private var showsDiscoverIdentity: Bool {
+        currentTab?.isNewTab == true && currentArticle == nil
+    }
+
+    private var principalTitle: String {
+        if let article = currentArticle, !article.title.isEmpty {
+            return article.title
+        }
+
+        if showsDiscoverIdentity {
+            return "Discover"
+        }
+
+        if let tab = currentTab, !tab.isNewTab, !tab.article.title.isEmpty {
+            return tab.article.title
+        }
+
+        return "MacWiki"
+    }
+
+    private var principalSubtitle: String? {
+        guard showsDiscoverIdentity else { return nil }
+        return "Today’s Edition"
     }
 
     private var isRead: Bool {
@@ -75,6 +101,11 @@ struct MainWindowToolbar: CustomizableToolbarContent {
                 findButton
             }
 
+            ToolbarItem(id: ItemID.principal, placement: .principal) {
+                principalIdentityView
+            }
+            .customizationBehavior(.disabled)
+
             ToolbarItem(id: ItemID.newTab, placement: .primaryAction) {
                 newTabButton
             }
@@ -100,14 +131,17 @@ struct MainWindowToolbar: CustomizableToolbarContent {
             ToolbarItem(id: ItemID.browser, placement: .primaryAction) {
                 browserButton
             }
+            .defaultCustomization(.hidden)
 
             ToolbarItem(id: ItemID.pageViews, placement: .primaryAction) {
                 pageViewsButton
             }
+            .defaultCustomization(.hidden)
 
             ToolbarItem(id: ItemID.focus, placement: .primaryAction) {
                 focusButton
             }
+            .defaultCustomization(.hidden)
 
             ToolbarItem(id: ItemID.inspector, placement: .primaryAction) {
                 inspectorButton
@@ -193,6 +227,25 @@ struct MainWindowToolbar: CustomizableToolbarContent {
                 )
             }
         }
+    }
+
+    private var principalIdentityView: some View {
+        VStack(spacing: 1) {
+            Text(principalTitle)
+                .font(.headline)
+                .lineLimit(1)
+                .truncationMode(.tail)
+
+            if let subtitle = principalSubtitle {
+                Text(subtitle)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+        }
+        .multilineTextAlignment(.center)
+        .allowsTightening(true)
+        .help(principalTitle)
     }
 
     private var markReadButton: some View {
