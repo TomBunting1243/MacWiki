@@ -43,6 +43,7 @@ struct ReaderProgressCoordinator {
         for article: Article,
         in modelContext: ModelContext,
         appState: AppState,
+        publishLiveProgress: Bool = true,
         now: TimeInterval = Date().timeIntervalSinceReferenceDate
     ) -> Double? {
         let clamped = min(max(progress, 0), 1)
@@ -50,15 +51,25 @@ struct ReaderProgressCoordinator {
             candidateProgress: clamped,
             articleTitle: article.title,
             appState: appState,
+            publishLiveProgress: publishLiveProgress,
             now: now
         ) {
             return nil
         }
 
         latestReadingProgress = clamped
-        appState.setLiveReadingProgress(forTitle: article.title, progress: clamped)
+        if publishLiveProgress {
+            appState.setLiveReadingProgress(forTitle: article.title, progress: clamped)
+        }
         persist(progress: clamped, for: article, in: modelContext, force: false, now: now)
         return clamped
+    }
+
+    mutating func publishLatestProgress(
+        for article: Article,
+        appState: AppState
+    ) {
+        appState.setLiveReadingProgress(forTitle: article.title, progress: latestReadingProgress)
     }
 
     mutating func persistCurrentProgress(
@@ -112,6 +123,7 @@ struct ReaderProgressCoordinator {
         candidateProgress: Double,
         articleTitle: String,
         appState: AppState,
+        publishLiveProgress: Bool,
         now: TimeInterval
     ) -> Bool {
         guard now < initialRestoreRegressionGuardUntil else { return false }
@@ -127,7 +139,9 @@ struct ReaderProgressCoordinator {
         let largeNearTopDrop = candidateProgress < 0.06 && (baseline - candidateProgress) > 0.22
         if largeNearTopDrop {
             // Keep list-side live progress stable until restore settles.
-            appState.setLiveReadingProgress(forTitle: articleTitle, progress: baseline)
+            if publishLiveProgress {
+                appState.setLiveReadingProgress(forTitle: articleTitle, progress: baseline)
+            }
             return true
         }
 

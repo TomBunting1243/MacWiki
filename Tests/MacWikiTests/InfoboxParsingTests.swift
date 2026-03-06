@@ -171,4 +171,5 @@ final class InfoboxParsingTests: XCTestCase {
         XCTAssertFalse(value.contains("}}"), "Parser leaked JSON characters. Got: \(value)")
         XCTAssertEqual(value, "Sanni McCandless (married)")
     }
+
 }

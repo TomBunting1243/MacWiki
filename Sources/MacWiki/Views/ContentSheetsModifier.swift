@@ -22,6 +22,7 @@ extension View {
 struct ContentSheetsModifier: ViewModifier {
     @Environment(AppState.self) private var appState
     @Environment(\.modelContext) private var modelContext
+    @Query(sort: \ReadingList.updatedAt, order: .reverse) private var readingLists: [ReadingList]
 
     @Binding var editingLabel: Label?
     @Binding var showNewLabelSheet: Bool
@@ -52,6 +53,7 @@ struct ContentSheetsModifier: ViewModifier {
                     onSave: { newLabel in
                         if let article = articleForNewLabel {
                             article.labelId = newLabel.id
+                            attachPendingLabelArticleIfNeeded(article)
                             try? modelContext.save()
                             articleForNewLabel = nil
                         }
@@ -60,7 +62,7 @@ struct ContentSheetsModifier: ViewModifier {
             }
             .sheet(item: $editingLabel) { label in
                 LabelDetailSheet(
-                    isPresented: Binding(get: { true }, set: { _ in editingLabel = nil }),
+                    isPresented: editingLabelSheetBinding,
                     labelToEdit: label
                 )
             }
@@ -71,11 +73,11 @@ struct ContentSheetsModifier: ViewModifier {
                     onSave: { newTag in
                         guard let article = articleForNewTag else { return }
                         let title = article.title
-                        let urlString = "https://en.wikipedia.org/wiki/\(title.replacingOccurrences(of: " ", with: "_"))"
+                        let urlString = ReadStateSync.urlString(for: title)
                         guard let url = URL(string: urlString) else { return }
 
                         let descriptor = FetchDescriptor<ArticleState>(
-                            predicate: #Predicate { $0.articleURLString == url.absoluteString }
+                            predicate: #Predicate { $0.articleURLString == urlString }
                         )
 
                         if let state = try? modelContext.fetch(descriptor).first {
@@ -94,5 +96,41 @@ struct ContentSheetsModifier: ViewModifier {
                     }
                 )
             }
+            .onChange(of: showNewLabelSheet) { _, isPresented in
+                guard !isPresented else { return }
+                cleanupPendingLabelDraftIfNeeded()
+            }
+    }
+
+    private var defaultReadingList: ReadingList? {
+        readingLists.first(where: { $0.name == "Inbox" }) ?? readingLists.first
+    }
+
+    private var editingLabelSheetBinding: Binding<Bool> {
+        Binding(
+            get: { editingLabel != nil },
+            set: { isPresented in
+                guard !isPresented else { return }
+                editingLabel = nil
+            }
+        )
+    }
+
+    private func attachPendingLabelArticleIfNeeded(_ article: SavedArticle) {
+        guard article.readingList == nil, let list = defaultReadingList else { return }
+        guard !list.articles.contains(where: { $0.id == article.id }) else { return }
+
+        list.articles.append(article)
+        list.updatedAt = Date()
+        SavedArticleSummaryBackfill.enqueueIfNeeded(article, modelContext: modelContext)
+    }
+
+    private func cleanupPendingLabelDraftIfNeeded() {
+        guard let article = articleForNewLabel else { return }
+        defer { articleForNewLabel = nil }
+
+        guard article.readingList == nil, article.labelId == nil else { return }
+        modelContext.delete(article)
+        try? modelContext.save()
     }
 }

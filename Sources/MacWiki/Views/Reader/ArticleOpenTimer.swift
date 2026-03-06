@@ -71,25 +71,33 @@ struct ArticleOpenTimer {
 
     private func log() {
         guard taskStart > 0, revealComplete > 0 else { return }
-        let total = ms(from: taskStart, to: revealComplete)
-        let fetchMs = fetchComplete > 0 ? ms(from: taskStart, to: fetchComplete) : nil
-        let bindMs = htmlBound > 0 ? ms(from: taskStart, to: htmlBound) : nil
-        let finishMs = didFinish > 0 ? ms(from: taskStart, to: didFinish) : nil
-        let highlightMs = highlightsApplied > 0 ? ms(from: taskStart, to: highlightsApplied) : nil
+        let totalMs = milliseconds(from: taskStart, to: revealComplete)
+        let fetchMs = fetchComplete > 0 ? milliseconds(from: taskStart, to: fetchComplete) : nil
+        let bindMs = htmlBound > 0 ? milliseconds(from: taskStart, to: htmlBound) : nil
+        let finishMs = didFinish > 0 ? milliseconds(from: taskStart, to: didFinish) : nil
+        let highlightMs = highlightsApplied > 0 ? milliseconds(from: taskStart, to: highlightsApplied) : nil
 
         var phases: [String] = []
-        if let f = fetchMs { phases.append("fetch=\(f)") }
-        if let b = bindMs { phases.append("bind=\(b)") }
-        if let f = finishMs { phases.append("didFinish=\(f)") }
-        if let h = highlightMs { phases.append("highlights=\(h)") }
-        phases.append("reveal=\(total)")
+        if let f = fetchMs { phases.append("fetch=\(msLabel(f))") }
+        if let b = bindMs { phases.append("bind=\(msLabel(b))") }
+        if let f = finishMs { phases.append("didFinish=\(msLabel(f))") }
+        if let h = highlightMs { phases.append("highlights=\(msLabel(h))") }
+        phases.append("reveal=\(msLabel(totalMs))")
 
         let summary = "[\(kind.rawValue)] \(articleTitle.prefix(40)): \(phases.joined(separator: " "))"
         Self.logger.info("article-open \(summary, privacy: .public)")
+        PerformanceMetricsStore.shared.record(
+            kind: .readerOpen,
+            durationMs: totalMs,
+            detail: "kind=\(kind.rawValue) \(phases.joined(separator: " "))"
+        )
     }
 
-    private func ms(from start: CFAbsoluteTime, to end: CFAbsoluteTime) -> String {
-        let millis = (end - start) * 1000
-        return String(format: "%.0fms", millis)
+    private func milliseconds(from start: CFAbsoluteTime, to end: CFAbsoluteTime) -> Double {
+        (end - start) * 1_000
+    }
+
+    private func msLabel(_ millis: Double) -> String {
+        String(format: "%.0fms", millis)
     }
 }

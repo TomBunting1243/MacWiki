@@ -7,22 +7,48 @@ import Foundation
 actor ThumbnailPrefetcher {
     static let shared = ThumbnailPrefetcher()
 
-    private let session: URLSession
-    private var inFlight: Set<URL> = []
+    typealias DataLoader = @Sendable (URLRequest) async -> Void
+    typealias CachedResponseLoader = @Sendable (URLRequest) -> CachedURLResponse?
+    typealias DateProvider = @Sendable () -> Date
 
-    init() {
+    private let dataLoader: DataLoader
+    private let cachedResponseLoader: CachedResponseLoader
+    private let dateProvider: DateProvider
+    private let recentAttemptCooldown: TimeInterval
+    private let maxRememberedURLs: Int
+    private var inFlight: Set<URL> = []
+    private var recentAttemptDates: [URL: Date] = [:]
+    private var recentAttemptOrder = LRUKeyTracker<URL>()
+
+    init(
+        dataLoader: DataLoader? = nil,
+        cachedResponseLoader: CachedResponseLoader? = nil,
+        dateProvider: @escaping DateProvider = Date.init,
+        recentAttemptCooldown: TimeInterval = 10 * 60,
+        maxRememberedURLs: Int = 512
+    ) {
         let configuration = URLSessionConfiguration.default
         configuration.requestCachePolicy = .returnCacheDataElseLoad
         configuration.timeoutIntervalForRequest = 10
         configuration.timeoutIntervalForResource = 14
         configuration.waitsForConnectivity = false
         configuration.httpMaximumConnectionsPerHost = 6
-        session = URLSession(configuration: configuration)
+        let session = URLSession(configuration: configuration)
+        self.dataLoader = dataLoader ?? { request in
+            _ = try? await session.data(for: request)
+        }
+        self.cachedResponseLoader = cachedResponseLoader ?? { request in
+            URLCache.shared.cachedResponse(for: request)
+        }
+        self.dateProvider = dateProvider
+        self.recentAttemptCooldown = max(0, recentAttemptCooldown)
+        self.maxRememberedURLs = max(0, maxRememberedURLs)
     }
 
     func prefetch(_ urls: [URL], maxConcurrent: Int = 6) async {
-        let uniqueURLs = Array(Set(urls))
+        let uniqueURLs = deduplicatedURLsPreservingOrder(from: urls)
         guard !uniqueURLs.isEmpty else { return }
+        let now = dateProvider()
 
         var index = 0
         while index < uniqueURLs.count {
@@ -35,14 +61,16 @@ actor ThumbnailPrefetcher {
 
                     var request = URLRequest(url: url)
                     request.cachePolicy = .returnCacheDataElseLoad
-                    if URLCache.shared.cachedResponse(for: request) != nil { continue }
+                    if cachedResponseLoader(request) != nil { continue }
+                    if shouldThrottlePrefetch(for: url, now: now) { continue }
 
                     inFlight.insert(url)
-                    group.addTask { [session] in
+                    rememberAttempt(for: url, at: now)
+                    group.addTask { [dataLoader] in
                         var request = URLRequest(url: url)
                         request.cachePolicy = .returnCacheDataElseLoad
                         request.timeoutInterval = 10
-                        _ = try? await session.data(for: request)
+                        await dataLoader(request)
                         return url
                     }
                 }
@@ -57,5 +85,29 @@ actor ThumbnailPrefetcher {
             index = batchEnd
         }
     }
-}
 
+    private func shouldThrottlePrefetch(for url: URL, now: Date) -> Bool {
+        guard let attemptedAt = recentAttemptDates[url] else { return false }
+        return now.timeIntervalSince(attemptedAt) < recentAttemptCooldown
+    }
+
+    private func rememberAttempt(for url: URL, at date: Date) {
+        recentAttemptDates[url] = date
+        recentAttemptOrder.touch(url)
+        for evictedURL in recentAttemptOrder.trim(to: maxRememberedURLs) {
+            recentAttemptDates.removeValue(forKey: evictedURL)
+        }
+    }
+
+    private func deduplicatedURLsPreservingOrder(from urls: [URL]) -> [URL] {
+        var seen = Set<URL>()
+        var deduplicated: [URL] = []
+        deduplicated.reserveCapacity(urls.count)
+
+        for url in urls where seen.insert(url).inserted {
+            deduplicated.append(url)
+        }
+
+        return deduplicated
+    }
+}

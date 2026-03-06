@@ -119,6 +119,8 @@ struct SidebarSearchView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.colorScheme) private var colorScheme
     @Query(sort: \ReadingList.updatedAt, order: .reverse) private var allLists: [ReadingList]
+    @Query(sort: \Label.sortOrder) private var allLabels: [Label]
+    @Query(sort: \Tag.sortOrder) private var allTags: [Tag]
     @Query(sort: \ArticleState.updatedAt, order: .reverse) private var articleStates: [ArticleState]
 
     @State private var searchCoordinator = SearchCoordinator(
@@ -128,13 +130,13 @@ struct SidebarSearchView: View {
         searchPrefetchLimit: 24,
         trendingPrefetchLimit: 24
     )
+    @State private var articleLookupSnapshot = ArticleLookupIndex.empty
     @State private var activePageViewsPopover: SidebarSearchPageViewsPopoverPayload?
     @State private var readFilter: SidebarSearchReadFilter = .all
     @State private var sortMode: SidebarSearchSortMode = .relevance
     @State private var selectedVisibleIndex = 0
     @State private var selectedVisibleResultID: String?
-    @State private var wordCountByTitle: [String: Int] = [:]
-    @State private var wordCountAttemptedTitleKeys: Set<String> = []
+    @State private var wordCountStore = ArticleWordCountStore()
 
     @FocusState private var isSearchFieldFocused: Bool
 
@@ -156,37 +158,26 @@ struct SidebarSearchView: View {
         usesCompactHeaderChrome ? 0 : SidebarSearchMetrics.titleBottomPadding
     }
 
-    private var articleStateByURL: [String: ArticleState] {
-        articleStates.reduce(into: [:]) { result, state in
-            result[state.articleURLString] = state
-        }
+    private var articleLookup: ArticleLookupIndex {
+        articleLookupSnapshot
     }
 
-    private var articleStateByTitle: [String: ArticleState] {
-        articleStates.reduce(into: [:]) { result, state in
-            result[ReadStateSync.normalizedTitle(state.articleTitle)] = state
-        }
+    private var articleLookupFingerprint: Int {
+        articleLookupIndexFingerprint(
+            articleStates: articleStates,
+            readingLists: allLists
+        )
     }
 
-    private var savedArticleByTitle: [String: SavedArticle] {
-        var lookup: [String: SavedArticle] = [:]
-        for list in allLists {
-            for article in list.articles {
-                let key = ReadStateSync.normalizedTitle(article.title)
-                if lookup[key] == nil {
-                    lookup[key] = article
-                }
-            }
-        }
-        return lookup
+    private func refreshArticleLookupSnapshot() {
+        articleLookupSnapshot = ArticleLookupIndex(
+            articleStates: articleStates,
+            readingLists: allLists
+        )
     }
 
     private var currentArticleTitleNormalized: String? {
-        guard let activeId = appState.activeTabId,
-              let tab = appState.openTabs.first(where: { $0.id == activeId }) else {
-            return nil
-        }
-        return ReadStateSync.normalizedTitle(tab.article.title)
+        ArticleLookupIndex.currentArticleTitleNormalized(in: appState)
     }
 
     private var sourceResults: [WikipediaService.SearchResult] {
@@ -228,6 +219,7 @@ struct SidebarSearchView: View {
         hasher.combine(sourceResults.count)
         for result in sourceResults {
             hasher.combine(ReadStateSync.normalizedTitle(result.title))
+            hasher.combine(articleLookup.savedArticle(for: result.title)?.wordCount)
         }
         return hasher.finalize()
     }
@@ -237,21 +229,11 @@ struct SidebarSearchView: View {
     }
 
     private func articleState(for title: String) -> ArticleState? {
-        let urlString = ReadStateSync.urlString(for: title)
-        if let state = articleStateByURL[urlString] {
-            return state
-        }
-        return articleStateByTitle[ReadStateSync.normalizedTitle(title)]
+        articleLookup.articleState(for: title)
     }
 
     private func effectiveReadState(for article: Article) -> Bool {
-        if let state = articleState(for: article.title) {
-            return state.isRead
-        }
-        if let saved = savedArticleByTitle[ReadStateSync.normalizedTitle(article.title)] {
-            return saved.isRead
-        }
-        return false
+        articleLookup.effectiveReadState(for: article.title, fallback: false)
     }
 
     private func readingProgress(for article: Article) -> Double {
@@ -297,14 +279,22 @@ struct SidebarSearchView: View {
     }
 
     private func resolvedWordCount(for result: WikipediaService.SearchResult) -> Int? {
-        let key = ReadStateSync.normalizedTitle(result.title)
-        if let cached = wordCountByTitle[key] {
+        if let cached = wordCountStore.wordCount(for: result.title) {
             return cached
         }
-        if let savedWordCount = savedArticleByTitle[key]?.wordCount {
+        if let savedWordCount = articleLookup.savedArticle(for: result.title)?.wordCount {
             return savedWordCount
         }
         return nil
+    }
+
+    private var knownWordCountTitles: Set<String> {
+        sourceResults.reduce(into: Set<String>()) { titles, result in
+            if let savedWordCount = articleLookup.savedArticle(for: result.title)?.wordCount,
+               savedWordCount > 0 {
+                titles.insert(result.title)
+            }
+        }
     }
 
     private func pageViewsPopoverBinding(for rowKey: String) -> Binding<Bool> {
@@ -366,53 +356,6 @@ struct SidebarSearchView: View {
         selectedVisibleResultID = visibleResults[selectedVisibleIndex].id
     }
 
-    private func unresolvedWordCountTitles(limit: Int = 32) -> [String] {
-        guard sortMode == .articleLength else { return [] }
-
-        var keysSeen = Set<String>()
-        var unresolved: [String] = []
-        unresolved.reserveCapacity(limit)
-
-        for result in sourceResults {
-            let key = ReadStateSync.normalizedTitle(result.title)
-            guard keysSeen.insert(key).inserted else { continue }
-            guard resolvedWordCount(for: result) == nil else { continue }
-            guard !wordCountAttemptedTitleKeys.contains(key) else { continue }
-
-            unresolved.append(result.title)
-            if unresolved.count >= limit {
-                break
-            }
-        }
-
-        return unresolved
-    }
-
-    @MainActor
-    private func prefetchWordCountsIfNeeded() async {
-        guard sortMode == .articleLength else { return }
-
-        let titlesToFetch = unresolvedWordCountTitles()
-        guard !titlesToFetch.isEmpty else { return }
-
-        let wikipediaService = WikipediaService.shared
-
-        for title in titlesToFetch {
-            guard !Task.isCancelled else { return }
-
-            let key = ReadStateSync.normalizedTitle(title)
-            if wordCountAttemptedTitleKeys.contains(key) {
-                continue
-            }
-            wordCountAttemptedTitleKeys.insert(key)
-
-            if let metadata = try? await wikipediaService.fetchPageMetadata(title) {
-                guard !Task.isCancelled else { return }
-                wordCountByTitle[key] = metadata.wordCount
-            }
-        }
-    }
-
     var body: some View {
         GeometryReader { proxy in
             let layoutClass = SidebarSearchLayoutClass(width: proxy.size.width)
@@ -428,6 +371,7 @@ struct SidebarSearchView: View {
         }
         .ignoresSafeArea(.container, edges: .top)
         .onAppear {
+            refreshArticleLookupSnapshot()
             if let launchQuery = appState.consumeLaunchSidebarSearchQuery() {
                 searchCoordinator.searchText = launchQuery
             }
@@ -435,6 +379,9 @@ struct SidebarSearchView: View {
                 isSearchFieldFocused = true
             }
             searchCoordinator.loadTrendingIfNeeded()
+        }
+        .onChange(of: articleLookupFingerprint) { _, _ in
+            refreshArticleLookupSnapshot()
         }
         .onChange(of: searchCoordinator.searchText) { _, _ in
             selectedVisibleIndex = 0
@@ -444,7 +391,15 @@ struct SidebarSearchView: View {
             reconcileSelection(with: visibleResultIDs)
         }
         .task(id: wordCountPrefetchFingerprint) {
-            await prefetchWordCountsIfNeeded()
+            guard sortMode == .articleLength else {
+                wordCountStore.cancel()
+                return
+            }
+            wordCountStore.queueLoad(
+                results: sourceResults,
+                limit: 32,
+                skippingTitles: knownWordCountTitles
+            )
         }
         .onMoveCommand { direction in
             switch direction {
@@ -461,6 +416,7 @@ struct SidebarSearchView: View {
         }
         .onDisappear {
             searchCoordinator.cancel()
+            wordCountStore.cancel()
         }
     }
 
@@ -605,7 +561,8 @@ struct SidebarSearchView: View {
                         }
                     }
                 } label: {
-                    Image(systemName: "arrow.up.arrow.down")
+                    SwiftUI.Label("Sort Results", systemImage: "arrow.up.arrow.down")
+                        .labelStyle(.iconOnly)
                         .font(.system(size: ChromeIconMetrics.symbolPointSize, weight: ChromeIconMetrics.regularWeight))
                         .imageScale(.medium)
                         .foregroundStyle(.secondary)
@@ -641,7 +598,8 @@ struct SidebarSearchView: View {
                         .disabled(visibleResults.isEmpty)
                     }
                 } label: {
-                    Image(systemName: "ellipsis.circle")
+                    SwiftUI.Label("Search Actions", systemImage: "ellipsis.circle")
+                        .labelStyle(.iconOnly)
                         .font(.system(size: ChromeIconMetrics.symbolPointSize, weight: ChromeIconMetrics.regularWeight))
                         .imageScale(.medium)
                         .foregroundStyle(.secondary)
@@ -860,17 +818,12 @@ struct SidebarSearchView: View {
                             SearchResultContextMenuContent(
                                 result: result,
                                 allLists: allLists,
+                                allLabels: allLabels,
+                                allTags: allTags,
                                 onOpen: { inNewTab in
                                     selectedVisibleIndex = index
                                     selectedVisibleResultID = result.id
                                     selectResult(result, inNewTab: inNewTab)
-                                },
-                                onSaveToList: { list in
-                                    SearchResultActions.saveToList(
-                                        result,
-                                        list: list,
-                                        modelContext: modelContext
-                                    )
                                 },
                                 onShowPageViews: {
                                     activePageViewsPopover = SidebarSearchPageViewsPopoverPayload(

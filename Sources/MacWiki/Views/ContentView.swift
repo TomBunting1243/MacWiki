@@ -128,6 +128,16 @@ struct ContentView: View {
         .onChange(of: wikiHopPostV1Enabled) { _, _ in
             enforceWikiHopAvailabilityIfNeeded()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .macWikiRequestNewArticleLabel)) { notification in
+            guard let article = notification.object as? SavedArticle else { return }
+            articleForNewLabel = article
+            showNewLabelSheet = true
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .macWikiRequestNewArticleTag)) { notification in
+            guard let article = notification.userInfo?["article"] as? Article else { return }
+            articleForNewTag = article
+            showNewTagSheet = true
+        }
         .onChange(of: columnVisibility) { _, newValue in
             let resolvedSidebarVisible: Bool?
             switch newValue {
@@ -254,7 +264,6 @@ struct ContentView: View {
                 let clampedWidth = min(QuickSearchView.idealSize.width, containerSize.width * 0.82)
                 let clampedHeight = min(QuickSearchView.idealSize.height, containerSize.height * 0.78)
                 let modalSize = CGSize(width: clampedWidth, height: clampedHeight)
-
                 let topInset = max(appState.windowTopObscuredHeight + 18, 28)
 
                 ZStack(alignment: .top) {

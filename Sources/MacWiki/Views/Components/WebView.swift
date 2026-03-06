@@ -57,6 +57,7 @@ private enum LinkHoverGlassMetrics {
 }
 
 private enum LinkHoverSummaryPreviewMetrics {
+    static let cornerRadius: CGFloat = 16
     static let maxExtractCharacters = 360
     static let artworkHeight: CGFloat = 152
 }
@@ -311,8 +312,12 @@ private struct LinkHoverArticleSummaryPreview: View {
         return normalizedTitle
     }
 
-    private var thumbnailTransaction: Transaction {
-        reduceMotion ? Transaction(animation: nil) : Transaction(animation: .easeOut(duration: 0.18))
+    private var previewArtworkTargetSize: CGSize {
+        let estimatedWidth = LinkHoverPreviewMetrics.width - (LinkHoverGlassMetrics.contentInset * 2) - 28
+        return CGSize(
+            width: max(220, estimatedWidth),
+            height: LinkHoverSummaryPreviewMetrics.artworkHeight
+        )
     }
 
     private var artworkMonogram: String {
@@ -428,23 +433,20 @@ private struct LinkHoverArticleSummaryPreview: View {
     private var previewArtwork: some View {
         Group {
             if let thumbnailURL {
-                AsyncImage(url: thumbnailURL, transaction: thumbnailTransaction) { phase in
-                    switch phase {
-                    case .empty:
-                        loadingArtwork
-                    case .success(let image):
-                        ZStack {
-                            artworkBackground
-                            image
-                                .resizable()
-                                .aspectRatio(contentMode: .fill)
-                                .transition(.opacity)
-                        }
-                    case .failure:
-                        fallbackArtwork
-                    @unknown default:
-                        fallbackArtwork
+                CachedThumbnailImage(
+                    url: thumbnailURL,
+                    targetSize: previewArtworkTargetSize
+                ) { image in
+                    ZStack {
+                        artworkBackground
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
                     }
+                } placeholder: {
+                    loadingArtwork
+                } failure: {
+                    fallbackArtwork
                 }
             } else {
                 fallbackArtwork
@@ -669,7 +671,8 @@ struct WebView: NSViewRepresentable {
         "highlightRightClicked",
         "referenceClicked",
         "scrollChanged",
-        "scrollPerfSnapshot"
+        "scrollPerfSnapshot",
+        "scrollRestoreReady"
     ]
 
     /// Lightweight content signature for reload detection.
@@ -1346,6 +1349,8 @@ struct WebView: NSViewRepresentable {
         context.coordinator.openTimer = openTimer
         context.coordinator.isSectionTrackingRequested =
             (inspectorVisible && inspectorMode == .info) || focusModeEnabled
+        context.coordinator.isReferencesRequested =
+            inspectorVisible && inspectorMode == .references
         context.coordinator.syncNativeHighlightMenuMode(on: webView)
 
         // Process all pending actions (don't early-return so multiple can be handled)
@@ -1548,7 +1553,11 @@ struct WebView: NSViewRepresentable {
             context.coordinator.lastLoadedHTMLSignature != htmlSignature
 
         if shouldReloadContent {
-            let preparedHTMLContent = context.coordinator.prepareHTMLForInitialLoad(htmlContent)
+            let preparedHTMLContent = context.coordinator.prepareHTMLForInitialLoad(
+                htmlContent,
+                articleTitle: articleTitle,
+                htmlSignature: htmlSignature
+            )
             context.coordinator.lastLoadedArticleTitle = articleTitle
             context.coordinator.lastLoadedHTMLSignature = htmlSignature
             context.coordinator.configureRecoveryPayload(
@@ -1580,21 +1589,7 @@ struct WebView: NSViewRepresentable {
             context.coordinator.syncScrollTelemetryMode(on: webView)
             context.coordinator.syncRestoreTelemetryMode(on: webView)
             context.coordinator.maybeApplyHighlightsIfNeeded(to: webView, highlights: highlights)
-
-            // Republish TOC and visible section on tab switch so inspector updates.
-            // Guard: only re-publish when article title changed (tab switch), not every state update.
-            if context.coordinator.lastTOCPublishedForTitle != articleTitle {
-                context.coordinator.lastTOCPublishedForTitle = articleTitle
-                context.coordinator.resetPublishedTOCFingerprint()
-                context.coordinator.publishTableOfContents(from: webView)
-                context.coordinator.publishVisibleSection(from: webView, force: true)
-            }
-
-            if context.coordinator.lastReferencesPublishedForTitle != articleTitle {
-                context.coordinator.lastReferencesPublishedForTitle = articleTitle
-                context.coordinator.resetPublishedReferencesFingerprint()
-                context.coordinator.publishReferences(from: webView)
-            }
+            context.coordinator.refreshDeferredInspectorContentIfNeeded(on: webView)
         }
     }
     
@@ -1677,6 +1672,7 @@ struct WebView: NSViewRepresentable {
         var lastAppliedReaderTopInset: CGFloat = -1
         var lastAppliedNativeHighlightingMenuEnabled: Bool?
         var isSectionTrackingRequested: Bool = false
+        var isReferencesRequested: Bool = false
         var lastAppliedSectionTrackingRequest: Bool?
         var lastAppliedRestoreTelemetryMode: Bool?
         weak var webView: WKWebView?
@@ -1736,6 +1732,7 @@ struct WebView: NSViewRepresentable {
         private var activeLinkHoverSignature: String?
         private var isHoveringLinkPreviewSource = false
         private var isHoveringLinkPreviewPopover = false
+        private var preparedHTMLCache = PreparedHTMLTransformCache()
         private let maxRecoveryHTMLBytes = 420_000
         private let eagerImageCountForInitialLoad = 3
         private let findRequestTimeoutSeconds: TimeInterval = 1.6
@@ -1851,6 +1848,7 @@ struct WebView: NSViewRepresentable {
 
         func attachReusedWebView(_ webView: WKWebView) {
             dismissLinkHoverPreview(immediate: true)
+            cancelScriptedScrollRestore(on: webView)
             isContentLoadInFlight = false
             expectedNavigationToken = nil
             activeRestoreSessionID = nil
@@ -1930,6 +1928,11 @@ struct WebView: NSViewRepresentable {
             case "scrollPerfSnapshot":
                 if let data = body as? [String: Any] {
                     handleScrollPerfSnapshot(data)
+                }
+
+            case "scrollRestoreReady":
+                if let data = body as? [String: Any] {
+                    handleScrollRestoreReady(data)
                 }
 
             case "highlightShortcut":
@@ -2177,6 +2180,22 @@ struct WebView: NSViewRepresentable {
             }
 
             applyScrollProfile(targetProfile)
+        }
+
+        private func handleScrollRestoreReady(_ data: [String: Any]) {
+            guard let sessionIDString = data["sessionID"] as? String,
+                  let sessionID = UUID(uuidString: sessionIDString),
+                  isRestoreSessionActive(sessionID),
+                  let webView,
+                  webView.alphaValue < 1 else {
+                return
+            }
+
+            if let y = data["y"] as? Double {
+                lastKnownScrollY = CGFloat(y)
+            }
+
+            revealWebView(webView, animated: true)
         }
 
         func applyHighlights(to webView: WKWebView) {
@@ -3271,18 +3290,43 @@ struct WebView: NSViewRepresentable {
             }
         }
 
-        func prepareHTMLForInitialLoad(_ htmlContent: String) -> String {
+        func prepareHTMLForInitialLoad(
+            _ htmlContent: String,
+            articleTitle: String,
+            htmlSignature: UInt64
+        ) -> String {
+            let byteCount = htmlContent.utf8.count
+            let cacheKey = preparedHTMLCacheKey(
+                articleTitle: articleTitle,
+                htmlSignature: htmlSignature,
+                byteCount: byteCount
+            )
+
+            if let cached = preparedHTMLCache.cachedEntry(forKey: cacheKey) {
+                switch cached {
+                case .passthrough:
+                    return htmlContent
+                case .rewritten(let preparedHTML):
+                    return preparedHTML
+                }
+            }
+
             guard htmlContent.range(of: "<img", options: .caseInsensitive) != nil,
                   let regex = Self.imgTagRegex else {
+                preparedHTMLCache.store(.passthrough, forKey: cacheKey)
                 return htmlContent
             }
 
             let source = htmlContent as NSString
             let matches = regex.matches(in: htmlContent, range: NSRange(location: 0, length: source.length))
-            guard !matches.isEmpty else { return htmlContent }
+            guard !matches.isEmpty else {
+                preparedHTMLCache.store(.passthrough, forKey: cacheKey)
+                return htmlContent
+            }
 
             var rewritten = htmlContent
             var locationOffset = 0
+            var didRewriteAnyTag = false
 
             for (index, match) in matches.enumerated() {
                 let adjustedRange = NSRange(
@@ -3311,12 +3355,27 @@ struct WebView: NSViewRepresentable {
                 }
 
                 guard didMutate else { continue }
+                didRewriteAnyTag = true
                 let previousLength = adjustedRange.length
                 rewritten.replaceSubrange(swiftRange, with: tag)
                 locationOffset += (tag as NSString).length - previousLength
             }
 
+            guard didRewriteAnyTag else {
+                preparedHTMLCache.store(.passthrough, forKey: cacheKey)
+                return htmlContent
+            }
+
+            preparedHTMLCache.store(.rewritten(rewritten), forKey: cacheKey)
             return rewritten
+        }
+
+        private func preparedHTMLCacheKey(
+            articleTitle: String,
+            htmlSignature: UInt64,
+            byteCount: Int
+        ) -> String {
+            "\(articleTitle)|\(String(htmlSignature, radix: 16))|\(byteCount)"
         }
 
         private func containsHTMLAttribute(_ name: String, in tag: String) -> Bool {
@@ -3341,7 +3400,7 @@ struct WebView: NSViewRepresentable {
             )
             return updated
         }
-        
+
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
             if let expectedNavigationToken,
                let navigation,
@@ -3379,57 +3438,6 @@ struct WebView: NSViewRepresentable {
             )
             syncScrollTelemetryMode(on: webView, force: true)
 
-            if scrollY > 0 {
-                // First attempt immediately so restored position can settle before reveal probes.
-                markProgrammaticScroll(y: scrollY)
-                webView.evaluateJavaScript("window.scrollTo(0, \(scrollY))")
-
-                // Include later retries to catch delayed layout growth from images/content.
-                let restoreDelays: [TimeInterval]
-                if preferImmediateReveal {
-                    restoreDelays = [0.03, 0.09, 0.2, 0.38, 0.66, 1.0]
-                } else {
-                    restoreDelays = [0.08, 0.24, 0.55, 1.1, 1.9, 2.8]
-                }
-                for delay in restoreDelays {
-                    scheduleForRestoreSession(restoreSessionID, after: delay) { [weak self, weak webView] in
-                        guard let self, let webView else { return }
-                        self.markProgrammaticScroll(y: scrollY)
-                        webView.evaluateJavaScript("window.scrollTo(0, \(scrollY))")
-                    }
-                }
-            } else if fallbackProgress > 0.01 {
-                let clampedProgress = min(max(fallbackProgress, 0), 1)
-                let restoreScript = """
-                (function() {
-                    var maxScroll = Math.max(
-                        document.documentElement.scrollHeight,
-                        document.body ? document.body.scrollHeight : 0
-                    ) - window.innerHeight;
-                    if (maxScroll > 0) {
-                        window.scrollTo(0, maxScroll * \(clampedProgress));
-                    }
-                })();
-                """
-                // First attempt immediately so restored position can settle before reveal probes.
-                markProgrammaticScroll()
-                webView.evaluateJavaScript(restoreScript)
-
-                let restoreDelays: [TimeInterval]
-                if preferImmediateReveal {
-                    restoreDelays = [0.03, 0.09, 0.2, 0.38, 0.66, 1.0]
-                } else {
-                    restoreDelays = [0.08, 0.24, 0.55, 1.1, 1.9, 2.8]
-                }
-                for delay in restoreDelays {
-                    scheduleForRestoreSession(restoreSessionID, after: delay) { [weak self, weak webView] in
-                        guard let self, let webView else { return }
-                        self.markProgrammaticScroll()
-                        webView.evaluateJavaScript(restoreScript)
-                    }
-                }
-            }
-
             // Apply highlights before reveal so they are present on first visible frame.
             if !highlights.isEmpty {
                 let highlightDelay: TimeInterval = preferImmediateReveal ? 0.03 : 0.12
@@ -3441,8 +3449,8 @@ struct WebView: NSViewRepresentable {
             }
 
             if shouldDeferRevealUntilRestored {
-                scheduleRevealAfterRestore(
-                    for: webView,
+                startScriptedScrollRestore(
+                    on: webView,
                     desiredY: scrollY,
                     fallbackProgress: fallbackProgress,
                     restoreSessionID: restoreSessionID
@@ -3468,24 +3476,32 @@ struct WebView: NSViewRepresentable {
                     if let scrollView = self.findScrollView(in: webView) {
                         self.reportScrollProgress(from: scrollView, force: true)
                     }
-                    self.publishVisibleSection(from: webView, force: true)
+                    if self.isSectionTrackingRequested {
+                        self.publishVisibleSection(from: webView, force: true)
+                    }
                 }
 
                 self.scheduleForCurrentWebView(after: 0.06, webView: webView) { [weak self, weak webView] in
                     guard let self, let webView else { return }
-                    self.publishTableOfContents(from: webView)
-                    self.publishReferences(from: webView)
+                    if self.isSectionTrackingRequested {
+                        self.publishTableOfContents(from: webView)
+                    }
+                    if self.isReferencesRequested {
+                        self.publishReferences(from: webView)
+                    }
                 }
 
                 self.scheduleForCurrentWebView(after: 0.24, webView: webView) { [weak self, weak webView] in
                     guard let self, let webView else { return }
-                    if !self.hasPublishedNonEmptyTOCSinceLoad {
+                    if self.isSectionTrackingRequested && !self.hasPublishedNonEmptyTOCSinceLoad {
                         self.publishTableOfContents(from: webView)
                     }
-                    if !self.hasPublishedNonEmptyReferencesSinceLoad {
+                    if self.isReferencesRequested && !self.hasPublishedNonEmptyReferencesSinceLoad {
                         self.publishReferences(from: webView)
                     }
-                    self.publishVisibleSection(from: webView, force: true)
+                    if self.isSectionTrackingRequested {
+                        self.publishVisibleSection(from: webView, force: true)
+                    }
                 }
             }
         }
@@ -3497,6 +3513,7 @@ struct WebView: NSViewRepresentable {
             // Keep the current surface visible during recovery to avoid a hard flash.
             isContentLoadInFlight = true
             expectedNavigationToken = nil
+            cancelScriptedScrollRestore(on: webView)
             activeRestoreSessionID = nil
             pendingPostRevealTasks.removeAll(keepingCapacity: false)
             syncRestoreTelemetryMode(on: webView, force: true)
@@ -3515,6 +3532,7 @@ struct WebView: NSViewRepresentable {
         func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
             isContentLoadInFlight = false
             expectedNavigationToken = nil
+            cancelScriptedScrollRestore(on: webView)
             activeRestoreSessionID = nil
             pendingPostRevealTasks.removeAll(keepingCapacity: false)
             syncRestoreTelemetryMode(on: webView, force: true)
@@ -3523,6 +3541,7 @@ struct WebView: NSViewRepresentable {
         func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
             isContentLoadInFlight = false
             expectedNavigationToken = nil
+            cancelScriptedScrollRestore(on: webView)
             activeRestoreSessionID = nil
             pendingPostRevealTasks.removeAll(keepingCapacity: false)
             syncRestoreTelemetryMode(on: webView, force: true)
@@ -3937,6 +3956,7 @@ struct WebView: NSViewRepresentable {
 
         func prepareForContentReload() {
             dismissLinkHoverPreview(immediate: true)
+            cancelScriptedScrollRestore(on: webView)
             lastReportedProgress = -1
             lastProgressTimestamp = 0
             hasUserDrivenScrollSinceLoad = false
@@ -3955,6 +3975,23 @@ struct WebView: NSViewRepresentable {
             hasPublishedNonEmptyReferencesSinceLoad = false
             isTOCPublishInFlight = false
             isReferencesPublishInFlight = false
+        }
+
+        func refreshDeferredInspectorContentIfNeeded(on webView: WKWebView) {
+            guard !isContentLoadInFlight else { return }
+
+            if isSectionTrackingRequested, lastTOCPublishedForTitle != articleTitle {
+                lastTOCPublishedForTitle = articleTitle
+                resetPublishedTOCFingerprint()
+                publishTableOfContents(from: webView)
+                publishVisibleSection(from: webView, force: true)
+            }
+
+            if isReferencesRequested, lastReferencesPublishedForTitle != articleTitle {
+                lastReferencesPublishedForTitle = articleTitle
+                resetPublishedReferencesFingerprint()
+                publishReferences(from: webView)
+            }
         }
 
         func beginContentReload(on webView: WKWebView, htmlContent: String, baseURL: URL?) {
@@ -3994,6 +4031,153 @@ struct WebView: NSViewRepresentable {
                 guard let self, let expectedWebView else { return }
                 guard self.webView === expectedWebView else { return }
                 work()
+            }
+        }
+
+        private var scriptedRestoreRetryDelays: [TimeInterval] {
+            if preferImmediateReveal {
+                return [0.03, 0.09, 0.2, 0.38, 0.66, 1.0]
+            }
+            return [0.08, 0.24, 0.55, 1.1, 1.9, 2.8]
+        }
+
+        private var scriptedRestoreRevealCheckpoints: [TimeInterval] {
+            if preferImmediateReveal {
+                return [0.02, 0.06, 0.13, 0.24, 0.42, 0.74]
+            }
+            return [0.16, 0.38, 0.82, 1.45, 2.35, 3.35]
+        }
+
+        private func cancelScriptedScrollRestore(on webView: WKWebView?) {
+            guard let webView else { return }
+            let script = "window.cancelMacWikiScrollRestore && window.cancelMacWikiScrollRestore();"
+            webView.evaluateJavaScript(script)
+        }
+
+        private func startScriptedScrollRestore(
+            on webView: WKWebView,
+            desiredY: CGFloat,
+            fallbackProgress: Double,
+            restoreSessionID: UUID
+        ) {
+            let retryDelays = scriptedRestoreRetryDelays
+            let revealCheckpoints = scriptedRestoreRevealCheckpoints
+            let retryDelaysMs = retryDelays.map { Int(($0 * 1000).rounded()) }
+            let revealCheckpointsMs = revealCheckpoints.map { Int(($0 * 1000).rounded()) }
+            let clampedFallback = min(max(fallbackProgress, 0), 1)
+            let maxBridgeDelay = max(
+                retryDelays.last ?? 0,
+                revealCheckpoints.last ?? 0
+            )
+            let programmaticWindow = maxBridgeDelay + 0.55
+
+            let payload: [String: Any] = [
+                "sessionID": restoreSessionID.uuidString,
+                "desiredY": Double(desiredY),
+                "fallbackProgress": clampedFallback,
+                "preferImmediateReveal": preferImmediateReveal,
+                "retryDelaysMs": retryDelaysMs,
+                "revealCheckpointsMs": revealCheckpointsMs
+            ]
+
+            guard let data = try? JSONSerialization.data(withJSONObject: payload),
+                  let jsonString = String(data: data, encoding: .utf8) else {
+                startFallbackNativeScrollRestore(
+                    on: webView,
+                    desiredY: desiredY,
+                    fallbackProgress: clampedFallback,
+                    restoreSessionID: restoreSessionID,
+                    retryDelays: retryDelays
+                )
+                scheduleRevealAfterRestore(
+                    for: webView,
+                    desiredY: desiredY,
+                    fallbackProgress: clampedFallback,
+                    restoreSessionID: restoreSessionID
+                )
+                return
+            }
+
+            if desiredY > 0 {
+                markProgrammaticScroll(y: desiredY, activeFor: programmaticWindow)
+            } else {
+                markProgrammaticScroll(activeFor: programmaticWindow)
+            }
+
+            let script = "window.beginMacWikiScrollRestore && window.beginMacWikiScrollRestore(\(jsonString));"
+            webView.evaluateJavaScript(script) { [weak self, weak webView] result, error in
+                guard let self, let webView else { return }
+                guard self.isRestoreSessionActive(restoreSessionID) else { return }
+
+                let didStartScriptedRestore = (result as? Bool) == true && error == nil
+                if !didStartScriptedRestore {
+                    self.startFallbackNativeScrollRestore(
+                        on: webView,
+                        desiredY: desiredY,
+                        fallbackProgress: clampedFallback,
+                        restoreSessionID: restoreSessionID,
+                        retryDelays: retryDelays
+                    )
+                    self.scheduleRevealAfterRestore(
+                        for: webView,
+                        desiredY: desiredY,
+                        fallbackProgress: clampedFallback,
+                        restoreSessionID: restoreSessionID
+                    )
+                    return
+                }
+
+                let failsafeDelay = maxBridgeDelay + (self.preferImmediateReveal ? 0.14 : 0.32)
+                self.scheduleForRestoreSession(restoreSessionID, after: failsafeDelay) { [weak self, weak webView] in
+                    guard let self, let webView else { return }
+                    self.revealWebView(webView, animated: true)
+                }
+            }
+        }
+
+        private func startFallbackNativeScrollRestore(
+            on webView: WKWebView,
+            desiredY: CGFloat,
+            fallbackProgress: Double,
+            restoreSessionID: UUID,
+            retryDelays: [TimeInterval]
+        ) {
+            if desiredY > 0 {
+                markProgrammaticScroll(y: desiredY)
+                webView.evaluateJavaScript("window.scrollTo(0, \(desiredY))")
+
+                for delay in retryDelays {
+                    scheduleForRestoreSession(restoreSessionID, after: delay) { [weak self, weak webView] in
+                        guard let self, let webView else { return }
+                        self.markProgrammaticScroll(y: desiredY)
+                        webView.evaluateJavaScript("window.scrollTo(0, \(desiredY))")
+                    }
+                }
+                return
+            }
+
+            guard fallbackProgress > 0.01 else { return }
+            let restoreScript = """
+            (function() {
+                var maxScroll = Math.max(
+                    document.documentElement.scrollHeight,
+                    document.body ? document.body.scrollHeight : 0
+                ) - window.innerHeight;
+                if (maxScroll > 0) {
+                    window.scrollTo(0, maxScroll * \(fallbackProgress));
+                }
+            })();
+            """
+
+            markProgrammaticScroll()
+            webView.evaluateJavaScript(restoreScript)
+
+            for delay in retryDelays {
+                scheduleForRestoreSession(restoreSessionID, after: delay) { [weak self, weak webView] in
+                    guard let self, let webView else { return }
+                    self.markProgrammaticScroll()
+                    webView.evaluateJavaScript(restoreScript)
+                }
             }
         }
 
@@ -4066,6 +4250,7 @@ struct WebView: NSViewRepresentable {
             programmaticScrollActiveUntil = now
 
             if activeRestoreSessionID != nil {
+                cancelScriptedScrollRestore(on: webView)
                 activeRestoreSessionID = nil
                 clearInitialRestoreTelemetryGuard()
                 if let webView, webView.alphaValue < 1 {

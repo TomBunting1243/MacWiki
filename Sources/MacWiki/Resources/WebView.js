@@ -1914,6 +1914,169 @@ document.addEventListener('contextmenu', function (e) {
         }
     });
 
+    var scrollRestoreSequence = 0;
+    var scrollRestoreTimers = [];
+
+    function clearScrollRestoreTimers() {
+        while (scrollRestoreTimers.length > 0) {
+            clearTimeout(scrollRestoreTimers.pop());
+        }
+    }
+
+    function currentRestoreState() {
+        var y = currentScrollY();
+        var maxScroll = getMaxScroll(false);
+        return {
+            y: y,
+            progress: currentProgress(y),
+            maxScroll: maxScroll
+        };
+    }
+
+    function postScrollRestoreReady(payload) {
+        if (
+            window.webkit &&
+            window.webkit.messageHandlers &&
+            window.webkit.messageHandlers.scrollRestoreReady
+        ) {
+            window.webkit.messageHandlers.scrollRestoreReady.postMessage(payload);
+        }
+    }
+
+    function shouldRevealAfterScrollRestore(state, options, isFinalProbe) {
+        if (isFinalProbe) return true;
+        if ((state.maxScroll || 0) <= 1) return true;
+
+        var desiredY = Number(options.desiredY);
+        if (!Number.isFinite(desiredY)) desiredY = 0;
+        var fallbackProgress = clamp(Number(options.fallbackProgress) || 0, 0, 1);
+        var preferImmediateReveal = !!options.preferImmediateReveal;
+
+        if (desiredY > 6) {
+            var positionTolerance = Math.max(44, desiredY * 0.09);
+            if (Math.abs(state.y - desiredY) <= positionTolerance) {
+                return true;
+            }
+            if (state.y >= desiredY * (preferImmediateReveal ? 0.64 : 0.78)) {
+                return true;
+            }
+            return false;
+        }
+
+        if (fallbackProgress > 0.01) {
+            if (Math.abs(state.progress - fallbackProgress) <= 0.07) {
+                return true;
+            }
+            if (state.progress >= fallbackProgress * (preferImmediateReveal ? 0.68 : 0.82)) {
+                return true;
+            }
+            return false;
+        }
+
+        return true;
+    }
+
+    function performScrollRestoreAttempt(options, programmaticWindowMs) {
+        var desiredY = Number(options.desiredY);
+        if (!Number.isFinite(desiredY)) desiredY = 0;
+        var fallbackProgress = clamp(Number(options.fallbackProgress) || 0, 0, 1);
+
+        if (desiredY > 0) {
+            setProgrammaticScrollMode(programmaticWindowMs);
+            window.scrollTo(0, desiredY);
+            return;
+        }
+
+        if (fallbackProgress > 0.01) {
+            var maxScroll = getMaxScroll(true);
+            if (maxScroll > 0) {
+                setProgrammaticScrollMode(programmaticWindowMs);
+                window.scrollTo(0, maxScroll * fallbackProgress);
+            }
+        }
+    }
+
+    window.cancelMacWikiScrollRestore = function () {
+        scrollRestoreSequence += 1;
+        clearScrollRestoreTimers();
+    };
+
+    window.beginMacWikiScrollRestore = function (options) {
+        options = options || {};
+        scrollRestoreSequence += 1;
+        var sequenceId = scrollRestoreSequence;
+        clearScrollRestoreTimers();
+        cancelSmoothScrollAnimation();
+
+        var retryDelaysMs = Array.isArray(options.retryDelaysMs) ? options.retryDelaysMs : [];
+        var revealCheckpointsMs = Array.isArray(options.revealCheckpointsMs) ? options.revealCheckpointsMs : [];
+        var maxRetryDelayMs = 0;
+        var maxRevealDelayMs = 0;
+
+        retryDelaysMs.forEach(function (delayMs) {
+            maxRetryDelayMs = Math.max(maxRetryDelayMs, Number(delayMs) || 0);
+        });
+        revealCheckpointsMs.forEach(function (delayMs) {
+            maxRevealDelayMs = Math.max(maxRevealDelayMs, Number(delayMs) || 0);
+        });
+
+        var programmaticWindowMs = clamp(
+            Math.max(maxRetryDelayMs, maxRevealDelayMs) + 420,
+            320,
+            3800
+        );
+        var sessionID = options.sessionID ? String(options.sessionID) : '';
+
+        function schedule(delayMs, work) {
+            var clampedDelayMs = Math.max(Number(delayMs) || 0, 0);
+            var timer = setTimeout(function () {
+                if (sequenceId !== scrollRestoreSequence) return;
+                work();
+            }, clampedDelayMs);
+            scrollRestoreTimers.push(timer);
+        }
+
+        function finishRestore(isFinalProbe) {
+            if (sequenceId !== scrollRestoreSequence) return;
+            clearScrollRestoreTimers();
+            var state = currentRestoreState();
+            postScrollRestoreReady({
+                sessionID: sessionID,
+                y: state.y,
+                progress: state.progress,
+                maxScroll: state.maxScroll,
+                final: !!isFinalProbe
+            });
+        }
+
+        performScrollRestoreAttempt(options, programmaticWindowMs);
+
+        retryDelaysMs.forEach(function (delayMs) {
+            schedule(delayMs, function () {
+                performScrollRestoreAttempt(options, programmaticWindowMs);
+            });
+        });
+
+        if (revealCheckpointsMs.length === 0) {
+            schedule(0, function () {
+                finishRestore(true);
+            });
+            return true;
+        }
+
+        revealCheckpointsMs.forEach(function (delayMs, index) {
+            schedule(delayMs, function () {
+                var state = currentRestoreState();
+                var isFinalProbe = index === revealCheckpointsMs.length - 1;
+                if (shouldRevealAfterScrollRestore(state, options, isFinalProbe)) {
+                    finishRestore(isFinalProbe);
+                }
+            });
+        });
+
+        return true;
+    };
+
     window.setScrollTelemetrySectionTrackingEnabled = function (enabled) {
         sectionTrackingEnabled = !!enabled;
         throttleMs = sectionTrackingEnabled ? 150 : 210;

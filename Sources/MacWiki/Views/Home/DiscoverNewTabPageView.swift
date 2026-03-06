@@ -5,10 +5,11 @@ import Foundation
 /// Apple News-inspired discovery hub used by the New Tab page.
 struct DiscoverNewTabPageView: View {
     @Environment(AppState.self) private var appState
-    @Environment(\.modelContext) private var modelContext
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Query(sort: \ReadingList.updatedAt, order: .reverse) private var allLists: [ReadingList]
+    @Query(sort: \Label.sortOrder) private var allLabels: [Label]
+    @Query(sort: \Tag.sortOrder) private var allTags: [Tag]
 
     @State private var searchCoordinator = SearchCoordinator(
         debounceMilliseconds: SearchCoordinator.defaultDebounceMilliseconds,
@@ -16,6 +17,7 @@ struct DiscoverNewTabPageView: View {
         supportsTrending: false,
         searchPrefetchLimit: 24
     )
+    @State private var articleLookupSnapshot = ArticleLookupIndex.empty
     @State private var discoverFeedStore = DiscoverFeedStore()
     @State private var isAppeared = false
     @State private var selectedDiscoverDate = Date()
@@ -49,8 +51,20 @@ struct DiscoverNewTabPageView: View {
         shouldShowDelayedTimeTravelSkeleton && shouldQueueTimeTravelSkeleton
     }
 
+    private var articleLookup: ArticleLookupIndex {
+        articleLookupSnapshot
+    }
+
+    private var articleLookupFingerprint: Int {
+        articleLookupIndexFingerprint(readingLists: allLists)
+    }
+
     private var savedArticleTitlesNormalized: Set<String> {
-        SearchResultActions.savedArticleTitlesNormalized(from: allLists)
+        articleLookup.savedArticleTitlesNormalized
+    }
+
+    private func refreshArticleLookupSnapshot() {
+        articleLookupSnapshot = ArticleLookupIndex(readingLists: allLists)
     }
 
     @AppStorage(DiscoverStartMode.storageKey) private var discoverStartMode: DiscoverStartMode = .discoverFeed
@@ -99,6 +113,7 @@ struct DiscoverNewTabPageView: View {
         }
         .background(discoverBackground.ignoresSafeArea())
         .onAppear {
+            refreshArticleLookupSnapshot()
             if reduceMotion {
                 isAppeared = true
             } else {
@@ -119,6 +134,9 @@ struct DiscoverNewTabPageView: View {
             timeTravelSkeletonDelayTask = nil
             shouldShowDelayedTimeTravelSkeleton = false
             discoverFeedStore.cancel()
+        }
+        .onChange(of: articleLookupFingerprint) { _, _ in
+            refreshArticleLookupSnapshot()
         }
         .onChange(of: shouldQueueTimeTravelSkeleton) { _, _ in
             updateTimeTravelSkeletonVisibility()
@@ -612,15 +630,10 @@ struct DiscoverNewTabPageView: View {
                             SearchResultContextMenuContent(
                                 result: result,
                                 allLists: allLists,
+                                allLabels: allLabels,
+                                allTags: allTags,
                                 onOpen: { inNewTab in
                                     open(result, inNewTab: inNewTab)
-                                },
-                                onSaveToList: { list in
-                                    SearchResultActions.saveToList(
-                                        result,
-                                        list: list,
-                                        modelContext: modelContext
-                                    )
                                 },
                                 onShowPageViews: {
                                     activeSearchResultPageViewsPopover = DiscoverInlinePageViewsPopoverPayload(
@@ -681,6 +694,9 @@ struct DiscoverNewTabPageView: View {
                     availableWidth: discoverContentWidth,
                     isSearchFieldFocused: isSearchFocused,
                     refreshGeneration: discoverRefreshGeneration,
+                    allLists: allLists,
+                    allLabels: allLabels,
+                    allTags: allTags,
                     onOpen: { result, inNewTab in
                         open(result, inNewTab: inNewTab)
                     }
@@ -1104,6 +1120,9 @@ private struct DiscoverFeedSections: View {
     let availableWidth: CGFloat
     let isSearchFieldFocused: Bool
     let refreshGeneration: Int
+    let allLists: [ReadingList]
+    let allLabels: [Label]
+    let allTags: [Tag]
     let onOpen: (WikipediaService.SearchResult, Bool) -> Void
     @Environment(\.openURL) private var openURL
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -1111,7 +1130,7 @@ private struct DiscoverFeedSections: View {
     @State private var todayMostReadStore = DiscoverTodayMostReadStore()
     @State private var trendPulseStore = DiscoverTrendPulseStore()
     @State private var todayTrendPulseStore = DiscoverTrendPulseStore()
-    @State private var wordCountStore = DiscoverWordCountStore()
+    @State private var wordCountStore = ArticleWordCountStore()
     @State private var featuredSummaryStore = DiscoverFeaturedSummaryStore()
     @State private var visualContextStore = DiscoverVisualContextStore()
     @State private var activePageViewsPopover: DiscoverPageViewsPopoverPayload?
@@ -1165,6 +1184,14 @@ private struct DiscoverFeedSections: View {
             GridItem(.flexible(minimum: 280), spacing: 14),
             GridItem(.flexible(minimum: 280), spacing: 14)
         ]
+    }
+
+    private var usesCollectionsExplorationSplit: Bool {
+        availableWidth >= 1040
+    }
+
+    private var collectionsExplorationRailWidth: CGFloat {
+        min(max(availableWidth * 0.34, 318), 372)
     }
 
     private var usesMediaSpotlightSplit: Bool {
@@ -1272,12 +1299,18 @@ private struct DiscoverFeedSections: View {
         "today-most-read:\(refreshGeneration)"
     }
 
-    private var todayTrendPulseLoadKey: String {
-        "\(feed.dateKey)|\(todayMostReadItems.map(\.title).joined(separator: "|"))"
+    private var todayTrendPulseLoadKey: Int {
+        titleFingerprint(
+            todayMostReadItems.map(\.title),
+            seeds: [AnyHashable(feed.dateKey), AnyHashable("today-most-read-pulse")]
+        )
     }
 
-    private var trendPulseLoadKey: String {
-        "\(feed.dateKey)|\(playlistMostReadItems.map(\.title).joined(separator: "|"))"
+    private var trendPulseLoadKey: Int {
+        titleFingerprint(
+            playlistMostReadItems.map(\.title),
+            seeds: [AnyHashable(feed.dateKey), AnyHashable("playlist-most-read-pulse")]
+        )
     }
 
     private var featuredArticleTitle: String? {
@@ -1299,6 +1332,20 @@ private struct DiscoverFeedSections: View {
 
     private var mostReadPulseReferenceDate: Date {
         trendReferenceDate
+    }
+
+    private func titleFingerprint<S: Sequence>(
+        _ titles: S,
+        seeds: [AnyHashable] = []
+    ) -> Int where S.Element == String {
+        var hasher = Hasher()
+        for seed in seeds {
+            hasher.combine(seed)
+        }
+        for title in titles {
+            hasher.combine(ReadStateSync.normalizedTitle(title))
+        }
+        return hasher.finalize()
     }
 
     private var todayMostReadSubtitle: String {
@@ -1352,8 +1399,11 @@ private struct DiscoverFeedSections: View {
         Array(allTimeMostReadStore.entries.prefix(allTimeMostReadLoadLimit).map(\.result))
     }
 
-    private var wordCountLoadKey: String {
-        longestReadCandidates.map(\.title).joined(separator: "|")
+    private var wordCountLoadKey: Int {
+        titleFingerprint(
+            longestReadCandidates.map(\.title),
+            seeds: [AnyHashable("longest-word-count")]
+        )
     }
 
     private var longestReadItems: [DiscoverLongestReadEntry] {
@@ -1400,10 +1450,21 @@ private struct DiscoverFeedSections: View {
         return lanes
     }
 
-    private var collectionsFocusDataKey: String {
-        let mostReadKey = keyboardMostReadResults.map(\.title).joined(separator: "|")
-        let longestKey = keyboardLongestResults.map(\.title).joined(separator: "|")
-        return "\(mostReadKey)|\(longestKey)"
+    private var collectionsFocusDataKey: Int {
+        var hasher = Hasher()
+        hasher.combine(
+            titleFingerprint(
+                keyboardMostReadResults.map(\.title),
+                seeds: [AnyHashable("keyboard-most-read")]
+            )
+        )
+        hasher.combine(
+            titleFingerprint(
+                keyboardLongestResults.map(\.title),
+                seeds: [AnyHashable("keyboard-longest")]
+            )
+        )
+        return hasher.finalize()
     }
 
     private var canOpenFocusedCollectionItem: Bool {
@@ -1609,39 +1670,38 @@ private struct DiscoverFeedSections: View {
     }
 
     @ViewBuilder
-    private var todayMostReadSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            DiscoverSectionHeader(
-                title: "Today’s Most Read",
-                subtitle: "PLACEHOLDER"
-            )
+    private var mostReadCollectionModule: some View {
+        DiscoverEditorialPanel(accent: .accentColor, tone: .atlas) {
             DiscoverPlaylistColumn(
-                title: "Today",
-                subtitle: todayMostReadSubtitle,
-                meta: todayMostReadMeta,
-                systemImage: "sun.max.fill",
-                tint: Color.blue.opacity(0.9),
-                showsLoading: todayMostReadStore.isLoading || todayTrendPulseStore.isLoading,
-                isKeyboardFocused: false
+                title: "Most Read",
+                subtitle: playlistMostReadSubtitle,
+                meta: mostReadCollectionMeta,
+                systemImage: "chart.line.uptrend.xyaxis",
+                tint: .accentColor,
+                showsLoading: trendPulseStore.isLoading,
+                isKeyboardFocused: isCollectionsKeyboardFocusActive && focusedCollectionLane == .mostRead,
+                showsSurface: false
             ) {
-                if todayMostReadItems.isEmpty {
+                if playlistMostReadItems.isEmpty {
                     DiscoverPlaylistPlaceholder(
-                        text: todayMostReadStore.isLoading
-                            ? "Loading today’s most read…"
-                            : "Today’s Most Read is unavailable right now."
+                        text: allTimeMostReadStore.isLoading
+                            ? "Loading all-time most read…"
+                            : "All-time Most Read is unavailable right now."
                     )
                 } else {
-                    ForEach(Array(todayMostReadItems.enumerated()), id: \.element.id) { index, result in
-                        let rowKey = pageViewsRowKey(section: "today-most-read", result: result, index: index)
-                        let trendPulse = todayMostReadPulse(for: result)
+                    ForEach(Array(playlistMostReadItems.enumerated()), id: \.element.id) { index, result in
+                        let rowKey = pageViewsRowKey(section: "collection-most-read", result: result, index: index)
+                        let trendPulse = trendPulseStore.pulse(for: result.title)
                         DiscoverPlaylistArticleRow(
                             result: result,
                             rank: index + 1,
-                            primaryStat: todayMostReadPrimaryStat(for: result),
-                            secondaryStat: todayMostReadSecondaryStat(for: result),
-                            statTint: todayMostReadStatTint(for: result),
-                            isKeyboardFocused: false,
-                            onFocus: nil,
+                            primaryStat: mostReadPrimaryStat(for: result),
+                            secondaryStat: mostReadSecondaryStat(for: result),
+                            statTint: mostReadStatTint(for: result),
+                            isKeyboardFocused: isFocusedCollectionRow(lane: .mostRead, index: index),
+                            onFocus: {
+                                markCollectionsFocus(lane: .mostRead, index: index)
+                            },
                             onOpen: onOpen
                         )
                         .contextMenu {
@@ -1663,20 +1723,73 @@ private struct DiscoverFeedSections: View {
     }
 
     @ViewBuilder
-    private var newsBriefingSection: some View {
-        if !feed.newsStories.isEmpty {
-            VStack(alignment: .leading, spacing: 10) {
-                DiscoverSectionHeader(
-                    title: "News Briefing",
-                    subtitle: "PLACEHOLDER"
-                )
-                VStack(spacing: 10) {
-                    ForEach(feed.newsStories.prefix(newsBriefingLimit)) { story in
-                        DiscoverNewsStoryCard(
-                            story: story,
-                            onOpen: onOpen,
-                            referenceDate: trendReferenceDate
+    private var longestReadsCollectionModule: some View {
+        DiscoverEditorialPanel(accent: Color.orange.opacity(0.9), tone: .notebook) {
+            DiscoverPlaylistColumn(
+                title: "Longest Reads",
+                subtitle: playlistLongestSubtitle,
+                meta: longestCollectionMeta,
+                systemImage: "text.alignleft",
+                tint: Color.orange.opacity(0.9),
+                showsLoading: wordCountStore.isLoading,
+                isKeyboardFocused: isCollectionsKeyboardFocusActive && focusedCollectionLane == .longest,
+                showsSurface: false
+            ) {
+                if longestReadItems.isEmpty {
+                    if longestFallbackItems.isEmpty {
+                        DiscoverPlaylistPlaceholder(
+                            text: wordCountStore.isLoading
+                                ? "Finding long reads…"
+                                : "No all-time long-read candidates are available yet."
                         )
+                    } else {
+                        ForEach(Array(longestFallbackItems.enumerated()), id: \.element.id) { index, result in
+                            let rowKey = pageViewsRowKey(section: "collection-longest-fallback", result: result, index: index)
+                            DiscoverPlaylistArticleRow(
+                                result: result,
+                                rank: index + 1,
+                                primaryStat: wordCountStore.isLoading ? "Loading words…" : "Word count unavailable",
+                                secondaryStat: wordCountStore.isLoading ? nil : "Open to inspect",
+                                statTint: .secondary,
+                                isKeyboardFocused: isFocusedCollectionRow(lane: .longest, index: index),
+                                onFocus: {
+                                    markCollectionsFocus(lane: .longest, index: index)
+                                },
+                                onOpen: onOpen
+                            )
+                            .contextMenu {
+                                discoverContextMenu(for: result) {
+                                    presentPageViewsPopover(for: result, rowKey: rowKey)
+                                }
+                            }
+                            .popover(isPresented: pageViewsPopoverBinding(for: rowKey), arrowEdge: .trailing) {
+                                pageViewsPopover(for: rowKey)
+                            }
+                        }
+                    }
+                } else {
+                    ForEach(Array(longestReadItems.enumerated()), id: \.element.id) { index, entry in
+                        let rowKey = pageViewsRowKey(section: "collection-longest", result: entry.result, index: index)
+                        DiscoverPlaylistArticleRow(
+                            result: entry.result,
+                            rank: index + 1,
+                            primaryStat: formattedWordCount(entry.wordCount),
+                            secondaryStat: estimatedReadingTimeText(for: entry.wordCount),
+                            statTint: Color.orange.opacity(0.92),
+                            isKeyboardFocused: isFocusedCollectionRow(lane: .longest, index: index),
+                            onFocus: {
+                                markCollectionsFocus(lane: .longest, index: index)
+                            },
+                            onOpen: onOpen
+                        )
+                        .contextMenu {
+                            discoverContextMenu(for: entry.result) {
+                                presentPageViewsPopover(for: entry.result, rowKey: rowKey)
+                            }
+                        }
+                        .popover(isPresented: pageViewsPopoverBinding(for: rowKey), arrowEdge: .trailing) {
+                            pageViewsPopover(for: rowKey)
+                        }
                     }
                 }
             }
@@ -1684,57 +1797,41 @@ private struct DiscoverFeedSections: View {
     }
 
     @ViewBuilder
-    private var openingEditorialSpread: some View {
-        if usesOpeningModuleSplit {
-            LazyVGrid(columns: openingModuleColumns, alignment: .leading, spacing: 14) {
-                todayMostReadSection
-                newsBriefingSection
-            }
-        } else {
-            todayMostReadSection
-            newsBriefingSection
-        }
-    }
-
-    @ViewBuilder
-    private var collectionsStage: some View {
-        VStack(alignment: .leading, spacing: isCompactLayout ? 12 : 14) {
-            DiscoverSectionHeader(
-                title: "Collections",
-                subtitle: "PLACEHOLDER"
-            )
-
-            LazyVGrid(columns: playlistColumns, spacing: 12) {
+    private var todayMostReadSection: some View {
+        DiscoverEditorialPanel(accent: Color.blue.opacity(0.9), tone: .feature) {
+            VStack(alignment: .leading, spacing: 12) {
+                DiscoverSectionHeader(
+                    title: "Today’s Most Read",
+                    subtitle: "PLACEHOLDER"
+                )
                 DiscoverPlaylistColumn(
-                    title: "Most Read",
-                    subtitle: playlistMostReadSubtitle,
-                    meta: mostReadCollectionMeta,
-                    systemImage: "chart.line.uptrend.xyaxis",
-                    tint: .accentColor,
-                    showsLoading: trendPulseStore.isLoading,
-                    isKeyboardFocused: isCollectionsKeyboardFocusActive && focusedCollectionLane == .mostRead,
+                    title: "Today",
+                    subtitle: todayMostReadSubtitle,
+                    meta: todayMostReadMeta,
+                    systemImage: "sun.max.fill",
+                    tint: Color.blue.opacity(0.9),
+                    showsLoading: todayMostReadStore.isLoading || todayTrendPulseStore.isLoading,
+                    isKeyboardFocused: false,
                     showsSurface: false
                 ) {
-                    if playlistMostReadItems.isEmpty {
+                    if todayMostReadItems.isEmpty {
                         DiscoverPlaylistPlaceholder(
-                            text: allTimeMostReadStore.isLoading
-                                ? "Loading all-time most read…"
-                                : "All-time Most Read is unavailable right now."
+                            text: todayMostReadStore.isLoading
+                                ? "Loading today’s most read…"
+                                : "Today’s Most Read is unavailable right now."
                         )
                     } else {
-                        ForEach(Array(playlistMostReadItems.enumerated()), id: \.element.id) { index, result in
-                            let rowKey = pageViewsRowKey(section: "collection-most-read", result: result, index: index)
-                            let trendPulse = trendPulseStore.pulse(for: result.title)
+                        ForEach(Array(todayMostReadItems.enumerated()), id: \.element.id) { index, result in
+                            let rowKey = pageViewsRowKey(section: "today-most-read", result: result, index: index)
+                            let trendPulse = todayMostReadPulse(for: result)
                             DiscoverPlaylistArticleRow(
                                 result: result,
                                 rank: index + 1,
-                                primaryStat: mostReadPrimaryStat(for: result),
-                                secondaryStat: mostReadSecondaryStat(for: result),
-                                statTint: mostReadStatTint(for: result),
-                                isKeyboardFocused: isFocusedCollectionRow(lane: .mostRead, index: index),
-                                onFocus: {
-                                    markCollectionsFocus(lane: .mostRead, index: index)
-                                },
+                                primaryStat: todayMostReadPrimaryStat(for: result),
+                                secondaryStat: todayMostReadSecondaryStat(for: result),
+                                statTint: todayMostReadStatTint(for: result),
+                                isKeyboardFocused: false,
+                                onFocus: nil,
                                 onOpen: onOpen
                             )
                             .contextMenu {
@@ -1752,37 +1849,95 @@ private struct DiscoverFeedSections: View {
                         }
                     }
                 }
+            }
+        }
+    }
 
-                DiscoverPlaylistColumn(
-                    title: "Longest Reads",
-                    subtitle: playlistLongestSubtitle,
-                    meta: longestCollectionMeta,
-                    systemImage: "text.alignleft",
-                    tint: Color.orange.opacity(0.9),
-                    showsLoading: wordCountStore.isLoading,
-                    isKeyboardFocused: isCollectionsKeyboardFocusActive && focusedCollectionLane == .longest,
-                    showsSurface: false
-                ) {
-                    if longestReadItems.isEmpty {
-                        if longestFallbackItems.isEmpty {
-                            DiscoverPlaylistPlaceholder(
-                                text: wordCountStore.isLoading
-                                    ? "Finding long reads…"
-                                    : "No all-time long-read candidates are available yet."
+    @ViewBuilder
+    private var newsBriefingSection: some View {
+        if !feed.newsStories.isEmpty {
+            DiscoverEditorialPanel(accent: Color.teal.opacity(0.84), tone: .notebook) {
+                VStack(alignment: .leading, spacing: 12) {
+                    DiscoverSectionHeader(
+                        title: "News Briefing",
+                        subtitle: "PLACEHOLDER"
+                    )
+                    VStack(spacing: 10) {
+                        ForEach(feed.newsStories.prefix(newsBriefingLimit)) { story in
+                            DiscoverNewsStoryCard(
+                                story: story,
+                                onOpen: onOpen,
+                                referenceDate: trendReferenceDate,
+                                showsSurface: false
                             )
-                        } else {
-                            ForEach(Array(longestFallbackItems.enumerated()), id: \.element.id) { index, result in
-                                let rowKey = pageViewsRowKey(section: "collection-longest-fallback", result: result, index: index)
-                                DiscoverPlaylistArticleRow(
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var openingEditorialSpread: some View {
+        if usesOpeningModuleSplit {
+            LazyVGrid(columns: openingModuleColumns, alignment: .leading, spacing: 18) {
+                todayMostReadSection
+                newsBriefingSection
+            }
+        } else {
+            todayMostReadSection
+            newsBriefingSection
+        }
+    }
+
+    @ViewBuilder
+    private var collectionsStage: some View {
+        VStack(alignment: .leading, spacing: isCompactLayout ? 14 : 16) {
+            DiscoverSectionHeader(
+                title: "Collections",
+                subtitle: "PLACEHOLDER"
+            )
+
+            if usesCollectionsExplorationSplit {
+                HStack(alignment: .top, spacing: 18) {
+                    mostReadCollectionModule
+                        .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
+                    longestReadsCollectionModule
+                        .frame(width: collectionsExplorationRailWidth, alignment: .leading)
+                }
+            } else {
+                LazyVGrid(columns: playlistColumns, spacing: 16) {
+                    mostReadCollectionModule
+                    longestReadsCollectionModule
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var mediaSpotlightSection: some View {
+        if usesMediaSpotlightSplit, let featuredImage = feed.featuredImage {
+            HStack(alignment: .top, spacing: 16) {
+                DiscoverEditorialPanel(accent: Color.indigo.opacity(0.82), tone: .feature) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        DiscoverSectionHeader(title: "Image of the Day", subtitle: "PLACEHOLDER")
+                        DiscoverFeaturedImageCard(
+                            image: featuredImage,
+                            prefersHorizontalLayout: true
+                        )
+                    }
+                }
+                .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
+
+                DiscoverEditorialPanel(accent: Color.red.opacity(0.78), tone: .notebook) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        DiscoverSectionHeader(title: "In the News", subtitle: "PLACEHOLDER")
+                        VStack(spacing: 10) {
+                            ForEach(remainingNewsItems.prefix(inTheNewsRailLimit)) { result in
+                                let rowKey = pageViewsRowKey(section: "in-news", result: result)
+                                DiscoverNewsCard(
                                     result: result,
-                                    rank: index + 1,
-                                    primaryStat: wordCountStore.isLoading ? "Loading words…" : "Word count unavailable",
-                                    secondaryStat: wordCountStore.isLoading ? nil : "Open to inspect",
-                                    statTint: .secondary,
-                                    isKeyboardFocused: isFocusedCollectionRow(lane: .longest, index: index),
-                                    onFocus: {
-                                        markCollectionsFocus(lane: .longest, index: index)
-                                    },
+                                    style: .rail,
                                     onOpen: onOpen
                                 )
                                 .contextMenu {
@@ -1795,116 +1950,45 @@ private struct DiscoverFeedSections: View {
                                 }
                             }
                         }
-                    } else {
-                        ForEach(Array(longestReadItems.enumerated()), id: \.element.id) { index, entry in
-                            let rowKey = pageViewsRowKey(section: "collection-longest", result: entry.result, index: index)
-                            DiscoverPlaylistArticleRow(
-                                result: entry.result,
-                                rank: index + 1,
-                                primaryStat: formattedWordCount(entry.wordCount),
-                                secondaryStat: estimatedReadingTimeText(for: entry.wordCount),
-                                statTint: Color.orange.opacity(0.92),
-                                isKeyboardFocused: isFocusedCollectionRow(lane: .longest, index: index),
-                                onFocus: {
-                                    markCollectionsFocus(lane: .longest, index: index)
-                                },
-                                onOpen: onOpen
-                            )
-                            .contextMenu {
-                                discoverContextMenu(for: entry.result) {
-                                    presentPageViewsPopover(for: entry.result, rowKey: rowKey)
-                                }
-                            }
-                            .popover(isPresented: pageViewsPopoverBinding(for: rowKey), arrowEdge: .trailing) {
-                                pageViewsPopover(for: rowKey)
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        .padding(isCompactLayout ? 14 : 18)
-        .background(
-            LinearGradient(
-                colors: [
-                    Color.primary.opacity(0.028),
-                    Color.accentColor.opacity(0.028),
-                    Color.orange.opacity(0.024)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            ),
-            in: RoundedRectangle(cornerRadius: 24, style: .continuous)
-        )
-        .overlay {
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.9)
-        }
-    }
-
-    @ViewBuilder
-    private var mediaSpotlightSection: some View {
-        if usesMediaSpotlightSplit, let featuredImage = feed.featuredImage {
-            HStack(alignment: .top, spacing: 16) {
-                VStack(alignment: .leading, spacing: 10) {
-                    DiscoverSectionHeader(title: "Image of the Day", subtitle: "PLACEHOLDER")
-                    DiscoverFeaturedImageCard(
-                        image: featuredImage,
-                        prefersHorizontalLayout: true
-                    )
-                }
-                .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
-
-                VStack(alignment: .leading, spacing: 10) {
-                    DiscoverSectionHeader(title: "In the News", subtitle: "PLACEHOLDER")
-                    VStack(spacing: 10) {
-                        ForEach(remainingNewsItems.prefix(inTheNewsRailLimit)) { result in
-                            let rowKey = pageViewsRowKey(section: "in-news", result: result)
-                            DiscoverNewsCard(
-                                result: result,
-                                style: .rail,
-                                onOpen: onOpen
-                            )
-                            .contextMenu {
-                                discoverContextMenu(for: result) {
-                                    presentPageViewsPopover(for: result, rowKey: rowKey)
-                                }
-                            }
-                            .popover(isPresented: pageViewsPopoverBinding(for: rowKey), arrowEdge: .trailing) {
-                                pageViewsPopover(for: rowKey)
-                            }
-                        }
                     }
                 }
                 .frame(width: mediaSpotlightRailWidth, alignment: .leading)
             }
         } else {
             if let featuredImage = feed.featuredImage {
-                DiscoverSectionHeader(title: "Image of the Day", subtitle: "PLACEHOLDER")
-                DiscoverFeaturedImageCard(image: featuredImage)
+                DiscoverEditorialPanel(accent: Color.indigo.opacity(0.82), tone: .feature) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        DiscoverSectionHeader(title: "Image of the Day", subtitle: "PLACEHOLDER")
+                        DiscoverFeaturedImageCard(image: featuredImage)
+                    }
+                }
             }
 
             if !remainingNewsItems.isEmpty {
-                DiscoverSectionHeader(title: "In the News", subtitle: "PLACEHOLDER")
-                ScrollView(.horizontal) {
-                    LazyHStack(spacing: 12) {
-                        ForEach(remainingNewsItems.prefix(inTheNewsRailLimit)) { result in
-                            let rowKey = pageViewsRowKey(section: "in-news", result: result)
-                            DiscoverNewsCard(result: result, onOpen: onOpen)
-                                .frame(width: 230)
-                                .contextMenu {
-                                    discoverContextMenu(for: result) {
-                                        presentPageViewsPopover(for: result, rowKey: rowKey)
-                                    }
+                DiscoverEditorialPanel(accent: Color.red.opacity(0.78), tone: .notebook) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        DiscoverSectionHeader(title: "In the News", subtitle: "PLACEHOLDER")
+                        ScrollView(.horizontal) {
+                            LazyHStack(spacing: 12) {
+                                ForEach(remainingNewsItems.prefix(inTheNewsRailLimit)) { result in
+                                    let rowKey = pageViewsRowKey(section: "in-news", result: result)
+                                    DiscoverNewsCard(result: result, onOpen: onOpen)
+                                        .frame(width: 230)
+                                        .contextMenu {
+                                            discoverContextMenu(for: result) {
+                                                presentPageViewsPopover(for: result, rowKey: rowKey)
+                                            }
+                                        }
+                                        .popover(isPresented: pageViewsPopoverBinding(for: rowKey), arrowEdge: .trailing) {
+                                            pageViewsPopover(for: rowKey)
+                                        }
                                 }
-                                .popover(isPresented: pageViewsPopoverBinding(for: rowKey), arrowEdge: .trailing) {
-                                    pageViewsPopover(for: rowKey)
-                                }
+                            }
+                            .padding(.vertical, 2)
                         }
+                        .scrollIndicators(.hidden)
                     }
-                    .padding(.vertical, 2)
                 }
-                .scrollIndicators(.hidden)
             }
         }
     }
@@ -2347,47 +2431,16 @@ private struct DiscoverFeedSections: View {
         for result: WikipediaService.SearchResult,
         onShowPageViews: (() -> Void)? = nil
     ) -> some View {
-        Button {
-            onOpen(result, false)
-        } label: {
-            SwiftUI.Label("Open", systemImage: "doc.text")
-        }
-
-        Button {
-            onOpen(result, true)
-        } label: {
-            SwiftUI.Label("Open in New Tab", systemImage: "plus.rectangle.on.rectangle")
-        }
-
-        if let onShowPageViews {
-            Button {
-                onShowPageViews()
-            } label: {
-                SwiftUI.Label("Show Page Views", systemImage: "chart.xyaxis.line")
-            }
-        }
-
-        Divider()
-
-        Button {
-            copyToClipboard(result.title)
-        } label: {
-            SwiftUI.Label("Copy Title", systemImage: "doc.on.doc")
-        }
-
-        Button {
-            copyToClipboard(wikipediaURLString(for: result.title))
-        } label: {
-            SwiftUI.Label("Copy Wikipedia Link", systemImage: "link")
-        }
-    }
-
-    private func copyToClipboard(_ value: String) {
-        _ = SystemBridge.copyText(value)
-    }
-
-    private func wikipediaURLString(for title: String) -> String {
-        WikipediaURLBuilder.articleURLString(forTitle: title)
+        SearchResultContextMenuContent(
+            result: result,
+            allLists: allLists,
+            allLabels: allLabels,
+            allTags: allTags,
+            onOpen: { inNewTab in
+                onOpen(result, inNewTab)
+            },
+            onShowPageViews: onShowPageViews
+        )
     }
 }
 
@@ -2447,7 +2500,7 @@ private struct DiscoverSectionHeader: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: showsSubtitle ? 3 : 0) {
+        VStack(alignment: .leading, spacing: showsSubtitle ? 4 : 0) {
             if showsSubtitle {
                 Text(normalizedSubtitle)
                     .font(DiscoverTypography.sectionSubtitle)
@@ -2462,11 +2515,20 @@ private struct DiscoverSectionHeader: View {
 }
 
 private enum DiscoverEditorialPanelTone {
+    case feature
+    case notebook
+    case atlas
     case archive
     case timewarp
 
     func backgroundColors(accent: Color) -> [Color] {
         switch self {
+        case .feature:
+            return [accent.opacity(0.14), Color.primary.opacity(0.03), Color.white.opacity(0.16)]
+        case .notebook:
+            return [Color.primary.opacity(0.018), accent.opacity(0.055), Color.white.opacity(0.10)]
+        case .atlas:
+            return [accent.opacity(0.09), Color.primary.opacity(0.022), Color.white.opacity(0.12)]
         case .archive:
             return [accent.opacity(0.08), Color.orange.opacity(0.05), Color.white.opacity(0.14)]
         case .timewarp:
@@ -2476,42 +2538,65 @@ private enum DiscoverEditorialPanelTone {
 
     var topRuleHeight: CGFloat {
         switch self {
-        case .archive: return 2
+        case .feature: return 3
         case .timewarp: return 2.5
+        case .notebook, .atlas, .archive: return 2
         }
     }
 
     var cornerRadius: CGFloat {
         switch self {
-        case .archive: return 20
-        case .timewarp: return 24
+        case .feature:
+            return 26
+        case .notebook, .atlas:
+            return 22
+        case .archive:
+            return 20
+        case .timewarp:
+            return 24
         }
     }
 
     var borderOpacity: Double {
         switch self {
-        case .archive: return 0.11
-        case .timewarp: return 0.16
+        case .feature:
+            return 0.16
+        case .notebook:
+            return 0.12
+        case .atlas:
+            return 0.13
+        case .archive:
+            return 0.11
+        case .timewarp:
+            return 0.16
         }
     }
 
     var shadowOpacity: Double {
         switch self {
-        case .archive: return 0.04
-        case .timewarp: return 0.07
+        case .feature:
+            return 0.08
+        case .notebook:
+            return 0.05
+        case .atlas:
+            return 0.055
+        case .archive:
+            return 0.04
+        case .timewarp:
+            return 0.07
         }
     }
 }
 
 private struct DiscoverEditorialPanel<Content: View>: View {
     let accent: Color
-    var tone: DiscoverEditorialPanelTone = .archive
+    var tone: DiscoverEditorialPanelTone = .feature
     var contentPadding: CGFloat = 16
     let content: Content
 
     init(
         accent: Color,
-        tone: DiscoverEditorialPanelTone = .archive,
+        tone: DiscoverEditorialPanelTone = .feature,
         contentPadding: CGFloat = 16,
         @ViewBuilder content: () -> Content
     ) {
@@ -2658,8 +2743,6 @@ private struct DiscoverPlaylistColumn<Content: View>: View {
     }
 
     var body: some View {
-        let cornerRadius = showsSurface ? 18.0 : 20.0
-
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .top, spacing: 9) {
                 Image(systemName: systemImage)
@@ -2695,30 +2778,20 @@ private struct DiscoverPlaylistColumn<Content: View>: View {
                 content
             }
         }
-        .padding(13)
+        .padding(12)
         .background(
             Group {
                 if showsSurface {
-                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                        .fill(
-                            LinearGradient(
-                                colors: [
-                                    Color.primary.opacity(0.028),
-                                    tint.opacity(0.035),
-                                    Color.white.opacity(0.08)
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(.regularMaterial)
                 } else {
-                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
                         .fill(Color.primary.opacity(isHovered || isKeyboardFocused ? 0.045 : 0.025))
                 }
             }
         )
         .overlay {
-            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+            RoundedRectangle(cornerRadius: showsSurface ? 16 : 18, style: .continuous)
                 .strokeBorder(
                     isKeyboardFocused
                         ? tint.opacity(0.48)
@@ -2728,10 +2801,10 @@ private struct DiscoverPlaylistColumn<Content: View>: View {
         }
         .overlay {
             if showsSurface {
-                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
                     .strokeBorder(
                         LinearGradient(
-                            colors: [Color.white.opacity(0.18), tint.opacity(0.12), Color.primary.opacity(0.015)],
+                            colors: [tint.opacity(0.18), Color.primary.opacity(0.02)],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         ),
@@ -2870,9 +2943,9 @@ private struct DiscoverPlaylistArticleRow: View {
 }
 
 private enum DiscoverTypography {
-    static let sectionTitle = Font.system(size: 18.5, weight: .semibold)
-    static let sectionSubtitle = Font.system(size: 11.5, weight: .medium)
-    static let featureTitle = Font.system(size: 29, weight: .semibold, design: .serif)
+    static let sectionTitle = Font.system(size: 21, weight: .semibold, design: .serif)
+    static let sectionSubtitle = Font.system(size: 10.5, weight: .semibold, design: .rounded)
+    static let featureTitle = Font.system(size: 31, weight: .semibold, design: .serif)
     static let featureDescription = Font.system(size: 13.5, weight: .regular)
     static let newsCardTitle = Font.system(size: 13.5, weight: .semibold, design: .rounded)
     static let newsRailTitle = Font.system(size: 14.5, weight: .semibold)
@@ -2880,7 +2953,7 @@ private enum DiscoverTypography {
     static let compactRank = Font.system(size: 14.5, weight: .semibold, design: .rounded)
     static let compactTitle = Font.system(size: 12.5, weight: .medium)
     static let compactDescription = Font.system(size: 11, weight: .regular)
-    static let storyBody = Font.system(size: 13, weight: .regular)
+    static let storyBody = Font.system(size: 14, weight: .regular, design: .serif)
     static let mediaTitle = Font.system(size: 16.5, weight: .semibold, design: .rounded)
     static let mediaDescription = Font.system(size: 12.5, weight: .regular)
     static let mediaMeta = Font.system(size: 11.5, weight: .medium)
@@ -2961,10 +3034,6 @@ private struct DiscoverFeatureCard: View {
     var showsSurface: Bool = true
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isHovered = false
-
-    private var imageTransaction: Transaction {
-        reduceMotion ? Transaction(animation: nil) : Transaction(animation: .easeOut(duration: 0.18))
-    }
 
     private var displayTitle: String {
         let trimmed = result.title.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -3062,38 +3131,35 @@ private struct DiscoverFeatureCard: View {
     @ViewBuilder
     private var featureImage: some View {
         if let thumbnailURL = result.thumbnailURL {
-            AsyncImage(
+            CachedThumbnailImage(
                 url: thumbnailURL,
-                transaction: imageTransaction
-            ) { phase in
-                switch phase {
-                case .success(let image):
-                    ZStack {
-                        Rectangle()
-                            .fill(Color.primary.opacity(0.04))
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                    }
-                    .transition(.opacity)
-                case .failure:
-                    LinearGradient(
-                        colors: [Color.accentColor.opacity(0.25), Color.blue.opacity(0.2)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                    .overlay {
-                        Image(systemName: "photo")
-                            .font(.system(size: 28, weight: .semibold))
-                            .foregroundStyle(.white.opacity(0.55))
-                    }
-                default:
-                    AppLoadingThumbnailPlaceholder(
-                        width: 320,
-                        height: heroImageHeight,
-                        cornerRadius: 14,
-                        tone: .accent
-                    )
+                targetSize: CGSize(width: 320, height: heroImageHeight),
+                animatesNetworkSuccess: !reduceMotion
+            ) { image in
+                ZStack {
+                    Rectangle()
+                        .fill(Color.primary.opacity(0.04))
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                }
+            } placeholder: {
+                AppLoadingThumbnailPlaceholder(
+                    width: 320,
+                    height: heroImageHeight,
+                    cornerRadius: 14,
+                    tone: .accent
+                )
+            } failure: {
+                LinearGradient(
+                    colors: [Color.accentColor.opacity(0.25), Color.blue.opacity(0.2)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .overlay {
+                    Image(systemName: "photo")
+                        .font(.system(size: 28, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.55))
                 }
             }
         } else {
@@ -3112,10 +3178,6 @@ private struct DiscoverNewsCard: View {
     let onOpen: (WikipediaService.SearchResult, Bool) -> Void
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isHovered = false
-
-    private var imageTransaction: Transaction {
-        reduceMotion ? Transaction(animation: nil) : Transaction(animation: .easeOut(duration: 0.18))
-    }
 
     var body: some View {
         Button {
@@ -3176,38 +3238,33 @@ private struct DiscoverNewsCard: View {
     @ViewBuilder
     private var newsThumbnail: some View {
         if let thumbnailURL = result.thumbnailURL {
-            AsyncImage(
+            CachedThumbnailImage(
                 url: thumbnailURL,
-                transaction: imageTransaction
-            ) { phase in
-                switch phase {
-                case .empty:
-                    AppLoadingThumbnailPlaceholder(
-                        width: style.thumbnailTargetSize.width,
-                        height: style.thumbnailTargetSize.height,
-                        cornerRadius: 10,
-                        tone: .accent
-                    )
-                case .success(let image):
-                    ZStack {
-                        Rectangle()
-                            .fill(Color.primary.opacity(0.04))
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                    }
-                    .transition(.opacity)
-                case .failure:
+                targetSize: style.thumbnailTargetSize,
+                animatesNetworkSuccess: !reduceMotion
+            ) { image in
+                ZStack {
                     Rectangle()
-                        .fill(.quaternary)
-                        .overlay {
-                            Image(systemName: "photo")
-                                .font(.system(size: 18, weight: .semibold))
-                                .foregroundStyle(.tertiary)
-                        }
-                @unknown default:
-                    Rectangle().fill(.quaternary)
+                        .fill(Color.primary.opacity(0.04))
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
                 }
+            } placeholder: {
+                AppLoadingThumbnailPlaceholder(
+                    width: style.thumbnailTargetSize.width,
+                    height: style.thumbnailTargetSize.height,
+                    cornerRadius: 10,
+                    tone: .accent
+                )
+            } failure: {
+                Rectangle()
+                    .fill(.quaternary)
+                    .overlay {
+                        Image(systemName: "photo")
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundStyle(.tertiary)
+                    }
             }
             .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         }
@@ -3569,10 +3626,6 @@ private struct DiscoverVisualContextCard: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isHovered = false
 
-    private var imageTransaction: Transaction {
-        reduceMotion ? Transaction(animation: nil) : Transaction(animation: .easeOut(duration: 0.18))
-    }
-
     private var displayTitle: String {
         var cleaned = image.mediaTitle.trimmingCharacters(in: .whitespacesAndNewlines)
         if cleaned.lowercased().hasPrefix("file:") {
@@ -3597,29 +3650,28 @@ private struct DiscoverVisualContextCard: View {
             }
         } label: {
             VStack(alignment: .leading, spacing: 6) {
-                AsyncImage(url: image.thumbnailURL, transaction: imageTransaction) { phase in
-                    switch phase {
-                    case .empty:
-                        AppLoadingThumbnailPlaceholder(
-                            width: 180,
-                            height: 108,
-                            cornerRadius: 10,
-                            tone: .accent
-                        )
-                    case .success(let loadedImage):
-                        loadedImage
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                    case .failure:
-                        Rectangle()
-                            .fill(.quaternary)
-                            .overlay {
-                                Image(systemName: "photo")
-                                    .foregroundStyle(.tertiary)
-                            }
-                    @unknown default:
-                        Rectangle().fill(.quaternary)
-                    }
+                CachedThumbnailImage(
+                    url: image.thumbnailURL,
+                    targetSize: CGSize(width: 180, height: 108),
+                    animatesNetworkSuccess: !reduceMotion
+                ) { loadedImage in
+                    loadedImage
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                } placeholder: {
+                    AppLoadingThumbnailPlaceholder(
+                        width: 180,
+                        height: 108,
+                        cornerRadius: 10,
+                        tone: .accent
+                    )
+                } failure: {
+                    Rectangle()
+                        .fill(.quaternary)
+                        .overlay {
+                            Image(systemName: "photo")
+                                .foregroundStyle(.tertiary)
+                        }
                 }
                 .frame(height: 108)
                 .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
@@ -3658,37 +3710,31 @@ private struct DiscoverThumbnailSlot: View {
     let imagePadding: CGFloat
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    private var imageTransaction: Transaction {
-        reduceMotion ? Transaction(animation: nil) : Transaction(animation: .easeOut(duration: 0.18))
-    }
-
     var body: some View {
         Group {
             if let thumbnailURL {
-                AsyncImage(url: thumbnailURL, transaction: imageTransaction) { phase in
-                    switch phase {
-                    case .empty:
-                        AppLoadingThumbnailPlaceholder(
-                            width: size,
-                            height: size,
-                            cornerRadius: cornerRadius,
-                            tone: .accent
-                        )
-                    case .success(let image):
-                        ZStack {
-                            Rectangle()
-                                .fill(Color.primary.opacity(0.04))
-                            image
-                                .resizable()
-                                .aspectRatio(contentMode: .fit)
-                                .padding(imagePadding)
-                        }
-                        .transition(.opacity)
-                    case .failure:
-                        emptySlot
-                    @unknown default:
-                        emptySlot
+                CachedThumbnailImage(
+                    url: thumbnailURL,
+                    targetSize: CGSize(width: size, height: size),
+                    animatesNetworkSuccess: !reduceMotion
+                ) { image in
+                    ZStack {
+                        Rectangle()
+                            .fill(Color.primary.opacity(0.04))
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .padding(imagePadding)
                     }
+                } placeholder: {
+                    AppLoadingThumbnailPlaceholder(
+                        width: size,
+                        height: size,
+                        cornerRadius: cornerRadius,
+                        tone: .accent
+                    )
+                } failure: {
+                    emptySlot
                 }
             } else {
                 emptySlot
@@ -3709,10 +3755,6 @@ private struct DiscoverFeaturedImageCard: View {
     @Environment(\.openURL) private var openURL
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isHovered = false
-
-    private var imageTransaction: Transaction {
-        reduceMotion ? Transaction(animation: nil) : Transaction(animation: .easeOut(duration: 0.18))
-    }
 
     private var displayImageURL: URL? {
         image.thumbnailURL ?? image.imageURL
@@ -3827,39 +3869,36 @@ private struct DiscoverFeaturedImageCard: View {
     private var imagePanel: some View {
         Group {
             if let displayImageURL {
-                AsyncImage(
+                CachedThumbnailImage(
                     url: displayImageURL,
-                    transaction: imageTransaction
-                ) { phase in
-                    switch phase {
-                    case .empty:
-                        AppLoadingThumbnailPlaceholder(
-                            width: prefersHorizontalLayout ? 480 : 300,
-                            height: prefersHorizontalLayout ? 352 : 180,
-                            cornerRadius: 12,
-                            tone: .accent
-                        )
-                    case .success(let loadedImage):
-                        ZStack {
-                            Rectangle()
-                                .fill(Color.primary.opacity(0.04))
-                            loadedImage
-                                .resizable()
-                                .aspectRatio(contentMode: .fit)
-                                .padding(prefersHorizontalLayout ? 12 : 8)
-                        }
-                        .transition(.opacity)
-                    case .failure:
+                    targetSize: prefersHorizontalLayout
+                        ? CGSize(width: 480, height: 352)
+                        : CGSize(width: 300, height: 280),
+                    animatesNetworkSuccess: !reduceMotion
+                ) { loadedImage in
+                    ZStack {
                         Rectangle()
-                            .fill(.quaternary)
-                            .overlay {
-                                Image(systemName: "photo")
-                                    .font(.system(size: 22, weight: .semibold))
-                                    .foregroundStyle(.tertiary)
-                            }
-                    @unknown default:
-                        Rectangle().fill(.quaternary)
+                            .fill(Color.primary.opacity(0.04))
+                        loadedImage
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .padding(prefersHorizontalLayout ? 12 : 8)
                     }
+                } placeholder: {
+                    AppLoadingThumbnailPlaceholder(
+                        width: prefersHorizontalLayout ? 480 : 300,
+                        height: prefersHorizontalLayout ? 352 : 180,
+                        cornerRadius: 12,
+                        tone: .accent
+                    )
+                } failure: {
+                    Rectangle()
+                        .fill(.quaternary)
+                        .overlay {
+                            Image(systemName: "photo")
+                                .font(.system(size: 22, weight: .semibold))
+                                .foregroundStyle(.tertiary)
+                        }
                 }
             } else {
                 Rectangle().fill(.quaternary)
@@ -3937,6 +3976,7 @@ private struct DiscoverNewsStoryCard: View {
     let story: WikipediaService.DiscoverFeed.NewsStory
     let onOpen: (WikipediaService.SearchResult, Bool) -> Void
     let referenceDate: Date
+    var showsSurface: Bool = true
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var activePageViewsTitle: String?
     @State private var isHovered = false
@@ -4039,15 +4079,25 @@ private struct DiscoverNewsStoryCard: View {
             }
         }
         .padding(11)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(
+            Group {
+                if showsSurface {
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(.regularMaterial)
+                } else {
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(Color.primary.opacity(isHovered ? 0.05 : 0.028))
+                }
+            }
+        )
         .overlay {
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .strokeBorder(Color.primary.opacity(isHovered ? 0.16 : 0.08), lineWidth: 0.8)
+            RoundedRectangle(cornerRadius: showsSurface ? 14 : 16, style: .continuous)
+                .strokeBorder(Color.primary.opacity(isHovered ? 0.16 : (showsSurface ? 0.08 : 0.05)), lineWidth: 0.8)
         }
         .scaleEffect(reduceMotion ? 1 : (isHovered ? 1.006 : 1))
         .animation(reduceMotion ? nil : .easeOut(duration: 0.14), value: isHovered)
         .onHover { isHovered = $0 }
-        .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: showsSurface ? 14 : 16, style: .continuous))
     }
 }
 

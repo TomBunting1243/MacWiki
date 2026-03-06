@@ -29,6 +29,7 @@ struct SettingsView: View {
     @AppStorage(ExperimentFlag.wikiHopPOCEnabled.key) private var wikiHopPOCEnabled = false
     @AppStorage("features.wikiHopPostV1Enabled") private var wikiHopPostV1Enabled = false
     @State private var cacheMetrics: WikipediaService.CacheMetrics?
+    @State private var performanceMetrics = PerformanceMetricsStore.shared
     @State private var isCacheActionRunning = false
     @State private var cacheStatusMessage: String?
     @State private var pendingCacheAction: CacheAction?
@@ -573,6 +574,12 @@ struct SettingsView: View {
                 )
             }
 
+            if performanceMetrics.hasSamples {
+                performanceMetricsCard(performanceMetrics.summaries)
+            } else {
+                settingDescription("Performance samples appear here after session restore, search, sidebar hydration, and reader opens run at least once.")
+            }
+
             HStack(spacing: 8) {
                 Button("Refresh Stats") {
                     Task {
@@ -587,6 +594,11 @@ struct SettingsView: View {
 
                 Spacer()
             }
+
+            Button("Clear Performance Samples") {
+                performanceMetrics.clear()
+            }
+            .disabled(!performanceMetrics.hasSamples)
 
             if let cacheStatusMessage {
                 settingDescription(cacheStatusMessage)
@@ -616,6 +628,7 @@ struct SettingsView: View {
 
             settingDescription("Use temporary clear for routine cleanup. Use full clear to reset article cache only. Use app reset only when you want a full local factory reset.")
             settingDescription("Saved, highlighted, and tagged articles are pinned in disk cache until you run a full article cache clear.")
+            settingDescription("Performance samples are rolling summaries over the last 30 runs per path and persist across launches.")
         }
     }
 
@@ -744,6 +757,45 @@ struct SettingsView: View {
                 )
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    @ViewBuilder
+    private func performanceMetricsCard(_ summaries: [PerformanceMetricsStore.Summary]) -> some View {
+        GroupBox("Performance Samples") {
+            VStack(alignment: .leading, spacing: 10) {
+                ForEach(Array(summaries.enumerated()), id: \.element.id) { index, summary in
+                    performanceMetricSummaryRow(summary)
+                    if index < summaries.count - 1 {
+                        Divider()
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    @ViewBuilder
+    private func performanceMetricSummaryRow(_ summary: PerformanceMetricsStore.Summary) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                SwiftUI.Label(summary.kind.title, systemImage: summary.kind.symbolName)
+                    .foregroundStyle(.secondary)
+                Spacer(minLength: 8)
+                Text("\(PerformanceMetricsStore.formatDuration(summary.lastDurationMs)) last")
+                    .font(.caption.monospacedDigit())
+            }
+
+            Text(
+                "avg \(PerformanceMetricsStore.formatDuration(summary.averageDurationMs)) • best \(PerformanceMetricsStore.formatDuration(summary.bestDurationMs)) • worst \(PerformanceMetricsStore.formatDuration(summary.worstDurationMs)) • \(entryCountLabel(summary.sampleCount))"
+            )
+            .font(.caption.monospacedDigit())
+            .foregroundStyle(.secondary)
+
+            Text(summary.lastDetail)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 

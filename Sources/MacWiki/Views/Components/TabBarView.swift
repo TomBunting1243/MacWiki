@@ -520,7 +520,8 @@ struct TabBarView: View {
             }
         } label: {
             if chromeStyle == .strip || chromeStyle == .toolbar {
-                Image(systemName: "chevron.down")
+                SwiftUI.Label("All Tabs", systemImage: "chevron.down")
+                    .labelStyle(.iconOnly)
                     .font(.system(size: ChromeIconMetrics.symbolPointSize, weight: ChromeIconMetrics.regularWeight))
                     .imageScale(.small)
                     .foregroundStyle(
@@ -535,7 +536,8 @@ struct TabBarView: View {
                     .background(stripAccessoryBackground())
                     .contentShape(RoundedRectangle(cornerRadius: stripAccessoryCornerRadius, style: .continuous))
             } else {
-                Image(systemName: "chevron.down.circle")
+                SwiftUI.Label("All Tabs", systemImage: "chevron.down.circle")
+                    .labelStyle(.iconOnly)
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(.secondary)
                     .frame(width: chromeStyle.newTabButtonSize, height: chromeStyle.newTabButtonSize)
@@ -545,7 +547,6 @@ struct TabBarView: View {
         }
         .menuStyle(.borderlessButton)
         .help("All Tabs")
-        .accessibilityLabel("All Tabs")
         .accessibilityHint("Shows open tabs")
     }
     
@@ -919,6 +920,7 @@ private struct DraggableTabItemView: View {
     
     @State private var isHovered = false
     @State private var showCloseButton = false
+    @State private var saveScheduler = DebouncedActionScheduler()
     @GestureState private var isDragActive = false
     
     /// The most recently used list (for quick save)
@@ -936,6 +938,20 @@ private struct DraggableTabItemView: View {
             }
         }
         return nil
+    }
+
+    private func requestModelContextSave() {
+        saveScheduler.schedule { [modelContext] in
+            guard modelContext.hasChanges else { return }
+            try? modelContext.save()
+        }
+    }
+
+    private func flushScheduledModelContextSave() {
+        saveScheduler.flush { [modelContext] in
+            guard modelContext.hasChanges else { return }
+            try? modelContext.save()
+        }
     }
     
     // MARK: - Drag Animation Settings
@@ -1146,6 +1162,9 @@ private struct DraggableTabItemView: View {
         .onAppear {
             syncCloseButton(animated: false)
         }
+        .onDisappear {
+            flushScheduledModelContextSave()
+        }
         .onChange(of: isActive) { _, _ in
             syncCloseButton()
         }
@@ -1296,31 +1315,21 @@ private struct DraggableTabItemView: View {
     }
     
     private var faviconView: some View {
-        AsyncImage(
-            url: tab.article.thumbnailURL,
-            transaction: Transaction(animation: .easeOut(duration: 0.16))
-        ) { phase in
-            switch phase {
-            case .empty:
-                AppLoadingThumbnailPlaceholder(
-                    width: 16,
-                    height: 16,
-                    cornerRadius: 3,
-                    tone: .neutral,
-                    symbol: "doc.text.fill"
-                )
-            case .success(let image):
-                image
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .transition(.opacity)
-            case .failure:
-                Image(systemName: "doc.text.fill")
-                    .foregroundStyle(.tertiary)
-            @unknown default:
-                Image(systemName: "doc.text.fill")
-                    .foregroundStyle(.tertiary)
-            }
+        CachedThumbnailImage(url: tab.article.thumbnailURL, targetSize: CGSize(width: 16, height: 16)) { image in
+            image
+                .resizable()
+                .aspectRatio(contentMode: .fill)
+        } placeholder: {
+            AppLoadingThumbnailPlaceholder(
+                width: 16,
+                height: 16,
+                cornerRadius: 3,
+                tone: .neutral,
+                symbol: "doc.text.fill"
+            )
+        } failure: {
+            Image(systemName: "doc.text.fill")
+                .foregroundStyle(.tertiary)
         }
         .frame(width: chromeStyle == .strip ? 16 : 16, height: chromeStyle == .strip ? 16 : 16)
         .clipShape(RoundedRectangle(cornerRadius: 3))
@@ -1505,7 +1514,7 @@ private struct DraggableTabItemView: View {
                 Menu {
                     Button {
                         savedArticle.labelId = nil
-                        try? modelContext.save()
+                        requestModelContextSave()
                     } label: {
                         SwiftUI.Label(
                             "None",
@@ -1518,7 +1527,7 @@ private struct DraggableTabItemView: View {
                     ForEach(allLabels) { label in
                         Button {
                             savedArticle.labelId = label.id
-                            try? modelContext.save()
+                            requestModelContextSave()
                         } label: {
                             SwiftUI.Label {
                                 Text(label.name)

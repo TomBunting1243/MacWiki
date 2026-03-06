@@ -110,6 +110,13 @@ struct NewTabPageView: View {
 
 /// Article view with WebView content rendering
 struct ArticleView: View {
+    private struct PendingHydratedMetadata: Equatable {
+        let articleID: String
+        let articleTitle: String
+        let items: [WikipediaService.MetadataItem]
+        let wordCount: Int
+    }
+
     let tabId: UUID
     let article: Article
     @Binding var scrollPosition: CGFloat
@@ -124,6 +131,7 @@ struct ArticleView: View {
     @State private var loadedArticleKey: String?
     @State private var isLoading = true
     @State private var isWebContentReady = false
+    @State private var hasPublishedLiveReadingProgressForCurrentOpen = false
     @State private var isLoadingSkeletonVisible = false
     @State private var loadingSkeletonShownAt: TimeInterval = 0
     @State private var skeletonVisibilityTicket = UUID()
@@ -137,6 +145,7 @@ struct ArticleView: View {
     @State private var articleLoader = ReaderArticleLoader()
     @State private var promptPolicy = ReaderPromptPolicy()
     @State private var openTimer = ArticleOpenTimer()
+    @State private var pendingHydratedMetadata: PendingHydratedMetadata?
     @AppStorage(ReaderAppearanceStorageKey.fontPreset) private var readerFontPreset: ReaderFontPreset = .system
     @AppStorage(ReaderAppearanceStorageKey.fontSize) private var readerFontSize: Double = ReaderAppearance.default.fontSize
     @AppStorage(ReaderAppearanceStorageKey.lineHeight) private var readerLineHeight: Double = ReaderAppearance.default.lineHeight
@@ -342,6 +351,8 @@ struct ArticleView: View {
         }
         .task(id: "\(tabId.uuidString)-\(article.id)") {
             articleLoader.cancelPendingMetadataHydration()
+            pendingHydratedMetadata = nil
+            hasPublishedLiveReadingProgressForCurrentOpen = false
             articleLoader.cancelPendingPinSync()
             articleLoader.schedulePinSync(shouldPinArticleBodyCache, forArticleTitle: article.title)
             appState.setArticleHTMLPinned(shouldPinArticleBodyCache, forTitle: article.title)
@@ -370,6 +381,8 @@ struct ArticleView: View {
             progressCoordinator.persistCurrentProgress(for: article, in: modelContext, force: true)
             articleLoader.cancelPendingMetadataHydration()
             articleLoader.cancelPendingPinSync()
+            pendingHydratedMetadata = nil
+            hasPublishedLiveReadingProgressForCurrentOpen = false
         }
         .onChange(of: article.title) { oldTitle, newTitle in
             guard oldTitle != newTitle else { return }
@@ -477,6 +490,8 @@ struct ArticleView: View {
                     }
                     openTimer.markRevealComplete()
                     hideLoadingSkeletonIfNeeded()
+                    publishLiveReadingProgressIfNeeded()
+                    applyPendingHydratedMetadataIfNeeded()
                 },
                 nativeHighlightingMenuEnabled: nativeHighlightingMenuEnabled,
                 openTimer: $openTimer,
@@ -671,7 +686,8 @@ struct ArticleView: View {
             progress,
             for: article,
             in: modelContext,
-            appState: appState
+            appState: appState,
+            publishLiveProgress: hasPublishedLiveReadingProgressForCurrentOpen
         ) else {
             return
         }
@@ -786,6 +802,7 @@ struct ArticleView: View {
         let hasReusableWebSurface = !forceRefresh && WebViewPool.shared.hasReusableWebView(for: tabId)
         loadedArticleKey = nil
         isWebContentReady = false
+        hasPublishedLiveReadingProgressForCurrentOpen = false
         isLoadingSkeletonVisible = false
         suppressLoadingSkeletonForCurrentOpen = hasReusableWebSurface
         openTimer.begin(title: article.title, preloaded: resolvedPreloadedHTML != nil)
@@ -805,6 +822,7 @@ struct ArticleView: View {
             isLoading = true
         }
         errorMessage = nil
+        pendingHydratedMetadata = nil
         if !appState.currentArticleMetadata.isEmpty {
             appState.currentArticleMetadata = []
         }
@@ -828,22 +846,23 @@ struct ArticleView: View {
             isLoading = false
             cacheArticleHTMLSizeAware(content.html, title: article.title)
             appState.currentArticleMetadata = content.metadata
-            let activeArticleTitle = article.title
-            let activeArticleID = article.id
-            let appStateRef = appState
             articleLoader.scheduleMetadataHydration(
                 for: article,
                 html: content.html,
                 wordCount: content.wordCount
             ) { enriched in
-                guard appStateRef.currentArticle?.title == activeArticleTitle else { return }
-                appStateRef.currentArticleMetadata = enriched.items
-                appStateRef.updateArticleMetadata(
-                    id: activeArticleID,
-                    description: nil,
-                    extract: nil,
+                guard appState.currentArticle?.title == article.title else { return }
+                let hydrated = PendingHydratedMetadata(
+                    articleID: article.id,
+                    articleTitle: article.title,
+                    items: enriched.items,
                     wordCount: enriched.wordCount
                 )
+                if isWebContentReady {
+                    applyHydratedMetadata(hydrated)
+                } else {
+                    pendingHydratedMetadata = hydrated
+                }
             }
         } catch {
             if error is CancellationError {
@@ -861,6 +880,35 @@ struct ArticleView: View {
             isWebContentReady = true
             isLoadingSkeletonVisible = false
         }
+    }
+
+    private func applyPendingHydratedMetadataIfNeeded() {
+        guard let pending = pendingHydratedMetadata,
+              pending.articleID == article.id,
+              pending.articleTitle == article.title else {
+            return
+        }
+
+        pendingHydratedMetadata = nil
+        applyHydratedMetadata(pending)
+    }
+
+    private func applyHydratedMetadata(_ hydrated: PendingHydratedMetadata) {
+        guard appState.currentArticle?.title == hydrated.articleTitle else { return }
+
+        appState.currentArticleMetadata = hydrated.items
+        appState.updateArticleMetadata(
+            id: hydrated.articleID,
+            description: nil,
+            extract: nil,
+            wordCount: hydrated.wordCount
+        )
+    }
+
+    private func publishLiveReadingProgressIfNeeded() {
+        guard !hasPublishedLiveReadingProgressForCurrentOpen else { return }
+        hasPublishedLiveReadingProgressForCurrentOpen = true
+        progressCoordinator.publishLatestProgress(for: article, appState: appState)
     }
 
     private func scheduleLoadingSkeletonAppearance(preloaded: Bool, suppressed: Bool) {

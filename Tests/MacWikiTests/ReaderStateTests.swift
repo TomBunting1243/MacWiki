@@ -72,6 +72,31 @@ struct ReaderStateTests {
         #expect(approximatelyEqual(state?.readingProgress, 0.24))
     }
 
+    @Test func progressCoordinatorCanDeferLivePublicationUntilReveal() throws {
+        let appState = AppState()
+        let modelContext = try makeInMemoryModelContext()
+        let article = Article(id: "Grace", title: "Grace Hopper")
+        var coordinator = ReaderProgressCoordinator()
+
+        coordinator.bootstrapFromPersisted(0.18, articleTitle: article.title, appState: appState, now: 10)
+
+        let telemetryAccepted = coordinator.consumeTelemetry(
+            0.41,
+            for: article,
+            in: modelContext,
+            appState: appState,
+            publishLiveProgress: false,
+            now: 11
+        )
+
+        #expect(approximatelyEqual(telemetryAccepted, 0.41))
+        #expect(approximatelyEqual(coordinator.latestReadingProgress, 0.41))
+        #expect(approximatelyEqual(appState.liveReadingProgress(forTitle: article.title), 0.18))
+
+        coordinator.publishLatestProgress(for: article, appState: appState)
+        #expect(approximatelyEqual(appState.liveReadingProgress(forTitle: article.title), 0.41))
+    }
+
     @Test func progressCoordinatorForcePersistSupportsTransitionFlush() throws {
         let modelContext = try makeInMemoryModelContext()
         let article = Article(id: "Ada", title: "Ada Lovelace")

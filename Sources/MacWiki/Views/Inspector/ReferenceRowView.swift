@@ -18,25 +18,37 @@ struct ReferenceRowView: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
-            Button(action: onToggleSelection) {
-                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(isSelected ? Color.accentColor : .secondary)
-            }
+            Button(
+                isSelected ? "Deselect Reference" : "Select Reference",
+                systemImage: isSelected ? "checkmark.circle.fill" : "circle",
+                action: onToggleSelection
+            )
+            .labelStyle(.iconOnly)
+            .font(.system(size: 14, weight: .semibold))
+            .foregroundStyle(isSelected ? Color.accentColor : .secondary)
             .buttonStyle(.plain)
             .padding(.top, 2)
 
             VStack(alignment: .leading, spacing: 8) {
-                labelRow
+                Button(action: onFocus) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        labelRow
 
-                Text(item.text)
-                    .font(.callout)
-                    .foregroundStyle(.primary)
-                    .lineLimit(4)
-                    .lineSpacing(2)
+                        Text(item.text)
+                            .font(.callout)
+                            .foregroundStyle(.primary)
+                            .lineLimit(4)
+                            .lineSpacing(2)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityHint("Focus this reference")
 
                 actionRow
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 12)
@@ -57,10 +69,6 @@ struct ReferenceRowView: View {
                 .stroke(Color.accentColor.opacity(0.5), lineWidth: 1.6)
                 .opacity(focusPulse ? 1 : 0)
                 .scaleEffect(focusPulse ? 1.02 : 0.98)
-        }
-        .contentShape(Rectangle())
-        .onTapGesture {
-            onFocus()
         }
         .onHover { hovering in
             withAnimation(.easeOut(duration: 0.12)) {
@@ -137,35 +145,31 @@ struct ReferenceRowView: View {
 
     private var actionRow: some View {
         HStack(spacing: 8) {
-            Button {
-                onOpen()
-            } label: {
-                Image(systemName: "arrow.up.right.square")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(hasLink ? .secondary : .tertiary)
-                    .frame(width: 22, height: 22)
-                    .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .strokeBorder(Color.white.opacity(0.12), lineWidth: 0.8)
-                    }
+            Button("Open Source", systemImage: "arrow.up.right.square", action: onOpen)
+            .labelStyle(.iconOnly)
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundStyle(hasLink ? .secondary : .tertiary)
+            .frame(width: 22, height: 22)
+            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .strokeBorder(Color.white.opacity(0.12), lineWidth: 0.8)
             }
             .buttonStyle(.plain)
             .disabled(!hasLink)
             .help(hasLink ? "Open source" : "No link available")
 
-            Button {
+            Button("Copy Reference", systemImage: "doc.on.doc") {
                 onCopy(.plainText)
-            } label: {
-                Image(systemName: "doc.on.doc")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 22, height: 22)
-                    .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .strokeBorder(Color.white.opacity(0.12), lineWidth: 0.8)
-                    }
+            }
+            .labelStyle(.iconOnly)
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundStyle(.secondary)
+            .frame(width: 22, height: 22)
+            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .strokeBorder(Color.white.opacity(0.12), lineWidth: 0.8)
             }
             .buttonStyle(.plain)
 

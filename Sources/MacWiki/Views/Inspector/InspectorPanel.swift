@@ -45,7 +45,6 @@ struct InspectorPanel: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.openURL) private var openURL
     @Environment(\.colorScheme) private var colorScheme
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage("tabBarLiquidGlass") private var tabBarLiquidGlass = true
     @AppStorage("inspectorTOCPresentation") private var tocPresentation: InspectorTableOfContentsPresentation = .standard
     @AppStorage("inspectorInfoSplitRatio") private var infoSplitRatioSetting: Double = 0
@@ -290,11 +289,11 @@ struct InspectorPanel: View {
         let highlightFingerprint = currentArticleHighlights.reduce(into: Hasher()) { hasher, highlight in
             hasher.combine(highlight.id)
             hasher.combine(highlight.updatedAt.timeIntervalSinceReferenceDate.bitPattern)
-            hasher.combine(highlight.tags.count)
+            hasher.combine(stableTagFingerprint(for: highlight.tags))
             hasher.combine(highlight.isArchivedRaw ?? false)
         }.finalize()
-        let tagCount = currentArticleState?.tags.count ?? 0
-        return "\(title)|\(highlightFingerprint)|\(tagCount)"
+        let stateTagFingerprint = stableTagFingerprint(for: currentArticleState?.tags ?? [])
+        return "\(title)|\(highlightFingerprint)|\(stateTagFingerprint)"
     }
 
     /// Height for the top spacer that pushes the tab bar below the toolbar area.
@@ -304,10 +303,6 @@ struct InspectorPanel: View {
 
     private var inspectorTopSpacerHeight: CGFloat {
         max(0, inspectorTopBarHeight - ColumnChromeMetrics.topBarHeight)
-    }
-
-    private var thumbnailTransaction: Transaction {
-        reduceMotion ? Transaction(animation: nil) : Transaction(animation: .easeOut(duration: 0.18))
     }
 
     private var sectionFillOpacity: Double {
@@ -436,51 +431,55 @@ struct InspectorPanel: View {
     }
     
     private var infoContent: some View {
-        VStack(spacing: 0) {
-            if let article = appState.currentArticle {
-                VStack(alignment: .leading, spacing: InspectorLayout.sectionSpacing) {
-                    articleSummaryHeader(article)
+        GeometryReader { proxy in
+            Group {
+                if let article = appState.currentArticle {
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: InspectorLayout.sectionSpacing) {
+                            articleSummaryHeader(article)
 
-                    InspectorLabelSection(
-                        article: article,
-                        allLabels: allLabels
+                            InspectorLabelSection(
+                                article: article,
+                                allLabels: allLabels
+                            )
+
+                            InspectorTagStatusBox(article: article, tags: cachedCurrentArticleTags, allTags: allTags)
+
+                            if !appState.currentArticleMetadata.isEmpty {
+                                metadataSection
+                            }
+
+                            if tocPresentation == .standard, !appState.currentArticleTableOfContents.isEmpty {
+                                tableOfContentsSection
+                                    .transition(standardTOCTransition)
+                            }
+                        }
+                        .padding(.horizontal, 14)
+                        .padding(.top, 12)
+                        .padding(.bottom, 18)
+                        .frame(
+                            maxWidth: .infinity,
+                            minHeight: proxy.size.height,
+                            alignment: .topLeading
+                        )
+                        .animation(.easeInOut(duration: 0.25), value: appState.currentArticleMetadata.isEmpty)
+                    }
+                    .scrollIndicators(.hidden)
+                } else {
+                    ColumnEmptyStateView(
+                        title: "No Article",
+                        systemImage: "doc.text",
+                        description: "Select an article to view info",
+                        style: .quiet
                     )
-
-                    InspectorTagStatusBox(article: article, tags: cachedCurrentArticleTags, allTags: allTags)
-
-                    if !appState.currentArticleMetadata.isEmpty {
-                        metadataSection
-                    }
-
-                    if tocPresentation == .standard, !appState.currentArticleTableOfContents.isEmpty {
-                        tableOfContentsSection
-                            .transition(standardTOCTransition)
-                    }
                 }
-                .padding(.horizontal, 14)
-                .padding(.top, 12)
-                .padding(.bottom, 18)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                .animation(.easeInOut(duration: 0.25), value: appState.currentArticleMetadata.isEmpty)
-            } else {
-                ColumnEmptyStateView(
-                    title: "No Article",
-                    systemImage: "doc.text",
-                    description: "Select an article to view info",
-                    style: .quiet
-                )
             }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background {
-            GeometryReader { proxy in
-                Color.clear
-                    .onAppear {
-                        updateInfoViewportHeight(proxy.size.height)
-                    }
-                    .onChange(of: proxy.size.height) { _, newHeight in
-                        updateInfoViewportHeight(newHeight)
-                    }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .onAppear {
+                updateInfoViewportHeight(proxy.size.height)
+            }
+            .onChange(of: proxy.size.height) { _, newHeight in
+                updateInfoViewportHeight(newHeight)
             }
         }
         .task(id: appState.currentArticle?.title) {
@@ -667,41 +666,36 @@ struct InspectorPanel: View {
     private func articleSummaryHeader(_ article: Article) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             if let thumbnailURL = article.thumbnailURL {
-                AsyncImage(
+                CachedThumbnailImage(
                     url: thumbnailURL,
-                    transaction: thumbnailTransaction
-                ) { phase in
+                    targetSize: CGSize(width: 220, height: 118)
+                ) { image in
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 10)
+                            .fill(.quaternary.opacity(colorScheme == .dark ? 0.18 : 0.28))
+                    }
+                    .overlay {
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .padding(8)
+                    }
+                } placeholder: {
+                    AppLoadingThumbnailPlaceholder(
+                        width: 220,
+                        height: 118,
+                        cornerRadius: 10,
+                        tone: .accent
+                    )
+                } failure: {
                     ZStack {
                         RoundedRectangle(cornerRadius: 10)
                             .fill(.quaternary.opacity(colorScheme == .dark ? 0.18 : 0.28))
 
-                        switch phase {
-                        case .success(let image):
-                            image
-                                .resizable()
-                                .aspectRatio(contentMode: .fit)
-                                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                                .padding(8)
-                                .transition(.opacity)
-                        case .failure:
-                            Image(systemName: "photo")
-                                .font(.system(size: 17, weight: .semibold))
-                                .foregroundStyle(.secondary)
-                        case .empty:
-                            AppLoadingThumbnailPlaceholder(
-                                width: 220,
-                                height: 118,
-                                cornerRadius: 10,
-                                tone: .accent
-                            )
-                        @unknown default:
-                            AppLoadingThumbnailPlaceholder(
-                                width: 220,
-                                height: 118,
-                                cornerRadius: 10,
-                                tone: .accent
-                            )
-                        }
+                        Image(systemName: "photo")
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundStyle(.secondary)
                     }
                 }
                 .frame(height: 118)

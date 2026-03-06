@@ -246,6 +246,17 @@ struct InspectorTagStatusBox: View {
         return !allTags.contains { $0.name.lowercased() == normalized }
     }
 
+    private var editingTagSheetBinding: Binding<Bool> {
+        Binding(
+            get: { editingTag != nil },
+            set: { isPresented in
+                if !isPresented {
+                    editingTag = nil
+                }
+            }
+        )
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             // Header
@@ -256,7 +267,7 @@ struct InspectorTagStatusBox: View {
 
                 Spacer()
 
-                Button {
+                Button(isExpanded ? "Collapse Tags" : "Add Tags", systemImage: "chevron.down") {
                     withAnimation(.easeInOut(duration: 0.25)) {
                         isExpanded.toggle()
                         tagMarkedForRemoval = nil
@@ -264,14 +275,12 @@ struct InspectorTagStatusBox: View {
                             isFieldFocused = true
                         }
                     }
-                } label: {
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(.secondary)
-                        .frame(width: 20, height: 20)
-                        .rotationEffect(.degrees(isExpanded ? -180 : 0))
-                        .contentShape(Rectangle())
                 }
+                .labelStyle(.iconOnly)
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .frame(width: 20, height: 20)
+                .rotationEffect(.degrees(isExpanded ? -180 : 0))
                 .buttonStyle(.plain)
                 .help(isExpanded ? "Collapse" : "Add Tags")
             }
@@ -358,10 +367,7 @@ struct InspectorTagStatusBox: View {
         }
         .sheet(item: $editingTag) { tag in
             TagDetailSheet(
-                isPresented: Binding(
-                    get: { true },
-                    set: { _ in editingTag = nil }
-                ),
+                isPresented: editingTagSheetBinding,
                 tagToEdit: tag
             )
         }
@@ -386,15 +392,14 @@ struct InspectorTagStatusBox: View {
                     }
 
                 if !newTagName.isEmpty {
-                    Button {
+                    Button("Clear Tag Search", systemImage: "xmark.circle.fill") {
                         withAnimation(.easeOut(duration: 0.15)) {
                             newTagName = ""
                         }
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 11))
-                            .foregroundStyle(.tertiary)
                     }
+                    .labelStyle(.iconOnly)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.tertiary)
                     .buttonStyle(.plain)
                     .transition(.opacity.combined(with: .scale(scale: 0.8)))
                 }

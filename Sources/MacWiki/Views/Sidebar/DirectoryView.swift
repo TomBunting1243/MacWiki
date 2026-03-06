@@ -2,64 +2,46 @@ import SwiftUI
 import SwiftData
 import Charts
 
-private enum DirectoryReadFilter {
+enum DirectoryReadFilter {
     case all
     case unread
 }
 
-private enum DirectorySupplementalSortMode: String, CaseIterable {
+enum DirectorySupplementalSortMode: String, CaseIterable {
     case recent = "Recent"
     case title = "Title"
     case articleLength = "Length"
 }
 
 @MainActor
-private struct DirectoryArticleIndexes {
+struct DirectoryArticleIndexes {
     static let empty = DirectoryArticleIndexes(articleStates: [], highlights: [], savedArticles: [])
 
-    private let articleStateByURL: [String: ArticleState]
-    private let articleStateByTitle: [String: ArticleState]
+    private let lookupIndex: ArticleLookupIndex
     private let highlightsByTitle: [String: [Highlight]]
-    private let savedByTitle: [String: SavedArticle]
 
     init(
         articleStates: [ArticleState],
         highlights: [Highlight],
         savedArticles: [SavedArticle] = []
     ) {
-        articleStateByURL = articleStates.reduce(into: [:]) { result, state in
-            result[state.articleURLString] = state
-        }
-
-        articleStateByTitle = articleStates.reduce(into: [:]) { result, state in
-            result[ReadStateSync.normalizedTitle(state.articleTitle)] = state
-        }
+        lookupIndex = ArticleLookupIndex(
+            articleStates: articleStates,
+            savedArticles: savedArticles
+        )
 
         highlightsByTitle = highlights.reduce(into: [:]) { result, highlight in
             let key = ReadStateSync.normalizedTitle(highlight.articleTitle)
             result[key, default: []].append(highlight)
         }
-
-        var savedLookup: [String: SavedArticle] = [:]
-        for article in savedArticles {
-            let key = ReadStateSync.normalizedTitle(article.title)
-            if savedLookup[key] == nil {
-                savedLookup[key] = article
-            }
-        }
-        savedByTitle = savedLookup
     }
 
     func articleState(for title: String) -> ArticleState? {
-        let urlString = ReadStateSync.urlString(for: title)
-        if let state = articleStateByURL[urlString] {
-            return state
-        }
-        return articleStateByTitle[ReadStateSync.normalizedTitle(title)]
+        lookupIndex.articleState(for: title)
     }
 
     func savedArticle(for title: String) -> SavedArticle? {
-        savedByTitle[ReadStateSync.normalizedTitle(title)]
+        lookupIndex.savedArticle(for: title)
     }
 
     func cachedHighlights(for title: String) -> [Highlight] {
@@ -67,7 +49,7 @@ private struct DirectoryArticleIndexes {
     }
 
     func effectiveReadState(for title: String, fallback: Bool) -> Bool {
-        articleState(for: title)?.isRead ?? fallback
+        lookupIndex.effectiveReadState(for: title, fallback: fallback)
     }
 
     func tagsForArticle(title: String) -> [Tag] {
@@ -103,11 +85,7 @@ private struct DirectoryArticleIndexes {
     }
 
     static func currentArticleTitleNormalized(in appState: AppState) -> String? {
-        guard let activeId = appState.activeTabId,
-              let tab = appState.openTabs.first(where: { $0.id == activeId }) else {
-            return nil
-        }
-        return ReadStateSync.normalizedTitle(tab.article.title)
+        ArticleLookupIndex.currentArticleTitleNormalized(in: appState)
     }
 }
 
@@ -118,31 +96,39 @@ private func directoryArticleIndexesFingerprint(
     savedArticles: [SavedArticle]
 ) -> Int {
     var hasher = Hasher()
-    hasher.combine(articleStates.count)
+    hasher.combine(articleLookupIndexFingerprint(
+        articleStates: articleStates,
+        savedArticles: savedArticles
+    ))
     hasher.combine(highlights.count)
-    hasher.combine(savedArticles.count)
-
-    for state in articleStates {
-        hasher.combine(state.id)
-        hasher.combine(state.updatedAt.timeIntervalSinceReferenceDate.bitPattern)
-        hasher.combine(state.tags.count)
-        hasher.combine(state.labelId)
-    }
 
     for highlight in highlights {
         hasher.combine(highlight.id)
         hasher.combine(highlight.updatedAt.timeIntervalSinceReferenceDate.bitPattern)
-        hasher.combine(highlight.tags.count)
+        hasher.combine(stableTagFingerprint(for: highlight.tags))
         hasher.combine(highlight.isArchivedRaw ?? false)
     }
 
-    for article in savedArticles {
-        hasher.combine(article.id)
-        hasher.combine(article.savedAt.timeIntervalSinceReferenceDate.bitPattern)
-        hasher.combine(article.labelId)
-    }
-
     return hasher.finalize()
+}
+
+@MainActor
+private struct DirectoryVisibleSnapshot {
+    static let empty = DirectoryVisibleSnapshot(
+        visibleTitles: [],
+        listArticles: [],
+        tabHistoryItems: [],
+        recentArticles: [],
+        visibleReadCount: 0,
+        visibleUnreadCount: 0
+    )
+
+    let visibleTitles: [String]
+    let listArticles: [SavedArticle]
+    let tabHistoryItems: [HistoryItem]
+    let recentArticles: [Article]
+    let visibleReadCount: Int
+    let visibleUnreadCount: Int
 }
 
 struct DirectoryView: View {
@@ -172,6 +158,7 @@ struct DirectoryView: View {
     @State private var localTagFilter: Tag? = nil
     @State private var discoverFeedStore = DiscoverFeedStore()
     @State private var discoverTrendPulseStore = DiscoverTrendPulseStore()
+    @State private var metadataHydrator = ArticleMetadataHydrator()
     @State private var selectedDiscoverDate = Date()
     @State private var supplementalReadFilter: DirectoryReadFilter = .all
     @State private var supplementalSortMode: DirectorySupplementalSortMode = .recent
@@ -181,6 +168,8 @@ struct DirectoryView: View {
     @State private var selectionAnchorSavedArticleID: UUID?
     @State private var showDeleteSelectedConfirmation = false
     @State private var articleIndexesSnapshot = DirectoryArticleIndexes.empty
+    @State private var visibleSnapshot = DirectoryVisibleSnapshot.empty
+    @State private var saveScheduler = DebouncedActionScheduler()
     @State private var pendingPageViewsRowKey: String?
     @State private var activePageViewsPopover: SidebarPageViewsPopoverPayload?
     @State private var discoverDateLoadTask: Task<Void, Never>?
@@ -200,12 +189,119 @@ struct DirectoryView: View {
         articleIndexesSnapshot
     }
 
+    private var directoryVisibleSnapshot: DirectoryVisibleSnapshot {
+        visibleSnapshot
+    }
+
     private var articleIndexesFingerprint: Int {
         directoryArticleIndexesFingerprint(
             articleStates: articleStates,
             highlights: highlights,
             savedArticles: savedArticles
         )
+    }
+
+    private var visibleSnapshotCandidateTitles: [String] {
+        if rootSelection == .discover || (rootSelection == .wikiHop && isWikiHopAvailable) {
+            return []
+        }
+
+        if let list = selectedList {
+            return list.articles.map(\.title)
+        }
+
+        if let label = selectedLabel {
+            return savedArticles
+                .filter { $0.labelId == label.id }
+                .map(\.title)
+        }
+
+        if let tag = selectedTag {
+            return taggedArticleTitles(for: tag)
+        }
+
+        if recentsScope == .currentTab,
+           let activeId = appState.activeTabId,
+           let tab = appState.openTabs.first(where: { $0.id == activeId }) {
+            return deduplicatedHistory(tab.history).map(\.article.title)
+        }
+
+        return appState.recentArticles.map(\.title)
+    }
+
+    private var shouldTrackHydratedWordCountsInVisibleSnapshot: Bool {
+        if let list = selectedList {
+            return list.sortMode == .articleLength
+        }
+        return supplementalSortMode == .articleLength
+    }
+
+    private var visibleSnapshotFingerprint: Int {
+        var hasher = Hasher()
+        hasher.combine(articleIndexesFingerprint)
+        hasher.combine(rootSelection.rawValue)
+        hasher.combine(recentsScope.rawValue)
+        hasher.combine(selectedList?.id)
+        hasher.combine(selectedLabel?.id)
+        hasher.combine(selectedTag?.id)
+        hasher.combine(localLabelFilter?.id)
+        hasher.combine(localTagFilter?.id)
+        hasher.combine(supplementalReadFilter == .unread)
+        hasher.combine(supplementalSortMode.rawValue)
+
+        if let list = selectedList {
+            hasher.combine(list.filterMode.rawValue)
+            hasher.combine(list.sortMode.rawValue)
+            hasher.combine(list.articles.count)
+            for article in list.articles {
+                hasher.combine(article.id)
+                hasher.combine(article.manualOrder)
+            }
+        } else if let label = selectedLabel {
+            hasher.combine(label.id)
+            let labeledIDs = savedArticles
+                .filter { $0.labelId == label.id }
+                .map(\.id)
+                .sorted { $0.uuidString < $1.uuidString }
+            hasher.combine(labeledIDs.count)
+            for id in labeledIDs {
+                hasher.combine(id)
+            }
+        } else if let tag = selectedTag {
+            let tagTitles = taggedArticleTitles(for: tag)
+            hasher.combine(tag.id)
+            hasher.combine(tagTitles.count)
+            for title in tagTitles {
+                hasher.combine(ReadStateSync.normalizedTitle(title))
+            }
+        } else if recentsScope == .currentTab,
+                  let activeId = appState.activeTabId,
+                  let tab = appState.openTabs.first(where: { $0.id == activeId }) {
+            hasher.combine(activeId)
+            hasher.combine(tab.currentIndex)
+            hasher.combine(tab.history.count)
+            for item in tab.history {
+                hasher.combine(item.id)
+                hasher.combine(item.article.title)
+                hasher.combine(item.article.isRead)
+            }
+        } else {
+            hasher.combine(appState.recentArticles.count)
+            for article in appState.recentArticles {
+                hasher.combine(article.id)
+                hasher.combine(article.title)
+                hasher.combine(article.isRead)
+            }
+        }
+
+        if shouldTrackHydratedWordCountsInVisibleSnapshot {
+            for title in visibleSnapshotCandidateTitles {
+                hasher.combine(ReadStateSync.normalizedTitle(title))
+                hasher.combine(metadataHydrator.snapshot(for: title)?.wordCount)
+            }
+        }
+
+        return hasher.finalize()
     }
 
     private func articleState(for title: String) -> ArticleState? {
@@ -318,12 +414,80 @@ struct DirectoryView: View {
         return discoverMostReadItems(from: feed)
     }
 
-    private var discoverTrendingPulseLoadKey: String {
-        guard rootSelection == .discover, let feed = discoverFeedStore.feed else {
-            return "inactive"
+    private func titleFingerprint<S: Sequence>(
+        _ titles: S,
+        seeds: [AnyHashable] = []
+    ) -> Int where S.Element == String {
+        var hasher = Hasher()
+        for seed in seeds {
+            hasher.combine(seed)
         }
-        let titleKey = discoverMostReadItems(from: feed).map(\.title).joined(separator: "|")
-        return "\(feed.dateKey)|\(titleKey)"
+        for title in titles {
+            hasher.combine(ReadStateSync.normalizedTitle(title))
+        }
+        return hasher.finalize()
+    }
+
+    private var discoverTrendingPulseLoadKey: Int {
+        guard rootSelection == .discover, let feed = discoverFeedStore.feed else {
+            return titleFingerprint([], seeds: [AnyHashable("inactive-discover-pulse")])
+        }
+        return titleFingerprint(
+            discoverMostReadItems(from: feed).map(\.title),
+            seeds: [AnyHashable(feed.dateKey), AnyHashable("discover-pulse")]
+        )
+    }
+
+    private var metadataHydrationRequests: [ArticleMetadataHydrationRequest] {
+        guard !isSidebarSearchPresented else { return [] }
+
+        if rootSelection == .discover {
+            return discoverTrendingItems.map { result in
+                metadataHydrationRequest(for: discoverArticle(from: result))
+            }
+        }
+
+        if selectedList != nil {
+            return orderedVisibleSavedArticles.map { metadataHydrationRequest(for: $0) }
+        }
+
+        if let label = selectedLabel {
+            return filteredLabelArticles(for: label).map { metadataHydrationRequest(for: $0) }
+        }
+
+        if let tag = selectedTag {
+            return filteredTaggedArticles(for: tag).map { metadataHydrationRequest(for: $0) }
+        }
+
+        if recentsScope == .currentTab,
+           let activeId = appState.activeTabId,
+           appState.openTabs.contains(where: { $0.id == activeId }) {
+            return directoryVisibleSnapshot.tabHistoryItems.map { metadataHydrationRequest(for: $0.article) }
+        }
+
+        return directoryVisibleSnapshot.recentArticles.map { metadataHydrationRequest(for: $0) }
+    }
+
+    private var metadataHydrationFingerprint: Int {
+        var hasher = Hasher()
+        hasher.combine(rootSelection.rawValue)
+        hasher.combine(selectedList?.id)
+        hasher.combine(selectedLabel?.id)
+        hasher.combine(selectedTag?.id)
+        hasher.combine(recentsScope.rawValue)
+        hasher.combine(metadataHydrationRequests.count)
+
+        for request in metadataHydrationRequests {
+            hasher.combine(ReadStateSync.normalizedTitle(request.title))
+            hasher.combine(request.articleID)
+            hasher.combine(request.savedArticle?.id)
+            hasher.combine(request.description == nil)
+            hasher.combine(request.extract == nil)
+            hasher.combine(request.thumbnailURL == nil)
+            hasher.combine(request.wordCount == nil)
+        }
+
+        return hasher.finalize()
     }
 
     private func discoverMostReadItems(
@@ -395,6 +559,73 @@ struct DirectoryView: View {
         )
     }
 
+    private func refreshVisibleSnapshot() {
+        let listArticles: [SavedArticle]
+        let tabHistoryItems: [HistoryItem]
+        let recentArticles: [Article]
+        let visibleTitles: [String]
+
+        if let list = selectedList {
+            listArticles = sortedArticles(for: list)
+            tabHistoryItems = []
+            recentArticles = []
+            visibleTitles = listArticles.map(\.title)
+        } else if let label = selectedLabel {
+            listArticles = []
+            tabHistoryItems = []
+            recentArticles = []
+            visibleTitles = filteredLabelArticles(for: label).map(\.title)
+        } else if let tag = selectedTag {
+            listArticles = []
+            tabHistoryItems = []
+            recentArticles = []
+            visibleTitles = filteredTaggedArticles(for: tag).map(\.title)
+        } else if recentsScope == .currentTab,
+                  let activeId = appState.activeTabId,
+                  let tab = appState.openTabs.first(where: { $0.id == activeId }) {
+            listArticles = []
+            tabHistoryItems = filteredTabHistoryItems(for: tab)
+            recentArticles = []
+            visibleTitles = tabHistoryItems.map(\.article.title)
+        } else {
+            listArticles = []
+            tabHistoryItems = []
+            recentArticles = filteredRecentArticles()
+            visibleTitles = recentArticles.map(\.title)
+        }
+
+        let counts = visibleTitles.reduce(into: (read: 0, unread: 0)) { result, title in
+            if effectiveReadState(for: title, fallback: false) {
+                result.read += 1
+            } else {
+                result.unread += 1
+            }
+        }
+
+        visibleSnapshot = DirectoryVisibleSnapshot(
+            visibleTitles: visibleTitles,
+            listArticles: listArticles,
+            tabHistoryItems: tabHistoryItems,
+            recentArticles: recentArticles,
+            visibleReadCount: counts.read,
+            visibleUnreadCount: counts.unread
+        )
+    }
+
+    private func requestModelContextSave() {
+        saveScheduler.schedule { [modelContext] in
+            guard modelContext.hasChanges else { return }
+            try? modelContext.save()
+        }
+    }
+
+    private func flushScheduledModelContextSave() {
+        saveScheduler.flush { [modelContext] in
+            guard modelContext.hasChanges else { return }
+            try? modelContext.save()
+        }
+    }
+
     private func presentPageViewsPopover(
         for title: String,
         rowKey: String,
@@ -443,6 +674,7 @@ struct DirectoryView: View {
         .onAppear {
             chromeAlignedSidebarVisible = appState.sidebarVisible
             refreshArticleIndexesSnapshot()
+            refreshVisibleSnapshot()
             updateSidebarTimeTravelSkeletonVisibility()
         }
         .onChange(of: shouldQueueSidebarTimeTravelSkeleton) { _, _ in
@@ -450,6 +682,9 @@ struct DirectoryView: View {
         }
         .onChange(of: articleIndexesFingerprint) { _, _ in
             refreshArticleIndexesSnapshot()
+        }
+        .onChange(of: visibleSnapshotFingerprint) { _, _ in
+            refreshVisibleSnapshot()
         }
         .onChange(of: selectionResetKey) {
             localLabelFilter = nil
@@ -488,6 +723,8 @@ struct DirectoryView: View {
             sidebarTimeTravelSkeletonDelayTask?.cancel()
             sidebarTimeTravelSkeletonDelayTask = nil
             shouldShowDelayedSidebarTimeTravelSkeleton = false
+            flushScheduledModelContextSave()
+            metadataHydrator.cancel()
         }
         .confirmationDialog(
             "Delete selected articles?",
@@ -552,10 +789,6 @@ struct DirectoryView: View {
             SidebarPaneBackground()
         }
         .ignoresSafeArea(.container, edges: .top)
-        .task(id: selectedList?.id) {
-            guard let list = selectedList else { return }
-            await fetchMissingExtracts(for: list)
-        }
         .task(id: rootSelection) {
             if rootSelection == .discover {
                 discoverFeedStore.queueLoad(referenceDate: discoverReferenceDate, forceRefresh: false)
@@ -573,6 +806,13 @@ struct DirectoryView: View {
         }
         .task(id: pinnedArticleFingerprint) {
             await wikipediaService.replacePinnedArticleTitles(Array(pinnedArticleTitles))
+        }
+        .task(id: metadataHydrationFingerprint) {
+            metadataHydrator.queueLoad(
+                requests: metadataHydrationRequests,
+                appState: appState,
+                modelContext: modelContext
+            )
         }
     }
 
@@ -636,6 +876,7 @@ struct DirectoryView: View {
                 highlights: highlights,
                 readFilter: supplementalReadFilter,
                 sortMode: supplementalSortMode,
+                metadataHydrator: metadataHydrator,
                 onNewLabelWithArticle: onNewLabelWithArticle,
                 onNewTagWithArticle: onNewTagWithArticle
             )
@@ -650,6 +891,7 @@ struct DirectoryView: View {
                 allHighlights: highlights,
                 readFilter: supplementalReadFilter,
                 sortMode: supplementalSortMode,
+                metadataHydrator: metadataHydrator,
                 onNewLabelWithArticle: onNewLabelWithArticle,
                 onNewTagWithArticle: onNewTagWithArticle
             )
@@ -671,7 +913,7 @@ struct DirectoryView: View {
     @ViewBuilder
     private func selectedListSection(_ list: ReadingList) -> some View {
         Section {
-            if filteredArticles(for: list).isEmpty {
+            if orderedVisibleSavedArticles.isEmpty {
                 if list.articles.isEmpty {
                     Text("No articles")
                         .foregroundStyle(.secondary)
@@ -682,12 +924,13 @@ struct DirectoryView: View {
                         .font(.subheadline)
                 }
             } else {
-                ForEach(sortedArticles(for: list)) { savedArticle in
+                ForEach(orderedVisibleSavedArticles) { savedArticle in
                     let isRead = effectiveReadState(for: savedArticle.title, fallback: savedArticle.isRead)
                     let progress = readingProgress(for: savedArticle.title)
                     let tags = tagsForSavedArticle(savedArticle)
                     SavedArticleRow(
                         savedArticle: savedArticle,
+                        hydratedMetadata: hydratedMetadata(for: savedArticle.title),
                         isRead: isRead,
                         readProgress: progress,
                         isCurrent: isCurrentArticle(savedArticle.title),
@@ -719,39 +962,6 @@ struct DirectoryView: View {
                     )
                 }
             }
-        }
-    }
-
-    /// Fetch extracts for articles that don't have them
-    private func fetchMissingExtracts(for list: ReadingList) async {
-        let service = WikipediaService.shared
-        // Get titles that need fetching first to avoid iteration issues
-        let articlesToFetch = list.articles.filter { $0.extract == nil }.map { $0.title }
-        var didMutate = false
-
-        for title in articlesToFetch {
-            do {
-                let summary = try await service.fetchSummary(title)
-                guard !Task.isCancelled else { return }
-
-                // Find the article again in case the list changed
-                if let article = list.articles.first(where: { $0.title == title }) {
-                    article.extract = summary.extract
-                    if article.articleDescription == nil {
-                        article.articleDescription = summary.description
-                    }
-                    if article.thumbnailURLString == nil {
-                        article.thumbnailURLString = summary.thumbnailURL?.absoluteString
-                    }
-                    didMutate = true
-                }
-            } catch {
-                // Silently fail for individual articles
-            }
-        }
-
-        if didMutate {
-            try? modelContext.save()
         }
     }
 
@@ -898,7 +1108,8 @@ struct DirectoryView: View {
                         }
                     }
                 } label: {
-                    Image(systemName: "arrow.up.arrow.down")
+                    SwiftUI.Label("Sort Articles", systemImage: "arrow.up.arrow.down")
+                        .labelStyle(.iconOnly)
                         .font(.system(size: ChromeIconMetrics.symbolPointSize, weight: ChromeIconMetrics.regularWeight))
                         .imageScale(.medium)
                         .foregroundStyle(.secondary)
@@ -980,7 +1191,8 @@ struct DirectoryView: View {
                     }
                     .disabled(visibleReadCount == 0)
                 } label: {
-                    Image(systemName: "ellipsis.circle")
+                    SwiftUI.Label("Batch Actions", systemImage: "ellipsis.circle")
+                        .labelStyle(.iconOnly)
                         .font(.system(size: ChromeIconMetrics.symbolPointSize, weight: ChromeIconMetrics.regularWeight))
                         .imageScale(.medium)
                         .foregroundStyle(.secondary)
@@ -1004,7 +1216,7 @@ struct DirectoryView: View {
     private func toggleUnreadFilter() {
         if let list = selectedList {
             list.filterMode = (list.filterMode == .unread) ? .all : .unread
-            try? modelContext.save()
+            requestModelContextSave()
         } else {
             supplementalReadFilter = (supplementalReadFilter == .unread) ? .all : .unread
         }
@@ -1034,7 +1246,7 @@ struct DirectoryView: View {
             case .articleLength:
                 list.sortMode = .articleLength
             }
-            try? modelContext.save()
+            requestModelContextSave()
         } else {
             supplementalSortMode = mode
         }
@@ -1047,7 +1259,7 @@ struct DirectoryView: View {
         case .title:
             return articles.sorted { $0.title.localizedCompare($1.title) == .orderedAscending }
         case .articleLength:
-            return articles.sorted { $0.approximateLength > $1.approximateLength }
+            return articles.sorted { resolvedWordCount(for: $0) > resolvedWordCount(for: $1) }
         }
     }
 
@@ -1058,7 +1270,7 @@ struct DirectoryView: View {
         case .title:
             return articles.sorted { $0.title.localizedCompare($1.title) == .orderedAscending }
         case .articleLength:
-            return articles.sorted { ($0.wordCount ?? 0) > ($1.wordCount ?? 0) }
+            return articles.sorted { resolvedWordCount(for: $0) > resolvedWordCount(for: $1) }
         }
     }
 
@@ -1072,7 +1284,7 @@ struct DirectoryView: View {
         return sortedSupplementalSavedArticles(scoped)
     }
 
-    private func taggedArticles(for tag: Tag) -> [Article] {
+    private func taggedArticleTitles(for tag: Tag) -> [String] {
         var latestByTitle: [String: Date] = [:]
 
         for highlight in highlights where highlight.tags.contains(where: { $0.id == tag.id }) {
@@ -1089,11 +1301,13 @@ struct DirectoryView: View {
             }
         }
 
-        let orderedTitles = latestByTitle
+        return latestByTitle
             .sorted { $0.value > $1.value }
             .map(\.key)
+    }
 
-        return orderedTitles.map { title in
+    private func taggedArticles(for tag: Tag) -> [Article] {
+        taggedArticleTitles(for: tag).map { title in
             if let saved = savedArticle(for: title) {
                 return Article(
                     id: saved.title,
@@ -1141,7 +1355,7 @@ struct DirectoryView: View {
         case .title:
             return scoped.sorted { $0.article.title.localizedCompare($1.article.title) == .orderedAscending }
         case .articleLength:
-            return scoped.sorted { ($0.article.wordCount ?? 0) > ($1.article.wordCount ?? 0) }
+            return scoped.sorted { resolvedWordCount(for: $0.article) > resolvedWordCount(for: $1.article) }
         }
     }
 
@@ -1160,25 +1374,7 @@ struct DirectoryView: View {
     }
 
     private var directoryVisibleTitles: [String] {
-        if let list = selectedList {
-            return sortedArticles(for: list).map(\.title)
-        }
-
-        if let label = selectedLabel {
-            return filteredLabelArticles(for: label).map(\.title)
-        }
-
-        if let tag = selectedTag {
-            return filteredTaggedArticles(for: tag).map(\.title)
-        }
-
-        if recentsScope == .currentTab,
-           let activeId = appState.activeTabId,
-           let tab = appState.openTabs.first(where: { $0.id == activeId }) {
-            return filteredTabHistoryItems(for: tab).map(\.article.title)
-        }
-
-        return filteredRecentArticles().map(\.title)
+        directoryVisibleSnapshot.visibleTitles
     }
 
     private var directoryVisibleArticleCount: Int {
@@ -1198,8 +1394,7 @@ struct DirectoryView: View {
     }
 
     private var orderedVisibleSavedArticles: [SavedArticle] {
-        guard let list = selectedList else { return [] }
-        return sortedArticles(for: list)
+        directoryVisibleSnapshot.listArticles
     }
 
     private var orderedVisibleSavedArticleIDs: [UUID] {
@@ -1220,15 +1415,11 @@ struct DirectoryView: View {
     }
 
     private var visibleUnreadCount: Int {
-        directoryVisibleTitles.filter { title in
-            !effectiveReadState(for: title, fallback: false)
-        }.count
+        directoryVisibleSnapshot.visibleUnreadCount
     }
 
     private var visibleReadCount: Int {
-        directoryVisibleTitles.filter { title in
-            effectiveReadState(for: title, fallback: false)
-        }.count
+        directoryVisibleSnapshot.visibleReadCount
     }
 
     private func clearSavedArticleSelection() {
@@ -1339,8 +1530,44 @@ struct DirectoryView: View {
         case .manual:
             return filtered.sorted { $0.manualOrder < $1.manualOrder }
         case .articleLength:
-            return filtered.sorted { $0.approximateLength > $1.approximateLength }
+            return filtered.sorted { resolvedWordCount(for: $0) > resolvedWordCount(for: $1) }
         }
+    }
+
+    private func metadataHydrationRequest(for savedArticle: SavedArticle) -> ArticleMetadataHydrationRequest {
+        ArticleMetadataHydrationRequest(
+            title: savedArticle.title,
+            description: savedArticle.articleDescription,
+            extract: savedArticle.extract,
+            thumbnailURL: savedArticle.thumbnailURL,
+            wordCount: savedArticle.wordCount,
+            savedArticle: savedArticle
+        )
+    }
+
+    private func metadataHydrationRequest(for article: Article) -> ArticleMetadataHydrationRequest {
+        let saved = savedArticle(for: article.title)
+        return ArticleMetadataHydrationRequest(
+            title: article.title,
+            articleID: article.id,
+            description: saved?.articleDescription ?? article.description,
+            extract: saved?.extract ?? article.extract,
+            thumbnailURL: saved?.thumbnailURL ?? article.thumbnailURL,
+            wordCount: saved?.wordCount ?? article.wordCount,
+            savedArticle: saved
+        )
+    }
+
+    private func hydratedMetadata(for title: String) -> ArticleMetadataHydrationSnapshot? {
+        metadataHydrator.snapshot(for: title)
+    }
+
+    private func resolvedWordCount(for savedArticle: SavedArticle) -> Int {
+        hydratedMetadata(for: savedArticle.title)?.wordCount ?? savedArticle.wordCount ?? savedArticle.approximateLength
+    }
+
+    private func resolvedWordCount(for article: Article) -> Int {
+        hydratedMetadata(for: article.title)?.wordCount ?? article.wordCount ?? 0
     }
     
     private func toggleReadStatus(_ article: SavedArticle) {
@@ -1389,7 +1616,7 @@ struct DirectoryView: View {
             article.readingList?.updatedAt = Date()
         }
 
-        try? modelContext.save()
+        requestModelContextSave()
     }
 
     private func addTagToSelectedSavedArticles(_ tag: Tag) {
@@ -1403,7 +1630,7 @@ struct DirectoryView: View {
             state.updatedAt = Date()
         }
 
-        try? modelContext.save()
+        requestModelContextSave()
     }
 
     private func removeTagFromSelectedSavedArticles(_ tag: Tag) {
@@ -1415,7 +1642,7 @@ struct DirectoryView: View {
             state.updatedAt = Date()
         }
 
-        try? modelContext.save()
+        requestModelContextSave()
     }
 
     private func addSelectedSavedArticles(to targetList: ReadingList) {
@@ -1551,7 +1778,7 @@ struct DirectoryView: View {
              newState.tags.append(tag)
              modelContext.insert(newState)
         }
-        try? modelContext.save()
+        requestModelContextSave()
     }
 }
 /// Wrapper for list items with hover state and read indicator
@@ -1795,11 +2022,11 @@ struct ArticleRow: View {
     }
 }
 
-/// Row that fetches its own extract if not provided
+/// Row that renders metadata from the shared hydrator when available.
 /// TODO: Add title wrapping toggle to Settings page
 struct ArticleRowWithFetch: View {
     let article: Article
-    var fetchSupplementalMetadata: Bool = true
+    var hydratedMetadata: ArticleMetadataHydrationSnapshot? = nil
     var isHovered: Bool = false
     var label: Label? = nil
     var onLabelClick: ((Label) -> Void)? = nil
@@ -1809,25 +2036,32 @@ struct ArticleRowWithFetch: View {
     var onTrendPulseTap: ((WikipediaService.TrendPulse) -> Void)? = nil
     var onTagClick: ((Tag) -> Void)? = nil
     private let subheadLineLimit = 2
-    @Environment(AppState.self) private var appState
-    
-    // Local state for fetched metadata (since AppState doesn't cache everything)
-    @State private var localDescription: String?
-    @State private var localExtract: String?
-    @State private var localWordCount: Int?
+
+    private var resolvedDescription: String? {
+        let text = hydratedMetadata?.description ?? article.description
+        let trimmed = text?.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed?.isEmpty == true ? nil : trimmed
+    }
+
+    private var resolvedExtract: String? {
+        let text = hydratedMetadata?.extract ?? article.extract
+        let trimmed = text?.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed?.isEmpty == true ? nil : trimmed
+    }
+
+    private var resolvedWordCount: Int? {
+        hydratedMetadata?.wordCount ?? article.wordCount
+    }
 
     /// Formatted word count based on full content or extract
     private var wordCountText: String? {
-        // Check local state first, then article struct
-        let wc = localWordCount ?? article.wordCount
-        
+        let wc = resolvedWordCount
         if let wc = wc {
              let formatted = NumberFormatter.localizedString(from: NSNumber(value: wc), number: .decimal)
              return "\(formatted) words"
         }
-        
-        let extract = localExtract ?? article.extract
-        guard let validExtract = extract, validExtract.count > 50 else { return nil }
+
+        guard let validExtract = resolvedExtract, validExtract.count > 50 else { return nil }
         // Rough estimate: ~5 chars per word
         let count = validExtract.count / 5
         let formatted = NumberFormatter.localizedString(from: NSNumber(value: count), number: .decimal)
@@ -1835,21 +2069,19 @@ struct ArticleRowWithFetch: View {
     }
 
     private var displayedDescription: String {
-        let text = (localDescription ?? article.description)?.trimmingCharacters(in: .whitespacesAndNewlines)
-        return (text?.isEmpty ?? true) ? " " : (text ?? " ")
+        resolvedDescription ?? " "
     }
 
     private var displayedExtract: String {
-        let text = (localExtract ?? article.extract)?.trimmingCharacters(in: .whitespacesAndNewlines)
-        return (text?.isEmpty ?? true) ? " \n " : (text ?? " \n ")
+        resolvedExtract ?? " \n "
     }
 
     private var hasDescription: Bool {
-        localDescription != nil || article.description != nil
+        resolvedDescription != nil
     }
 
     private var hasExtract: Bool {
-        localExtract != nil || article.extract != nil
+        resolvedExtract != nil
     }
 
     private var hasFooterMetadata: Bool {
@@ -1940,48 +2172,6 @@ struct ArticleRowWithFetch: View {
         }
         .padding(.vertical, 4)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .task(id: article.id, priority: .utility) {
-            guard fetchSupplementalMetadata else { return }
-            let service = WikipediaService.shared
-            
-            // 1. Fetch Summary if missing
-            if article.description == nil || article.extract == nil {
-                if let summary = try? await service.fetchSummary(article.title) {
-                    await MainActor.run {
-                        // Update local view state
-                        self.localDescription = summary.description
-                        self.localExtract = summary.extract
-                        
-                        // Also update AppState for valid caches
-                        appState.updateArticleMetadata(
-                            id: article.id,
-                            description: summary.description,
-                            extract: summary.extract,
-                            wordCount: nil
-                        )
-                    }
-                }
-            }
-            
-            // 2. Fetch accurate Word Count if missing
-            if article.wordCount == nil {
-                if let metadata = try? await service.fetchPageMetadata(article.title) {
-                    guard !Task.isCancelled else { return }
-                    await MainActor.run {
-                        // Update local view state
-                        self.localWordCount = metadata.wordCount
-                        
-                        // Update AppState
-                        appState.updateArticleMetadata(
-                            id: article.id,
-                            description: nil,
-                            extract: nil,
-                            wordCount: metadata.wordCount
-                        )
-                    }
-                }
-            }
-        }
     }
 }
 
@@ -2020,7 +2210,7 @@ private struct SidebarTrendPulseChip: View {
         return .secondary
     }
 
-    var body: some View {
+    private var chipLabel: some View {
         HStack(spacing: 6) {
             Image(systemName: trendSymbol)
                 .font(.system(size: 9, weight: .semibold))
@@ -2039,8 +2229,20 @@ private struct SidebarTrendPulseChip: View {
                 .stroke(tint.opacity(0.18), lineWidth: 0.7)
         }
         .contentShape(Capsule())
-        .onTapGesture {
-            onChartRequested?()
+    }
+
+    var body: some View {
+        Group {
+            if let onChartRequested {
+                Button(action: onChartRequested) {
+                    chipLabel
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("\(deltaText), \(viewsText)")
+                .accessibilityHint("Show recent pageview chart")
+            } else {
+                chipLabel
+            }
         }
         .help("Views from recent daily pageviews")
     }
@@ -2769,6 +2971,7 @@ private struct SavedArticleRow: View {
     @Environment(AppState.self) private var appState
     @Environment(\.modelContext) private var modelContext
     let savedArticle: SavedArticle
+    var hydratedMetadata: ArticleMetadataHydrationSnapshot? = nil
     let isRead: Bool
     let readProgress: Double
     var isCurrent: Bool = false
@@ -2790,6 +2993,7 @@ private struct SavedArticleRow: View {
     let onNewLabel: (SavedArticle) -> Void
     var onNewTag: ((Article) -> Void)? = nil
     @State private var showingPageViewsPopover = false
+    @State private var saveScheduler = DebouncedActionScheduler()
     
     private var currentLabel: Label? {
         allLabels.first { $0.id == savedArticle.labelId }
@@ -2799,14 +3003,33 @@ private struct SavedArticleRow: View {
         _ = SystemBridge.copyText(text)
     }
 
+    private func requestModelContextSave() {
+        saveScheduler.schedule { [modelContext] in
+            guard modelContext.hasChanges else { return }
+            try? modelContext.save()
+        }
+    }
+
+    private func flushScheduledModelContextSave() {
+        saveScheduler.flush { [modelContext] in
+            guard modelContext.hasChanges else { return }
+            try? modelContext.save()
+        }
+    }
+
     var body: some View {
+        let resolvedDescription = hydratedMetadata?.description ?? savedArticle.articleDescription
+        let resolvedExtract = hydratedMetadata?.extract ?? savedArticle.extract
+        let resolvedThumbnailURL = hydratedMetadata?.thumbnailURL ?? savedArticle.thumbnailURL
+        let resolvedWordCount = hydratedMetadata?.wordCount ?? savedArticle.wordCount
         let article = Article(
             id: savedArticle.title,
             title: savedArticle.title,
-            description: savedArticle.articleDescription,
-            thumbnailURL: savedArticle.thumbnailURL,
+            description: resolvedDescription,
+            extract: resolvedExtract,
+            thumbnailURL: resolvedThumbnailURL,
             isRead: isRead,
-            wordCount: savedArticle.wordCount
+            wordCount: resolvedWordCount
         )
 
         ArticleListItem(
@@ -2831,7 +3054,7 @@ private struct SavedArticleRow: View {
         ) { isHovered, label in
              ArticleRow(
                 article: article,
-                extract: savedArticle.extract,
+                extract: resolvedExtract,
                 allowsEstimatedWordCount: false,
                 isHovered: isHovered,
                 label: label,
@@ -2841,23 +3064,12 @@ private struct SavedArticleRow: View {
                 onTagClick: onTagClick
              )
         }
-        .task(priority: .utility) {
-            // Fetch word count if missing
-            if savedArticle.wordCount == nil {
-                let service = WikipediaService.shared
-                if let metadata = try? await service.fetchPageMetadata(savedArticle.title) {
-                    guard !Task.isCancelled else { return }
-                    savedArticle.wordCount = metadata.wordCount
-                    try? modelContext.save()
-                }
-            }
-        }
         .contextMenu {
             ArticleContextMenuContent(
                 title: savedArticle.title,
-                description: savedArticle.articleDescription,
-                extract: savedArticle.extract,
-                thumbnailURL: savedArticle.thumbnailURL,
+                description: resolvedDescription,
+                extract: resolvedExtract,
+                thumbnailURL: resolvedThumbnailURL,
                 isRead: isRead,
                 currentLabelId: savedArticle.labelId,
                 currentTags: tags,
@@ -2869,7 +3081,7 @@ private struct SavedArticleRow: View {
                 onToggleRead: onToggleRead,
                 onSetLabel: { labelId in
                     savedArticle.labelId = labelId
-                    try? modelContext.save()
+                    requestModelContextSave()
                 },
                 onNewLabel: { onNewLabel(savedArticle) },
                 onToggleTag: { tag in
@@ -2893,7 +3105,7 @@ private struct SavedArticleRow: View {
                         state.tags.append(tag)
                     }
                     state.updatedAt = Date()
-                    try? modelContext.save()
+                    requestModelContextSave()
                 },
                 onNewTag: {
                     if let onNewTag = onNewTag {
@@ -2948,6 +3160,9 @@ private struct SavedArticleRow: View {
                 referenceDate: Date()
             )
         }
+        .onDisappear {
+            flushScheduledModelContextSave()
+        }
         .draggable(savedArticle.id.uuidString) {
             SwiftUI.Label(savedArticle.title, systemImage: "doc.text")
                 .padding(8)
@@ -2969,15 +3184,13 @@ private struct LabelArticlesView: View {
     let highlights: [Highlight]
     let readFilter: DirectoryReadFilter
     let sortMode: DirectorySupplementalSortMode
+    let metadataHydrator: ArticleMetadataHydrator
     
     let onNewLabelWithArticle: (SavedArticle) -> Void
     let onNewTagWithArticle: (Article) -> Void
     @State private var localTagFilter: Tag? = nil
     @State private var articleIndexesSnapshot = DirectoryArticleIndexes.empty
-
-    private var labeledArticles: [SavedArticle] {
-        savedArticles.filter { $0.labelId == label.id }
-    }
+    @State private var visibleSnapshot = LabelArticlesSnapshot.empty
 
     private var articleIndexes: DirectoryArticleIndexes {
         articleIndexesSnapshot
@@ -2991,6 +3204,34 @@ private struct LabelArticlesView: View {
         )
     }
 
+    private var visibleArticles: [SavedArticle] {
+        visibleSnapshot.articles
+    }
+
+    private var visibleSnapshotCandidateTitles: [String] {
+        savedArticles
+            .filter { $0.labelId == label.id }
+            .map(\.title)
+    }
+
+    private var visibleSnapshotFingerprint: Int {
+        var hasher = Hasher()
+        hasher.combine(articleIndexesFingerprint)
+        hasher.combine(label.id)
+        hasher.combine(readFilter == .unread)
+        hasher.combine(sortMode.rawValue)
+        hasher.combine(localTagFilter?.id)
+
+        if sortMode == .articleLength {
+            for title in visibleSnapshotCandidateTitles {
+                hasher.combine(ReadStateSync.normalizedTitle(title))
+                hasher.combine(metadataHydrator.snapshot(for: title)?.wordCount)
+            }
+        }
+
+        return hasher.finalize()
+    }
+
     private func refreshArticleIndexesSnapshot() {
         articleIndexesSnapshot = DirectoryArticleIndexes(
             articleStates: articleStates,
@@ -2999,12 +3240,16 @@ private struct LabelArticlesView: View {
         )
     }
 
-    private func articleState(for title: String) -> ArticleState? {
-        articleIndexes.articleState(for: title)
-    }
-
-    private func cachedHighlights(for title: String) -> [Highlight] {
-        articleIndexes.cachedHighlights(for: title)
+    private func refreshVisibleSnapshot() {
+        visibleSnapshot = LabelArticlesSnapshot(
+            label: label,
+            savedArticles: savedArticles,
+            readFilter: readFilter,
+            sortMode: sortMode,
+            tagFilter: localTagFilter,
+            articleIndexes: articleIndexes,
+            resolvedWordCount: resolvedWordCount(for:)
+        )
     }
 
     private func readingProgress(for title: String) -> Double {
@@ -3023,25 +3268,12 @@ private struct LabelArticlesView: View {
         articleIndexes.articleHasTag(title, tagId: tagId)
     }
 
-    private var filteredArticles: [SavedArticle] {
-        var scoped = labeledArticles
+    private func hydratedMetadata(for title: String) -> ArticleMetadataHydrationSnapshot? {
+        metadataHydrator.snapshot(for: title)
+    }
 
-        if readFilter == .unread {
-            scoped = scoped.filter { !effectiveReadState(for: $0.title, fallback: $0.isRead) }
-        }
-
-        if let tag = localTagFilter {
-            scoped = scoped.filter { articleHasTag($0.title, tagId: tag.id) }
-        }
-
-        switch sortMode {
-        case .recent:
-            return scoped.sorted { $0.savedAt > $1.savedAt }
-        case .title:
-            return scoped.sorted { $0.title.localizedCompare($1.title) == .orderedAscending }
-        case .articleLength:
-            return scoped.sorted { $0.approximateLength > $1.approximateLength }
-        }
+    private func resolvedWordCount(for savedArticle: SavedArticle) -> Int {
+        hydratedMetadata(for: savedArticle.title)?.wordCount ?? savedArticle.wordCount ?? savedArticle.approximateLength
     }
 
     private var currentArticleTitleNormalized: String? {
@@ -3076,7 +3308,7 @@ private struct LabelArticlesView: View {
     
     var body: some View {
         Section {
-            if filteredArticles.isEmpty {
+            if visibleArticles.isEmpty {
                 Text("No articles")
                     .foregroundStyle(.secondary)
                     .font(.subheadline)
@@ -3097,13 +3329,14 @@ private struct LabelArticlesView: View {
                     .padding(.vertical, 4)
                 }
 
-                ForEach(filteredArticles) { article in
+                ForEach(visibleArticles) { article in
                     let isRead = effectiveReadState(for: article.title, fallback: article.isRead)
                     let progress = readingProgress(for: article.title)
                     let tags = tagsForArticle(title: article.title)
                     let isCurrent = currentArticleTitleNormalized == ReadStateSync.normalizedTitle(article.title)
                     SavedArticleRow(
                         savedArticle: article,
+                        hydratedMetadata: hydratedMetadata(for: article.title),
                         isRead: isRead,
                         readProgress: progress,
                         isCurrent: isCurrent,
@@ -3154,9 +3387,13 @@ private struct LabelArticlesView: View {
         }
         .onAppear {
             refreshArticleIndexesSnapshot()
+            refreshVisibleSnapshot()
         }
         .onChange(of: articleIndexesFingerprint) { _, _ in
             refreshArticleIndexesSnapshot()
+        }
+        .onChange(of: visibleSnapshotFingerprint) { _, _ in
+            refreshVisibleSnapshot()
         }
     }
 
@@ -3174,11 +3411,13 @@ private struct TagArticlesView: View {
     let allHighlights: [Highlight]
     let readFilter: DirectoryReadFilter
     let sortMode: DirectorySupplementalSortMode
+    let metadataHydrator: ArticleMetadataHydrator
     let onNewLabelWithArticle: (SavedArticle) -> Void
     let onNewTagWithArticle: (Article) -> Void
     @State private var localTagFilter: Tag? = nil
     @State private var articleIndexesSnapshot = DirectoryArticleIndexes.empty
     @State private var activePageViewsArticleTitle: String?
+    @State private var visibleSnapshot = TagArticlesSnapshot.empty
 
     private var articleIndexes: DirectoryArticleIndexes {
         articleIndexesSnapshot
@@ -3192,6 +3431,36 @@ private struct TagArticlesView: View {
         )
     }
 
+    private var visibleArticles: [Article] {
+        visibleSnapshot.articles
+    }
+
+    private var visibleSnapshotCandidateTitles: [String] {
+        TagArticlesSnapshot.titlesByRecency(
+            for: tag,
+            articleStates: articleStates,
+            highlights: allHighlights
+        )
+    }
+
+    private var visibleSnapshotFingerprint: Int {
+        var hasher = Hasher()
+        hasher.combine(articleIndexesFingerprint)
+        hasher.combine(tag.id)
+        hasher.combine(readFilter == .unread)
+        hasher.combine(sortMode.rawValue)
+        hasher.combine(localTagFilter?.id)
+
+        if sortMode == .articleLength {
+            for title in visibleSnapshotCandidateTitles {
+                hasher.combine(ReadStateSync.normalizedTitle(title))
+                hasher.combine(metadataHydrator.snapshot(for: title)?.wordCount)
+            }
+        }
+
+        return hasher.finalize()
+    }
+
     private func refreshArticleIndexesSnapshot() {
         articleIndexesSnapshot = DirectoryArticleIndexes(
             articleStates: articleStates,
@@ -3200,66 +3469,21 @@ private struct TagArticlesView: View {
         )
     }
 
-    private func articleState(for title: String) -> ArticleState? {
-        articleIndexes.articleState(for: title)
-    }
-
-    private func cachedHighlights(for title: String) -> [Highlight] {
-        articleIndexes.cachedHighlights(for: title)
+    private func refreshVisibleSnapshot() {
+        visibleSnapshot = TagArticlesSnapshot(
+            tag: tag,
+            articleStates: articleStates,
+            highlights: allHighlights,
+            readFilter: readFilter,
+            sortMode: sortMode,
+            tagFilter: localTagFilter,
+            articleIndexes: articleIndexes,
+            resolvedWordCount: resolvedWordCount(for:)
+        )
     }
 
     private func savedArticle(for title: String) -> SavedArticle? {
         articleIndexes.savedArticle(for: title)
-    }
-
-    private var taggedArticles: [Article] {
-        var latestByTitle: [String: Date] = [:]
-        for highlight in allHighlights {
-            guard highlight.tags.contains(where: { $0.id == tag.id }) else { continue }
-            let title = highlight.articleTitle
-            if let existing = latestByTitle[title] {
-                if highlight.createdAt > existing {
-                    latestByTitle[title] = highlight.createdAt
-                }
-            } else {
-                latestByTitle[title] = highlight.createdAt
-            }
-        }
-
-        for state in articleStates {
-            guard state.tags.contains(where: { $0.id == tag.id }) else { continue }
-            let title = state.articleTitle
-            if let existing = latestByTitle[title] {
-                if state.updatedAt > existing {
-                    latestByTitle[title] = state.updatedAt
-                }
-            } else {
-                latestByTitle[title] = state.updatedAt
-            }
-        }
-
-        let sortedTitles = latestByTitle
-            .sorted { $0.value > $1.value }
-            .map { $0.key }
-
-        return sortedTitles.map { title in
-            if let saved = savedArticle(for: title) {
-                let article = Article(
-                    id: saved.title,
-                    title: saved.title,
-                    description: saved.articleDescription,
-                    extract: saved.extract,
-                    thumbnailURL: saved.thumbnailURL,
-                    wordCount: saved.wordCount
-                )
-                // Note: Article struct doesn't have readingList reference, but UI handles context separately
-                return article
-            }
-            
-            // Fallback for unsaved article (just history/highlight)
-            let article = Article(id: title, title: title)
-            return article
-        }
     }
 
     private func readingProgress(for title: String) -> Double {
@@ -3278,25 +3502,12 @@ private struct TagArticlesView: View {
         articleIndexes.articleHasTag(title, tagId: tagId)
     }
 
-    private var filteredTaggedArticles: [Article] {
-        var scoped = taggedArticles
+    private func hydratedMetadata(for title: String) -> ArticleMetadataHydrationSnapshot? {
+        metadataHydrator.snapshot(for: title)
+    }
 
-        if readFilter == .unread {
-            scoped = scoped.filter { !effectiveReadState(for: $0.title) }
-        }
-
-        if let filter = localTagFilter {
-            scoped = scoped.filter { articleHasTag($0.title, tagId: filter.id) }
-        }
-
-        switch sortMode {
-        case .recent:
-            return scoped
-        case .title:
-            return scoped.sorted { $0.title.localizedCompare($1.title) == .orderedAscending }
-        case .articleLength:
-            return scoped.sorted { ($0.wordCount ?? 0) > ($1.wordCount ?? 0) }
-        }
+    private func resolvedWordCount(for article: Article) -> Int {
+        hydratedMetadata(for: article.title)?.wordCount ?? article.wordCount ?? 0
     }
 
     private var currentArticleTitleNormalized: String? {
@@ -3321,7 +3532,7 @@ private struct TagArticlesView: View {
 
     var body: some View {
         Section {
-            if filteredTaggedArticles.isEmpty {
+            if visibleArticles.isEmpty {
                 Text("No tagged articles")
                     .foregroundStyle(.secondary)
                     .font(.subheadline)
@@ -3342,7 +3553,7 @@ private struct TagArticlesView: View {
                     .padding(.vertical, 4)
                 }
 
-                ForEach(filteredTaggedArticles) { article in
+                ForEach(visibleArticles) { article in
                     let isRead = effectiveReadState(for: article.title)
                     let progress = readingProgress(for: article.title)
                     let tags = tagsForArticle(title: article.title)
@@ -3350,6 +3561,7 @@ private struct TagArticlesView: View {
                     if let saved = savedArticle(for: article.title) {
                         SavedArticleRow(
                             savedArticle: saved,
+                            hydratedMetadata: hydratedMetadata(for: article.title),
                             isRead: isRead,
                             readProgress: progress,
                             isCurrent: isCurrentArticle(article.title),
@@ -3410,6 +3622,7 @@ private struct TagArticlesView: View {
                         ) { isHovered, _ in
                             ArticleRowWithFetch(
                                 article: article,
+                                hydratedMetadata: hydratedMetadata(for: article.title),
                                 isHovered: isHovered,
                                 tags: tags,
                                 selectedTagId: localTagFilter?.id,
@@ -3451,9 +3664,13 @@ private struct TagArticlesView: View {
         }
         .onAppear {
             refreshArticleIndexesSnapshot()
+            refreshVisibleSnapshot()
         }
         .onChange(of: articleIndexesFingerprint) { _, _ in
             refreshArticleIndexesSnapshot()
+        }
+        .onChange(of: visibleSnapshotFingerprint) { _, _ in
+            refreshVisibleSnapshot()
         }
     }
 }
@@ -4140,6 +4357,7 @@ extension DirectoryView {
         ) { isHovered, label in
             ArticleRowWithFetch(
                 article: article,
+                hydratedMetadata: hydratedMetadata(for: article.title),
                 isHovered: isHovered,
                 label: label,
                 tags: tags,
@@ -4218,7 +4436,7 @@ extension DirectoryView {
                 Text("No history")
                     .foregroundStyle(.secondary)
             } else {
-                let filteredHistory = filteredTabHistoryItems(for: tab)
+                let filteredHistory = directoryVisibleSnapshot.tabHistoryItems
                 if let tag = localTagFilter {
                     tagFilterRow(tag: tag)
                 }
@@ -4242,6 +4460,7 @@ extension DirectoryView {
                     ) { isHovered, label in
                         ArticleRowWithFetch(
                             article: item.article,
+                            hydratedMetadata: hydratedMetadata(for: item.article.title),
                             isHovered: isHovered,
                             label: label,
                             tags: tags,
@@ -4283,7 +4502,7 @@ extension DirectoryView {
     @ViewBuilder
     func recentArticlesSection() -> some View {
         Section {
-            let filteredRecents = filteredRecentArticles()
+            let filteredRecents = directoryVisibleSnapshot.recentArticles
             if let tag = localTagFilter {
                 tagFilterRow(tag: tag)
             }
@@ -4295,6 +4514,7 @@ extension DirectoryView {
                 if let saved = savedArticle(for: article.title) {
                     SavedArticleRow(
                         savedArticle: saved,
+                        hydratedMetadata: hydratedMetadata(for: article.title),
                         isRead: isRead,
                         readProgress: progress,
                         isCurrent: isCurrentArticle(article.title),
@@ -4335,6 +4555,7 @@ extension DirectoryView {
                     ) { isHovered, label in
                         ArticleRowWithFetch(
                             article: article,
+                            hydratedMetadata: hydratedMetadata(for: article.title),
                             isHovered: isHovered,
                             label: label,
                             tags: tags,

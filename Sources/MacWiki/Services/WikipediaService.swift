@@ -467,6 +467,70 @@ actor WikipediaService {
         content.html.utf8.count
     }
 
+    private func cachedLRUValue<Value>(
+        for key: String,
+        in cache: [String: Value],
+        order: inout LRUKeyTracker<String>
+    ) -> Value? {
+        guard let cached = cache[key] else { return nil }
+        order.touch(key)
+        return cached
+    }
+
+    private func storeLRUValue<Value>(
+        _ value: Value,
+        for key: String,
+        in cache: inout [String: Value],
+        order: inout LRUKeyTracker<String>,
+        maxSize: Int
+    ) {
+        cache[key] = value
+        order.touch(key)
+        trimLRUCache(&cache, order: &order, maxSize: maxSize)
+    }
+
+    private func storeLRUPairedValue<Primary, Secondary>(
+        primary primaryValue: Primary,
+        secondary secondaryValue: Secondary,
+        for key: String,
+        primaryCache: inout [String: Primary],
+        secondaryCache: inout [String: Secondary],
+        order: inout LRUKeyTracker<String>,
+        maxSize: Int
+    ) {
+        primaryCache[key] = primaryValue
+        secondaryCache[key] = secondaryValue
+        order.touch(key)
+        trimPairedLRUCaches(
+            primary: &primaryCache,
+            secondary: &secondaryCache,
+            order: &order,
+            maxSize: maxSize
+        )
+    }
+
+    private func trimLRUCache<Value>(
+        _ cache: inout [String: Value],
+        order: inout LRUKeyTracker<String>,
+        maxSize: Int
+    ) {
+        for evictedKey in order.trim(to: maxSize) {
+            cache.removeValue(forKey: evictedKey)
+        }
+    }
+
+    private func trimPairedLRUCaches<Primary, Secondary>(
+        primary: inout [String: Primary],
+        secondary: inout [String: Secondary],
+        order: inout LRUKeyTracker<String>,
+        maxSize: Int
+    ) {
+        for evictedKey in order.trim(to: maxSize) {
+            primary.removeValue(forKey: evictedKey)
+            secondary.removeValue(forKey: evictedKey)
+        }
+    }
+
     private func cachedFullArticle(for key: String) -> ArticleContent? {
         guard let cached = articleCache[key] else { return nil }
         articleCacheOrder.removeAll { $0 == key }
@@ -944,7 +1008,9 @@ actor WikipediaService {
     // MARK: - Caching
     
     private var searchCache: [String: [SearchResult]] = [:]
+    private var searchCacheOrder = LRUKeyTracker<String>()
     private var summaryCache: [String: ArticleSummary] = [:]
+    private var summaryCacheOrder = LRUKeyTracker<String>()
     private var articleCache: [String: ArticleContent] = [:]
     private var articleFastCache: [String: ArticleContent] = [:]
     private var inFlightSummaryTasks: [String: Task<ArticleSummary, Error>] = [:]
@@ -957,13 +1023,20 @@ actor WikipediaService {
     private var articleCacheTotalBytes: Int = 0
     private var articleFastCacheTotalBytes: Int = 0
     private var trendingCache: [String: [SearchResult]] = [:]
+    private var trendingCacheOrder = LRUKeyTracker<String>()
     private var discoverCache: [String: DiscoverFeed] = [:]
     private var discoverCacheFetchedAt: [String: Date] = [:]
+    private var discoverCacheOrder = LRUKeyTracker<String>()
     private var pageMetadataCache: [String: PageMetadata] = [:]
+    private var pageMetadataCacheOrder = LRUKeyTracker<String>()
     private var trendPulseCache: [String: TrendPulse] = [:]
+    private var trendPulseCacheOrder = LRUKeyTracker<String>()
     private var visualContextCache: [String: [VisualContextImage]] = [:]
+    private var visualContextCacheOrder = LRUKeyTracker<String>()
     private var peakPageviewDaysCache: [String: [PeakPageviewDay]] = [:]
+    private var peakPageviewDaysCacheOrder = LRUKeyTracker<String>()
     private var allTimeMostReadCache: [String: [AllTimeMostReadEntry]] = [:]
+    private var allTimeMostReadCacheOrder = LRUKeyTracker<String>()
     private var pinnedArticleTitles: Set<String> = []
 
     private let diskArticleCacheDirectoryURL: URL?
@@ -1009,9 +1082,10 @@ actor WikipediaService {
     func search(_ query: String) async throws -> [SearchResult] {
         let trimmedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedQuery.isEmpty else { return [] }
+        let cacheKey = trimmedQuery.lowercased()
         
         // Check cache
-        if let cached = searchCache[trimmedQuery.lowercased()] {
+        if let cached = cachedLRUValue(for: cacheKey, in: searchCache, order: &searchCacheOrder) {
             return cached
         }
         
@@ -1040,10 +1114,13 @@ actor WikipediaService {
         let results = try parseSearchResults(data)
         
         // Cache results
-        if searchCache.count >= maxSearchCacheSize {
-            searchCache.removeAll()
-        }
-        searchCache[trimmedQuery.lowercased()] = results
+        storeLRUValue(
+            results,
+            for: cacheKey,
+            in: &searchCache,
+            order: &searchCacheOrder,
+            maxSize: maxSearchCacheSize
+        )
         
         return results
     }
@@ -1107,7 +1184,7 @@ actor WikipediaService {
         for candidate in candidates {
             let dateKey = featuredFeedDatePath(for: candidate)
 
-            if !forceRefresh, let cached = discoverCache[dateKey] {
+            if !forceRefresh, let cached = cachedLRUValue(for: dateKey, in: discoverCache, order: &discoverCacheOrder) {
                 let shouldRefresh = shouldRefreshDiscoverCache(
                     cachedFeed: cached,
                     cachedAt: discoverCacheFetchedAt[dateKey],
@@ -1134,16 +1211,22 @@ actor WikipediaService {
                     feed = apply(onThisDayCollections: collections, to: feed)
                 }
                 try Task.checkCancellation()
-                if discoverCache.count >= maxDiscoverCacheSize {
-                    discoverCache.removeAll()
-                    discoverCacheFetchedAt.removeAll()
-                }
-                discoverCache[dateKey] = feed
-                discoverCacheFetchedAt[dateKey] = Date()
-                if trendingCache.count >= maxTrendingCacheSize {
-                    trendingCache.removeAll()
-                }
-                trendingCache[dateKey] = feed.trending
+                storeLRUPairedValue(
+                    primary: feed,
+                    secondary: Date(),
+                    for: dateKey,
+                    primaryCache: &discoverCache,
+                    secondaryCache: &discoverCacheFetchedAt,
+                    order: &discoverCacheOrder,
+                    maxSize: maxDiscoverCacheSize
+                )
+                storeLRUValue(
+                    feed.trending,
+                    for: dateKey,
+                    in: &trendingCache,
+                    order: &trendingCacheOrder,
+                    maxSize: maxTrendingCacheSize
+                )
                 return feed
             } catch {
                 if error is CancellationError || Task.isCancelled {
@@ -1195,7 +1278,7 @@ actor WikipediaService {
         let endKey = pageviewsDateFormatter.string(from: endDate)
         let cacheKey = "\(normalizedTitle.lowercased())|\(endKey)|\(clampedDays)"
 
-        if let cached = trendPulseCache[cacheKey] {
+        if let cached = cachedLRUValue(for: cacheKey, in: trendPulseCache, order: &trendPulseCacheOrder) {
             return cached
         }
 
@@ -1246,10 +1329,13 @@ actor WikipediaService {
             windowStart: resolvedWindowStart,
             windowEnd: resolvedWindowEnd
         )
-        if trendPulseCache.count >= maxTrendPulseCacheSize {
-            trendPulseCache.removeAll()
-        }
-        trendPulseCache[cacheKey] = pulse
+        storeLRUValue(
+            pulse,
+            for: cacheKey,
+            in: &trendPulseCache,
+            order: &trendPulseCacheOrder,
+            maxSize: maxTrendPulseCacheSize
+        )
         return pulse
     }
 
@@ -1263,7 +1349,7 @@ actor WikipediaService {
 
         let clampedLimit = min(max(limit, 1), 16)
         let cacheKey = "\(normalizedTitle.lowercased())|\(clampedLimit)"
-        if let cached = visualContextCache[cacheKey] {
+        if let cached = cachedLRUValue(for: cacheKey, in: visualContextCache, order: &visualContextCacheOrder) {
             return cached
         }
 
@@ -1353,10 +1439,13 @@ actor WikipediaService {
             .prefix(clampedLimit)
 
         let result = Array(images)
-        if visualContextCache.count >= maxVisualContextCacheSize {
-            visualContextCache.removeAll()
-        }
-        visualContextCache[cacheKey] = result
+        storeLRUValue(
+            result,
+            for: cacheKey,
+            in: &visualContextCache,
+            order: &visualContextCacheOrder,
+            maxSize: maxVisualContextCacheSize
+        )
         return result
     }
 
@@ -1375,7 +1464,7 @@ actor WikipediaService {
         let endKey = pageviewsDateFormatter.string(from: endDate)
         let cacheKey = "\(normalizedTitle.lowercased())|\(endKey)|\(clampedTop)"
 
-        if let cached = peakPageviewDaysCache[cacheKey] {
+        if let cached = cachedLRUValue(for: cacheKey, in: peakPageviewDaysCache, order: &peakPageviewDaysCacheOrder) {
             return cached
         }
 
@@ -1426,10 +1515,13 @@ actor WikipediaService {
             .prefix(clampedTop)
 
         let result = Array(peaks)
-        if peakPageviewDaysCache.count >= maxPeakPageviewCacheSize {
-            peakPageviewDaysCache.removeAll()
-        }
-        peakPageviewDaysCache[cacheKey] = result
+        storeLRUValue(
+            result,
+            for: cacheKey,
+            in: &peakPageviewDaysCache,
+            order: &peakPageviewDaysCacheOrder,
+            maxSize: maxPeakPageviewCacheSize
+        )
         return result
     }
 
@@ -1445,7 +1537,8 @@ actor WikipediaService {
         }
 
         let cacheKey = "all-time-\(latestMonth.year)-\(latestMonth.month)"
-        if let cached = allTimeMostReadCache[cacheKey], !cached.isEmpty {
+        if let cached = cachedLRUValue(for: cacheKey, in: allTimeMostReadCache, order: &allTimeMostReadCacheOrder),
+           !cached.isEmpty {
             return Array(cached.prefix(clampedLimit))
         }
 
@@ -1548,10 +1641,13 @@ actor WikipediaService {
             throw WikipediaError.noResults
         }
 
-        if allTimeMostReadCache.count >= maxAllTimeMostReadCacheSize {
-            allTimeMostReadCache.removeAll()
-        }
-        allTimeMostReadCache[cacheKey] = enriched
+        storeLRUValue(
+            enriched,
+            for: cacheKey,
+            in: &allTimeMostReadCache,
+            order: &allTimeMostReadCacheOrder,
+            maxSize: maxAllTimeMostReadCacheSize
+        )
 
         return Array(enriched.prefix(clampedLimit))
     }
@@ -2060,7 +2156,7 @@ actor WikipediaService {
         let normalizedTitle = title.replacingOccurrences(of: " ", with: "_")
         
         // Check cache
-        if let cached = summaryCache[normalizedTitle] {
+        if let cached = cachedLRUValue(for: normalizedTitle, in: summaryCache, order: &summaryCacheOrder) {
             return cached
         }
 
@@ -2082,10 +2178,13 @@ actor WikipediaService {
             let data = try await performRequest(url: url)
             let summary = try parseSummary(data, title: title)
 
-            if summaryCache.count >= maxSummaryCacheSize {
-                summaryCache.removeAll()
-            }
-            summaryCache[normalizedTitle] = summary
+            storeLRUValue(
+                summary,
+                for: normalizedTitle,
+                in: &summaryCache,
+                order: &summaryCacheOrder,
+                maxSize: maxSummaryCacheSize
+            )
 
             return summary
         }
@@ -2185,7 +2284,7 @@ actor WikipediaService {
     func fetchPageMetadata(_ title: String) async throws -> PageMetadata {
         let normalizedTitle = normalizedArticleTitle(title)
 
-        if let cached = pageMetadataCache[normalizedTitle] {
+        if let cached = cachedLRUValue(for: normalizedTitle, in: pageMetadataCache, order: &pageMetadataCacheOrder) {
             return cached
         }
 
@@ -2328,10 +2427,13 @@ actor WikipediaService {
     }
 
     private func storePageMetadata(_ metadata: PageMetadata, for normalizedTitle: String) {
-        if pageMetadataCache.count >= maxPageMetadataCacheSize {
-            pageMetadataCache.removeAll(keepingCapacity: true)
-        }
-        pageMetadataCache[normalizedTitle] = metadata
+        storeLRUValue(
+            metadata,
+            for: normalizedTitle,
+            in: &pageMetadataCache,
+            order: &pageMetadataCacheOrder,
+            maxSize: maxPageMetadataCacheSize
+        )
     }
 
     /// Fetch revision timestamps for last edited and first created dates
@@ -2597,9 +2699,13 @@ actor WikipediaService {
         articleCacheTotalBytes = 0
         articleFastCacheTotalBytes = 0
         pageMetadataCache.removeAll()
+        pageMetadataCacheOrder.removeAll()
         trendPulseCache.removeAll()
+        trendPulseCacheOrder.removeAll()
         visualContextCache.removeAll()
+        visualContextCacheOrder.removeAll()
         peakPageviewDaysCache.removeAll()
+        peakPageviewDaysCacheOrder.removeAll()
         inFlightSummaryTasks.values.forEach { $0.cancel() }
         inFlightSummaryTasks.removeAll()
         inFlightPageMetadataTasks.values.forEach { $0.cancel() }
@@ -2644,16 +2750,24 @@ actor WikipediaService {
     /// Clear all caches
     func clearCache() {
         searchCache.removeAll()
+        searchCacheOrder.removeAll()
         summaryCache.removeAll()
+        summaryCacheOrder.removeAll()
         clearInMemoryArticleCache()
         clearDiskArticleCache()
         trendingCache.removeAll()
+        trendingCacheOrder.removeAll()
         discoverCache.removeAll()
         discoverCacheFetchedAt.removeAll()
+        discoverCacheOrder.removeAll()
         trendPulseCache.removeAll()
+        trendPulseCacheOrder.removeAll()
         visualContextCache.removeAll()
+        visualContextCacheOrder.removeAll()
         peakPageviewDaysCache.removeAll()
+        peakPageviewDaysCacheOrder.removeAll()
         allTimeMostReadCache.removeAll()
+        allTimeMostReadCacheOrder.removeAll()
         inFlightFastArticleTasks.values.forEach { $0.cancel() }
         inFlightFastArticleTasks.removeAll()
     }

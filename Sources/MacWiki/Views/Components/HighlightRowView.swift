@@ -24,7 +24,88 @@ struct HighlightRowView: View {
         return selectedId == highlight.id.uuidString
     }
 
+    private var rowActivationHint: String {
+        if isEditing {
+            return "Select this highlight while editing."
+        }
+        return isExpanded ? "Collapse this highlight." : "Expand this highlight."
+    }
+
+    private var rowActivationActionName: Text {
+        Text(isEditing ? "Select Highlight" : (isExpanded ? "Collapse Highlight" : "Expand Highlight"))
+    }
+
     var body: some View {
+        interactiveRow
+            .contextMenu {
+                contextMenuItems
+            }
+            .onChange(of: isEditing) { _, newValue in
+                if newValue {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                        isNoteEditorFocused = true
+                    }
+                }
+            }
+            .task(id: appState.pendingHighlightNoteEditorRequest?.requestID) {
+                consumePendingNoteEditorRequestIfNeeded()
+            }
+            .sheet(isPresented: $showNewTagSheet) {
+                TagDetailSheet(isPresented: $showNewTagSheet, tagToEdit: nil) { tag in
+                    if highlight.tags.contains(where: { $0.id == tag.id }) {
+                        return
+                    }
+                    highlight.tags.append(tag)
+                }
+            }
+    }
+
+    private var interactiveRow: some View {
+        styledRowContent
+            .contentShape(Rectangle())
+            .onTapGesture(perform: activateHighlightRow)
+            .accessibilityAddTraits(.isButton)
+            .accessibilityHint(rowActivationHint)
+            .accessibilityAction(named: rowActivationActionName, activateHighlightRow)
+            .onHover { hovering in
+                withAnimation(.easeOut(duration: 0.15)) {
+                    isHovered = hovering
+                }
+            }
+    }
+
+    private var styledRowContent: some View {
+        rowContent
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .background(rowBackgroundShape)
+            .padding(.leading, highlightMarkerStyle == .bar ? 6 : 0)
+            .overlay(alignment: .leading, content: leadingMarkerOverlay)
+            .overlay(content: rowStrokeOverlay)
+    }
+
+    private var rowBackgroundShape: some View {
+        RoundedRectangle(cornerRadius: 12)
+            .fill(rowBackground)
+    }
+
+    @ViewBuilder
+    private func leadingMarkerOverlay() -> some View {
+        markerView
+    }
+
+    @ViewBuilder
+    private func rowStrokeOverlay() -> some View {
+        RoundedRectangle(cornerRadius: 12)
+            .stroke(Color.white.opacity(0.08), lineWidth: 0.8)
+
+        if isSelected {
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(selectionStrokeColor, lineWidth: selectionStrokeWidth)
+        }
+    }
+
+    private var rowContent: some View {
         HStack(alignment: .top, spacing: 12) {
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
@@ -89,44 +170,7 @@ struct HighlightRowView: View {
 
                     Spacer(minLength: 8)
 
-                    HStack(spacing: 6) {
-                        Button {
-                            editedNote = highlight.note ?? ""
-                            withAnimation(.easeInOut(duration: 0.2)) {
-                                isExpanded = true
-                                isEditing = true
-                            }
-                        } label: {
-                            Image(systemName: "note.text")
-                                .font(.system(size: 10, weight: .semibold))
-                                .foregroundStyle(isHovered ? .primary : .secondary)
-                                .frame(width: 20, height: 20)
-                                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
-                                .overlay {
-                                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                        .strokeBorder(Color.white.opacity(0.12), lineWidth: 0.8)
-                                }
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("Add note")
-
-                        Button {
-                            jumpToHighlight()
-                        } label: {
-                            Image(systemName: "arrow.down.right")
-                                .font(.system(size: 10, weight: .semibold))
-                                .foregroundStyle(isHovered ? .primary : .secondary)
-                                .frame(width: 20, height: 20)
-                                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
-                                .overlay {
-                                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                        .strokeBorder(Color.white.opacity(0.12), lineWidth: 0.8)
-                                }
-                        }
-                        .buttonStyle(.plain)
-                        .disabled(highlight.isArchived)
-                        .accessibilityLabel("Jump to highlight")
-                    }
+                    quickActionButtons
                 }
 
                 if highlight.isStale {
@@ -158,184 +202,130 @@ struct HighlightRowView: View {
                 }
             }
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 12)
-        .background {
-            RoundedRectangle(cornerRadius: 12)
-                .fill(rowBackground)
-        }
-        .padding(.leading, highlightMarkerStyle == .bar ? 6 : 0)
-        .overlay(alignment: .leading) {
-            markerView
-        }
-        .overlay {
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color.white.opacity(0.08), lineWidth: 0.8)
+    }
 
-            if isSelected {
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(
-                        highlightMarkerStyle == .background
-                            ? highlight.color.swiftUIColor.opacity(0.6)
-                            : Color.accentColor.opacity(0.6),
-                        lineWidth: selectionStrokeWidth
-                    )
-            }
-        }
-        .contentShape(Rectangle())
-        .onTapGesture {
-            appState.selectedHighlightId = highlight.id.uuidString
-            if !isEditing {
-                withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) {
-                    isExpanded.toggle()
-                }
-            }
-        }
-        .onHover { hovering in
-            withAnimation(.easeOut(duration: 0.15)) {
-                isHovered = hovering
-            }
-        }
-        .contextMenu {
-            if highlight.isArchived {
-                Button {
-                    restoreHighlight()
-                } label: {
-                    SwiftUI.Label("Restore Highlight", systemImage: "arrow.uturn.backward")
-                }
-
-                Divider()
-            } else if highlight.isStale {
-                Button {
-                    appState.pendingHighlightArticleRefresh = AppState.HighlightArticleRefreshRequest(
-                        id: UUID(),
-                        articleTitle: highlight.articleTitle
-                    )
-                } label: {
-                    SwiftUI.Label("Refresh Article", systemImage: "arrow.clockwise")
-                }
-                .disabled(appState.isHighlightArticleRefreshInProgress)
-
-                Divider()
-            }
-
+    @ViewBuilder
+    private var contextMenuItems: some View {
+        if highlight.isArchived {
             Button {
-                editedNote = highlight.note ?? ""
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    isExpanded = true
-                    isEditing = true
-                }
+                restoreHighlight()
             } label: {
-                SwiftUI.Label(highlight.note?.isEmpty ?? true ? "Add Note" : "Edit Note", systemImage: "pencil")
+                SwiftUI.Label("Restore Highlight", systemImage: "arrow.uturn.backward")
             }
 
             Divider()
+        } else if highlight.isStale {
+            Button {
+                appState.pendingHighlightArticleRefresh = AppState.HighlightArticleRefreshRequest(
+                    id: UUID(),
+                    articleTitle: highlight.articleTitle
+                )
+            } label: {
+                SwiftUI.Label("Refresh Article", systemImage: "arrow.clockwise")
+            }
+            .disabled(appState.isHighlightArticleRefreshInProgress)
 
-            Menu {
-                ForEach(HighlightColor.allCases, id: \.self) { color in
-                    Button {
-                        withAnimation(.easeOut(duration: 0.2)) {
-                            highlight.color = color
-                            try? modelContext.save()
-                            appState.pendingHighlightColorChange = AppState.HighlightColorChangeRequest(
-                                id: highlight.id,
-                                cssColor: color.cssColor
-                            )
+            Divider()
+        }
+
+        Button {
+            editedNote = highlight.note ?? ""
+            withAnimation(.easeInOut(duration: 0.2)) {
+                isExpanded = true
+                isEditing = true
+            }
+        } label: {
+            SwiftUI.Label(highlight.note?.isEmpty ?? true ? "Add Note" : "Edit Note", systemImage: "pencil")
+        }
+
+        Divider()
+
+        Menu {
+            ForEach(HighlightColor.allCases, id: \.self) { color in
+                Button {
+                    withAnimation(.easeOut(duration: 0.2)) {
+                        highlight.color = color
+                        try? modelContext.save()
+                        appState.pendingHighlightColorChange = AppState.HighlightColorChangeRequest(
+                            id: highlight.id,
+                            cssColor: color.cssColor
+                        )
+                    }
+                } label: {
+                    HStack {
+                        Circle()
+                            .fill(color.swiftUIColor)
+                            .frame(width: 12, height: 12)
+                        Text(color.rawValue)
+                        Spacer()
+                        if highlight.color == color {
+                            Image(systemName: "checkmark")
+                                .font(.caption)
                         }
+                    }
+                }
+            }
+        } label: {
+            SwiftUI.Label("Change Color", systemImage: "paintpalette")
+        }
+
+        Divider()
+
+        Menu {
+            Button {
+                showNewTagSheet = true
+            } label: {
+                SwiftUI.Label("New Tag", systemImage: "plus")
+            }
+
+            if !allTags.isEmpty {
+                Divider()
+            }
+
+            if allTags.isEmpty {
+                Text("No tags yet")
+            } else {
+                ForEach(allTags) { tag in
+                    Button {
+                        toggleTag(tag)
                     } label: {
                         HStack {
-                            Circle()
-                                .fill(color.swiftUIColor)
-                                .frame(width: 12, height: 12)
-                            Text(color.rawValue)
+                            Text(tag.name)
                             Spacer()
-                            if highlight.color == color {
+                            if highlight.tags.contains(where: { $0.id == tag.id }) {
                                 Image(systemName: "checkmark")
                                     .font(.caption)
                             }
                         }
                     }
                 }
-            } label: {
-                SwiftUI.Label("Change Color", systemImage: "paintpalette")
             }
+        } label: {
+            SwiftUI.Label("Tags", systemImage: "tag")
+        }
 
-            Divider()
+        Divider()
 
-            Menu {
-                Button {
-                    showNewTagSheet = true
-                } label: {
-                    SwiftUI.Label("New Tag", systemImage: "plus")
-                }
+        Button {
+            _ = SystemBridge.copyText(highlight.text)
+        } label: {
+            SwiftUI.Label("Copy Text", systemImage: "doc.on.doc")
+        }
 
-                if !allTags.isEmpty {
-                    Divider()
-                }
-
-                if allTags.isEmpty {
-                    Text("No tags yet")
-                } else {
-                    ForEach(allTags) { tag in
-                        Button {
-                            toggleTag(tag)
-                        } label: {
-                            HStack {
-                                Text(tag.name)
-                                Spacer()
-                                if highlight.tags.contains(where: { $0.id == tag.id }) {
-                                    Image(systemName: "checkmark")
-                                        .font(.caption)
-                                }
-                            }
-                        }
-                    }
-                }
-            } label: {
-                SwiftUI.Label("Tags", systemImage: "tag")
-            }
-
-            Divider()
-
+        if let note = highlight.note, !note.isEmpty {
             Button {
-                _ = SystemBridge.copyText(highlight.text)
+                _ = SystemBridge.copyText(note)
             } label: {
-                SwiftUI.Label("Copy Text", systemImage: "doc.on.doc")
-            }
-
-            if let note = highlight.note, !note.isEmpty {
-                Button {
-                    _ = SystemBridge.copyText(note)
-                } label: {
-                    SwiftUI.Label("Copy Note", systemImage: "doc.on.doc.fill")
-                }
-            }
-
-            Divider()
-
-            Button(role: .destructive) {
-                onDelete()
-            } label: {
-                SwiftUI.Label("Delete Highlight", systemImage: "trash")
+                SwiftUI.Label("Copy Note", systemImage: "doc.on.doc.fill")
             }
         }
-        .onChange(of: isEditing) { _, newValue in
-            if newValue {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                    isNoteEditorFocused = true
-                }
-            }
-        }
-        .task(id: appState.pendingHighlightNoteEditorRequest?.requestID) {
-            consumePendingNoteEditorRequestIfNeeded()
-        }
-        .sheet(isPresented: $showNewTagSheet) {
-            TagDetailSheet(isPresented: $showNewTagSheet, tagToEdit: nil) { tag in
-                if highlight.tags.contains(where: { $0.id == tag.id }) {
-                    return
-                }
-                highlight.tags.append(tag)
-            }
+
+        Divider()
+
+        Button(role: .destructive) {
+            onDelete()
+        } label: {
+            SwiftUI.Label("Delete Highlight", systemImage: "trash")
         }
     }
 
@@ -387,6 +377,54 @@ struct HighlightRowView: View {
         appState.pendingHighlightScroll = highlight.id
     }
 
+    private func activateHighlightRow() {
+        appState.selectedHighlightId = highlight.id.uuidString
+        guard !isEditing else { return }
+        withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) {
+            isExpanded.toggle()
+        }
+    }
+
+    private var quickActionButtons: some View {
+        HStack(spacing: 6) {
+            Button(
+                highlight.note?.isEmpty ?? true ? "Add Note" : "Edit Note",
+                systemImage: "note.text"
+            ) {
+                editedNote = highlight.note ?? ""
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    isExpanded = true
+                    isEditing = true
+                }
+            }
+            .labelStyle(.iconOnly)
+            .font(.system(size: 10, weight: .semibold))
+            .foregroundStyle(isHovered ? .primary : .secondary)
+            .frame(width: 20, height: 20)
+            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .strokeBorder(Color.white.opacity(0.12), lineWidth: 0.8)
+            }
+            .buttonStyle(.plain)
+
+            Button("Jump to Highlight", systemImage: "arrow.down.right") {
+                jumpToHighlight()
+            }
+            .labelStyle(.iconOnly)
+            .font(.system(size: 10, weight: .semibold))
+            .foregroundStyle(isHovered ? .primary : .secondary)
+            .frame(width: 20, height: 20)
+            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .strokeBorder(Color.white.opacity(0.12), lineWidth: 0.8)
+            }
+            .buttonStyle(.plain)
+            .disabled(highlight.isArchived)
+        }
+    }
+
     private var rowBackground: Color {
         if highlightMarkerStyle == .background {
             if isSelected {
@@ -404,6 +442,13 @@ struct HighlightRowView: View {
 
     private var selectionStrokeWidth: CGFloat {
         highlightMarkerStyle == .background ? 1.6 : 1.0
+    }
+
+    private var selectionStrokeColor: Color {
+        if highlightMarkerStyle == .background {
+            return highlight.color.swiftUIColor.opacity(0.6)
+        }
+        return Color.accentColor.opacity(0.6)
     }
 
     private var shortRelativeAge: String {

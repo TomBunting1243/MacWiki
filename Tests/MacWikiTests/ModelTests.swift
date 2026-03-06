@@ -83,3 +83,77 @@ import Testing
 @Test func searchCoordinatorDefaultDebounceMatchesRepoContract() {
     #expect(SearchCoordinator.defaultDebounceMilliseconds == 300)
 }
+
+@MainActor
+@Test func articleLookupIndexBuildsSavedTitleMembershipFromReadingLists() {
+    let list = ReadingList(name: "Inbox")
+    let saved = SavedArticle(title: "A/B testing?", list: list)
+    list.articles.append(saved)
+
+    let index = ArticleLookupIndex(readingLists: [list])
+
+    #expect(index.isSaved(title: "A/B testing?"))
+    #expect(index.savedArticle(for: "A/B testing?")?.id == saved.id)
+}
+
+@MainActor
+@Test func articleLookupIndexPrefersArticleStateForEffectiveReadState() {
+    let saved = SavedArticle(title: "AC/DC")
+    saved.isRead = false
+
+    let state = ArticleState(
+        articleTitle: "AC/DC",
+        articleURL: URL(string: WikipediaURLBuilder.articleURLString(forTitle: "AC/DC"))!,
+        isRead: true,
+        readingProgress: 0.42
+    )
+
+    let index = ArticleLookupIndex(
+        articleStates: [state],
+        savedArticles: [saved]
+    )
+
+    #expect(index.articleState(for: "AC/DC")?.id == state.id)
+    #expect(index.effectiveReadState(for: "AC/DC", fallback: false))
+}
+
+@MainActor
+@Test func stableTagFingerprintChangesWhenTagIdentityChangesAtSameCount() {
+    let firstTag = Tag(name: "Alpha")
+    let secondTag = Tag(name: "Beta")
+
+    #expect(
+        stableTagFingerprint(for: [firstTag]) !=
+        stableTagFingerprint(for: [secondTag])
+    )
+}
+
+@MainActor
+@Test func articleLookupIndexFingerprintChangesWhenArticleStateTagsChangeAtSameCount() {
+    let articleURL = URL(string: WikipediaURLBuilder.articleURLString(forTitle: "AC/DC"))!
+    let state = ArticleState(articleTitle: "AC/DC", articleURL: articleURL)
+    let readingList = ReadingList(name: "Inbox")
+
+    state.tags = [Tag(name: "Alpha")]
+    let directFingerprintBefore = articleLookupIndexFingerprint(
+        articleStates: [state],
+        savedArticles: []
+    )
+    let readingListsFingerprintBefore = articleLookupIndexFingerprint(
+        articleStates: [state],
+        readingLists: [readingList]
+    )
+
+    state.tags = [Tag(name: "Beta")]
+    let directFingerprintAfter = articleLookupIndexFingerprint(
+        articleStates: [state],
+        savedArticles: []
+    )
+    let readingListsFingerprintAfter = articleLookupIndexFingerprint(
+        articleStates: [state],
+        readingLists: [readingList]
+    )
+
+    #expect(directFingerprintBefore != directFingerprintAfter)
+    #expect(readingListsFingerprintBefore != readingListsFingerprintAfter)
+}

@@ -55,6 +55,48 @@ struct BugRegressionTests {
         #expect(appState.recentArticles.prefix(2).map(\.title) == ["Second Article", "First Article"])
     }
 
+    @Test func batchMetadataUpdateTouchesOnlyRequestedArticles() {
+        let appState = AppState()
+        appState.openTabs = [
+            ArticleTab(article: Article(id: "history-1", title: "History One")),
+            ArticleTab(article: Article(id: "history-2", title: "History Two"))
+        ]
+        appState.activeTabId = appState.openTabs.first?.id
+        appState.recentArticles = [
+            Article(id: "recent-target", title: "Recent Target"),
+            Article(
+                id: "recent-other",
+                title: "Recent Other",
+                description: "Keep me",
+                extract: "Existing extract",
+                wordCount: 11
+            )
+        ]
+
+        appState.updateArticleMetadata(
+            ids: ["recent-target", "history-2"],
+            description: "Updated description",
+            extract: "Updated extract",
+            wordCount: 321
+        )
+
+        #expect(appState.recentArticles[0].description == "Updated description")
+        #expect(appState.recentArticles[0].extract == "Updated extract")
+        #expect(appState.recentArticles[0].wordCount == 321)
+
+        #expect(appState.recentArticles[1].description == "Keep me")
+        #expect(appState.recentArticles[1].extract == "Existing extract")
+        #expect(appState.recentArticles[1].wordCount == 11)
+
+        #expect(appState.openTabs[0].history[0].article.description == nil)
+        #expect(appState.openTabs[0].history[0].article.extract == nil)
+        #expect(appState.openTabs[0].history[0].article.wordCount == nil)
+
+        #expect(appState.openTabs[1].history[0].article.description == "Updated description")
+        #expect(appState.openTabs[1].history[0].article.extract == "Updated extract")
+        #expect(appState.openTabs[1].history[0].article.wordCount == 321)
+    }
+
     @Test func searchSavePreventsNormalizedDuplicateTitles() throws {
         let modelContext = try makeInMemoryModelContext()
         let list = ReadingList(name: "Research")

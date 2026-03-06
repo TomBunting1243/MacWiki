@@ -7,8 +7,9 @@ struct QuickSearchView: View {
 
     @Environment(AppState.self) private var appState
     @Environment(\.colorScheme) private var colorScheme
-    @Environment(\.modelContext) private var modelContext
     @Query(sort: \ReadingList.updatedAt, order: .reverse) private var allLists: [ReadingList]
+    @Query(sort: \Label.sortOrder) private var allLabels: [Label]
+    @Query(sort: \Tag.sortOrder) private var allTags: [Tag]
 
     @State private var searchCoordinator = SearchCoordinator(
         debounceMilliseconds: SearchCoordinator.defaultDebounceMilliseconds,
@@ -17,6 +18,7 @@ struct QuickSearchView: View {
         searchPrefetchLimit: 24,
         trendingPrefetchLimit: 24
     )
+    @State private var articleLookupSnapshot = ArticleLookupIndex.empty
 
     // UI State
     @State private var isAppeared = false
@@ -30,8 +32,20 @@ struct QuickSearchView: View {
         self.modalSize = modalSize
     }
 
+    private var articleLookup: ArticleLookupIndex {
+        articleLookupSnapshot
+    }
+
+    private var articleLookupFingerprint: Int {
+        articleLookupIndexFingerprint(readingLists: allLists)
+    }
+
     private var savedArticleTitlesNormalized: Set<String> {
-        SearchResultActions.savedArticleTitlesNormalized(from: allLists)
+        articleLookup.savedArticleTitlesNormalized
+    }
+
+    private func refreshArticleLookupSnapshot() {
+        articleLookupSnapshot = ArticleLookupIndex(readingLists: allLists)
     }
 
     private func pageViewsPopoverBinding(for rowKey: String) -> Binding<Bool> {
@@ -120,6 +134,7 @@ struct QuickSearchView: View {
         .scaleEffect(isAppeared ? 1 : 0.985)
         .opacity(isAppeared ? 1 : 0)
         .onAppear {
+            refreshArticleLookupSnapshot()
             withAnimation(AppLoadingMotion.overlaySettle) {
                 isAppeared = true
             }
@@ -127,6 +142,9 @@ struct QuickSearchView: View {
                 isSearchFieldFocused = true
             }
             searchCoordinator.loadTrendingIfNeeded()
+        }
+        .onChange(of: articleLookupFingerprint) { _, _ in
+            refreshArticleLookupSnapshot()
         }
         .onMoveCommand { direction in
             guard searchCoordinator.hasQuery else { return }
@@ -221,15 +239,10 @@ struct QuickSearchView: View {
                                     SearchResultContextMenuContent(
                                         result: result,
                                         allLists: allLists,
+                                        allLabels: allLabels,
+                                        allTags: allTags,
                                         onOpen: { inNewTab in
                                             selectResult(result, inNewTab: inNewTab)
-                                        },
-                                        onSaveToList: { list in
-                                            SearchResultActions.saveToList(
-                                                result,
-                                                list: list,
-                                                modelContext: modelContext
-                                            )
                                         },
                                         onShowPageViews: {
                                             activePageViewsPopover = QuickSearchPageViewsPopoverPayload(
@@ -326,15 +339,10 @@ struct QuickSearchView: View {
                                 SearchResultContextMenuContent(
                                     result: result,
                                     allLists: allLists,
+                                    allLabels: allLabels,
+                                    allTags: allTags,
                                     onOpen: { inNewTab in
                                         selectResult(result, inNewTab: inNewTab)
-                                    },
-                                    onSaveToList: { list in
-                                        SearchResultActions.saveToList(
-                                            result,
-                                            list: list,
-                                            modelContext: modelContext
-                                        )
                                     },
                                     onShowPageViews: {
                                         activePageViewsPopover = QuickSearchPageViewsPopoverPayload(
@@ -401,35 +409,26 @@ struct SearchResultRow: View {
             // Thumbnail
             Group {
                 if let url = result.thumbnailURL {
-                    AsyncImage(
-                        url: url,
-                        transaction: Transaction(animation: .easeOut(duration: 0.18))
-                    ) { phase in
-                        switch phase {
-                        case .empty:
-                            AppLoadingThumbnailPlaceholder(
-                                width: 62,
-                                height: 62,
-                                cornerRadius: 8,
-                                tone: .neutral,
-                                symbol: "doc.text"
-                            )
-                        case .success(let image):
-                            image
-                                .resizable()
-                                .scaledToFit()
-                                .padding(4)
-                                .transition(.opacity)
-                        case .failure:
-                            Rectangle()
-                                .fill(.quaternary)
-                                .overlay {
-                                    Image(systemName: "doc.text")
-                                        .foregroundStyle(.tertiary)
-                                }
-                        @unknown default:
-                            Rectangle().fill(.quaternary)
-                        }
+                    CachedThumbnailImage(url: url, targetSize: CGSize(width: 62, height: 62)) { image in
+                        image
+                            .resizable()
+                            .scaledToFit()
+                            .padding(4)
+                    } placeholder: {
+                        AppLoadingThumbnailPlaceholder(
+                            width: 62,
+                            height: 62,
+                            cornerRadius: 8,
+                            tone: .neutral,
+                            symbol: "doc.text"
+                        )
+                    } failure: {
+                        Rectangle()
+                            .fill(.quaternary)
+                            .overlay {
+                                Image(systemName: "doc.text")
+                                    .foregroundStyle(.tertiary)
+                            }
                     }
                 } else {
                     Rectangle()
@@ -498,38 +497,32 @@ struct TrendingCard: View {
 
                 Group {
                     if let url = result.thumbnailURL {
-                        AsyncImage(
+                        CachedThumbnailImage(
                             url: url,
-                            transaction: Transaction(animation: .easeOut(duration: 0.18))
-                        ) { phase in
-                            switch phase {
-                            case .empty:
-                                ZStack {
-                                    AppLoadingSkeletonBar(
-                                        width: nil,
-                                        height: imageHeight,
-                                        cornerRadius: 0,
-                                        tone: .accent
-                                    )
+                            targetSize: CGSize(width: 220, height: imageHeight)
+                        ) { image in
+                            image
+                                .resizable()
+                                .scaledToFit()
+                                .padding(8)
+                        } placeholder: {
+                            ZStack {
+                                AppLoadingSkeletonBar(
+                                    width: nil,
+                                    height: imageHeight,
+                                    cornerRadius: 0,
+                                    tone: .accent
+                                )
+                                Image(systemName: "photo")
+                                    .foregroundStyle(.tertiary)
+                            }
+                        } failure: {
+                            Rectangle()
+                                .fill(.quaternary)
+                                .overlay {
                                     Image(systemName: "photo")
                                         .foregroundStyle(.tertiary)
                                 }
-                            case .success(let image):
-                                image
-                                    .resizable()
-                                    .scaledToFit()
-                                    .padding(8)
-                                    .transition(.opacity)
-                            case .failure:
-                                Rectangle()
-                                    .fill(.quaternary)
-                                    .overlay {
-                                        Image(systemName: "photo")
-                                            .foregroundStyle(.tertiary)
-                                    }
-                            @unknown default:
-                                Rectangle().fill(.quaternary)
-                            }
                         }
                     } else {
                         Rectangle()

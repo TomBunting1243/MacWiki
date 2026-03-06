@@ -608,31 +608,59 @@ final class AppState {
 
     /// Update article metadata (description, extract, wordCount) in recents and tab history
     func updateArticleMetadata(id: String, description: String?, extract: String?, wordCount: Int?) {
-        // Update in recents
-        if let index = recentArticles.firstIndex(where: { $0.id == id }) {
-            if description != nil { recentArticles[index].description = description }
-            if extract != nil { recentArticles[index].extract = extract }
-            if wordCount != nil { recentArticles[index].wordCount = wordCount }
+        updateArticleMetadata(
+            ids: [id],
+            description: description,
+            extract: extract,
+            wordCount: wordCount
+        )
+    }
+
+    /// Batch update article metadata across recents and tab history with one save request.
+    func updateArticleMetadata(ids: Set<String>, description: String?, extract: String?, wordCount: Int?) {
+        guard !ids.isEmpty else { return }
+        var didChange = false
+
+        for index in recentArticles.indices where ids.contains(recentArticles[index].id) {
+            if let description, recentArticles[index].description != description {
+                recentArticles[index].description = description
+                didChange = true
+            }
+            if let extract, recentArticles[index].extract != extract {
+                recentArticles[index].extract = extract
+                didChange = true
+            }
+            if let wordCount, recentArticles[index].wordCount != wordCount {
+                recentArticles[index].wordCount = wordCount
+                didChange = true
+            }
         }
 
-        // Update in tab history
         for tabIndex in openTabs.indices {
             for historyIndex in openTabs[tabIndex].history.indices {
-                if openTabs[tabIndex].history[historyIndex].article.id == id {
-                    if description != nil {
-                        openTabs[tabIndex].history[historyIndex].article.description = description
-                    }
-                    if extract != nil {
-                        openTabs[tabIndex].history[historyIndex].article.extract = extract
-                    }
-                    if wordCount != nil {
-                         openTabs[tabIndex].history[historyIndex].article.wordCount = wordCount
-                    }
+                guard ids.contains(openTabs[tabIndex].history[historyIndex].article.id) else { continue }
+
+                if let description,
+                   openTabs[tabIndex].history[historyIndex].article.description != description {
+                    openTabs[tabIndex].history[historyIndex].article.description = description
+                    didChange = true
+                }
+                if let extract,
+                   openTabs[tabIndex].history[historyIndex].article.extract != extract {
+                    openTabs[tabIndex].history[historyIndex].article.extract = extract
+                    didChange = true
+                }
+                if let wordCount,
+                   openTabs[tabIndex].history[historyIndex].article.wordCount != wordCount {
+                    openTabs[tabIndex].history[historyIndex].article.wordCount = wordCount
+                    didChange = true
                 }
             }
         }
 
-        requestSave()
+        if didChange {
+            requestSave()
+        }
     }
 
     /// Update read status across recents and all tab history items matching title
@@ -1075,8 +1103,8 @@ final class AppState {
     
     private enum SavedStateLoadResult {
         case missing
-        case success(SavedState)
-        case failure(Error)
+        case success(SavedState, byteCount: Int)
+        case failure(Error, byteCount: Int?)
     }
 
     private struct SavedState: Codable {
@@ -1127,6 +1155,7 @@ final class AppState {
     
     private func load() {
         guard let url = persistenceURL else { return }
+        let loadStartedAt = CFAbsoluteTimeGetCurrent()
 
         let loadResult: SavedStateLoadResult
         if DispatchQueue.getSpecific(key: persistenceQueueKey) != nil {
@@ -1140,7 +1169,7 @@ final class AppState {
         switch loadResult {
         case .missing:
             return
-        case .success(let state):
+        case .success(let state, let byteCount):
             self.openTabs = state.openTabs
             self.activeTabId = state.activeTabId
             self.recentArticles = state.recentArticles
@@ -1161,12 +1190,22 @@ final class AppState {
                 activeTabId = openTabs.first?.id
             }
             disableFocusModeIfUnavailable()
-        case .failure(let error):
+            PerformanceMetricsStore.shared.record(
+                kind: .sessionRestore,
+                durationMs: (CFAbsoluteTimeGetCurrent() - loadStartedAt) * 1_000,
+                detail: "tabs=\(openTabs.count) recents=\(recentArticles.count) bytes=\(byteCount)"
+            )
+        case .failure(let error, let byteCount):
             // Backup corrupted file for debugging, then start fresh
             appStateLogger.error("Failed to decode state; starting fresh: \(error.localizedDescription, privacy: .public)")
             let backup = url.deletingPathExtension().appendingPathExtension("corrupted.json")
             try? FileManager.default.removeItem(at: backup)
             try? FileManager.default.moveItem(at: url, to: backup)
+            PerformanceMetricsStore.shared.record(
+                kind: .sessionRestore,
+                durationMs: (CFAbsoluteTimeGetCurrent() - loadStartedAt) * 1_000,
+                detail: "failed bytes=\(byteCount ?? 0)"
+            )
         }
     }
 
@@ -1177,10 +1216,14 @@ final class AppState {
 
         do {
             let data = try Data(contentsOf: url)
-            let state = try JSONDecoder().decode(SavedState.self, from: data)
-            return .success(state)
+            do {
+                let state = try JSONDecoder().decode(SavedState.self, from: data)
+                return .success(state, byteCount: data.count)
+            } catch {
+                return .failure(error, byteCount: data.count)
+            }
         } catch {
-            return .failure(error)
+            return .failure(error, byteCount: nil)
         }
     }
     

@@ -232,6 +232,8 @@ struct ListsSidebar: View {
     @State private var showAreaRenameAlert = false
     @State private var pendingAreaDeletion: PendingAreaDeletion?
     @State private var showAreaDeleteContentsPrompt = false
+    @State private var collectionsSnapshot = ListsSidebarSnapshot.empty
+    @State private var saveScheduler = DebouncedActionScheduler()
 
     // Tag management
     @State private var showNewTagSheet = false
@@ -242,14 +244,6 @@ struct ListsSidebar: View {
     
     let onEditLabel: (Label) -> Void
     let onAddNewLabel: () -> Void
-
-    enum ListSortOrder: String, CaseIterable {
-        case manual = "Manual"
-        case name = "Name"
-        case createdDate = "Created"
-        case updatedDate = "Updated"
-        case articleCount = "Articles"
-    }
 
     private var trimmedEditingName: String {
         editingName.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -285,125 +279,74 @@ struct ListsSidebar: View {
         isWikiHopPostV1Enabled && isWikiHopEnabled
     }
 
+    private var collectionsFingerprint: Int {
+        listsSidebarSnapshotFingerprint(
+            lists: lists,
+            areas: areas,
+            labels: labels,
+            tags: tags,
+            savedArticles: savedArticles,
+            highlights: highlights,
+            articleStates: articleStates,
+            sortOrder: sortOrder
+        )
+    }
+
+    private func refreshCollectionsSnapshot() {
+        collectionsSnapshot = ListsSidebarSnapshot(
+            lists: lists,
+            areas: areas,
+            labels: labels,
+            tags: tags,
+            savedArticles: savedArticles,
+            highlights: highlights,
+            articleStates: articleStates,
+            sortOrder: sortOrder
+        )
+    }
+
     private var sortedLists: [ReadingList] {
-        switch sortOrder {
-        case .manual:
-            return lists.sorted(by: compareListsForManualSort)
-        case .name:
-            return lists.sorted { $0.name.localizedCompare($1.name) == .orderedAscending }
-        case .createdDate:
-            return lists.sorted { $0.createdAt > $1.createdAt }
-        case .updatedDate:
-            return lists.sorted { $0.updatedAt > $1.updatedAt }
-        case .articleCount:
-            return lists.sorted { $0.articles.count > $1.articles.count }
-        }
+        collectionsSnapshot.sortedLists
     }
     
     /// Lists not in any area
     private var rootLevelLists: [ReadingList] {
-        sortedLists.filter { $0.areaId == nil }
+        collectionsSnapshot.rootLevelLists
     }
     
     /// Lists within a specific area
     private func listsInArea(_ area: Area) -> [ReadingList] {
-        sortedLists.filter { $0.areaId == area.id }
+        collectionsSnapshot.lists(in: area)
     }
 
     /// Root-level areas (not nested under another area)
     private var rootAreas: [Area] {
-        areas.filter { $0.parentId == nil }.sorted(by: compareAreasForSortOrder)
+        collectionsSnapshot.rootAreas
     }
 
     /// Child areas within a specific parent area
     private func childAreas(of parent: Area) -> [Area] {
-        areas.filter { $0.parentId == parent.id }.sorted(by: compareAreasForSortOrder)
+        collectionsSnapshot.childAreas(of: parent)
     }
 
     private var sortedLabels: [Label] {
-        labels.sorted(by: compareLabelsForSortOrder)
+        collectionsSnapshot.sortedLabels
     }
 
     private var sortedTags: [Tag] {
-        tags.sorted(by: compareTagsForSortOrder)
+        collectionsSnapshot.sortedTags
     }
 
     private var labelArticleCounts: [UUID: Int] {
-        var counts: [UUID: Int] = [:]
-        counts.reserveCapacity(sortedLabels.count)
-        for article in savedArticles {
-            guard let labelId = article.labelId else { continue }
-            counts[labelId, default: 0] += 1
-        }
-        return counts
+        collectionsSnapshot.labelArticleCounts
     }
 
     private var tagArticleCounts: [UUID: Int] {
-        var titlesByTag: [UUID: Set<String>] = [:]
-        titlesByTag.reserveCapacity(sortedTags.count)
-
-        for highlight in highlights {
-            for tag in highlight.tags {
-                titlesByTag[tag.id, default: []].insert(highlight.articleTitle)
-            }
-        }
-
-        for state in articleStates {
-            for tag in state.tags {
-                titlesByTag[tag.id, default: []].insert(state.articleTitle)
-            }
-        }
-
-        var counts: [UUID: Int] = [:]
-        counts.reserveCapacity(titlesByTag.count)
-        for (tagId, titles) in titlesByTag {
-            counts[tagId] = titles.count
-        }
-        return counts
-    }
-
-    private func compareListsForManualSort(_ lhs: ReadingList, _ rhs: ReadingList) -> Bool {
-        if lhs.sortOrder != rhs.sortOrder {
-            return lhs.sortOrder < rhs.sortOrder
-        }
-        if lhs.createdAt != rhs.createdAt {
-            return lhs.createdAt < rhs.createdAt
-        }
-        return lhs.id.uuidString < rhs.id.uuidString
-    }
-
-    private func compareAreasForSortOrder(_ lhs: Area, _ rhs: Area) -> Bool {
-        if lhs.sortOrder != rhs.sortOrder {
-            return lhs.sortOrder < rhs.sortOrder
-        }
-        if lhs.createdAt != rhs.createdAt {
-            return lhs.createdAt < rhs.createdAt
-        }
-        return lhs.id.uuidString < rhs.id.uuidString
-    }
-
-    private func compareLabelsForSortOrder(_ lhs: Label, _ rhs: Label) -> Bool {
-        if lhs.sortOrder != rhs.sortOrder {
-            return lhs.sortOrder < rhs.sortOrder
-        }
-        if lhs.createdAt != rhs.createdAt {
-            return lhs.createdAt < rhs.createdAt
-        }
-        return lhs.id.uuidString < rhs.id.uuidString
-    }
-
-    private func compareTagsForSortOrder(_ lhs: Tag, _ rhs: Tag) -> Bool {
-        if lhs.sortOrder != rhs.sortOrder {
-            return lhs.sortOrder < rhs.sortOrder
-        }
-        if lhs.createdAt != rhs.createdAt {
-            return lhs.createdAt < rhs.createdAt
-        }
-        return lhs.id.uuidString < rhs.id.uuidString
+        collectionsSnapshot.tagArticleCounts
     }
 
     private var areaIndexByID: [UUID: Area] {
-        Dictionary(uniqueKeysWithValues: areas.map { ($0.id, $0) })
+        collectionsSnapshot.areaIndexByID
     }
 
     private var areaDeleteDialogTitle: String {
@@ -429,6 +372,25 @@ struct ListsSidebar: View {
         return "The selected folder\(pendingAreaDeletion.folderCount == 1 ? "" : "s") contain \(nestedDescription). Choose whether to move contents to root or delete them."
     }
 
+    private func saveModelContextNow() {
+        guard modelContext.hasChanges else { return }
+        try? modelContext.save()
+    }
+
+    private func requestModelContextSave() {
+        saveScheduler.schedule { [modelContext] in
+            guard modelContext.hasChanges else { return }
+            try? modelContext.save()
+        }
+    }
+
+    private func flushScheduledModelContextSave() {
+        saveScheduler.flush { [modelContext] in
+            guard modelContext.hasChanges else { return }
+            try? modelContext.save()
+        }
+    }
+
     private var sidebarWithPresentations: some View {
         sidebarList
         .sheet(isPresented: $showNewListSheet) {
@@ -443,7 +405,7 @@ struct ListsSidebar: View {
                     set: { newIcon in
                         list.icon = newIcon
                         list.updatedAt = Date()
-                        try? modelContext.save()
+                        requestModelContextSave()
                     }
                 ))
             } else {
@@ -509,48 +471,63 @@ struct ListsSidebar: View {
         }
     }
 
-    private var sidebarWithSelectionSync: some View {
+    private var sidebarWithCollectionSnapshotSync: some View {
         sidebarWithDeleteDialog
-        .onAppear {
-            syncSelectionFromBindings()
-            enforceWikiHopSelectionGuard()
-        }
-        .onChange(of: selectedList?.id) { _, _ in
-            syncSelectionFromBindings()
-        }
-        .onChange(of: selectedLabel?.id) { _, _ in
-            syncSelectionFromBindings()
-        }
-        .onChange(of: selectedTag?.id) { _, _ in
-            syncSelectionFromBindings()
-        }
-        .onChange(of: rootSelection) { _, _ in
-            syncSelectionFromBindings()
-        }
-        .onChange(of: isWikiHopEnabled) { _, _ in
-            enforceWikiHopSelectionGuard()
-            syncSelectionFromBindings()
-        }
-        .onChange(of: isWikiHopPostV1Enabled) { _, _ in
-            enforceWikiHopSelectionGuard()
-            syncSelectionFromBindings()
-        }
-        .onChange(of: areas.map(\.id)) { _, currentAreaIDs in
-            selectedAreaIDs.formIntersection(Set(currentAreaIDs))
-        }
-        .onChange(of: sidebarSelection) { _, newValue in
-            guard let newValue else { return }
-            applySelection(newValue)
-        }
-        .onChange(of: showAreaDeleteContentsPrompt) { _, isPresented in
-            if !isPresented {
-                pendingAreaDeletion = nil
+            .onAppear {
+                refreshCollectionsSnapshot()
+                syncSelectionFromBindings()
+                enforceWikiHopSelectionGuard()
             }
-        }
+            .onChange(of: collectionsFingerprint) { _, _ in
+                refreshCollectionsSnapshot()
+            }
+    }
+
+    private var sidebarWithBindingSelectionSync: some View {
+        sidebarWithCollectionSnapshotSync
+            .onChange(of: selectedList?.id) { _, _ in
+                syncSelectionFromBindings()
+            }
+            .onChange(of: selectedLabel?.id) { _, _ in
+                syncSelectionFromBindings()
+            }
+            .onChange(of: selectedTag?.id) { _, _ in
+                syncSelectionFromBindings()
+            }
+            .onChange(of: rootSelection) { _, _ in
+                syncSelectionFromBindings()
+            }
+    }
+
+    private var sidebarWithSelectionSync: some View {
+        sidebarWithBindingSelectionSync
+            .onChange(of: isWikiHopEnabled) { _, _ in
+                enforceWikiHopSelectionGuard()
+                syncSelectionFromBindings()
+            }
+            .onChange(of: isWikiHopPostV1Enabled) { _, _ in
+                enforceWikiHopSelectionGuard()
+                syncSelectionFromBindings()
+            }
+            .onChange(of: areas.map(\.id)) { _, currentAreaIDs in
+                selectedAreaIDs.formIntersection(Set(currentAreaIDs))
+            }
+            .onChange(of: sidebarSelection) { _, newValue in
+                guard let newValue else { return }
+                applySelection(newValue)
+            }
+            .onChange(of: showAreaDeleteContentsPrompt) { _, isPresented in
+                if !isPresented {
+                    pendingAreaDeletion = nil
+                }
+            }
     }
 
     var body: some View {
         sidebarWithSelectionSync
+        .onDisappear {
+            flushScheduledModelContextSave()
+        }
         .onReceive(NotificationCenter.default.publisher(for: .macWikiRequestNewReadingList)) { _ in
             showNewListSheet = true
         }
@@ -607,9 +584,17 @@ struct ListsSidebar: View {
     }
 
     private func sidebarAddButton(action: @escaping () -> Void, help: String) -> some View {
-        Button(action: action) {
-            sidebarAccessoryGlyph("plus")
-        }
+        Button(help, systemImage: "plus", action: action)
+            .labelStyle(.iconOnly)
+            .font(.system(size: SidebarMetrics.itemFontSize, weight: .semibold))
+            .imageScale(.medium)
+            .foregroundStyle(.secondary)
+            .frame(
+                width: SidebarMetrics.trailingControlSize,
+                height: SidebarMetrics.trailingControlSize,
+                alignment: .center
+            )
+            .contentShape(Rectangle())
         .buttonStyle(.borderless)
         .help(help)
     }
@@ -635,28 +620,35 @@ struct ListsSidebar: View {
         )
     }
 
+    private func rootSelectionItem(
+        _ title: String,
+        systemImage: String,
+        selection: SidebarSelectionID,
+        isSelected: Bool,
+        isDisabled: Bool = false
+    ) -> some View {
+        rootRowLabel(
+            title,
+            systemImage: systemImage,
+            isSelected: isSelected
+        )
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .listRowInsets(SidebarMetrics.rowInsets)
+        .tag(selection)
+        .disabled(isDisabled)
+    }
+
     private func selectableRootItem(
         _ title: String,
         systemImage: String,
         selection: SidebarRootSelection
     ) -> some View {
-        rootRowLabel(
+        rootSelectionItem(
             title,
             systemImage: systemImage,
+            selection: .root(selection),
             isSelected: resolvedSelection == .root(selection)
         )
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .listRowInsets(SidebarMetrics.rowInsets)
-        .onTapGesture {
-            selectSidebarTarget(.root(selection))
-        }
-    }
-
-    private func selectSidebarTarget(_ target: SidebarSelectionID) {
-        applySelection(target)
-        if sidebarSelection != target {
-            sidebarSelection = target
-        }
     }
 
     private func applySelection(_ selection: SidebarSelectionID) {
@@ -759,18 +751,13 @@ struct ListsSidebar: View {
         Section {
             selectableRootItem("Discover", systemImage: "sparkles", selection: .discover)
 
-            rootRowLabel(
+            rootSelectionItem(
                 "Search",
                 systemImage: "magnifyingglass",
-                isSelected: appState.showSearch
+                selection: .search,
+                isSelected: appState.showSearch,
+                isDisabled: appState.isWikiHopNavigationLocked
             )
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .listRowInsets(SidebarMetrics.rowInsets)
-            .disabled(appState.isWikiHopNavigationLocked)
-            .onTapGesture {
-                guard !appState.isWikiHopNavigationLocked else { return }
-                selectSidebarTarget(.search)
-            }
 
             selectableRootItem("Recents", systemImage: "clock", selection: .recents)
 
@@ -799,7 +786,7 @@ struct ListsSidebar: View {
                         area: area,
                         lists: listsInArea(area),
                         childAreas: childAreas(of: area),
-                        allAreas: areas,
+                        parentAreaByID: collectionsSnapshot.parentAreaByID,
                         selectedList: $selectedList,
                         selectedAreaIDs: $selectedAreaIDs,
                         sidebarSelection: $sidebarSelection,
@@ -814,6 +801,7 @@ struct ListsSidebar: View {
                         onRequestDelete: { areaIDs in
                             requestAreaDeletion(for: areaIDs)
                         },
+                        onPersistChange: requestModelContextSave,
                         onCollapseHidingSelectedList: {
                             setRecentsSelection()
                         }
@@ -848,9 +836,18 @@ struct ListsSidebar: View {
                         }
                     }
                 } label: {
-                    sidebarAccessoryGlyph("plus")
+                    SwiftUI.Label("Lists Options", systemImage: "plus")
+                        .labelStyle(.iconOnly)
+                        .font(.system(size: SidebarMetrics.itemFontSize, weight: .semibold))
+                        .imageScale(.medium)
+                        .foregroundStyle(.secondary)
+                        .frame(
+                            width: SidebarMetrics.trailingControlSize,
+                            height: SidebarMetrics.trailingControlSize,
+                            alignment: .center
+                        )
+                        .contentShape(Rectangle())
                         .accessibilityIdentifier("lists-options-menu")
-                        .accessibilityLabel("Lists Options Menu")
                 }
                 .menuStyle(.borderlessButton)
                 .help("List Options")
@@ -862,7 +859,7 @@ struct ListsSidebar: View {
     @ViewBuilder
     private var labelsSection: some View {
         Section {
-            if labels.isEmpty {
+            if sortedLabels.isEmpty {
                 Text("No labels")
                     .foregroundStyle(.secondary)
                     .font(SidebarMetrics.itemFont)
@@ -874,6 +871,7 @@ struct ListsSidebar: View {
                         label: label,
                         isSelected: sidebarSelection == .label(label.id),
                         articleCount: labelArticleCounts[label.id] ?? 0,
+                        onPersistChange: requestModelContextSave,
                         onRename: {
                             onEditLabel(label)
                         },
@@ -892,7 +890,7 @@ struct ListsSidebar: View {
                                 setRecentsSelection()
                             }
                             modelContext.delete(label)
-                            try? modelContext.save()
+                            saveModelContextNow()
                         }
                     )
                     .tag(SidebarSelectionID.label(label.id))
@@ -909,7 +907,7 @@ struct ListsSidebar: View {
     @ViewBuilder
     private var tagsSection: some View {
         Section {
-            if tags.isEmpty {
+            if sortedTags.isEmpty {
                 Text("No tags")
                     .foregroundStyle(.secondary)
                     .font(SidebarMetrics.itemFont)
@@ -929,7 +927,7 @@ struct ListsSidebar: View {
                                 setRecentsSelection()
                             }
                             modelContext.delete(tag)
-                            try? modelContext.save()
+                            saveModelContextNow()
                         }
                     )
                     .tag(SidebarSelectionID.tag(tag.id))
@@ -968,7 +966,7 @@ struct ListsSidebar: View {
                         setRecentsSelection()
                     }
                     modelContext.delete(list)
-                    try? modelContext.save()
+                    saveModelContextNow()
                 }
             }
         )
@@ -987,7 +985,7 @@ struct ListsSidebar: View {
             if let list = try? modelContext.fetch(descriptor).first {
                 // Move to root
                 list.areaId = nil
-                try? modelContext.save()
+                requestModelContextSave()
                 return true
             }
             return false
@@ -1067,7 +1065,7 @@ struct ListsSidebar: View {
             guard let lhs = index[lhsID], let rhs = index[rhsID] else {
                 return lhsID.uuidString < rhsID.uuidString
             }
-            return compareAreasForSortOrder(lhs, rhs)
+            return ListsSidebarSnapshot.compareAreasForSortOrder(lhs, rhs)
         }
     }
 
@@ -1115,7 +1113,7 @@ struct ListsSidebar: View {
                 modelContext.delete(area)
             }
         }
-        try? modelContext.save()
+        saveModelContextNow()
         selectedAreaIDs.subtract(rootSet)
     }
 
@@ -1148,7 +1146,7 @@ struct ListsSidebar: View {
             modelContext.delete(area)
         }
 
-        try? modelContext.save()
+        saveModelContextNow()
         selectedAreaIDs.subtract(subtreeAreaIDs)
     }
     
@@ -1164,7 +1162,7 @@ struct ListsSidebar: View {
         
         // Switch to manual sort to preserve order
         sortOrder = .manual
-        try? modelContext.save()
+        requestModelContextSave()
     }
     
     private func moveLabel(from source: IndexSet, to destination: Int) {
@@ -1175,7 +1173,7 @@ struct ListsSidebar: View {
         for (index, label) in updatedLabels.enumerated() {
             label.sortOrder = index
         }
-        try? modelContext.save()
+        requestModelContextSave()
     }
 
     private func moveTag(from source: IndexSet, to destination: Int) {
@@ -1185,7 +1183,7 @@ struct ListsSidebar: View {
         for (index, tag) in updatedTags.enumerated() {
             tag.sortOrder = index
         }
-        try? modelContext.save()
+        requestModelContextSave()
     }
 }
 
@@ -1357,6 +1355,7 @@ private struct LabelRowView: View {
     let label: Label
     let isSelected: Bool
     let articleCount: Int
+    let onPersistChange: () -> Void
     let onRename: () -> Void
     let onDelete: () -> Void
     
@@ -1422,7 +1421,7 @@ private struct LabelRowView: View {
         SwiftUI.ForEach(LabelColor.allCases, id: \.self) { (color: LabelColor) in
             Button {
                 label.color = color
-                try? modelContext.save()
+                onPersistChange()
             } label: {
                 SwiftUI.Label {
                     Text(color.rawValue)
@@ -1523,7 +1522,7 @@ private struct AreaRowView<ListRow: View>: View {
     let area: Area
     let lists: [ReadingList]
     let childAreas: [Area]
-    let allAreas: [Area]
+    let parentAreaByID: [UUID: UUID?]
     @Binding var selectedList: ReadingList?
     @Binding var selectedAreaIDs: Set<UUID>
     @Binding var sidebarSelection: SidebarSelectionID?
@@ -1532,6 +1531,7 @@ private struct AreaRowView<ListRow: View>: View {
     let childAreasOf: (Area) -> [Area]
     let onRename: (Area) -> Void
     let onRequestDelete: (Set<UUID>) -> Void
+    let onPersistChange: () -> Void
     let onCollapseHidingSelectedList: () -> Void
 
     @State private var isTargeted = false
@@ -1563,10 +1563,6 @@ private struct AreaRowView<ListRow: View>: View {
         return directLists + nestedLists
     }
 
-    private var parentAreaByID: [UUID: UUID?] {
-        Dictionary(uniqueKeysWithValues: allAreas.map { ($0.id, $0.parentId) })
-    }
-
     private var collapseWouldHideSelectedList: Bool {
         SidebarCollapseSelectionGuard.collapseWouldHideSelectedList(
             selectedAreaID: selectedList?.areaId,
@@ -1591,7 +1587,7 @@ private struct AreaRowView<ListRow: View>: View {
                         area.isExpanded = newValue
                     }
                 }
-                try? modelContext.save()
+                onPersistChange()
             }
         )) {
             // Nested child areas first
@@ -1600,7 +1596,7 @@ private struct AreaRowView<ListRow: View>: View {
                     area: childArea,
                     lists: listsInArea(childArea),
                     childAreas: childAreasOf(childArea),
-                    allAreas: allAreas,
+                    parentAreaByID: parentAreaByID,
                     selectedList: $selectedList,
                     selectedAreaIDs: $selectedAreaIDs,
                     sidebarSelection: $sidebarSelection,
@@ -1609,6 +1605,7 @@ private struct AreaRowView<ListRow: View>: View {
                     childAreasOf: childAreasOf,
                     onRename: onRename,
                     onRequestDelete: onRequestDelete,
+                    onPersistChange: onPersistChange,
                     onCollapseHidingSelectedList: onCollapseHidingSelectedList
                 )
             }
@@ -1711,7 +1708,7 @@ private struct AreaRowView<ListRow: View>: View {
             let listDescriptor = FetchDescriptor<ReadingList>(predicate: #Predicate { $0.id == uuid })
             if let list = try? modelContext.fetch(listDescriptor).first {
                 list.areaId = area.id
-                try? modelContext.save()
+                onPersistChange()
                 return true
             }
 
@@ -1720,10 +1717,10 @@ private struct AreaRowView<ListRow: View>: View {
             if let draggedArea = try? modelContext.fetch(areaDescriptor).first {
                 // Prevent dropping area into itself or its descendants
                 guard draggedArea.id != area.id else { return false }
-                guard !isDescendant(area, of: draggedArea) else { return false }
+                guard !isDescendant(areaID: area.id, of: draggedArea.id) else { return false }
 
                 draggedArea.parentId = area.id
-                try? modelContext.save()
+                onPersistChange()
                 return true
             }
 
@@ -1733,17 +1730,14 @@ private struct AreaRowView<ListRow: View>: View {
         }
     }
 
-    /// Check if potentialDescendant is a descendant of potentialAncestor
-    private func isDescendant(_ potentialDescendant: Area, of potentialAncestor: Area) -> Bool {
-        var current: Area? = potentialDescendant
-        while let check = current {
-            if check.id == potentialAncestor.id {
+    private func isDescendant(areaID potentialDescendantID: UUID, of potentialAncestorID: UUID) -> Bool {
+        var currentID: UUID? = potentialDescendantID
+        while let resolvedID = currentID {
+            if resolvedID == potentialAncestorID {
                 return true
             }
-            // Find parent area
-            current = allAreas.first { $0.id == check.parentId }
+            currentID = parentAreaByID[resolvedID] ?? nil
         }
         return false
     }
-
 }

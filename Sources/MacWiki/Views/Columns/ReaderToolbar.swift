@@ -731,7 +731,8 @@ struct ReaderToolbar: View {
                 }
             }
         } label: {
-            Image(systemName: "ellipsis")
+            SwiftUI.Label("More Actions", systemImage: "ellipsis")
+                .labelStyle(.iconOnly)
                 .font(.system(size: groupedControlSymbolSize, weight: .medium))
                 .imageScale(.medium)
                 .foregroundStyle(iconColor(enabled: true, isActive: false, isHovered: isHovered))

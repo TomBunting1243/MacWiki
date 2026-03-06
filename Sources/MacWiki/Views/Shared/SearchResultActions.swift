@@ -3,20 +3,6 @@ import SwiftData
 
 @MainActor
 enum SearchResultActions {
-    static func savedArticleTitlesNormalized(from lists: [ReadingList]) -> Set<String> {
-        var titles = Set<String>()
-        titles.reserveCapacity(lists.reduce(0) { $0 + $1.articles.count })
-
-        for list in lists {
-            for article in list.articles {
-                titles.insert(ReadStateSync.normalizedTitle(article.title))
-            }
-        }
-
-        return titles
-    }
-
-    @MainActor
     static func saveToList(
         _ result: WikipediaService.SearchResult,
         list: ReadingList,

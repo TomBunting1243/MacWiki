@@ -4,8 +4,6 @@ import SwiftData
 /// Unified context menu content for articles across all views.
 /// Ensures exact parity for Tags, Labels, Regular Lists, Tab History, and Recents.
 struct ArticleContextMenuContent: View {
-    @Environment(\.modelContext) private var modelContext
-    
     // Article info
     let title: String
     let description: String?
@@ -30,16 +28,35 @@ struct ArticleContextMenuContent: View {
     let onNewLabel: () -> Void
     let onToggleTag: (Tag) -> Void
     let onNewTag: () -> Void
+    var onOpen: (() -> Void)? = nil
     let onOpenInNewTab: () -> Void
     var onShowPageViews: (() -> Void)? = nil
     let onMoveToList: ((ReadingList) -> Void)?
     let onAddToList: ((ReadingList) -> Void)?
+    var onNewList: (() -> Void)? = {
+        NotificationCenter.default.post(name: .macWikiRequestNewReadingList, object: nil)
+    }
     let onRemove: (() -> Void)?
     let onCopyTitle: () -> Void
     let onCopyLink: () -> Void
+
+    private var currentTagIDs: Set<UUID> {
+        Set(currentTags.map(\.id))
+    }
+
+    private var addToListMenuTitle: String {
+        savedArticle == nil && currentList == nil ? "Save to List" : "Add to List"
+    }
+
+    private var addToListMenuSymbol: String {
+        savedArticle == nil && currentList == nil ? "bookmark" : "plus"
+    }
+
+    private var showsAddToListMenu: Bool {
+        onAddToList != nil || onNewList != nil
+    }
     
     var body: some View {
-        // MARK: - Toggle Read
         Button {
             onToggleRead()
         } label: {
@@ -51,20 +68,18 @@ struct ArticleContextMenuContent: View {
         
         Divider()
         
-        // MARK: - Set Label
-        if !allLabels.isEmpty {
-            Menu {
-                Button {
-                    onSetLabel(nil)
-                } label: {
-                    SwiftUI.Label(
-                        "None",
-                        systemImage: currentLabelId == nil ? "checkmark.circle" : "circle"
-                    )
-                }
-                
+        Menu {
+            Button {
+                onSetLabel(nil)
+            } label: {
+                SwiftUI.Label(
+                    "None",
+                    systemImage: currentLabelId == nil ? "checkmark.circle.fill" : "circle"
+                )
+            }
+
+            if !allLabels.isEmpty {
                 Divider()
-                
                 ForEach(allLabels) { label in
                     Button {
                         onSetLabel(label.id)
@@ -81,22 +96,26 @@ struct ArticleContextMenuContent: View {
                         }
                     }
                 }
-                
-                Divider()
-                
-                Button {
-                    onNewLabel()
-                } label: {
-                    SwiftUI.Label("New Label...", systemImage: "plus")
-                }
-            } label: {
-                SwiftUI.Label("Set Label", systemImage: "tag")
             }
+
+            Divider()
+
+            Button {
+                onNewLabel()
+            } label: {
+                SwiftUI.Label("New Label…", systemImage: "plus")
+            }
+        } label: {
+            SwiftUI.Label("Set Label", systemImage: "tag")
         }
-        
-        // MARK: - Set Tags
-        if !allTags.isEmpty {
-            Menu {
+
+        Menu {
+            if allTags.isEmpty {
+                Button { } label: {
+                    SwiftUI.Label("No Tags Yet", systemImage: "number")
+                }
+                .disabled(true)
+            } else {
                 ForEach(allTags) { tag in
                     Button {
                         onToggleTag(tag)
@@ -104,26 +123,33 @@ struct ArticleContextMenuContent: View {
                         SwiftUI.Label {
                             Text(tag.name)
                         } icon: {
-                            Image(systemName: currentTags.contains(where: { $0.id == tag.id }) ? "checkmark.circle.fill" : "circle")
+                            Image(systemName: currentTagIDs.contains(tag.id) ? "checkmark.circle.fill" : "circle")
                         }
                     }
                 }
-                
+
                 Divider()
-                
-                Button {
-                    onNewTag()
-                } label: {
-                    SwiftUI.Label("New Tag...", systemImage: "plus")
-                }
-            } label: {
-                SwiftUI.Label("Set Tags", systemImage: "number")
             }
+
+            Button {
+                onNewTag()
+            } label: {
+                SwiftUI.Label("New Tag…", systemImage: "plus")
+            }
+        } label: {
+            SwiftUI.Label("Set Tags", systemImage: "number")
         }
         
         Divider()
-        
-        // MARK: - Open in New Tab
+
+        if let onOpen {
+            Button {
+                onOpen()
+            } label: {
+                SwiftUI.Label("Open", systemImage: "doc.text")
+            }
+        }
+
         Button {
             onOpenInNewTab()
         } label: {
@@ -139,8 +165,7 @@ struct ArticleContextMenuContent: View {
         }
         
         Divider()
-        
-        // MARK: - Move/Add to List
+
         if let onMove = onMoveToList, let currentList = currentList, allLists.count > 1 {
             Menu {
                 ForEach(allLists.filter { $0.id != currentList.id }) { targetList in
@@ -155,21 +180,34 @@ struct ArticleContextMenuContent: View {
             }
         }
 
-        if let onAdd = onAddToList, !allLists.isEmpty {
+        if showsAddToListMenu {
             Menu {
-                ForEach(allLists) { list in
+                if let onAdd = onAddToList, !allLists.isEmpty {
+                    ForEach(allLists) { list in
+                        Button {
+                            onAdd(list)
+                        } label: {
+                            SwiftUI.Label(list.name, systemImage: list.icon)
+                        }
+                    }
+
+                    if onNewList != nil {
+                        Divider()
+                    }
+                }
+
+                if let onNewList {
                     Button {
-                        onAdd(list)
+                        onNewList()
                     } label: {
-                        SwiftUI.Label(list.name, systemImage: list.icon)
+                        SwiftUI.Label("New List…", systemImage: "plus")
                     }
                 }
             } label: {
-                SwiftUI.Label("Add to List", systemImage: "plus")
+                SwiftUI.Label(addToListMenuTitle, systemImage: addToListMenuSymbol)
             }
         }
         
-        // MARK: - Remove
         if let onRemove = onRemove {
             Button(role: .destructive) {
                 onRemove()
@@ -183,8 +221,7 @@ struct ArticleContextMenuContent: View {
         }
         
         Divider()
-        
-        // MARK: - Copy Actions
+
         Button {
             onCopyTitle()
         } label: {
@@ -213,10 +250,13 @@ extension ArticleContextMenuContent {
         appState: AppState,
         onNewLabel: @escaping (SavedArticle) -> Void,
         onNewTag: @escaping (Article) -> Void,
+        onOpen: (() -> Void)? = nil,
+        onOpenInNewTab: (() -> Void)? = nil,
         onRemove: (() -> Void)? = nil,
         onShowPageViews: (() -> Void)? = nil
     ) {
         let normalizedTitle = ReadStateSync.normalizedTitle(article.title)
+        let existingState = ReadStateSync.fetchArticleState(forURLString: article.url.absoluteString, in: modelContext)
 
         func existingSavedArticle() -> SavedArticle? {
             for list in allLists {
@@ -229,13 +269,22 @@ extension ArticleContextMenuContent {
             return nil
         }
 
+        let resolvedSavedArticle = existingSavedArticle()
+        let resolvedLabelId = resolvedSavedArticle?.labelId ?? existingState?.labelId
+        let resolvedTags: [Tag]
+        if currentTags.isEmpty {
+            resolvedTags = (existingState?.tags ?? []).sorted { $0.sortOrder < $1.sortOrder }
+        } else {
+            resolvedTags = currentTags
+        }
+
         self.title = article.title
         self.description = article.description
         self.extract = article.extract
         self.thumbnailURL = article.thumbnailURL
         self.isRead = isRead
-        self.currentLabelId = nil
-        self.currentTags = currentTags
+        self.currentLabelId = resolvedLabelId
+        self.currentTags = resolvedTags
         self.savedArticle = nil
         self.currentList = nil
         self.allLabels = allLabels
@@ -247,8 +296,17 @@ extension ArticleContextMenuContent {
         }
         
         self.onSetLabel = { labelId in
+            let state = ReadStateSync.ensureArticleState(for: article, in: modelContext, fallbackReadState: isRead)
+            state.labelId = labelId
+            state.updatedAt = Date()
+
             if let existing = existingSavedArticle() {
                 existing.labelId = labelId
+                try? modelContext.save()
+                return
+            }
+
+            guard let labelId else {
                 try? modelContext.save()
                 return
             }
@@ -271,13 +329,20 @@ extension ArticleContextMenuContent {
         }
         
         self.onNewLabel = {
-            let newSaved = SavedArticle(
+            if let existing = existingSavedArticle() {
+                onNewLabel(existing)
+                return
+            }
+
+            let draft = SavedArticle(
                 title: article.title,
                 description: article.description,
                 extract: article.extract,
                 thumbnailURL: article.thumbnailURL
             )
-            onNewLabel(newSaved)
+            draft.isRead = isRead
+            modelContext.insert(draft)
+            onNewLabel(draft)
         }
         
         self.onToggleTag = { tag in
@@ -307,8 +372,10 @@ extension ArticleContextMenuContent {
         self.onNewTag = {
             onNewTag(article)
         }
+
+        self.onOpen = onOpen
         
-        self.onOpenInNewTab = {
+        self.onOpenInNewTab = onOpenInNewTab ?? {
             appState.openArticleInNewTab(article)
         }
 

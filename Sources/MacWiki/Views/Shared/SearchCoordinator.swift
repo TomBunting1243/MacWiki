@@ -41,6 +41,7 @@ final class SearchCoordinator {
     @ObservationIgnored private var currentSearchRequestID: UUID?
 
     @ObservationIgnored private let wikipediaService: WikipediaService
+    @ObservationIgnored private let debounceMilliseconds: Int
     @ObservationIgnored private let debounceDuration: Duration
     @ObservationIgnored private let minimumQueryLength: Int
     @ObservationIgnored private let supportsTrending: Bool
@@ -56,7 +57,9 @@ final class SearchCoordinator {
         trendingPrefetchLimit: Int = 24
     ) {
         self.wikipediaService = wikipediaService
-        self.debounceDuration = .milliseconds(debounceMilliseconds)
+        let resolvedDebounceMilliseconds = max(0, debounceMilliseconds)
+        self.debounceMilliseconds = resolvedDebounceMilliseconds
+        self.debounceDuration = .milliseconds(resolvedDebounceMilliseconds)
         self.minimumQueryLength = max(1, minimumQueryLength)
         self.supportsTrending = supportsTrending
         self.searchPrefetchLimit = max(1, searchPrefetchLimit)
@@ -173,33 +176,47 @@ final class SearchCoordinator {
         isLoading = true
         errorMessage = nil
         let requestID = UUID()
+        let scheduledAt = CFAbsoluteTimeGetCurrent()
         currentSearchRequestID = requestID
 
         searchTask = Task { [weak self] in
             guard let self else { return }
             try? await Task.sleep(for: debounceDuration)
             guard !Task.isCancelled else { return }
+            let searchStartedAt = CFAbsoluteTimeGetCurrent()
 
             do {
                 let results = try await wikipediaService.search(query)
                 guard !Task.isCancelled else { return }
                 guard currentSearchRequestID == requestID else { return }
                 guard trimmedSearchText == query else { return }
+                let completedAt = CFAbsoluteTimeGetCurrent()
 
                 searchResults = results
                 isLoading = false
                 errorMessage = nil
                 clampSelectedIndex(usingTrendingFallback: false)
                 prefetchThumbnails(for: results, limit: searchPrefetchLimit)
+                PerformanceMetricsStore.shared.record(
+                    kind: .search,
+                    durationMs: (completedAt - scheduledAt) * 1_000,
+                    detail: "chars=\(query.count) results=\(results.count) debounce=\(debounceMilliseconds)ms network=\(Int(((completedAt - searchStartedAt) * 1_000).rounded()))ms"
+                )
             } catch {
                 guard !Task.isCancelled else { return }
                 guard currentSearchRequestID == requestID else { return }
                 guard trimmedSearchText == query else { return }
+                let failedAt = CFAbsoluteTimeGetCurrent()
 
                 searchResults = []
                 isLoading = false
                 errorMessage = error.localizedDescription
                 clampSelectedIndex(usingTrendingFallback: false)
+                PerformanceMetricsStore.shared.record(
+                    kind: .search,
+                    durationMs: (failedAt - scheduledAt) * 1_000,
+                    detail: "chars=\(query.count) results=0 debounce=\(debounceMilliseconds)ms status=error"
+                )
             }
         }
     }

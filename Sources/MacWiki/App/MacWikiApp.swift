@@ -38,6 +38,7 @@ struct MacWikiApp: App {
     @Environment(\.scenePhase) private var scenePhase
     @State private var appState: AppState
     @State private var launchIssue: LaunchIssue?
+    @State private var hasPresentedLaunchIssue = false
     private let bootstrap: ModelContainerBootstrap
 
     init() {
@@ -46,7 +47,7 @@ struct MacWikiApp: App {
         let bootstrap = Self.makeModelContainerBootstrap()
         self.bootstrap = bootstrap
         _appState = State(initialValue: AppState())
-        _launchIssue = State(initialValue: bootstrap.launchIssue)
+        _launchIssue = State(initialValue: nil)
     }
 
     private static var modelSchema: Schema {
@@ -213,6 +214,13 @@ struct MacWikiApp: App {
                         message: Text(issue.message),
                         dismissButton: .default(Text("Continue"))
                     )
+                }
+                .task {
+                    guard !hasPresentedLaunchIssue else { return }
+                    hasPresentedLaunchIssue = true
+                    if let issue = bootstrap.launchIssue {
+                        launchIssue = issue
+                    }
                 }
                 .onChange(of: scenePhase) { _, newPhase in
                     if newPhase != .active {
