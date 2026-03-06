@@ -28,18 +28,13 @@ enum ColumnChromeMetrics {
         colorScheme == .dark ? darkInternalDividerOpacity : internalDividerOpacity
     }
 
-    /// Titlebar/toolbar clearance that the reader should treat as native chrome.
-    static func readerTitleBarHeight(windowTopObscuredHeight: CGFloat) -> CGFloat {
-        max(windowTopObscuredHeight, titleBarClearance)
+    /// Combined overlay height of the reader-owned top chrome.
+    /// The native macOS toolbar now owns the titlebar band; the reader only overlays its tab lane.
+    static func readerChromeOverlayHeight(windowTopObscuredHeight _: CGFloat) -> CGFloat {
+        return topBarHeight
     }
 
-    /// Combined overlay height of native toolbar clearance + reader tab lane in liquid-glass mode.
-    static func readerChromeOverlayHeight(windowTopObscuredHeight: CGFloat) -> CGFloat {
-        let resolvedTitleBarHeight = readerTitleBarHeight(windowTopObscuredHeight: windowTopObscuredHeight)
-        return resolvedTitleBarHeight + topBarHeight
-    }
-
-    /// Suggested content inset that clears reader overlay chrome with comfortable breathing room.
+    /// Suggested content inset that clears the reader-owned overlay chrome with comfortable breathing room.
     static func readerContentTopInset(
         windowTopObscuredHeight: CGFloat,
         additionalSpacing: CGFloat = 12
