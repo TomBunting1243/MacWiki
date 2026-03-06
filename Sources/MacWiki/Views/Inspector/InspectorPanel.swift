@@ -83,7 +83,7 @@ struct InspectorPanel: View {
     }
 
     private enum InspectorLayout {
-        static let contentTopPadding: CGFloat = 2
+        static let contentTopPadding: CGFloat = 8
         static let sectionSpacing: CGFloat = 14
         static let sectionCornerRadius: CGFloat = 12
         static let modeSelectorSymbolPointSize: CGFloat = 14.5
@@ -305,12 +305,12 @@ struct InspectorPanel: View {
         max(0, inspectorTopBarHeight - ColumnChromeMetrics.topBarHeight)
     }
 
-    private var showsReaderCompanionLane: Bool {
-        !appState.isWikiHopNavigationLocked && !appState.isFocusModeEnabled
+    private var inspectorChromeHeight: CGFloat {
+        inspectorTopBarHeight
     }
 
-    private var inspectorChromeHeight: CGFloat {
-        inspectorTopBarHeight + (showsReaderCompanionLane ? ColumnChromeMetrics.topBarHeight : 0)
+    private var inspectorHeaderBottomPadding: CGFloat {
+        7
     }
 
     private var sectionFillOpacity: Double {
@@ -329,12 +329,7 @@ struct InspectorPanel: View {
                     .frame(height: inspectorTopSpacerHeight)
             }
 
-            // Icon tab bar
-            inspectorTabBar
-
-            if showsReaderCompanionLane {
-                inspectorCompanionLane
-            }
+            inspectorHeaderBar
 
             // Content area
             inspectorContent
@@ -390,33 +385,40 @@ struct InspectorPanel: View {
         }
     }
     
-    private var inspectorTabBar: some View {
-        ZStack {
+    private var inspectorHeaderBar: some View {
+        ZStack(alignment: .bottomLeading) {
             WindowDragHandle(minLength: 80)
                 .frame(maxWidth: .infinity)
 
-            HStack {
-                Spacer(minLength: 0)
+            HStack(alignment: .bottom, spacing: 12) {
+                inspectorHeaderIdentity
+
+                Spacer(minLength: 12)
+
                 inspectorModeSelector
-                Spacer(minLength: 0)
             }
+            .padding(.horizontal, 12)
+            .padding(.bottom, inspectorHeaderBottomPadding)
         }
-        .padding(.horizontal, ColumnChromeMetrics.horizontalPadding)
         .frame(height: ColumnChromeMetrics.topBarHeight)
         .animation(.interactiveSpring(response: 0.22, dampingFraction: 0.90), value: appState.inspectorMode)
         .zIndex(1)
     }
 
-    private var inspectorCompanionLane: some View {
-        WindowDragHandle(minLength: 80)
-            .frame(maxWidth: .infinity)
-            .frame(height: ColumnChromeMetrics.topBarHeight)
-            .overlay(alignment: .top) {
-                Rectangle()
-                    .fill(Color.primary.opacity(ColumnChromeMetrics.internalDividerOpacity(for: colorScheme)))
-                    .frame(height: 0.5)
-                    .allowsHitTesting(false)
+    private var inspectorHeaderIdentity: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(appState.inspectorMode.rawValue)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.primary)
+                .lineLimit(1)
+
+            if let currentTitle = appState.currentArticle?.title {
+                Text(currentTitle)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.tertiary)
+                    .lineLimit(1)
             }
+        }
     }
 
     private var inspectorModeSelector: some View {
@@ -967,17 +969,17 @@ private struct InspectorModeControl: View {
     private enum Metrics {
         static let pillWidth: CGFloat = 32
         static let pillHeight: CGFloat = TopChromeControlMetrics.groupButtonSize
-        static let pillSpacing: CGFloat = 4
+        static let pillSpacing: CGFloat = 0
         static let pillCornerRadius: CGFloat = TopChromeControlMetrics.groupCornerRadius
-        static let railHorizontalPadding: CGFloat = 2
-        static let railVerticalPadding: CGFloat = 1
+        static let railHorizontalPadding: CGFloat = TopChromeControlMetrics.groupHorizontalPadding
+        static let railVerticalPadding: CGFloat = 0
     }
 
     var body: some View {
         let darkMode = colorScheme == .dark
 
         HStack(spacing: Metrics.pillSpacing) {
-            ForEach(modes, id: \.self) { mode in
+            ForEach(Array(modes.enumerated()), id: \.element) { index, mode in
                 let isActive = selectedMode == mode
                 let isHovered = hoveredMode == mode && !isActive
 
@@ -999,27 +1001,12 @@ private struct InspectorModeControl: View {
                 }
                 .buttonStyle(.plain)
                 .background {
-                    ZStack {
-                        basePillBackground(darkMode: darkMode)
-                        if isActive {
-                            activePillBackground(darkMode: darkMode)
-                                .matchedGeometryEffect(id: "inspector-mode-active-pill", in: activeModeNamespace)
-                        } else if isHovered {
-                            hoverPillBackground(darkMode: darkMode)
-                        }
+                    if isActive {
+                        activePillBackground(darkMode: darkMode)
+                            .matchedGeometryEffect(id: "inspector-mode-active-pill", in: activeModeNamespace)
+                    } else if isHovered {
+                        hoverPillBackground(darkMode: darkMode)
                     }
-                }
-                .overlay {
-                    RoundedRectangle(cornerRadius: Metrics.pillCornerRadius, style: .continuous)
-                        .strokeBorder(
-                            Color.primary.opacity(
-                                TopChromeControlSurface.borderOpacity(
-                                    darkMode: darkMode,
-                                    liquid: useLiquidGlass
-                                )
-                            ),
-                            lineWidth: useLiquidGlass ? 0.52 : 0.60
-                        )
                 }
                 .clipShape(RoundedRectangle(cornerRadius: Metrics.pillCornerRadius, style: .continuous))
                 .contentShape(RoundedRectangle(cornerRadius: Metrics.pillCornerRadius, style: .continuous))
@@ -1032,10 +1019,18 @@ private struct InspectorModeControl: View {
                 }
                 .help(mode.rawValue)
                 .accessibilityLabel(mode.rawValue)
+
+                if index < modes.count - 1 {
+                    railDivider
+                }
             }
         }
         .padding(.horizontal, Metrics.railHorizontalPadding)
         .padding(.vertical, Metrics.railVerticalPadding)
+        .frame(height: TopChromeControlMetrics.groupHeight)
+        .background {
+            railBackground(darkMode: darkMode)
+        }
     }
 
     private func iconColor(isActive: Bool, isHovered: Bool, darkMode: Bool) -> Color {
@@ -1048,43 +1043,40 @@ private struct InspectorModeControl: View {
         return Color.primary.opacity(InspectorModePillStyle.iconPrimaryOpacity(darkMode: darkMode))
     }
 
+    private var railDivider: some View {
+        Rectangle()
+            .fill(Color.primary.opacity(ColumnChromeMetrics.internalDividerOpacity(for: colorScheme) * 1.45))
+            .frame(width: 0.5, height: 13)
+    }
+
     @ViewBuilder
-    private func basePillBackground(darkMode: Bool) -> some View {
+    private func railBackground(darkMode: Bool) -> some View {
         if useLiquidGlass {
             RoundedRectangle(cornerRadius: Metrics.pillCornerRadius, style: .continuous)
-                .fill(.ultraThinMaterial)
+                .fill(.thinMaterial)
                 .overlay {
                     RoundedRectangle(cornerRadius: Metrics.pillCornerRadius, style: .continuous)
                         .fill(
-                            Color(nsColor: .windowBackgroundColor)
-                                .opacity(TopChromeControlSurface.tintOpacity(darkMode: darkMode))
+                            Color(nsColor: .controlBackgroundColor)
+                                .opacity(darkMode ? 0.18 : 0.10)
                         )
                 }
                 .overlay {
                     RoundedRectangle(cornerRadius: Metrics.pillCornerRadius, style: .continuous)
-                        .fill(
-                            LinearGradient(
-                                colors: [
-                                    Color.white.opacity(TopChromeControlSurface.sheenOpacity(darkMode: darkMode)),
-                                    Color.clear,
-                                    Color.clear
-                                ],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
+                        .strokeBorder(
+                            Color.primary.opacity(
+                                TopChromeControlSurface.borderOpacity(
+                                    darkMode: darkMode,
+                                    liquid: useLiquidGlass,
+                                    compactAccessory: true
+                                )
+                            ),
+                            lineWidth: 0.44
                         )
-                        .blendMode(.screen)
-                }
-                .overlay {
-                    RoundedRectangle(cornerRadius: Metrics.pillCornerRadius, style: .continuous)
-                        .fill(
-                            Color.black.opacity(TopChromeControlSurface.depthMultiplyOpacity(darkMode: darkMode))
-                        )
-                        .blendMode(.multiply)
                 }
         } else {
             RoundedRectangle(cornerRadius: Metrics.pillCornerRadius, style: .continuous)
-                .fill(Color(nsColor: .controlBackgroundColor))
+                .fill(Color(nsColor: .controlBackgroundColor).opacity(darkMode ? 0.68 : 0.82))
         }
     }
 
