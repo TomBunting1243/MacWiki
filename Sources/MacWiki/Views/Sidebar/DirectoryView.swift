@@ -1802,10 +1802,11 @@ struct ArticleListItem<Content: View>: View {
     private var rowFill: Color {
         let isKeyWindow = controlActiveState == .key
         if isSelected {
-            return Color.accentColor.opacity(colorScheme == .dark ? (isKeyWindow ? 0.22 : 0.16) : (isKeyWindow ? 0.18 : 0.14))
+            return Color(nsColor: .controlBackgroundColor)
+                .opacity(colorScheme == .dark ? (isKeyWindow ? 0.30 : 0.22) : (isKeyWindow ? 0.66 : 0.54))
         }
         if isCurrent {
-            return Color.accentColor.opacity(colorScheme == .dark ? 0.12 : 0.09)
+            return Color.accentColor.opacity(colorScheme == .dark ? 0.07 : 0.04)
         }
         if isHovered {
             return colorScheme == .dark
@@ -1818,10 +1819,10 @@ struct ArticleListItem<Content: View>: View {
     private var rowStroke: Color {
         let isKeyWindow = controlActiveState == .key
         if isSelected {
-            return Color.accentColor.opacity(colorScheme == .dark ? (isKeyWindow ? 0.36 : 0.26) : (isKeyWindow ? 0.28 : 0.20))
+            return Color.accentColor.opacity(colorScheme == .dark ? (isKeyWindow ? 0.19 : 0.14) : (isKeyWindow ? 0.15 : 0.11))
         }
         if isCurrent {
-            return Color.accentColor.opacity(colorScheme == .dark ? 0.24 : 0.14)
+            return Color.primary.opacity(colorScheme == .dark ? 0.14 : 0.09)
         }
         if isHovered {
             return colorScheme == .dark
