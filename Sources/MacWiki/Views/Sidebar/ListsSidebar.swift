@@ -168,6 +168,7 @@ private struct SidebarRowSurface: View {
                         )
                 }
             }
+            .padding(.horizontal, 2)
     }
 }
 
