@@ -2,6 +2,9 @@ import SwiftUI
 
 struct FindOnPageBarView: View {
     @Environment(AppState.self) private var appState
+    @Environment(\.colorScheme) private var colorScheme
+    @AppStorage("tabBarLiquidGlass") private var tabBarLiquidGlass = true
+    @AppStorage(MacWikiGlassRuntime.forceLegacyFallbackKey) private var forceLegacyGlassFallback = false
     let tabID: UUID
     let availableWidth: CGFloat
 
@@ -19,6 +22,8 @@ struct FindOnPageBarView: View {
         static let statusChipHeight: CGFloat = 20
         static let buttonSize: CGFloat = 26
         static let symbolSize: CGFloat = 12
+        static let groupCornerRadius: CGFloat = 9
+        static let fieldCornerRadius: CGFloat = 8
         static let horizontalPadding: CGFloat = 10
         static let verticalPadding: CGFloat = 8
         static let debounceMs: UInt64 = 120
@@ -58,6 +63,18 @@ struct FindOnPageBarView: View {
         return nil
     }
 
+    private var findQueryBinding: Binding<String> {
+        Binding(
+            get: { appState.findOnPageQuery },
+            set: { appState.findOnPageQuery = $0 }
+        )
+    }
+
+    private var usesNativeGlass: Bool {
+        tabBarLiquidGlass &&
+            MacWikiGlassRuntime.usesNativeGlass(forceLegacyFallback: forceLegacyGlassFallback)
+    }
+
     @ViewBuilder
     private var statusChip: some View {
         Group {
@@ -65,13 +82,10 @@ struct FindOnPageBarView: View {
                 Text(statusText)
                     .font(.system(size: 11, weight: .medium))
                     .monospacedDigit()
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(statusChipForegroundStyle)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 3)
-                    .background(
-                        RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .fill(.quaternary)
-                    )
+                    .background(statusChipBackground)
                     .frame(width: Metrics.statusChipWidth, height: Metrics.statusChipHeight)
             } else {
                 Color.clear
@@ -84,89 +98,18 @@ struct FindOnPageBarView: View {
         @Bindable var appState = appState
 
         HStack(spacing: 8) {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(.secondary)
-
-            TextField("Find in page", text: $appState.findOnPageQuery)
-                .textFieldStyle(.plain)
-                .focused($isFieldFocused)
-                .frame(width: resolvedFieldWidth)
-                .onSubmit {
-                    findNext()
-                }
-                .onChange(of: appState.findOnPageQuery) { _, newValue in
-                    scheduleFind(for: newValue)
-                }
-
-            Button {
-                appState.findOnPageQuery = ""
-                appState.findOnPageMatchFound = nil
-                appState.findOnPageMatchCount = nil
-                issueFind(query: "", backwards: false)
-            } label: {
-                Image(systemName: "xmark.circle.fill")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(.tertiary)
-                    .frame(width: Metrics.buttonSize, height: Metrics.buttonSize)
-            }
-            .buttonStyle(.plain)
-            .help("Clear")
-            .opacity(hasQuery ? 1 : 0)
-            .allowsHitTesting(hasQuery)
-            .accessibilityHidden(!hasQuery)
+            searchFieldGroup
 
             if !isCompactLayout {
                 statusChip
             }
 
-            Button {
-                findPrevious()
-            } label: {
-                Image(systemName: "chevron.up")
-                    .font(.system(size: Metrics.symbolSize, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                    .frame(width: Metrics.buttonSize, height: Metrics.buttonSize)
-            }
-            .buttonStyle(.plain)
-            .help("Previous")
-
-            Button {
-                findNext()
-            } label: {
-                Image(systemName: "chevron.down")
-                    .font(.system(size: Metrics.symbolSize, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                    .frame(width: Metrics.buttonSize, height: Metrics.buttonSize)
-            }
-            .buttonStyle(.plain)
-            .help("Next")
-
-            Divider()
-                .frame(height: 16)
-
-            Button {
-                dismiss()
-            } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                    .frame(width: Metrics.buttonSize, height: Metrics.buttonSize)
-            }
-            .buttonStyle(.plain)
-            .help("Done")
+            actionGroup
         }
         .padding(.horizontal, Metrics.horizontalPadding)
         .padding(.vertical, Metrics.verticalPadding)
-        .background(
-            RoundedRectangle(cornerRadius: Metrics.cornerRadius, style: .continuous)
-                .fill(.ultraThinMaterial)
-                .overlay(
-                    RoundedRectangle(cornerRadius: Metrics.cornerRadius, style: .continuous)
-                        .strokeBorder(Color.primary.opacity(0.10), lineWidth: 0.7)
-                )
-        )
-        .shadow(color: .black.opacity(0.12), radius: 14, x: 0, y: 6)
+        .background(findBarBackground)
+        .shadow(color: .black.opacity(colorScheme == .dark ? 0.16 : 0.06), radius: 10, x: 0, y: 4)
         .frame(maxWidth: max(0, availableWidth), alignment: .trailing)
         .onAppear {
             DispatchQueue.main.async {
@@ -180,6 +123,154 @@ struct FindOnPageBarView: View {
             findTask?.cancel()
             findTask = nil
         }
+    }
+
+    private var searchFieldGroup: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(.secondary)
+
+            TextField("Find in page", text: findQueryBinding)
+                .textFieldStyle(.plain)
+                .focused($isFieldFocused)
+                .frame(width: resolvedFieldWidth)
+                .onSubmit {
+                    findNext()
+                }
+                .onChange(of: appState.findOnPageQuery) { _, newValue in
+                    scheduleFind(for: newValue)
+                }
+
+            Button("Clear", systemImage: "xmark.circle.fill", action: clearQuery)
+                .labelStyle(.iconOnly)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(.tertiary)
+                .frame(width: Metrics.buttonSize, height: Metrics.buttonSize)
+                .buttonStyle(.plain)
+                .help("Clear")
+                .opacity(hasQuery ? 1 : 0)
+                .allowsHitTesting(hasQuery)
+                .accessibilityHidden(!hasQuery)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .background(searchFieldBackground)
+    }
+
+    private var actionGroup: some View {
+        HStack(spacing: 2) {
+            Button("Previous", systemImage: "chevron.up", action: findPrevious)
+                .labelStyle(.iconOnly)
+                .font(.system(size: Metrics.symbolSize, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .frame(width: Metrics.buttonSize, height: Metrics.buttonSize)
+                .buttonStyle(.plain)
+                .help("Previous")
+
+            Button("Next", systemImage: "chevron.down", action: findNext)
+                .labelStyle(.iconOnly)
+                .font(.system(size: Metrics.symbolSize, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .frame(width: Metrics.buttonSize, height: Metrics.buttonSize)
+                .buttonStyle(.plain)
+                .help("Next")
+
+            Rectangle()
+                .fill(Color.primary.opacity(colorScheme == .dark ? 0.08 : 0.05))
+                .frame(width: 0.5, height: 16)
+                .padding(.horizontal, 2)
+
+            Button("Done", systemImage: "xmark", action: dismiss)
+                .labelStyle(.iconOnly)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .frame(width: Metrics.buttonSize, height: Metrics.buttonSize)
+                .buttonStyle(.plain)
+                .help("Done")
+        }
+        .padding(.horizontal, 4)
+        .padding(.vertical, 3)
+        .background(actionGroupBackground)
+    }
+
+    @ViewBuilder
+    private var findBarBackground: some View {
+        let shape = RoundedRectangle(cornerRadius: Metrics.cornerRadius, style: .continuous)
+        if #available(macOS 26, *), usesNativeGlass {
+            shape
+                .fill(.clear)
+                .glassEffect(.regular, in: .rect(cornerRadius: Metrics.cornerRadius))
+                .overlay {
+                    shape.fill(Color(nsColor: .windowBackgroundColor).opacity(colorScheme == .dark ? 0.022 : 0.014))
+                }
+                .overlay {
+                    shape.strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.070 : 0.046), lineWidth: 0.52)
+                }
+        } else {
+            shape
+                .fill(.thinMaterial)
+                .overlay {
+                    shape.fill(Color(nsColor: .windowBackgroundColor).opacity(colorScheme == .dark ? 0.10 : 0.06))
+                }
+                .overlay {
+                    shape.strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.09 : 0.055), lineWidth: 0.52)
+                }
+        }
+    }
+
+    private var searchFieldBackground: some View {
+        RoundedRectangle(cornerRadius: Metrics.fieldCornerRadius, style: .continuous)
+            .fill(Color(nsColor: .windowBackgroundColor).opacity(colorScheme == .dark ? 0.12 : 0.065))
+            .overlay {
+                RoundedRectangle(cornerRadius: Metrics.fieldCornerRadius, style: .continuous)
+                    .strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.050 : 0.032), lineWidth: 0.45)
+            }
+    }
+
+    private var actionGroupBackground: some View {
+        RoundedRectangle(cornerRadius: Metrics.groupCornerRadius, style: .continuous)
+            .fill(Color(nsColor: .windowBackgroundColor).opacity(colorScheme == .dark ? 0.10 : 0.055))
+            .overlay {
+                RoundedRectangle(cornerRadius: Metrics.groupCornerRadius, style: .continuous)
+                    .strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.048 : 0.030), lineWidth: 0.45)
+            }
+    }
+
+    private var statusChipForegroundStyle: Color {
+        if let found = appState.findOnPageMatchFound, !found {
+            return .primary.opacity(colorScheme == .dark ? 0.84 : 0.72)
+        }
+        return .secondary
+    }
+
+    private var statusChipBackground: some View {
+        RoundedRectangle(cornerRadius: 6, style: .continuous)
+            .fill(
+                Color(nsColor: .windowBackgroundColor)
+                    .opacity(statusChipFillOpacity)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .strokeBorder(
+                        statusChipStrokeColor,
+                        lineWidth: 0.45
+                    )
+            }
+    }
+
+    private var statusChipFillOpacity: Double {
+        if let found = appState.findOnPageMatchFound, !found {
+            return colorScheme == .dark ? 0.16 : 0.10
+        }
+        return colorScheme == .dark ? 0.10 : 0.055
+    }
+
+    private var statusChipStrokeColor: Color {
+        if let found = appState.findOnPageMatchFound, !found {
+            return Color.accentColor.opacity(colorScheme == .dark ? 0.16 : 0.10)
+        }
+        return Color.primary.opacity(colorScheme == .dark ? 0.048 : 0.030)
     }
 
     private func scheduleFind(for query: String) {
@@ -200,6 +291,13 @@ struct FindOnPageBarView: View {
             guard !Task.isCancelled else { return }
             issueFind(query: trimmed, backwards: false)
         }
+    }
+
+    private func clearQuery() {
+        appState.findOnPageQuery = ""
+        appState.findOnPageMatchFound = nil
+        appState.findOnPageMatchCount = nil
+        issueFind(query: "", backwards: false)
     }
 
     private func issueFind(query: String, backwards: Bool) {
