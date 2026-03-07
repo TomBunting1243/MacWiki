@@ -87,6 +87,7 @@ struct ContentView: View {
         ZStack(alignment: .topLeading) {
             workspaceSharedBackground
             mainSplitView
+            sidebarTitlebarCap
             sidebarWindowDragOverlay
             inspectorRevealOverlay
             wikiHopOverlay
@@ -342,6 +343,25 @@ struct ContentView: View {
     private var chromeRevealTopPadding: CGFloat {
         let topObscuredHeight = max(appState.windowTopObscuredHeight, ColumnChromeMetrics.topBarHeight)
         return max(6, (topObscuredHeight - ChromeIconMetrics.buttonSize) * 0.5)
+    }
+
+    @ViewBuilder
+    private var sidebarTitlebarCap: some View {
+        if appState.sidebarVisible {
+            SidebarPaneBackground()
+                .frame(
+                    width: resolvedListsSidebarWidth + 1,
+                    height: max(appState.windowTopObscuredHeight, 0),
+                    alignment: .topLeading
+                )
+                .overlay(alignment: .trailing) {
+                    Rectangle()
+                        .fill(Color.primary.opacity(colorScheme == .dark ? 0.16 : 0.09))
+                        .frame(width: 0.5)
+                }
+                .ignoresSafeArea(.container, edges: .top)
+                .allowsHitTesting(false)
+        }
     }
 
     private var sidebarDragHeight: CGFloat {
