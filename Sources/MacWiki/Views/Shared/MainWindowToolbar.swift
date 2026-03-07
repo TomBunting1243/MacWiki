@@ -85,8 +85,7 @@ struct MainWindowToolbar: CustomizableToolbarContent {
 
     private var leadingToolbarDeadZoneWidth: CGFloat {
         guard appState.sidebarVisible else { return 0 }
-        let sidebarWidth = CGFloat(min(max(listsSidebarWidth, 176), 260))
-        return max(0, sidebarWidth - ColumnChromeMetrics.titleBarClearance)
+        return CGFloat(min(max(listsSidebarWidth, 176), 260))
     }
 
     private var trailingToolbarDeadZoneWidth: CGFloat {
@@ -304,7 +303,7 @@ struct MainWindowToolbar: CustomizableToolbarContent {
         }
         .multilineTextAlignment(.center)
         .allowsTightening(true)
-        .padding(.horizontal, 10)
+        .padding(.horizontal, 8)
         .help(principalTitle)
     }
 

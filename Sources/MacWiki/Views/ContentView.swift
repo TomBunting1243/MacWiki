@@ -344,6 +344,14 @@ struct ContentView: View {
         return max(6, (topObscuredHeight - ChromeIconMetrics.buttonSize) * 0.5)
     }
 
+    private var roofDividerColor: Color {
+        Color.primary.opacity(ColumnChromeMetrics.dividerOpacity(for: colorScheme))
+    }
+
+    private var roofVerticalDividerColor: Color {
+        Color.primary.opacity(colorScheme == .dark ? 0.14 : 0.09)
+    }
+
     @ViewBuilder
     private var centerToolbarBand: some View {
         GeometryReader { proxy in
@@ -355,9 +363,19 @@ struct ContentView: View {
             if topBandHeight > 0.5 && bandWidth > 0.5 {
                 ColumnChromeBackground()
                     .frame(width: bandWidth, height: topBandHeight, alignment: .topLeading)
+                    .overlay(alignment: .leading) {
+                        Rectangle()
+                            .fill(roofVerticalDividerColor)
+                            .frame(width: 0.5)
+                    }
+                    .overlay(alignment: .trailing) {
+                        Rectangle()
+                            .fill(roofVerticalDividerColor)
+                            .frame(width: 0.5)
+                    }
                     .overlay(alignment: .bottom) {
                         Rectangle()
-                            .fill(Color.primary.opacity(colorScheme == .dark ? 0.14 : 0.08))
+                            .fill(roofDividerColor)
                             .frame(height: 0.5)
                     }
                     .offset(x: leadingInset)
@@ -379,8 +397,13 @@ struct ContentView: View {
                 )
                 .overlay(alignment: .trailing) {
                     Rectangle()
-                        .fill(Color.primary.opacity(colorScheme == .dark ? 0.16 : 0.09))
+                        .fill(roofVerticalDividerColor)
                         .frame(width: 0.5)
+                }
+                .overlay(alignment: .bottom) {
+                    Rectangle()
+                        .fill(roofDividerColor)
+                        .frame(height: 0.5)
                 }
                 .ignoresSafeArea(.container, edges: .top)
                 .allowsHitTesting(false)
