@@ -339,21 +339,25 @@ struct ToolbarBandBackground: View {
                 }
                 .overlay {
                     Color(nsColor: .windowBackgroundColor)
-                        .opacity(colorScheme == .dark ? 0.060 : 0.034)
+                        .opacity(colorScheme == .dark ? 0.045 : 0.026)
+                }
+                .overlay {
+                    Color(nsColor: .controlBackgroundColor)
+                        .opacity(colorScheme == .dark ? 0.016 : 0.008)
                 }
         } else {
             Rectangle()
-                .fill(.ultraThinMaterial)
+                .fill(.thinMaterial)
                 .overlay {
                     toolbarTintOverlay
                 }
                 .overlay {
                     Color(nsColor: .windowBackgroundColor)
-                        .opacity(colorScheme == .dark ? 0.090 : 0.050)
+                        .opacity(colorScheme == .dark ? 0.075 : 0.042)
                 }
                 .overlay {
                     Color(nsColor: .controlBackgroundColor)
-                        .opacity(colorScheme == .dark ? 0.040 : 0.020)
+                        .opacity(colorScheme == .dark ? 0.026 : 0.014)
                 }
         }
     }
@@ -361,8 +365,8 @@ struct ToolbarBandBackground: View {
     private var toolbarTintOverlay: some View {
         LinearGradient(
             colors: [
-                accentTint.opacity(colorScheme == .dark ? 0.13 : 0.055),
-                accentTint.opacity(colorScheme == .dark ? 0.07 : 0.028),
+                accentTint.opacity(colorScheme == .dark ? 0.078 : 0.032),
+                accentTint.opacity(colorScheme == .dark ? 0.034 : 0.014),
                 Color.clear
             ],
             startPoint: .topLeading,

@@ -349,7 +349,7 @@ struct ContentView: View {
     }
 
     private var roofVerticalDividerColor: Color {
-        Color.primary.opacity(colorScheme == .dark ? 0.14 : 0.09)
+        Color.primary.opacity(colorScheme == .dark ? 0.10 : 0.07)
     }
 
     @ViewBuilder

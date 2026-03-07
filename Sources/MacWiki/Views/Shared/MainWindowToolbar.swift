@@ -304,7 +304,7 @@ struct MainWindowToolbar: CustomizableToolbarContent {
         }
         .multilineTextAlignment(.center)
         .allowsTightening(true)
-        .padding(.horizontal, 8)
+        .padding(.horizontal, 6)
         .help(principalTitle)
     }
 
