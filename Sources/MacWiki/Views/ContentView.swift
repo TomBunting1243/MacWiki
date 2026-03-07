@@ -86,8 +86,6 @@ struct ContentView: View {
         ZStack(alignment: .topLeading) {
             workspaceSharedBackground
             mainSplitView
-            centerToolbarBand
-            sidebarTitlebarCap
             sidebarWindowDragOverlay
             inspectorRevealOverlay
             wikiHopOverlay
@@ -99,10 +97,14 @@ struct ContentView: View {
         .toolbar(id: "main-window-toolbar") {
             MainWindowToolbar()
         }
-        .toolbarBackground(.hidden, for: .windowToolbar)
+        .toolbarBackground(.visible, for: .windowToolbar)
         .animation(reduceMotion ? nil : PanelMotion.searchOverlayToggle, value: appState.showSearch)
         .background {
             WindowTopObscuredHeightReader()
+            WindowToolbarTrackingSeparators(
+                sidebarVisible: appState.sidebarVisible,
+                inspectorVisible: shouldPresentInspectorColumn && renderInspectorColumn && inspectorColumnExpanded
+            )
         }
         .contentSheets(
             editingLabel: $editingLabel, 
@@ -342,77 +344,6 @@ struct ContentView: View {
     private var chromeRevealTopPadding: CGFloat {
         let topObscuredHeight = max(appState.windowTopObscuredHeight, ColumnChromeMetrics.topBarHeight)
         return max(6, (topObscuredHeight - ChromeIconMetrics.buttonSize) * 0.5)
-    }
-
-    private var roofDividerColor: Color {
-        Color.primary.opacity(ColumnChromeMetrics.dividerOpacity(for: colorScheme))
-    }
-
-    private var roofVerticalDividerColor: Color {
-        Color.primary.opacity(colorScheme == .dark ? 0.10 : 0.07)
-    }
-
-    @ViewBuilder
-    private var centerToolbarBand: some View {
-        GeometryReader { proxy in
-            let topBandHeight = ColumnChromeMetrics.titlebarBandHeight(
-                windowTopObscuredHeight: appState.windowTopObscuredHeight
-            )
-            let leadingInset = appState.sidebarVisible ? resolvedListsSidebarWidth : 0
-            let trailingInset = resolvedInspectorWidth
-            let bandWidth = max(0, proxy.size.width - leadingInset - trailingInset)
-
-            if topBandHeight > 0.5 && bandWidth > 0.5 {
-                ToolbarBandBackground()
-                    .frame(width: bandWidth, height: topBandHeight, alignment: .topLeading)
-                    .overlay(alignment: .leading) {
-                        Rectangle()
-                            .fill(roofVerticalDividerColor)
-                            .frame(width: 0.5)
-                    }
-                    .overlay(alignment: .trailing) {
-                        Rectangle()
-                            .fill(roofVerticalDividerColor)
-                            .frame(width: 0.5)
-                    }
-                    .overlay(alignment: .bottom) {
-                        Rectangle()
-                            .fill(roofDividerColor)
-                            .frame(height: 0.5)
-                    }
-                    .offset(x: leadingInset)
-                    .ignoresSafeArea(.container, edges: .top)
-                    .allowsHitTesting(false)
-                    .zIndex(20)
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var sidebarTitlebarCap: some View {
-        if appState.sidebarVisible {
-            SidebarPaneBackground()
-                .frame(
-                    width: resolvedListsSidebarWidth + 1,
-                    height: ColumnChromeMetrics.titlebarBandHeight(
-                        windowTopObscuredHeight: appState.windowTopObscuredHeight
-                    ),
-                    alignment: .topLeading
-                )
-                .overlay(alignment: .trailing) {
-                    Rectangle()
-                        .fill(roofVerticalDividerColor)
-                        .frame(width: 0.5)
-                }
-                .overlay(alignment: .bottom) {
-                    Rectangle()
-                        .fill(roofDividerColor)
-                        .frame(height: 0.5)
-                }
-                .ignoresSafeArea(.container, edges: .top)
-                .allowsHitTesting(false)
-                .zIndex(30)
-        }
     }
 
     private var sidebarDragHeight: CGFloat {

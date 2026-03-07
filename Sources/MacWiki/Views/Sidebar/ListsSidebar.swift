@@ -459,12 +459,6 @@ struct ListsSidebar: View {
         }
     }
 
-    private var sidebarTitleBarHeight: CGFloat {
-        ColumnChromeMetrics.titlebarBandHeight(
-            windowTopObscuredHeight: appState.windowTopObscuredHeight
-        )
-    }
-
     private var sidebarWithCollectionSnapshotSync: some View {
         sidebarWithDeleteDialog
             .onAppear {
@@ -544,9 +538,6 @@ struct ListsSidebar: View {
             listsSection
             labelsSection
             tagsSection
-        }
-        .safeAreaInset(edge: .top, spacing: 0) {
-            Color.clear.frame(height: sidebarTitleBarHeight)
         }
         .listStyle(.sidebar)
         .scrollContentBackground(.hidden)
