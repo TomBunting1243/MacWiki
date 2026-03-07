@@ -32,6 +32,7 @@ struct ContentView: View {
     @State private var articleForNewTag: Article?
     @AppStorage("tabBarLiquidGlass") private var tabBarLiquidGlass = true
     @AppStorage("listsSidebarWidth") private var listsSidebarWidth: Double = 204
+    @AppStorage("inspectorWidth") private var inspectorWidth: Double = 240
     @AppStorage("searchPresentationMode") private var searchPresentationMode: SearchPresentationMode = .overlay
     @AppStorage(ExperimentFlag.wikiHopPOCEnabled.key) private var wikiHopPOCEnabled = false
     @AppStorage("features.wikiHopPostV1Enabled") private var wikiHopPostV1Enabled = false
@@ -76,17 +77,16 @@ struct ContentView: View {
         !appState.isFocusModeEnabled && appState.inspectorVisible
     }
 
-    private var windowToolbarBackgroundStyle: AnyShapeStyle {
-        if MacWikiGlassRuntime.usesNativeGlass(forceLegacyFallback: forceLegacyGlassFallback) {
-            return AnyShapeStyle(.ultraThinMaterial)
-        }
-        return AnyShapeStyle(.thinMaterial)
+    private var resolvedInspectorWidth: CGFloat {
+        guard shouldPresentInspectorColumn && renderInspectorColumn && inspectorColumnExpanded else { return 0 }
+        return CGFloat(min(max(inspectorWidth, 220), 380))
     }
 
     var body: some View {
         ZStack(alignment: .topLeading) {
             workspaceSharedBackground
             mainSplitView
+            centerToolbarBand
             sidebarTitlebarCap
             sidebarWindowDragOverlay
             inspectorRevealOverlay
@@ -99,8 +99,7 @@ struct ContentView: View {
         .toolbar(id: "main-window-toolbar") {
             MainWindowToolbar()
         }
-        .toolbarBackground(windowToolbarBackgroundStyle, for: .windowToolbar)
-        .toolbarBackground(.visible, for: .windowToolbar)
+        .toolbarBackground(.hidden, for: .windowToolbar)
         .animation(reduceMotion ? nil : PanelMotion.searchOverlayToggle, value: appState.showSearch)
         .background {
             WindowTopObscuredHeightReader()
@@ -346,6 +345,30 @@ struct ContentView: View {
     }
 
     @ViewBuilder
+    private var centerToolbarBand: some View {
+        GeometryReader { proxy in
+            let topBandHeight = max(appState.windowTopObscuredHeight, 0)
+            let leadingInset = appState.sidebarVisible ? resolvedListsSidebarWidth : 0
+            let trailingInset = resolvedInspectorWidth
+            let bandWidth = max(0, proxy.size.width - leadingInset - trailingInset)
+
+            if topBandHeight > 0.5 && bandWidth > 0.5 {
+                ColumnChromeBackground()
+                    .frame(width: bandWidth, height: topBandHeight, alignment: .topLeading)
+                    .overlay(alignment: .bottom) {
+                        Rectangle()
+                            .fill(Color.primary.opacity(colorScheme == .dark ? 0.14 : 0.08))
+                            .frame(height: 0.5)
+                    }
+                    .offset(x: leadingInset)
+                    .ignoresSafeArea(.container, edges: .top)
+                    .allowsHitTesting(false)
+                    .zIndex(20)
+            }
+        }
+    }
+
+    @ViewBuilder
     private var sidebarTitlebarCap: some View {
         if appState.sidebarVisible {
             SidebarPaneBackground()
@@ -361,6 +384,7 @@ struct ContentView: View {
                 }
                 .ignoresSafeArea(.container, edges: .top)
                 .allowsHitTesting(false)
+                .zIndex(30)
         }
     }
 
