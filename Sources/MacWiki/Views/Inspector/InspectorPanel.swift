@@ -311,15 +311,6 @@ struct InspectorPanel: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                 .padding(.top, InspectorLayout.contentTopPadding)
         }
-        .background(alignment: .top) {
-            ColumnChromeBackground()
-                .overlay(alignment: .bottom) {
-                    Rectangle()
-                        .fill(Color.primary.opacity(ColumnChromeMetrics.dividerOpacity(for: colorScheme)))
-                        .frame(height: 0.5)
-                }
-                .frame(height: inspectorChromeHeight)
-        }
         .overlay(alignment: .bottom) {
             if appState.isHighlightRehydrateInProgress {
                 HighlightToastView(toast: HighlightRehydrateToast(message: "Rehydrating…", isSuccess: true), showsSpinner: true)
@@ -374,6 +365,11 @@ struct InspectorPanel: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
         }
         .frame(height: InspectorLayout.headerBarHeight)
+        .overlay(alignment: .bottom) {
+            Rectangle()
+                .fill(Color.primary.opacity(ColumnChromeMetrics.dividerOpacity(for: colorScheme)))
+                .frame(height: 0.5)
+        }
         .animation(.interactiveSpring(response: 0.22, dampingFraction: 0.90), value: appState.inspectorMode)
         .zIndex(1)
     }
