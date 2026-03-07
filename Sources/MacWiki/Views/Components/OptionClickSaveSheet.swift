@@ -5,6 +5,7 @@ import SwiftData
 struct OptionClickSaveSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.colorScheme) private var colorScheme
 
     @Query(sort: \ReadingList.updatedAt, order: .reverse) private var allLists: [ReadingList]
     @Query(sort: \Tag.sortOrder) private var allTags: [Tag]
@@ -23,6 +24,12 @@ struct OptionClickSaveSheet: View {
     @State private var isTagsExpanded = false
     @State private var isSaving = false
     @FocusState private var isNewListFocused: Bool
+
+    private enum Metrics {
+        static let controlCornerRadius: CGFloat = 10
+        static let sectionCornerRadius: CGFloat = 12
+        static let controlHeight: CGFloat = 34
+    }
 
     private var trimmedNewListName: String {
         newListName.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -231,14 +238,11 @@ struct OptionClickSaveSheet: View {
                 .focused($isNewListFocused)
         }
         .padding(.horizontal, 12)
-        .frame(height: 32)
-        .background(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(.quaternary.opacity(0.35))
-        )
+        .frame(height: Metrics.controlHeight)
+        .background(controlSurfaceBackground)
         .overlay {
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .strokeBorder(Color.white.opacity(0.08), lineWidth: 0.8)
+            RoundedRectangle(cornerRadius: Metrics.controlCornerRadius, style: .continuous)
+                .strokeBorder(controlStrokeColor, lineWidth: 0.55)
         }
     }
 
@@ -322,10 +326,10 @@ struct OptionClickSaveSheet: View {
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .background(sectionSurfaceBackground)
         .overlay {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(Color.white.opacity(0.08), lineWidth: 0.8)
+            RoundedRectangle(cornerRadius: Metrics.sectionCornerRadius, style: .continuous)
+                .strokeBorder(controlStrokeColor, lineWidth: 0.55)
         }
     }
 
@@ -344,10 +348,7 @@ struct OptionClickSaveSheet: View {
             }
             .padding(.horizontal, 8)
             .padding(.vertical, 6)
-            .background(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(selectedTagID == id ? Color.accentColor.opacity(0.12) : Color.clear)
-            )
+            .background(tagRowBackground(isSelected: selectedTagID == id))
         }
         .buttonStyle(.plain)
     }
@@ -360,7 +361,7 @@ struct OptionClickSaveSheet: View {
     ) -> some View {
         HStack(spacing: 8) {
             Circle()
-                .fill(hasValue ? tint.opacity(0.9) : Color.clear)
+                .fill(hasValue ? tint.opacity(colorScheme == .dark ? 0.82 : 0.74) : Color.clear)
                 .overlay {
                     if !hasValue {
                         Circle()
@@ -371,7 +372,7 @@ struct OptionClickSaveSheet: View {
 
             Text(hasValue ? valueText : fallbackText)
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(hasValue ? tint : .secondary)
+                .foregroundStyle(hasValue ? .primary : .secondary)
                 .lineLimit(1)
 
             Spacer(minLength: 8)
@@ -387,15 +388,17 @@ struct OptionClickSaveSheet: View {
                 .foregroundStyle(.tertiary)
         }
         .padding(.horizontal, 12)
-        .frame(height: 31)
-        .contentShape(Capsule())
-        .background(
-            Capsule()
-                .fill(tint.opacity(hasValue ? 0.12 : 0.08))
-        )
+        .frame(height: Metrics.controlHeight)
+        .contentShape(RoundedRectangle(cornerRadius: Metrics.controlCornerRadius, style: .continuous))
+        .background(controlSurfaceBackground)
         .overlay {
-            Capsule()
-                .strokeBorder(tint.opacity(hasValue ? 0.32 : 0.18), lineWidth: 0.8)
+            RoundedRectangle(cornerRadius: Metrics.controlCornerRadius, style: .continuous)
+                .strokeBorder(
+                    hasValue
+                        ? tint.opacity(colorScheme == .dark ? 0.22 : 0.16)
+                        : controlStrokeColor,
+                    lineWidth: 0.55
+                )
         }
     }
 
@@ -414,10 +417,48 @@ struct OptionClickSaveSheet: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
-        .background(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(.quaternary.opacity(0.25))
-        )
+        .background(controlSurfaceBackground)
+        .overlay {
+            RoundedRectangle(cornerRadius: Metrics.controlCornerRadius, style: .continuous)
+                .strokeBorder(controlStrokeColor, lineWidth: 0.5)
+        }
+    }
+
+    private var controlSurfaceBackground: some View {
+        RoundedRectangle(cornerRadius: Metrics.controlCornerRadius, style: .continuous)
+            .fill(
+                Color(nsColor: .controlBackgroundColor)
+                    .opacity(colorScheme == .dark ? 0.56 : 0.84)
+            )
+    }
+
+    private var sectionSurfaceBackground: some View {
+        RoundedRectangle(cornerRadius: Metrics.sectionCornerRadius, style: .continuous)
+            .fill(
+                Color(nsColor: .controlBackgroundColor)
+                    .opacity(colorScheme == .dark ? 0.42 : 0.68)
+            )
+    }
+
+    private var controlStrokeColor: Color {
+        Color.primary.opacity(colorScheme == .dark ? 0.085 : 0.055)
+    }
+
+    private func tagRowBackground(isSelected: Bool) -> some View {
+        RoundedRectangle(cornerRadius: 8, style: .continuous)
+            .fill(
+                Color(nsColor: .windowBackgroundColor)
+                    .opacity(isSelected ? (colorScheme == .dark ? 0.16 : 0.09) : 0)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .strokeBorder(
+                        isSelected
+                            ? Color.primary.opacity(colorScheme == .dark ? 0.10 : 0.06)
+                            : Color.clear,
+                        lineWidth: 0.45
+                    )
+            }
     }
 
     private func seedSelectedListIfNeeded() {
