@@ -361,7 +361,7 @@ struct ContentView: View {
             let bandWidth = max(0, proxy.size.width - leadingInset - trailingInset)
 
             if topBandHeight > 0.5 && bandWidth > 0.5 {
-                ColumnChromeBackground()
+                ToolbarBandBackground()
                     .frame(width: bandWidth, height: topBandHeight, alignment: .topLeading)
                     .overlay(alignment: .leading) {
                         Rectangle()

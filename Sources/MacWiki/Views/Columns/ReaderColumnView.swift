@@ -42,33 +42,16 @@ struct ReaderColumnView: View {
             topTabLaneContent
                 .frame(maxWidth: .infinity, alignment: .top)
                 .padding(.top, titlebarUnderlapHeight)
-                .background(alignment: .top) {
-                    ColumnChromeBackground()
-                        .frame(height: titlebarUnderlapHeight + topTabLaneHeight)
-                        .allowsHitTesting(false)
-                }
-                .overlay(alignment: .bottom) {
-                    Rectangle()
-                        .fill(Color.primary.opacity(ColumnChromeMetrics.dividerOpacity(for: colorScheme)))
-                        .frame(height: 0.5)
-                        .allowsHitTesting(false)
-                }
         }
     }
 
     private var topTabLaneContent: some View {
         tabBarTop
-        .frame(height: topTabLaneHeight)
-        .overlay(alignment: .top) {
-            Rectangle()
-                .fill(Color.primary.opacity(ColumnChromeMetrics.internalDividerOpacity(for: colorScheme)))
-                .frame(height: 0.5)
-                .allowsHitTesting(false)
-        }
+            .frame(height: topTabLaneHeight)
     }
 
     private var tabBarTop: some View {
-        TabBarView(chromeStyle: .toolbar, onNewLabelWithArticle: onNewLabelWithArticle)
+        TabBarView(chromeStyle: .strip, onNewLabelWithArticle: onNewLabelWithArticle)
     }
 
     private var tabBarStandalone: some View {

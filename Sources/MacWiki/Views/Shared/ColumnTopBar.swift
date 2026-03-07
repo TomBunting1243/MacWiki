@@ -320,6 +320,57 @@ struct SidebarPaneBackground: View {
     }
 }
 
+struct ToolbarBandBackground: View {
+    @AppStorage(MacWikiGlassRuntime.forceLegacyFallbackKey) private var forceLegacyGlassFallback = false
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var accentTint: Color {
+        Color(nsColor: .controlAccentColor)
+    }
+
+    var body: some View {
+        if #available(macOS 26, *),
+           MacWikiGlassRuntime.usesNativeGlass(forceLegacyFallback: forceLegacyGlassFallback) {
+            Rectangle()
+                .fill(.clear)
+                .glassEffect(.regular, in: .rect)
+                .overlay {
+                    toolbarTintOverlay
+                }
+                .overlay {
+                    Color(nsColor: .windowBackgroundColor)
+                        .opacity(colorScheme == .dark ? 0.060 : 0.034)
+                }
+        } else {
+            Rectangle()
+                .fill(.ultraThinMaterial)
+                .overlay {
+                    toolbarTintOverlay
+                }
+                .overlay {
+                    Color(nsColor: .windowBackgroundColor)
+                        .opacity(colorScheme == .dark ? 0.090 : 0.050)
+                }
+                .overlay {
+                    Color(nsColor: .controlBackgroundColor)
+                        .opacity(colorScheme == .dark ? 0.040 : 0.020)
+                }
+        }
+    }
+
+    private var toolbarTintOverlay: some View {
+        LinearGradient(
+            colors: [
+                accentTint.opacity(colorScheme == .dark ? 0.13 : 0.055),
+                accentTint.opacity(colorScheme == .dark ? 0.07 : 0.028),
+                Color.clear
+            ],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
+}
+
 struct WorkspaceBackdropBackground: View {
     @Environment(\.colorScheme) private var colorScheme
 
