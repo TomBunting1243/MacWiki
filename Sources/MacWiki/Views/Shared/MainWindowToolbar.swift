@@ -96,10 +96,7 @@ struct MainWindowToolbar: CustomizableToolbarContent {
 
     var body: some CustomizableToolbarContent {
         Group {
-            ToolbarItem(id: ItemID.leadingDeadZone, placement: .navigation) {
-                toolbarDeadZone(width: leadingToolbarDeadZoneWidth)
-            }
-            .customizationBehavior(.disabled)
+            leadingDeadZoneItem
 
             ToolbarItem(id: ItemID.sidebar, placement: .navigation) {
                 sidebarToggleButton
@@ -167,6 +164,35 @@ struct MainWindowToolbar: CustomizableToolbarContent {
                 inspectorButton
             }
 
+            trailingDeadZoneItem
+        }
+    }
+
+    @ToolbarContentBuilder
+    private var leadingDeadZoneItem: some CustomizableToolbarContent {
+        if #available(macOS 26, *) {
+            ToolbarItem(id: ItemID.leadingDeadZone, placement: .navigation) {
+                toolbarDeadZone(width: leadingToolbarDeadZoneWidth)
+            }
+            .customizationBehavior(.disabled)
+            .sharedBackgroundVisibility(.hidden)
+        } else {
+            ToolbarItem(id: ItemID.leadingDeadZone, placement: .navigation) {
+                toolbarDeadZone(width: leadingToolbarDeadZoneWidth)
+            }
+            .customizationBehavior(.disabled)
+        }
+    }
+
+    @ToolbarContentBuilder
+    private var trailingDeadZoneItem: some CustomizableToolbarContent {
+        if #available(macOS 26, *) {
+            ToolbarItem(id: ItemID.trailingDeadZone, placement: .primaryAction) {
+                toolbarDeadZone(width: trailingToolbarDeadZoneWidth)
+            }
+            .customizationBehavior(.disabled)
+            .sharedBackgroundVisibility(.hidden)
+        } else {
             ToolbarItem(id: ItemID.trailingDeadZone, placement: .primaryAction) {
                 toolbarDeadZone(width: trailingToolbarDeadZoneWidth)
             }
@@ -278,7 +304,7 @@ struct MainWindowToolbar: CustomizableToolbarContent {
         }
         .multilineTextAlignment(.center)
         .allowsTightening(true)
-        .padding(.horizontal, 16)
+        .padding(.horizontal, 10)
         .help(principalTitle)
     }
 
