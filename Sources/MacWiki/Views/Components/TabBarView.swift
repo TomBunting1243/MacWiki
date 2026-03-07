@@ -229,57 +229,59 @@ struct TabBarView: View {
         HStack(spacing: (chromeStyle == .strip || chromeStyle == .toolbar) ? 8 : 8) {
             ScrollViewReader { proxy in
                 ScrollView(.horizontal) {
-                    HStack(spacing: tabSpacing) {
-                        ForEach(Array(appState.openTabs.enumerated()), id: \.element.id) { index, tab in
-                            DraggableTabItemView(
-                                tab: tab,
-                                tabIndex: index,
-                                lists: lists,
-                                allLabels: allLabels,
-                                tabBarLiquidGlass: tabBarLiquidGlass,
-                                isActive: appState.activeTabId == tab.id,
-                                isDragged: draggedTabId == tab.id,
-                                dragOffset: draggedTabId == tab.id ? dragOffset : 0,
-                                shiftAmount: shiftAmount(for: index),
-                                chromeStyle: chromeStyle,
-                                tabWidth: resolvedTabWidth,
-                                interactionProfile: interactionProfile,
-                                isSaved: isSaved(tab, savedTitles: savedTitles),
-                                hasHighlights: hasHighlights(tab, highlightedTitles: highlightedTitles),
-                                readingProgress: readingProgress(for: tab),
-                                showSavedMarker: showSavedTabMarker,
-                                showHighlightMarker: showHighlightTabMarker,
-                                showReadMarker: showReadTabMarker,
-                                showProgressTrack: showTabProgressTrack,
-                                showActiveDepth: showTabActiveDepth,
-                                reduceMotion: reduceMotion,
-                                onNewLabelWithArticle: onNewLabelWithArticle,
-                                onClose: {
-                                    performAnimation(interactionProfile.tabCreateClose) {
-                                        appState.closeTab(tab.id)
+                    MacWikiGlassGroup(spacing: tabSpacing) {
+                        HStack(spacing: tabSpacing) {
+                            ForEach(Array(appState.openTabs.enumerated()), id: \.element.id) { index, tab in
+                                DraggableTabItemView(
+                                    tab: tab,
+                                    tabIndex: index,
+                                    lists: lists,
+                                    allLabels: allLabels,
+                                    tabBarLiquidGlass: tabBarLiquidGlass,
+                                    isActive: appState.activeTabId == tab.id,
+                                    isDragged: draggedTabId == tab.id,
+                                    dragOffset: draggedTabId == tab.id ? dragOffset : 0,
+                                    shiftAmount: shiftAmount(for: index),
+                                    chromeStyle: chromeStyle,
+                                    tabWidth: resolvedTabWidth,
+                                    interactionProfile: interactionProfile,
+                                    isSaved: isSaved(tab, savedTitles: savedTitles),
+                                    hasHighlights: hasHighlights(tab, highlightedTitles: highlightedTitles),
+                                    readingProgress: readingProgress(for: tab),
+                                    showSavedMarker: showSavedTabMarker,
+                                    showHighlightMarker: showHighlightTabMarker,
+                                    showReadMarker: showReadTabMarker,
+                                    showProgressTrack: showTabProgressTrack,
+                                    showActiveDepth: showTabActiveDepth,
+                                    reduceMotion: reduceMotion,
+                                    onNewLabelWithArticle: onNewLabelWithArticle,
+                                    onClose: {
+                                        performAnimation(interactionProfile.tabCreateClose) {
+                                            appState.closeTab(tab.id)
+                                        }
+                                    },
+                                    onSelect: {
+                                        performAnimation(interactionProfile.tabSelect) {
+                                            appState.activeTabId = tab.id
+                                        }
+                                        appState.flushSaveNow()
+                                    },
+                                    onDragChanged: { translation, locationX in
+                                        handleDragChanged(tab: tab, at: index, translation: translation, dragLocationX: locationX)
+                                    },
+                                    onDragEnded: {
+                                        finalizeDrag(at: index)
                                     }
-                                },
-                                onSelect: {
-                                    performAnimation(interactionProfile.tabSelect) {
-                                        appState.activeTabId = tab.id
-                                    }
-                                    appState.flushSaveNow()
-                                },
-                                onDragChanged: { translation, locationX in
-                                    handleDragChanged(tab: tab, at: index, translation: translation, dragLocationX: locationX)
-                                },
-                                onDragEnded: {
-                                    finalizeDrag(at: index)
-                                }
-                            )
-                            .id(tab.id)
+                                )
+                                .id(tab.id)
+                            }
                         }
+                        .background(
+                            GeometryReader { geo in
+                                Color.clear.preference(key: TabContentWidthPreferenceKey.self, value: geo.size.width)
+                            }
+                        )
                     }
-                    .background(
-                        GeometryReader { geo in
-                            Color.clear.preference(key: TabContentWidthPreferenceKey.self, value: geo.size.width)
-                        }
-                    )
                     .coordinateSpace(name: "TabBarSpace")
                     .onPreferenceChange(TabFramePreferenceKey.self) { frames in
                         guard frames != tabFrames else { return }
@@ -327,42 +329,7 @@ struct TabBarView: View {
             }
             .frame(maxWidth: .infinity) // Force logical expansion for sizing
 
-            if showsOverflowMenu {
-                overflowMenu
-            }
-
-            Button {
-                performAnimation(interactionProfile.tabCreateClose) {
-                    appState.createNewTab()
-                }
-            } label: {
-                if chromeStyle == .strip || chromeStyle == .toolbar {
-                    Image(systemName: "plus")
-                        .font(.system(size: ChromeIconMetrics.symbolPointSize, weight: ChromeIconMetrics.regularWeight))
-                        .imageScale(.medium)
-                        .foregroundStyle(
-                            Color.primary.opacity(
-                                TabChromeHierarchy.iconPrimaryOpacity(darkMode: colorScheme == .dark)
-                            )
-                        )
-                        .frame(
-                            width: chromeStyle == .strip ? ChromeIconMetrics.compactButtonSize : ChromeIconMetrics.buttonSize,
-                            height: chromeStyle == .strip ? ChromeIconMetrics.compactButtonSize : ChromeIconMetrics.buttonSize
-                        )
-                        .background(stripAccessoryBackground())
-                        .contentShape(RoundedRectangle(cornerRadius: stripAccessoryCornerRadius, style: .continuous))
-                } else {
-                    Image(systemName: "plus")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(.secondary)
-                        .frame(width: chromeStyle.newTabButtonSize, height: chromeStyle.newTabButtonSize)
-                        .background(stripAccessoryBackground())
-                }
-            }
-            .buttonStyle(.plain)
-            .help("New Tab (⌘T)")
-            .accessibilityLabel("New Tab")
-            .accessibilityHint("Creates a new tab")
+            trailingAccessoryCluster
         }
         .padding(.horizontal, chromeStyle.horizontalPadding)
         .padding(.vertical, chromeStyle.verticalPadding)
@@ -412,7 +379,9 @@ struct TabBarView: View {
         if chromeStyle == .strip || chromeStyle == .toolbar {
             let cornerRadius = stripAccessoryCornerRadius
             let compactAccessory = chromeStyle == .strip
-            if tabBarLiquidGlass {
+            if #available(macOS 26, *), usesNativeGlassAccessories {
+                nativeStripAccessoryBackground(cornerRadius: cornerRadius)
+            } else if tabBarLiquidGlass {
                 let fillOpacity = darkMode
                     ? (compactAccessory ? 0.18 : 0.20)
                     : (compactAccessory ? 0.11 : 0.13)
@@ -497,35 +466,78 @@ struct TabBarView: View {
                 }
             }
         } label: {
-            if chromeStyle == .strip || chromeStyle == .toolbar {
-                SwiftUI.Label("All Tabs", systemImage: "chevron.down")
-                    .labelStyle(.iconOnly)
-                    .font(.system(size: ChromeIconMetrics.symbolPointSize, weight: ChromeIconMetrics.regularWeight))
-                    .imageScale(.small)
-                    .foregroundStyle(
-                        Color.primary.opacity(
-                            TabChromeHierarchy.iconPrimaryOpacity(darkMode: colorScheme == .dark)
-                        )
-                    )
-                    .frame(
-                        width: chromeStyle == .strip ? ChromeIconMetrics.compactButtonSize : ChromeIconMetrics.buttonSize,
-                        height: chromeStyle == .strip ? ChromeIconMetrics.compactButtonSize : ChromeIconMetrics.buttonSize
-                    )
-                    .background(stripAccessoryBackground())
-                    .contentShape(RoundedRectangle(cornerRadius: stripAccessoryCornerRadius, style: .continuous))
-            } else {
-                SwiftUI.Label("All Tabs", systemImage: "chevron.down.circle")
-                    .labelStyle(.iconOnly)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                    .frame(width: chromeStyle.newTabButtonSize, height: chromeStyle.newTabButtonSize)
-                    .background(stripAccessoryBackground())
-                    .contentShape(Circle())
-            }
+            stripAccessoryLabel(
+                systemImage: chromeStyle == .strip || chromeStyle == .toolbar ? "chevron.down" : "chevron.down.circle",
+                imageScale: .small
+            )
         }
         .menuStyle(.borderlessButton)
         .help("All Tabs")
         .accessibilityHint("Shows open tabs")
+    }
+
+    private var trailingAccessoryCluster: some View {
+        MacWikiGlassGroup(spacing: 8) {
+            HStack(spacing: 8) {
+                if showsOverflowMenu {
+                    overflowMenu
+                }
+
+                Button {
+                    performAnimation(interactionProfile.tabCreateClose) {
+                        appState.createNewTab()
+                    }
+                } label: {
+                    stripAccessoryLabel(systemImage: "plus", imageScale: .medium)
+                }
+                .buttonStyle(.plain)
+                .help("New Tab (⌘T)")
+                .accessibilityLabel("New Tab")
+                .accessibilityHint("Creates a new tab")
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func stripAccessoryLabel(systemImage: String, imageScale: Image.Scale) -> some View {
+        if chromeStyle == .strip || chromeStyle == .toolbar {
+            Image(systemName: systemImage)
+                .font(.system(size: ChromeIconMetrics.symbolPointSize, weight: ChromeIconMetrics.regularWeight))
+                .imageScale(imageScale)
+                .foregroundStyle(
+                    Color.primary.opacity(
+                        TabChromeHierarchy.iconPrimaryOpacity(darkMode: colorScheme == .dark)
+                    )
+                )
+                .frame(
+                    width: chromeStyle == .strip ? ChromeIconMetrics.compactButtonSize : ChromeIconMetrics.buttonSize,
+                    height: chromeStyle == .strip ? ChromeIconMetrics.compactButtonSize : ChromeIconMetrics.buttonSize
+                )
+                .background(stripAccessoryBackground())
+                .contentShape(RoundedRectangle(cornerRadius: stripAccessoryCornerRadius, style: .continuous))
+        } else {
+            Image(systemName: systemImage)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .frame(width: chromeStyle.newTabButtonSize, height: chromeStyle.newTabButtonSize)
+                .background(stripAccessoryBackground())
+                .contentShape(Circle())
+        }
+    }
+
+    private var usesNativeGlassAccessories: Bool {
+        guard tabBarLiquidGlass else { return false }
+        if #available(macOS 26, *) {
+            return chromeStyle == .strip || chromeStyle == .toolbar
+        }
+        return false
+    }
+
+    @available(macOS 26, *)
+    private func nativeStripAccessoryBackground(cornerRadius: CGFloat) -> some View {
+        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+            .fill(.clear)
+            .glassEffect(.regular.interactive(), in: .rect(cornerRadius: cornerRadius))
     }
     
     // MARK: - Drag Calculations (Optimized)
@@ -1165,7 +1177,14 @@ private struct DraggableTabItemView: View {
     @ViewBuilder
     private var stripGlassCellBackground: some View {
         let darkMode = colorScheme == .dark
-        if tabBarLiquidGlass {
+        if usesNativeStripGlassCells {
+            if isActive || isHovered {
+                nativeStripGlassCellBackground
+            } else {
+                RoundedRectangle(cornerRadius: tabCornerRadius, style: .continuous)
+                    .fill(Color.clear)
+            }
+        } else if tabBarLiquidGlass {
             let edgeOpacity = darkMode
                 ? (isActive ? 0.085 : (isHovered ? 0.055 : 0.036))
                 : (isActive ? 0.078 : (isHovered ? 0.052 : 0.034))
@@ -1220,6 +1239,38 @@ private struct DraggableTabItemView: View {
                             lineWidth: isActive ? 0.50 : 0.42
                         )
                 )
+        }
+    }
+
+    private var usesNativeStripGlassCells: Bool {
+        guard tabBarLiquidGlass else { return false }
+        if #available(macOS 26, *) {
+            return chromeStyle == .strip || chromeStyle == .toolbar
+        }
+        return false
+    }
+
+    @ViewBuilder
+    private var nativeStripGlassCellBackground: some View {
+        if #available(macOS 26, *) {
+            if isActive {
+                RoundedRectangle(cornerRadius: tabCornerRadius, style: .continuous)
+                    .fill(.clear)
+                    .glassEffect(
+                        .regular
+                            .tint(Color.accentColor.opacity(colorScheme == .dark ? 0.10 : 0.08))
+                            .interactive(),
+                        in: .rect(cornerRadius: tabCornerRadius)
+                    )
+                    .overlay {
+                        RoundedRectangle(cornerRadius: tabCornerRadius, style: .continuous)
+                            .fill(Color.accentColor.opacity(colorScheme == .dark ? 0.035 : 0.026))
+                    }
+            } else {
+                RoundedRectangle(cornerRadius: tabCornerRadius, style: .continuous)
+                    .fill(.clear)
+                    .glassEffect(.regular.interactive(), in: .rect(cornerRadius: tabCornerRadius))
+            }
         }
     }
     
