@@ -543,7 +543,7 @@ struct ArticleView: View {
             markAsReadIconBackground
             Image(systemName: "checkmark.circle.fill")
                 .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(.primary.opacity(colorScheme == .dark ? 0.72 : 0.60))
         }
         .frame(width: 30, height: 30)
     }
@@ -633,19 +633,15 @@ struct ArticleView: View {
     @ViewBuilder
     private var markAsReadIconBackground: some View {
         let shape = Circle()
-        if #available(macOS 26, *),
-           tabBarLiquidGlass &&
-            MacWikiGlassRuntime.usesNativeGlass(forceLegacyFallback: forceLegacyGlassFallback) {
-            shape
-                .fill(.clear)
-                .glassEffect(.regular, in: .circle)
-        } else {
-            shape
-                .fill(.thinMaterial)
-                .overlay {
-                    shape.strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.09 : 0.055), lineWidth: 0.52)
-                }
-        }
+        shape
+            .fill(Color.primary.opacity(colorScheme == .dark ? 0.10 : 0.055))
+            .overlay {
+                shape.strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.050 : 0.030), lineWidth: 0.45)
+            }
+    }
+
+    private var markAsReadPrimaryStrokeOpacity: Double {
+        colorScheme == .dark ? 0.075 : 0.046
     }
 
     @ViewBuilder
@@ -657,14 +653,17 @@ struct ArticleView: View {
             shape
                 .fill(.clear)
                 .glassEffect(.regular.interactive(), in: .capsule)
-        } else {
-            shape
-                .fill(.thinMaterial)
                 .overlay {
-                    shape.fill(Color(nsColor: .windowBackgroundColor).opacity(colorScheme == .dark ? 0.09 : 0.05))
+                    shape.fill(Color(nsColor: .windowBackgroundColor).opacity(colorScheme == .dark ? 0.028 : 0.016))
                 }
                 .overlay {
-                    shape.strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.09 : 0.055), lineWidth: 0.52)
+                    shape.strokeBorder(Color.primary.opacity(markAsReadPrimaryStrokeOpacity), lineWidth: 0.50)
+                }
+        } else {
+            shape
+                .fill(Color(nsColor: .windowBackgroundColor).opacity(colorScheme == .dark ? 0.16 : 0.09))
+                .overlay {
+                    shape.strokeBorder(Color.primary.opacity(markAsReadPrimaryStrokeOpacity), lineWidth: 0.50)
                 }
         }
     }
@@ -672,19 +671,11 @@ struct ArticleView: View {
     @ViewBuilder
     private var markAsReadSecondaryActionBackground: some View {
         let shape = Circle()
-        if #available(macOS 26, *),
-           tabBarLiquidGlass &&
-            MacWikiGlassRuntime.usesNativeGlass(forceLegacyFallback: forceLegacyGlassFallback) {
-            shape
-                .fill(.clear)
-                .glassEffect(.regular.interactive(), in: .circle)
-        } else {
-            shape
-                .fill(.thinMaterial)
-                .overlay {
-                    shape.strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.09 : 0.055), lineWidth: 0.52)
-                }
-        }
+        shape
+            .fill(Color.primary.opacity(colorScheme == .dark ? 0.08 : 0.045))
+            .overlay {
+                shape.strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.048 : 0.030), lineWidth: 0.45)
+            }
     }
 
     private func markAllAsRead() {

@@ -5,6 +5,8 @@ struct ReaderFocusTOCView: View {
     @Environment(AppState.self) private var appState
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @AppStorage("tabBarLiquidGlass") private var tabBarLiquidGlass = true
+    @AppStorage(MacWikiGlassRuntime.forceLegacyFallbackKey) private var forceLegacyGlassFallback = false
 
     let items: [ArticleTableOfContentsItem]
 
@@ -87,11 +89,9 @@ struct ReaderFocusTOCView: View {
         "\(Int((clampedReadingProgress * 100).rounded()))%"
     }
 
-    private var liquidSheenCenter: UnitPoint {
-        UnitPoint(
-            x: 0.16 + (0.66 * clampedReadingProgress),
-            y: 0.12 + (0.10 * clampedExpansionProgress)
-        )
+    private var usesNativeGlass: Bool {
+        tabBarLiquidGlass &&
+            MacWikiGlassRuntime.usesNativeGlass(forceLegacyFallback: forceLegacyGlassFallback)
     }
 
     private var resolvedWidth: CGFloat {
@@ -120,46 +120,18 @@ struct ReaderFocusTOCView: View {
         .padding(.vertical, 8 + (4 * clampedExpansionProgress))
         .frame(width: resolvedWidth, alignment: .leading)
         .background {
-            RoundedRectangle(cornerRadius: Metrics.cornerRadius, style: .continuous)
-                .fill(.thinMaterial)
-                .overlay {
-                    LinearGradient(
-                        colors: [
-                            Color.white.opacity(colorScheme == .dark ? 0.08 : 0.12),
-                            Color.white.opacity(colorScheme == .dark ? 0.015 : 0.02),
-                            Color.black.opacity(colorScheme == .dark ? 0.06 : 0.015)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                    .clipShape(RoundedRectangle(cornerRadius: Metrics.cornerRadius, style: .continuous))
-                    .blendMode(.screen)
-                }
-                .overlay {
-                    RadialGradient(
-                        colors: [
-                            Color.accentColor.opacity(colorScheme == .dark ? 0.16 : 0.12),
-                            Color.accentColor.opacity(0)
-                        ],
-                        center: liquidSheenCenter,
-                        startRadius: 8,
-                        endRadius: 150
-                    )
-                    .clipShape(RoundedRectangle(cornerRadius: Metrics.cornerRadius, style: .continuous))
-                    .blendMode(.screen)
-                    .opacity(0.68)
-                }
+            tocBackground
         }
         .overlay {
             RoundedRectangle(cornerRadius: Metrics.cornerRadius, style: .continuous)
-                .strokeBorder(Color.white.opacity(colorScheme == .dark ? 0.11 : 0.16), lineWidth: 0.8)
+                .strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.070 : 0.045), lineWidth: 0.55)
 
             RoundedRectangle(cornerRadius: Metrics.cornerRadius, style: .continuous)
-                .strokeBorder(Color.accentColor.opacity(0.32), lineWidth: 1)
+                .strokeBorder(Color.accentColor.opacity(colorScheme == .dark ? 0.16 : 0.12), lineWidth: 0.9)
                 .opacity(pulse ? 1 : 0)
         }
-        .shadow(color: .black.opacity(colorScheme == .dark ? 0.25 : 0.12), radius: 12, y: 5)
-        .scaleEffect(pulse ? 1.004 : 1)
+        .shadow(color: .black.opacity(colorScheme == .dark ? 0.16 : 0.06), radius: 10, y: 4)
+        .scaleEffect(pulse ? 1.002 : 1)
         .contentShape(RoundedRectangle(cornerRadius: Metrics.cornerRadius, style: .continuous))
         .onHover { hovering in
             handleHoverChange(isHovering: hovering)
@@ -186,6 +158,31 @@ struct ReaderFocusTOCView: View {
             reduceMotion ? nil : .easeOut(duration: 0.20),
             value: clampedReadingProgress
         )
+    }
+
+    @ViewBuilder
+    private var tocBackground: some View {
+        let shape = RoundedRectangle(cornerRadius: Metrics.cornerRadius, style: .continuous)
+        if #available(macOS 26, *), usesNativeGlass {
+            shape
+                .fill(.clear)
+                .glassEffect(.regular, in: .rect(cornerRadius: Metrics.cornerRadius))
+                .overlay {
+                    shape.fill(
+                        Color(nsColor: .windowBackgroundColor)
+                            .opacity(colorScheme == .dark ? 0.022 : 0.014)
+                    )
+                }
+        } else {
+            shape
+                .fill(.thinMaterial)
+                .overlay {
+                    shape.fill(
+                        Color(nsColor: .windowBackgroundColor)
+                            .opacity(colorScheme == .dark ? 0.10 : 0.06)
+                    )
+                }
+        }
     }
 
     @ViewBuilder
@@ -261,7 +258,7 @@ struct ReaderFocusTOCView: View {
                     .frame(width: 24, height: 24)
                     .background(
                         RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .fill(Color.primary.opacity(colorScheme == .dark ? 0.10 : 0.08))
+                            .fill(Color.primary.opacity(colorScheme == .dark ? 0.08 : 0.05))
                     )
             }
             .buttonStyle(.plain)
@@ -394,11 +391,19 @@ struct ReaderFocusTOCView: View {
                                 .padding(.horizontal, 6)
                                 .background(
                                     RoundedRectangle(cornerRadius: 7, style: .continuous)
-                                        .fill(Color.accentColor.opacity(isActive ? 0.16 : 0))
+                                        .fill(
+                                            isActive
+                                                ? Color(nsColor: .windowBackgroundColor)
+                                                    .opacity(colorScheme == .dark ? 0.16 : 0.09)
+                                                : Color.clear
+                                        )
                                 )
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 7, style: .continuous)
-                                        .strokeBorder(Color.accentColor.opacity(0.26), lineWidth: 0.8)
+                                        .strokeBorder(
+                                            Color.accentColor.opacity(colorScheme == .dark ? 0.14 : 0.10),
+                                            lineWidth: 0.7
+                                        )
                                         .opacity(isActive ? 1 : 0)
                                 )
                                 .contentShape(Rectangle())
