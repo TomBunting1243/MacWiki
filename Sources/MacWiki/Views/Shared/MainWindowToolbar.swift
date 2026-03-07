@@ -359,15 +359,22 @@ struct MainWindowToolbar: CustomizableToolbarContent {
             appState.showFindOnPage = false
             appState.findOnPageQuery = ""
             appState.findOnPageMatchFound = nil
-            appState.pendingFindOnPageRequest = AppState.FindOnPageRequest(
-                requestID: UUID(),
-                tabID: tabID,
-                query: "",
-                backwards: false
-            )
+            appState.findOnPageMatchCount = nil
+            if #available(macOS 26, *) {
+                appState.pendingFindOnPageRequest = nil
+                appState.currentFindOnPageRequestID = nil
+            } else {
+                appState.pendingFindOnPageRequest = AppState.FindOnPageRequest(
+                    requestID: UUID(),
+                    tabID: tabID,
+                    query: "",
+                    backwards: false
+                )
+            }
         } else {
             appState.showFindOnPage = true
             appState.findOnPageMatchFound = nil
+            appState.findOnPageMatchCount = nil
         }
     }
 

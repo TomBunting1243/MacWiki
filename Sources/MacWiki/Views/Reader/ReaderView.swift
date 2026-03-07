@@ -267,6 +267,20 @@ struct ArticleView: View {
         return 10 + compactWidthBoost
     }
 
+    private var usesNativeFindNavigator: Bool {
+        if #available(macOS 26, *) {
+            return true
+        }
+        return false
+    }
+
+    private var findNavigatorPresentedBinding: Binding<Bool> {
+        Binding(
+            get: { appState.showFindOnPage && !appState.isFocusModeEnabled },
+            set: { appState.showFindOnPage = $0 }
+        )
+    }
+
     private var focusTOCOverlayBottomPadding: CGFloat {
         let base: CGFloat = 14
         if showMarkAsReadPrompt && isArticleUnreadState {
@@ -323,7 +337,7 @@ struct ArticleView: View {
             }
         }
         .overlay(alignment: .topTrailing) {
-            if appState.showFindOnPage && !appState.isFocusModeEnabled {
+            if !usesNativeFindNavigator && appState.showFindOnPage && !appState.isFocusModeEnabled {
                 FindOnPageBarView(
                     tabID: tabId,
                     availableWidth: max(articleViewportWidth - 32, 0)
@@ -434,7 +448,7 @@ struct ArticleView: View {
         if let error = errorMessage {
             errorView(error)
         } else if let html = htmlContent, loadedArticleKey == article.id {
-            WebView(
+            let webView = WebView(
                 tabID: tabId,
                 htmlContent: html,
                 articleTitle: article.title,
@@ -501,7 +515,7 @@ struct ArticleView: View {
                 inspectorVisible: appState.inspectorVisible,
                 inspectorMode: appState.inspectorMode,
                 focusModeEnabled: appState.isFocusModeEnabled,
-                findOnPageRequestID: appState.pendingFindOnPageRequest?.requestID
+                findOnPageRequestID: usesNativeFindNavigator ? nil : appState.pendingFindOnPageRequest?.requestID
             )
             .id(tabId)
             .clipped()
@@ -510,6 +524,14 @@ struct ArticleView: View {
                 if !nativeHighlightingMenuEnabled {
                     HighlightToolbarOverlay(articleTitle: article.title)
                 }
+            }
+
+            if #available(macOS 26, *) {
+                webView
+                    .findNavigator(isPresented: findNavigatorPresentedBinding)
+                    .findDisabled(appState.isFocusModeEnabled)
+            } else {
+                webView
             }
         } else if isLoading {
             Color.clear

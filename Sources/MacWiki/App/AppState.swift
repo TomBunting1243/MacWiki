@@ -872,7 +872,10 @@ final class AppState {
             findOnPageQuery = ""
             findOnPageMatchFound = nil
             findOnPageMatchCount = nil
-            if let tabID = activeTabId {
+            if #available(macOS 26, *) {
+                pendingFindOnPageRequest = nil
+                currentFindOnPageRequestID = nil
+            } else if let tabID = activeTabId {
                 let clearRequest = FindOnPageRequest(
                     requestID: UUID(),
                     tabID: tabID,
