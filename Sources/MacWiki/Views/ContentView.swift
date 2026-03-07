@@ -40,8 +40,6 @@ struct ContentView: View {
     @State private var pendingDetailOnlyEnforcement = false
     @State private var detailOnlyEnforcementRetryCount = 0
     @State private var hasAppliedLaunchQAHarnessOverrides = false
-    @State private var renderInspectorColumn = true
-    @State private var inspectorColumnExpanded = true
 
     private var isWikiHopAvailable: Bool {
         wikiHopPostV1Enabled && wikiHopPOCEnabled
@@ -50,7 +48,6 @@ struct ContentView: View {
     private enum PanelMotion {
         static let sidebarToggle = ColumnMotion.sidebarVisibility
         static let inspectorToggle = ColumnMotion.inspectorVisibility
-        static let inspectorCollapseRemovalDelay: Double = 0.29
         static let detailOnlyEnforcementRetryLimit = 1
         static let searchOverlayToggle = Animation.spring(response: 0.24, dampingFraction: 0.88)
         static let wikiHopSummaryFade = Animation.easeInOut(duration: 0.3)
@@ -77,9 +74,20 @@ struct ContentView: View {
         !appState.isFocusModeEnabled && appState.inspectorVisible
     }
 
-    private var resolvedInspectorWidth: CGFloat {
-        guard shouldPresentInspectorColumn && renderInspectorColumn && inspectorColumnExpanded else { return 0 }
-        return CGFloat(min(max(inspectorWidth, 220), 380))
+    private var resolvedInspectorIdealWidth: CGFloat {
+        CGFloat(min(max(inspectorWidth, 220), 380))
+    }
+
+    private var inspectorPresentedBinding: Binding<Bool> {
+        Binding(
+            get: { shouldPresentInspectorColumn },
+            set: { newValue in
+                guard !appState.isFocusModeEnabled else { return }
+                if appState.inspectorVisible != newValue {
+                    appState.inspectorVisible = newValue
+                }
+            }
+        )
     }
 
     var body: some View {
@@ -103,7 +111,7 @@ struct ContentView: View {
             WindowTopObscuredHeightReader()
             WindowToolbarTrackingSeparators(
                 sidebarVisible: appState.sidebarVisible,
-                inspectorVisible: shouldPresentInspectorColumn && renderInspectorColumn && inspectorColumnExpanded
+                inspectorVisible: shouldPresentInspectorColumn
             )
         }
         .contentSheets(
@@ -123,7 +131,6 @@ struct ContentView: View {
             applyLaunchQAHarnessOverridesIfNeeded()
             enforceWikiHopAvailabilityIfNeeded()
             syncSidebarVisibilityFromState()
-            syncInspectorPresentation(animated: false)
             guard suppressInitialImplicitAnimations else { return }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
                 suppressInitialImplicitAnimations = false
@@ -134,10 +141,6 @@ struct ContentView: View {
         }
         .onChange(of: appState.isFocusModeEnabled) { _, _ in
             syncSidebarVisibilityFromState()
-            syncInspectorPresentation()
-        }
-        .onChange(of: appState.inspectorVisible) { _, _ in
-            syncInspectorPresentation()
         }
         .onChange(of: appState.showSearch) { _, isShowingSearch in
             guard isShowingSearch else { return }
@@ -264,22 +267,24 @@ struct ContentView: View {
     }
     
     private var mainDetailView: some View {
-        HSplitView {
-            ReaderColumnView(
-                tabBarLiquidGlass: tabBarLiquidGlass,
-                onNewLabelWithArticle: { article in
-                    articleForNewLabel = article
-                    showNewLabelSheet = true
-                }
-            )
-
-            if renderInspectorColumn {
-                InspectorColumnView(
-                    showNewLabelSheet: $showNewLabelSheet,
-                    articleForNewLabel: $articleForNewLabel,
-                    isExpanded: inspectorColumnExpanded
-                )
+        ReaderColumnView(
+            tabBarLiquidGlass: tabBarLiquidGlass,
+            onNewLabelWithArticle: { article in
+                articleForNewLabel = article
+                showNewLabelSheet = true
             }
+        )
+        .inspector(isPresented: inspectorPresentedBinding) {
+            InspectorPanel(
+                showNewLabelSheet: $showNewLabelSheet,
+                articleForNewLabel: $articleForNewLabel,
+                currentArticleTitle: appState.currentArticle?.title
+            )
+            .inspectorColumnWidth(
+                min: 220,
+                ideal: resolvedInspectorIdealWidth,
+                max: 380
+            )
         }
     }
     
@@ -487,67 +492,6 @@ struct ContentView: View {
 
         performAnimation(PanelMotion.sidebarToggle) {
             appState.sidebarVisible = true
-        }
-    }
-
-    private func syncInspectorPresentation(animated: Bool = true) {
-        let targetVisible = shouldPresentInspectorColumn
-
-        if targetVisible {
-            if !renderInspectorColumn {
-                renderInspectorColumn = true
-                inspectorColumnExpanded = false
-
-                guard animated else {
-                    inspectorColumnExpanded = true
-                    return
-                }
-
-                DispatchQueue.main.async {
-                    guard shouldPresentInspectorColumn else { return }
-                    performAnimation(PanelMotion.inspectorToggle) {
-                        inspectorColumnExpanded = true
-                    }
-                }
-                return
-            }
-
-            guard !inspectorColumnExpanded else { return }
-            if animated {
-                performAnimation(PanelMotion.inspectorToggle) {
-                    inspectorColumnExpanded = true
-                }
-            } else {
-                inspectorColumnExpanded = true
-            }
-            return
-        }
-
-        guard renderInspectorColumn else {
-            inspectorColumnExpanded = false
-            return
-        }
-
-        if inspectorColumnExpanded {
-            if animated {
-                performAnimation(PanelMotion.inspectorToggle) {
-                    inspectorColumnExpanded = false
-                }
-            } else {
-                inspectorColumnExpanded = false
-            }
-        }
-
-        let removalDelay: Double
-        if reduceMotion || !animated {
-            removalDelay = 0
-        } else {
-            removalDelay = PanelMotion.inspectorCollapseRemovalDelay
-        }
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + removalDelay) {
-            guard !shouldPresentInspectorColumn else { return }
-            renderInspectorColumn = false
         }
     }
 
