@@ -14,6 +14,7 @@ private enum ReaderMotion {
     static let promptPrimaryDismissDamping: Double = 0.84
     static let promptSecondaryDismissResponse: Double = 0.22
     static let promptSecondaryDismissDamping: Double = 0.88
+    static let promptCornerRadius: CGFloat = 21
 }
 
 /// Reader view - shows article content or new tab page
@@ -527,46 +528,8 @@ struct ArticleView: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 9)
-        .background(
-            RoundedRectangle(cornerRadius: 21, style: .continuous)
-                .fill(.ultraThinMaterial)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 21, style: .continuous)
-                        .fill(
-                            LinearGradient(
-                                colors: [
-                                    Color.white.opacity(colorScheme == .dark ? 0.17 : 0.32),
-                                    Color.white.opacity(colorScheme == .dark ? 0.04 : 0.11),
-                                    Color.clear
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .blendMode(.screen)
-                )
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 21, style: .continuous)
-                .strokeBorder(Color.white.opacity(colorScheme == .dark ? 0.20 : 0.33), lineWidth: 1.0)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 21, style: .continuous)
-                .inset(by: 0.7)
-                .strokeBorder(
-                    LinearGradient(
-                        colors: [
-                            Color.white.opacity(colorScheme == .dark ? 0.32 : 0.48),
-                            Color.white.opacity(0.02)
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    ),
-                    lineWidth: 0.8
-                )
-        )
-        .shadow(color: .black.opacity(colorScheme == .dark ? 0.34 : 0.16), radius: 22, y: 10)
-        .shadow(color: .black.opacity(colorScheme == .dark ? 0.18 : 0.08), radius: 7, y: 2)
+        .background(markAsReadPromptBackground)
+        .shadow(color: .black.opacity(colorScheme == .dark ? 0.22 : 0.10), radius: 14, y: 6)
         .compositingGroup()
         .frame(maxWidth: 620)
         .frame(maxWidth: .infinity)
@@ -576,20 +539,7 @@ struct ArticleView: View {
 
     private var markAsReadIcon: some View {
         ZStack {
-            Circle().fill(.regularMaterial)
-            Circle()
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            Color.white.opacity(colorScheme == .dark ? 0.24 : 0.42),
-                            Color.white.opacity(0.02)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-            Circle()
-                .strokeBorder(Color.white.opacity(colorScheme == .dark ? 0.18 : 0.30), lineWidth: 0.8)
+            markAsReadIconBackground
             Image(systemName: "checkmark.circle.fill")
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(.secondary)
@@ -632,27 +582,7 @@ struct ArticleView: View {
                     .foregroundStyle(.primary)
             }
             .buttonStyle(.plain)
-            .background(
-                Capsule(style: .continuous)
-                    .fill(.regularMaterial)
-                    .overlay(
-                        Capsule(style: .continuous)
-                            .fill(
-                                LinearGradient(
-                                    colors: [
-                                        Color.white.opacity(colorScheme == .dark ? 0.20 : 0.34),
-                                        Color.white.opacity(0.01)
-                                    ],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
-                    )
-                    .overlay(
-                        Capsule(style: .continuous)
-                            .strokeBorder(Color.white.opacity(colorScheme == .dark ? 0.18 : 0.30), lineWidth: 0.8)
-                    )
-            )
+            .background(markAsReadPrimaryActionBackground)
 
             Button {
                 performPromptAnimation(
@@ -666,13 +596,104 @@ struct ArticleView: View {
                     .font(.system(size: 10, weight: .bold))
                     .foregroundStyle(.secondary)
                     .frame(width: 23, height: 23)
-                    .background(.regularMaterial, in: Circle())
-                    .overlay(
-                        Circle()
-                            .strokeBorder(Color.white.opacity(colorScheme == .dark ? 0.14 : 0.24), lineWidth: 0.75)
-                    )
+                    .background(markAsReadSecondaryActionBackground)
             }
             .buttonStyle(.plain)
+        }
+    }
+
+    @ViewBuilder
+    private var markAsReadPromptBackground: some View {
+        let shape = RoundedRectangle(cornerRadius: ReaderMotion.promptCornerRadius, style: .continuous)
+        if #available(macOS 26, *), tabBarLiquidGlass {
+            shape
+                .fill(.clear)
+                .glassEffect(
+                    .regular.tint(
+                        Color(nsColor: .windowBackgroundColor)
+                            .opacity(colorScheme == .dark ? 0.10 : 0.06)
+                    ),
+                    in: .rect(cornerRadius: ReaderMotion.promptCornerRadius)
+                )
+                .overlay {
+                    shape.strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.10 : 0.07), lineWidth: 0.55)
+                }
+        } else {
+            shape
+                .fill(.regularMaterial)
+                .overlay {
+                    shape.strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.12 : 0.08), lineWidth: 0.60)
+                }
+        }
+    }
+
+    @ViewBuilder
+    private var markAsReadIconBackground: some View {
+        let shape = Circle()
+        if #available(macOS 26, *), tabBarLiquidGlass {
+            shape
+                .fill(.clear)
+                .glassEffect(
+                    .regular.tint(
+                        Color(nsColor: .windowBackgroundColor)
+                            .opacity(colorScheme == .dark ? 0.10 : 0.06)
+                    ),
+                    in: .circle
+                )
+        } else {
+            shape
+                .fill(.regularMaterial)
+                .overlay {
+                    shape.strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.12 : 0.08), lineWidth: 0.60)
+                }
+        }
+    }
+
+    @ViewBuilder
+    private var markAsReadPrimaryActionBackground: some View {
+        let shape = Capsule(style: .continuous)
+        if #available(macOS 26, *), tabBarLiquidGlass {
+            shape
+                .fill(.clear)
+                .glassEffect(
+                    .regular
+                        .tint(
+                            Color(nsColor: .windowBackgroundColor)
+                                .opacity(colorScheme == .dark ? 0.09 : 0.05)
+                        )
+                        .interactive(),
+                    in: .capsule
+                )
+        } else {
+            shape
+                .fill(.regularMaterial)
+                .overlay {
+                    shape.strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.12 : 0.08), lineWidth: 0.60)
+                }
+        }
+    }
+
+    @ViewBuilder
+    private var markAsReadSecondaryActionBackground: some View {
+        let shape = Circle()
+        if #available(macOS 26, *), tabBarLiquidGlass {
+            shape
+                .fill(.clear)
+                .glassEffect(
+                    .regular
+                        .tint(
+                            Color(nsColor: .windowBackgroundColor)
+                                .opacity(colorScheme == .dark ? 0.09 : 0.05)
+                        )
+                        .interactive(),
+                    in: .circle
+                )
+        } else {
+            shape
+                .fill(.regularMaterial)
+                .overlay {
+                    shape.strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.12 : 0.08), lineWidth: 0.60)
+                }
         }
     }
 
