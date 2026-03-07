@@ -84,8 +84,7 @@ struct MainWindowToolbar: CustomizableToolbarContent {
     }
 
     private var leadingToolbarDeadZoneWidth: CGFloat {
-        guard appState.sidebarVisible else { return 0 }
-        return CGFloat(min(max(listsSidebarWidth, 176), 260))
+        0
     }
 
     private var trailingToolbarDeadZoneWidth: CGFloat {
@@ -169,17 +168,19 @@ struct MainWindowToolbar: CustomizableToolbarContent {
 
     @ToolbarContentBuilder
     private var leadingDeadZoneItem: some CustomizableToolbarContent {
-        if #available(macOS 26, *) {
-            ToolbarItem(id: ItemID.leadingDeadZone, placement: .navigation) {
-                toolbarDeadZone(width: leadingToolbarDeadZoneWidth)
+        if leadingToolbarDeadZoneWidth > 0.5 {
+            if #available(macOS 26, *) {
+                ToolbarItem(id: ItemID.leadingDeadZone, placement: .navigation) {
+                    toolbarDeadZone(width: leadingToolbarDeadZoneWidth)
+                }
+                .customizationBehavior(.disabled)
+                .sharedBackgroundVisibility(.hidden)
+            } else {
+                ToolbarItem(id: ItemID.leadingDeadZone, placement: .navigation) {
+                    toolbarDeadZone(width: leadingToolbarDeadZoneWidth)
+                }
+                .customizationBehavior(.disabled)
             }
-            .customizationBehavior(.disabled)
-            .sharedBackgroundVisibility(.hidden)
-        } else {
-            ToolbarItem(id: ItemID.leadingDeadZone, placement: .navigation) {
-                toolbarDeadZone(width: leadingToolbarDeadZoneWidth)
-            }
-            .customizationBehavior(.disabled)
         }
     }
 
