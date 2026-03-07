@@ -15,7 +15,6 @@ struct ContentView: View {
     @Environment(AppState.self) private var appState
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @AppStorage(MacWikiGlassRuntime.forceLegacyFallbackKey) private var forceLegacyGlassFallback = false
     @State private var selectedList: ReadingList?
     @State private var selectedLabel: Label?
     @State private var selectedTag: Tag?
@@ -76,17 +75,6 @@ struct ContentView: View {
         !appState.isFocusModeEnabled && appState.inspectorVisible
     }
 
-    private var windowToolbarBackgroundStyle: AnyShapeStyle {
-        if MacWikiGlassRuntime.usesNativeGlass(forceLegacyFallback: forceLegacyGlassFallback) {
-            return AnyShapeStyle(
-                Color(nsColor: .windowBackgroundColor)
-                    .opacity(colorScheme == .dark ? 0.78 : 0.86)
-            )
-        }
-
-        return AnyShapeStyle(.regularMaterial)
-    }
-
     var body: some View {
         ZStack(alignment: .topLeading) {
             workspaceSharedBackground
@@ -102,7 +90,6 @@ struct ContentView: View {
         .toolbar(id: "main-window-toolbar") {
             MainWindowToolbar()
         }
-        .toolbarBackground(windowToolbarBackgroundStyle, for: .windowToolbar)
         .toolbarBackground(.visible, for: .windowToolbar)
         .animation(reduceMotion ? nil : PanelMotion.searchOverlayToggle, value: appState.showSearch)
         .background {

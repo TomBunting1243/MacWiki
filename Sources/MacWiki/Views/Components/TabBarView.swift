@@ -535,11 +535,17 @@ struct TabBarView: View {
     @available(macOS 26, *)
     private func nativeStripAccessoryBackground(cornerRadius: CGFloat) -> some View {
         RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-            .fill(.clear)
-            .glassEffect(
-                .regular.interactive(),
-                in: .rect(cornerRadius: cornerRadius)
+            .fill(
+                Color(nsColor: .controlBackgroundColor)
+                    .opacity(colorScheme == .dark ? 0.34 : 0.58)
             )
+            .overlay {
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .strokeBorder(
+                        Color.primary.opacity(colorScheme == .dark ? 0.055 : 0.075),
+                        lineWidth: 0.5
+                    )
+            }
     }
     
     // MARK: - Drag Calculations (Optimized)
@@ -1254,24 +1260,37 @@ private struct DraggableTabItemView: View {
     @ViewBuilder
     private var nativeStripGlassCellBackground: some View {
         if #available(macOS 26, *) {
+            let darkMode = colorScheme == .dark
             if isActive {
                 RoundedRectangle(cornerRadius: tabCornerRadius, style: .continuous)
-                    .fill(.clear)
-                    .glassEffect(
-                        .regular.interactive(),
-                        in: .rect(cornerRadius: tabCornerRadius)
+                    .fill(
+                        Color(nsColor: .controlBackgroundColor)
+                            .opacity(darkMode ? 0.38 : 0.72)
                     )
                     .overlay {
                         RoundedRectangle(cornerRadius: tabCornerRadius, style: .continuous)
-                            .fill(Color.accentColor.opacity(colorScheme == .dark ? 0.012 : 0.008))
+                            .fill(Color.accentColor.opacity(darkMode ? 0.008 : 0.006))
+                    }
+                    .overlay {
+                        RoundedRectangle(cornerRadius: tabCornerRadius, style: .continuous)
+                            .strokeBorder(
+                                Color.primary.opacity(darkMode ? 0.060 : 0.080),
+                                lineWidth: 0.48
+                            )
                     }
             } else {
                 RoundedRectangle(cornerRadius: tabCornerRadius, style: .continuous)
-                    .fill(.clear)
-                    .glassEffect(
-                        .regular.interactive(),
-                        in: .rect(cornerRadius: tabCornerRadius)
+                    .fill(
+                        Color(nsColor: .windowBackgroundColor)
+                            .opacity(darkMode ? 0.10 : 0.20)
                     )
+                    .overlay {
+                        RoundedRectangle(cornerRadius: tabCornerRadius, style: .continuous)
+                            .strokeBorder(
+                                Color.primary.opacity(darkMode ? 0.028 : 0.040),
+                                lineWidth: 0.40
+                            )
+                    }
             }
         }
     }
