@@ -26,9 +26,12 @@ struct OptionClickSaveSheet: View {
     @FocusState private var isNewListFocused: Bool
 
     private enum Metrics {
-        static let controlCornerRadius: CGFloat = 10
+        static let controlCornerRadius: CGFloat = 8
         static let sectionCornerRadius: CGFloat = 12
-        static let controlHeight: CGFloat = 34
+        static let controlHeight: CGFloat = 30
+        static let rowHorizontalPadding: CGFloat = 14
+        static let rowVerticalPadding: CGFloat = 11
+        static let fieldLabelWidth: CGFloat = 54
     }
 
     private var trimmedNewListName: String {
@@ -84,27 +87,14 @@ struct OptionClickSaveSheet: View {
 
     var body: some View {
         NavigationStack {
-            VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 16) {
                 articleHeader
-                Divider()
-                    .padding(.top, 10)
-                    .padding(.bottom, 14)
-
-                VStack(alignment: .leading, spacing: 12) {
-                    listSelector
-
-                    if isCreatingNewList || allLists.isEmpty {
-                        newListEditor
-                    }
-
-                    labelSelector
-                    tagsSection
-                    footerSummary
-                }
-
-                Spacer(minLength: 0)
+                primaryFieldsGroup
+                tagsSection
+                footerSummary
             }
-            .padding(16)
+            .padding(18)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .navigationTitle("Save Link")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -123,7 +113,7 @@ struct OptionClickSaveSheet: View {
                 }
             }
         }
-        .frame(minWidth: 540, minHeight: 430)
+        .frame(minWidth: 540, minHeight: 360)
         .onAppear {
             selectedTagID = nil
             selectedLabelID = nil
@@ -146,10 +136,38 @@ struct OptionClickSaveSheet: View {
 
             if let description = article.description, !description.isEmpty {
                 Text(description)
-                    .font(.title3.weight(.medium))
+                    .font(.body)
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
             }
+
+            Divider()
+                .padding(.top, 4)
+        }
+    }
+
+    private var primaryFieldsGroup: some View {
+        VStack(spacing: 0) {
+            fieldRow(title: "List") {
+                listSelector
+            }
+
+            if isCreatingNewList || allLists.isEmpty {
+                Divider().padding(.leading, Metrics.rowHorizontalPadding)
+                fieldRow(title: "") {
+                    newListEditor
+                }
+            }
+
+            Divider().padding(.leading, Metrics.rowHorizontalPadding)
+            fieldRow(title: "Label") {
+                labelSelector
+            }
+        }
+        .background(groupSurfaceBackground)
+        .overlay {
+            RoundedRectangle(cornerRadius: Metrics.sectionCornerRadius, style: .continuous)
+                .strokeBorder(groupStrokeColor, lineWidth: 0.65)
         }
     }
 
@@ -157,7 +175,7 @@ struct OptionClickSaveSheet: View {
         Menu {
             listMenuItems
         } label: {
-            selectorCapsule(
+            selectorButton(
                 valueText: listDisplayText,
                 fallbackText: "Select List",
                 hasValue: !listDisplayText.isEmpty,
@@ -166,6 +184,7 @@ struct OptionClickSaveSheet: View {
         }
         .buttonStyle(.plain)
         .menuIndicator(.hidden)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     @ViewBuilder
@@ -237,12 +256,12 @@ struct OptionClickSaveSheet: View {
                 .textFieldStyle(.plain)
                 .focused($isNewListFocused)
         }
-        .padding(.horizontal, 12)
+        .padding(.horizontal, 10)
         .frame(height: Metrics.controlHeight)
-        .background(controlSurfaceBackground)
+        .background(fieldSurfaceBackground)
         .overlay {
             RoundedRectangle(cornerRadius: Metrics.controlCornerRadius, style: .continuous)
-                .strokeBorder(controlStrokeColor, lineWidth: 0.55)
+                .strokeBorder(fieldStrokeColor, lineWidth: 0.6)
         }
     }
 
@@ -274,7 +293,7 @@ struct OptionClickSaveSheet: View {
                 }
             }
         } label: {
-            selectorCapsule(
+            selectorButton(
                 valueText: labelDisplayText,
                 fallbackText: "Add Label",
                 hasValue: selectedLabel != nil,
@@ -283,32 +302,42 @@ struct OptionClickSaveSheet: View {
         }
         .buttonStyle(.plain)
         .menuIndicator(.hidden)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var tagsSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Text("Tags")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
-
-                Spacer(minLength: 0)
-
+        VStack(spacing: 0) {
+            fieldRow(title: "Tags") {
                 Button {
                     withAnimation(.easeInOut(duration: 0.22)) {
                         isTagsExpanded.toggle()
                     }
                 } label: {
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(.secondary)
-                        .rotationEffect(.degrees(isTagsExpanded ? -180 : 0))
-                        .frame(width: 20, height: 20)
+                    HStack(spacing: 8) {
+                        Text(selectedTag?.name ?? "None")
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(selectedTag == nil ? .secondary : .primary)
+
+                        Spacer(minLength: 0)
+
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(.tertiary)
+                            .rotationEffect(.degrees(isTagsExpanded ? -180 : 0))
+                    }
+                    .padding(.horizontal, 10)
+                    .frame(height: Metrics.controlHeight)
+                    .background(fieldSurfaceBackground)
+                    .overlay {
+                        RoundedRectangle(cornerRadius: Metrics.controlCornerRadius, style: .continuous)
+                            .strokeBorder(fieldStrokeColor, lineWidth: 0.6)
+                    }
                 }
                 .buttonStyle(.plain)
             }
 
             if isTagsExpanded {
+                Divider().padding(.leading, Metrics.rowHorizontalPadding)
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 6) {
                         tagSelectionRow(id: nil, name: "None")
@@ -316,20 +345,15 @@ struct OptionClickSaveSheet: View {
                             tagSelectionRow(id: tag.id, name: tag.name)
                         }
                     }
+                    .padding(10)
                 }
-                .frame(maxHeight: 150)
-            } else {
-                Text(selectedTag?.name ?? "No tags yet")
-                    .font(.subheadline)
-                    .foregroundStyle(selectedTag == nil ? .tertiary : .secondary)
+                .frame(maxHeight: 168)
             }
         }
-        .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(sectionSurfaceBackground)
+        .background(groupSurfaceBackground)
         .overlay {
             RoundedRectangle(cornerRadius: Metrics.sectionCornerRadius, style: .continuous)
-                .strokeBorder(controlStrokeColor, lineWidth: 0.55)
+                .strokeBorder(groupStrokeColor, lineWidth: 0.65)
         }
     }
 
@@ -353,7 +377,28 @@ struct OptionClickSaveSheet: View {
         .buttonStyle(.plain)
     }
 
-    private func selectorCapsule(
+    private func fieldRow<Content: View>(
+        title: String,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        HStack(alignment: .center, spacing: 12) {
+            if title.isEmpty {
+                Color.clear
+                    .frame(width: Metrics.fieldLabelWidth, height: 1)
+            } else {
+                Text(title)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(.secondary)
+                    .frame(width: Metrics.fieldLabelWidth, alignment: .leading)
+            }
+
+            content()
+        }
+        .padding(.horizontal, Metrics.rowHorizontalPadding)
+        .padding(.vertical, Metrics.rowVerticalPadding)
+    }
+
+    private func selectorButton(
         valueText: String,
         fallbackText: String,
         hasValue: Bool,
@@ -387,17 +432,17 @@ struct OptionClickSaveSheet: View {
                 .font(.system(size: 9, weight: .semibold))
                 .foregroundStyle(.tertiary)
         }
-        .padding(.horizontal, 12)
+        .padding(.horizontal, 10)
         .frame(height: Metrics.controlHeight)
         .contentShape(RoundedRectangle(cornerRadius: Metrics.controlCornerRadius, style: .continuous))
-        .background(controlSurfaceBackground)
+        .background(fieldSurfaceBackground)
         .overlay {
             RoundedRectangle(cornerRadius: Metrics.controlCornerRadius, style: .continuous)
                 .strokeBorder(
                     hasValue
-                        ? tint.opacity(colorScheme == .dark ? 0.22 : 0.16)
-                        : controlStrokeColor,
-                    lineWidth: 0.55
+                        ? tint.opacity(colorScheme == .dark ? 0.28 : 0.20)
+                        : fieldStrokeColor,
+                    lineWidth: 0.65
                 )
         }
     }
@@ -415,48 +460,50 @@ struct OptionClickSaveSheet: View {
 
             Spacer(minLength: 0)
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
-        .background(controlSurfaceBackground)
-        .overlay {
-            RoundedRectangle(cornerRadius: Metrics.controlCornerRadius, style: .continuous)
-                .strokeBorder(controlStrokeColor, lineWidth: 0.5)
-        }
+        .padding(.horizontal, 2)
     }
 
-    private var controlSurfaceBackground: some View {
-        RoundedRectangle(cornerRadius: Metrics.controlCornerRadius, style: .continuous)
-            .fill(
-                Color(nsColor: .controlBackgroundColor)
-                    .opacity(colorScheme == .dark ? 0.56 : 0.84)
-            )
-    }
-
-    private var sectionSurfaceBackground: some View {
+    private var groupSurfaceBackground: some View {
         RoundedRectangle(cornerRadius: Metrics.sectionCornerRadius, style: .continuous)
             .fill(
                 Color(nsColor: .controlBackgroundColor)
-                    .opacity(colorScheme == .dark ? 0.42 : 0.68)
+                    .opacity(colorScheme == .dark ? 0.48 : 0.64)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: Metrics.sectionCornerRadius, style: .continuous)
+                    .fill(Color(nsColor: .windowBackgroundColor).opacity(colorScheme == .dark ? 0.06 : 0.20))
+            }
+    }
+
+    private var fieldSurfaceBackground: some View {
+        RoundedRectangle(cornerRadius: Metrics.controlCornerRadius, style: .continuous)
+            .fill(
+                Color(nsColor: .windowBackgroundColor)
+                    .opacity(colorScheme == .dark ? 0.30 : 0.72)
             )
     }
 
-    private var controlStrokeColor: Color {
-        Color.primary.opacity(colorScheme == .dark ? 0.085 : 0.055)
+    private var groupStrokeColor: Color {
+        Color.primary.opacity(colorScheme == .dark ? 0.09 : 0.075)
+    }
+
+    private var fieldStrokeColor: Color {
+        Color.primary.opacity(colorScheme == .dark ? 0.10 : 0.085)
     }
 
     private func tagRowBackground(isSelected: Bool) -> some View {
         RoundedRectangle(cornerRadius: 8, style: .continuous)
             .fill(
                 Color(nsColor: .windowBackgroundColor)
-                    .opacity(isSelected ? (colorScheme == .dark ? 0.16 : 0.09) : 0)
+                    .opacity(isSelected ? (colorScheme == .dark ? 0.18 : 0.16) : 0)
             )
             .overlay {
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
                     .strokeBorder(
                         isSelected
-                            ? Color.primary.opacity(colorScheme == .dark ? 0.10 : 0.06)
+                            ? Color.primary.opacity(colorScheme == .dark ? 0.12 : 0.10)
                             : Color.clear,
-                        lineWidth: 0.45
+                        lineWidth: 0.55
                     )
             }
     }
