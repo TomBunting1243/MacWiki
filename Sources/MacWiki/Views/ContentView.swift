@@ -355,7 +355,9 @@ struct ContentView: View {
     @ViewBuilder
     private var centerToolbarBand: some View {
         GeometryReader { proxy in
-            let topBandHeight = max(appState.windowTopObscuredHeight, 0)
+            let topBandHeight = ColumnChromeMetrics.titlebarBandHeight(
+                windowTopObscuredHeight: appState.windowTopObscuredHeight
+            )
             let leadingInset = appState.sidebarVisible ? resolvedListsSidebarWidth : 0
             let trailingInset = resolvedInspectorWidth
             let bandWidth = max(0, proxy.size.width - leadingInset - trailingInset)
@@ -392,7 +394,9 @@ struct ContentView: View {
             SidebarPaneBackground()
                 .frame(
                     width: resolvedListsSidebarWidth + 1,
-                    height: max(appState.windowTopObscuredHeight, 0),
+                    height: ColumnChromeMetrics.titlebarBandHeight(
+                        windowTopObscuredHeight: appState.windowTopObscuredHeight
+                    ),
                     alignment: .topLeading
                 )
                 .overlay(alignment: .trailing) {

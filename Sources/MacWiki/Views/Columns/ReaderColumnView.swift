@@ -12,7 +12,9 @@ struct ReaderColumnView: View {
     }
 
     private var titlebarUnderlapHeight: CGFloat {
-        max(appState.windowTopObscuredHeight, 0)
+        ColumnChromeMetrics.titlebarBandHeight(
+            windowTopObscuredHeight: appState.windowTopObscuredHeight
+        )
     }
 
     private var shouldShowReaderTopChrome: Bool {

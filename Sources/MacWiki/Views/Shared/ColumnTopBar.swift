@@ -24,6 +24,10 @@ enum ColumnChromeMetrics {
         colorScheme == .dark ? darkDividerOpacity : dividerOpacity
     }
 
+    static func titlebarBandHeight(windowTopObscuredHeight: CGFloat) -> CGFloat {
+        max(windowTopObscuredHeight, titleBarClearance)
+    }
+
     static func internalDividerOpacity(for colorScheme: ColorScheme) -> CGFloat {
         colorScheme == .dark ? darkInternalDividerOpacity : internalDividerOpacity
     }
@@ -33,7 +37,7 @@ enum ColumnChromeMetrics {
     /// toolbar glass, so article content needs to clear both the titlebar band
     /// and the reader-owned tab lane.
     static func readerChromeOverlayHeight(windowTopObscuredHeight: CGFloat) -> CGFloat {
-        return max(windowTopObscuredHeight, 0) + topBarHeight
+        titlebarBandHeight(windowTopObscuredHeight: windowTopObscuredHeight) + topBarHeight
     }
 
     /// Suggested content inset that clears the reader-owned overlay chrome with comfortable breathing room.
