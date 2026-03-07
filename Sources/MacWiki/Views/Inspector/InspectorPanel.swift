@@ -932,11 +932,35 @@ private struct InspectorModeControl: View {
         static let railHorizontalPadding: CGFloat = 3
         static let railVerticalPadding: CGFloat = 2
         static let railHeight: CGFloat = 32
+        static let nativeControlMinimumWidth: CGFloat = 230
     }
 
     var body: some View {
-        let darkMode = colorScheme == .dark
+        if #available(macOS 26, *) {
+            nativeSegmentedControl
+        } else {
+            legacySegmentedControl(darkMode: colorScheme == .dark)
+        }
+    }
 
+    @available(macOS 26, *)
+    private var nativeSegmentedControl: some View {
+        MacWikiGlassGroup(spacing: Metrics.pillSpacing) {
+            Picker("Inspector mode", selection: $selectedMode) {
+                ForEach(modes, id: \.self) { mode in
+                    Text(mode.rawValue)
+                        .tag(mode)
+                }
+            }
+            .labelsHidden()
+            .pickerStyle(.segmented)
+            .controlSize(.small)
+            .frame(minWidth: Metrics.nativeControlMinimumWidth)
+            .fixedSize()
+        }
+    }
+
+    private func legacySegmentedControl(darkMode: Bool) -> some View {
         HStack(spacing: Metrics.pillSpacing) {
             ForEach(modes, id: \.self) { mode in
                 let isActive = selectedMode == mode

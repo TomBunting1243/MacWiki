@@ -248,6 +248,16 @@ struct ColumnChromeBackground: View {
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
+        if #available(macOS 26, *) {
+            Rectangle()
+                .fill(.clear)
+                .glassEffect(.regular, in: .rect)
+        } else {
+            fallbackBackground
+        }
+    }
+
+    private var fallbackBackground: some View {
         let isDark = colorScheme == .dark
         let strongHighlight = isDark
             ? ColumnChromeMetrics.darkHighlightStrongOpacity
@@ -256,7 +266,7 @@ struct ColumnChromeBackground: View {
             ? ColumnChromeMetrics.darkHighlightSoftOpacity
             : ColumnChromeMetrics.highlightSoftOpacity
 
-        Rectangle()
+        return Rectangle()
             .fill(.ultraThinMaterial)
             .overlay {
                 Color(nsColor: .windowBackgroundColor)
@@ -280,6 +290,16 @@ struct SidebarPaneBackground: View {
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
+        if #available(macOS 26, *) {
+            Rectangle()
+                .fill(.clear)
+                .glassEffect(.regular, in: .rect)
+        } else {
+            fallbackBackground
+        }
+    }
+
+    private var fallbackBackground: some View {
         let isDark = colorScheme == .dark
         let strongHighlight = isDark
             ? ColumnChromeMetrics.darkHighlightStrongOpacity * 0.55
@@ -288,7 +308,7 @@ struct SidebarPaneBackground: View {
             ? ColumnChromeMetrics.darkHighlightSoftOpacity * 0.60
             : ColumnChromeMetrics.highlightSoftOpacity * 0.52
 
-        Rectangle()
+        return Rectangle()
             .fill(.thinMaterial)
             .overlay {
                 Color(nsColor: .windowBackgroundColor)
