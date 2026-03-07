@@ -3,25 +3,51 @@ import SwiftData
 
 /// Floating toolbar that appears when text is selected in the article
 struct HighlightToolbar: View {
+    @Environment(\.colorScheme) private var colorScheme
     let selectionData: TextSelectionData
     let articleTitle: String
     let onDismiss: () -> Void
 
     @Environment(AppState.self) private var appState
     @Environment(\.modelContext) private var modelContext
+    @AppStorage("tabBarLiquidGlass") private var tabBarLiquidGlass = true
+    @AppStorage(MacWikiGlassRuntime.forceLegacyFallbackKey) private var forceLegacyGlassFallback = false
     @State private var selectedColor: HighlightColor = .yellow
     @State private var isHoveringColor: HighlightColor?
+    @State private var hoveredAction: HighlightToolbarAction?
+
+    private enum Metrics {
+        static let cornerRadius: CGFloat = 11
+        static let groupCornerRadius: CGFloat = 8
+        static let colorButtonSize: CGFloat = 22
+        static let colorSwatchSize: CGFloat = 15
+        static let actionButtonSize: CGFloat = 24
+    }
+
+    private enum HighlightToolbarAction {
+        case addNote
+        case copy
+        case dismiss
+    }
+
+    private var usesNativeGlass: Bool {
+        tabBarLiquidGlass &&
+            MacWikiGlassRuntime.usesNativeGlass(forceLegacyFallback: forceLegacyGlassFallback)
+    }
 
     var body: some View {
-        VStack(spacing: 0) {
-            colorPickerView
-        }
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .stroke(.quaternary, lineWidth: 1)
-        }
-        .shadow(color: .black.opacity(0.18), radius: 10, x: 0, y: 4)
+        colorPickerView
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .background(toolbarBackground)
+            .overlay {
+                RoundedRectangle(cornerRadius: Metrics.cornerRadius, style: .continuous)
+                    .strokeBorder(
+                        Color.primary.opacity(colorScheme == .dark ? 0.075 : 0.046),
+                        lineWidth: 0.5
+                    )
+            }
+            .shadow(color: .black.opacity(colorScheme == .dark ? 0.16 : 0.06), radius: 10, x: 0, y: 4)
     }
 
     private var colorPickerView: some View {
@@ -34,16 +60,28 @@ struct HighlightToolbar: View {
                     } label: {
                         ZStack {
                             Circle()
-                                .fill(color.swiftUIColor)
-                                .frame(width: 16, height: 16)
+                                .fill(
+                                    Color(nsColor: .windowBackgroundColor)
+                                        .opacity(colorPlateOpacity(for: color))
+                                )
+                                .frame(width: Metrics.colorButtonSize, height: Metrics.colorButtonSize)
 
                             Circle()
-                                .strokeBorder(Color.white.opacity(0.9), lineWidth: selectedColor == color ? 1.5 : 0)
-                                .frame(width: 18, height: 18)
+                                .fill(color.swiftUIColor)
+                                .frame(width: Metrics.colorSwatchSize, height: Metrics.colorSwatchSize)
+
+                            Circle()
+                                .strokeBorder(Color.white.opacity(0.9), lineWidth: selectedColor == color ? 1.25 : 0)
+                                .frame(width: Metrics.colorSwatchSize + 2, height: Metrics.colorSwatchSize + 2)
                                 .opacity(selectedColor == color ? 1 : 0)
                         }
-                        .frame(width: 22, height: 22)
+                        .frame(width: Metrics.colorButtonSize, height: Metrics.colorButtonSize)
                         .contentShape(Circle())
+                        .overlay {
+                            Circle()
+                                .strokeBorder(colorPlateStroke(for: color), lineWidth: 0.45)
+                                .frame(width: Metrics.colorButtonSize, height: Metrics.colorButtonSize)
+                        }
                     }
                     .buttonStyle(.plain)
                     .onHover { hovering in
@@ -51,56 +89,148 @@ struct HighlightToolbar: View {
                             isHoveringColor = hovering ? color : nil
                         }
                     }
-                    .overlay {
-                        Circle()
-                            .stroke(color.swiftUIColor.opacity(0.4), lineWidth: 1)
-                            .frame(width: 22, height: 22)
-                            .opacity(isHoveringColor == color ? 1 : 0)
-                    }
                     .help("Highlight \(color.rawValue.lowercased())")
                 }
             }
+            .padding(.horizontal, 4)
+            .padding(.vertical, 3)
+            .background(controlGroupBackground)
 
-            Divider()
-                .frame(height: 18)
+            Rectangle()
+                .fill(Color.primary.opacity(colorScheme == .dark ? 0.08 : 0.05))
+                .frame(width: 0.5, height: 16)
+                .padding(.horizontal, 2)
 
-            Button {
+            actionGroup
+        }
+    }
+
+    private var actionGroup: some View {
+        HStack(spacing: 2) {
+            toolbarActionButton(
+                action: .addNote,
+                systemImage: "note.text",
+                helpText: "Add note"
+            ) {
                 createHighlight(color: selectedColor, openNoteEditor: true)
-            } label: {
-                Image(systemName: "note.text")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 24, height: 24)
             }
-            .buttonStyle(.plain)
-            .help("Add note")
 
-            Button {
+            toolbarActionButton(
+                action: .copy,
+                systemImage: "doc.on.doc",
+                helpText: "Copy selection"
+            ) {
                 copyToClipboard()
                 onDismiss()
-            } label: {
-                Image(systemName: "doc.on.doc")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 24, height: 24)
             }
-            .buttonStyle(.plain)
-            .help("Copy selection")
 
-            Button {
+            toolbarActionButton(
+                action: .dismiss,
+                systemImage: "xmark",
+                helpText: "Dismiss",
+                symbolWeight: .semibold,
+                symbolSize: 11
+            ) {
                 onDismiss()
-            } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(.tertiary)
-                    .frame(width: 24, height: 24)
             }
-            .buttonStyle(.plain)
-            .help("Dismiss")
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
+        .padding(.horizontal, 4)
+        .padding(.vertical, 3)
+        .background(controlGroupBackground)
     }
+
+    @ViewBuilder
+    private var toolbarBackground: some View {
+        let shape = RoundedRectangle(cornerRadius: Metrics.cornerRadius, style: .continuous)
+        if #available(macOS 26, *), usesNativeGlass {
+            shape
+                .fill(.clear)
+                .glassEffect(.regular, in: .rect(cornerRadius: Metrics.cornerRadius))
+                .overlay {
+                    shape.fill(Color(nsColor: .windowBackgroundColor).opacity(colorScheme == .dark ? 0.022 : 0.014))
+                }
+        } else {
+            shape
+                .fill(.thinMaterial)
+                .overlay {
+                    shape.fill(Color(nsColor: .windowBackgroundColor).opacity(colorScheme == .dark ? 0.10 : 0.06))
+                }
+        }
+    }
+
+    private var controlGroupBackground: some View {
+        RoundedRectangle(cornerRadius: Metrics.groupCornerRadius, style: .continuous)
+            .fill(Color(nsColor: .windowBackgroundColor).opacity(colorScheme == .dark ? 0.10 : 0.055))
+            .overlay {
+                RoundedRectangle(cornerRadius: Metrics.groupCornerRadius, style: .continuous)
+                    .strokeBorder(
+                        Color.primary.opacity(colorScheme == .dark ? 0.048 : 0.030),
+                        lineWidth: 0.45
+                    )
+            }
+    }
+
+    private func colorPlateOpacity(for color: HighlightColor) -> Double {
+        if selectedColor == color {
+            return colorScheme == .dark ? 0.14 : 0.08
+        }
+        if isHoveringColor == color {
+            return colorScheme == .dark ? 0.10 : 0.055
+        }
+        return 0
+    }
+
+    private func colorPlateStroke(for color: HighlightColor) -> Color {
+        if selectedColor == color {
+            return Color.primary.opacity(colorScheme == .dark ? 0.075 : 0.045)
+        }
+        if isHoveringColor == color {
+            return Color.primary.opacity(colorScheme == .dark ? 0.048 : 0.030)
+        }
+        return Color.clear
+    }
+
+    private func toolbarActionButton(
+        action actionType: HighlightToolbarAction,
+        systemImage: String,
+        helpText: String,
+        symbolWeight: Font.Weight = .medium,
+        symbolSize: CGFloat = 13,
+        perform action: @escaping () -> Void
+    ) -> some View {
+        Button(helpText, systemImage: systemImage, action: action)
+            .labelStyle(.iconOnly)
+            .buttonStyle(.plain)
+            .help(helpText)
+            .accessibilityLabel(helpText)
+            .font(.system(size: symbolSize, weight: symbolWeight))
+            .foregroundStyle(hoveredAction == actionType ? .primary : .secondary)
+            .frame(width: Metrics.actionButtonSize, height: Metrics.actionButtonSize)
+            .background(actionBackground(for: actionType))
+            .onHover { hovering in
+                withAnimation(.easeOut(duration: 0.12)) {
+                    hoveredAction = hovering ? actionType : (hoveredAction == actionType ? nil : hoveredAction)
+                }
+            }
+    }
+
+    private func actionBackground(for action: HighlightToolbarAction) -> some View {
+        RoundedRectangle(cornerRadius: 7, style: .continuous)
+            .fill(
+                Color(nsColor: .windowBackgroundColor)
+                    .opacity(hoveredAction == action ? (colorScheme == .dark ? 0.12 : 0.065) : 0)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .strokeBorder(
+                        hoveredAction == action
+                            ? Color.primary.opacity(colorScheme == .dark ? 0.075 : 0.045)
+                            : Color.primary.opacity(colorScheme == .dark ? 0.028 : 0.018),
+                        lineWidth: 0.45
+                    )
+            }
+    }
+
     private func createHighlight(color: HighlightColor, openNoteEditor: Bool = false) {
         let highlight = Highlight(
             text: selectionData.text,
