@@ -106,6 +106,7 @@ struct TabBarView: View {
     @Environment(AppState.self) private var appState
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @AppStorage(MacWikiGlassRuntime.forceLegacyFallbackKey) private var forceLegacyGlassFallback = false
     @AppStorage("tabBarLiquidGlass") private var tabBarLiquidGlass = true
     @AppStorage(TabAccompanimentStorageKey.showSavedMarker) private var showSavedTabMarker = true
     @AppStorage(TabAccompanimentStorageKey.showHighlightMarker) private var showHighlightTabMarker = true
@@ -527,10 +528,8 @@ struct TabBarView: View {
 
     private var usesNativeGlassAccessories: Bool {
         guard tabBarLiquidGlass else { return false }
-        if #available(macOS 26, *) {
-            return chromeStyle == .strip || chromeStyle == .toolbar
-        }
-        return false
+        return MacWikiGlassRuntime.usesNativeGlass(forceLegacyFallback: forceLegacyGlassFallback) &&
+            (chromeStyle == .strip || chromeStyle == .toolbar)
     }
 
     @available(macOS 26, *)
@@ -920,6 +919,7 @@ private struct DraggableTabItemView: View {
     @State private var showCloseButton = false
     @State private var saveScheduler = DebouncedActionScheduler()
     @GestureState private var isDragActive = false
+    @AppStorage(MacWikiGlassRuntime.forceLegacyFallbackKey) private var forceLegacyGlassFallback = false
     
     /// The most recently used list (for quick save)
     private var recentList: ReadingList? {
@@ -1252,10 +1252,8 @@ private struct DraggableTabItemView: View {
 
     private var usesNativeStripGlassCells: Bool {
         guard tabBarLiquidGlass else { return false }
-        if #available(macOS 26, *) {
-            return chromeStyle == .strip || chromeStyle == .toolbar
-        }
-        return false
+        return MacWikiGlassRuntime.usesNativeGlass(forceLegacyFallback: forceLegacyGlassFallback) &&
+            (chromeStyle == .strip || chromeStyle == .toolbar)
     }
 
     @ViewBuilder

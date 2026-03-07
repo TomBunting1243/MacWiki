@@ -920,6 +920,7 @@ private struct InspectorModeControl: View {
 
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @AppStorage(MacWikiGlassRuntime.forceLegacyFallbackKey) private var forceLegacyGlassFallback = false
     @State private var hoveredMode: InspectorMode?
     @Namespace private var activeModeNamespace
 
@@ -936,7 +937,8 @@ private struct InspectorModeControl: View {
     }
 
     var body: some View {
-        if #available(macOS 26, *) {
+        if #available(macOS 26, *),
+           MacWikiGlassRuntime.usesNativeGlass(forceLegacyFallback: forceLegacyGlassFallback) {
             nativeSegmentedControl
         } else {
             legacySegmentedControl(darkMode: colorScheme == .dark)

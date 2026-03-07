@@ -21,6 +21,7 @@ struct SettingsView: View {
     @AppStorage("searchPresentationMode") private var searchPresentationMode: SearchPresentationMode = .overlay
     @AppStorage("recentsScope") private var recentsScope: RecentsScope = .currentTab
     @AppStorage("tabBarLiquidGlass") private var tabBarLiquidGlass = true
+    @AppStorage(MacWikiGlassRuntime.forceLegacyFallbackKey) private var forceLegacyGlassFallback = false
     @AppStorage(TabAccompanimentStorageKey.showSavedMarker) private var showSavedTabMarker = true
     @AppStorage(TabAccompanimentStorageKey.showHighlightMarker) private var showHighlightTabMarker = true
     @AppStorage(TabAccompanimentStorageKey.showReadMarker) private var showReadTabMarker = true
@@ -510,6 +511,9 @@ struct SettingsView: View {
 
             Toggle("Liquid Glass Tab Bar", isOn: $tabBarLiquidGlass)
             settingDescription("Use translucent liquid-glass treatment for the reader tab bar and top chrome. Disable for a more solid chrome look.")
+
+            Toggle("Use Legacy Glass Fallbacks", isOn: $forceLegacyGlassFallback)
+            settingDescription("Disable macOS 26 glass APIs and render the older material-based fallback path instead. Useful when reproducing older-system chrome bugs on a newer Mac.")
 
             GroupBox("Tab Accompaniments (Pro)") {
                 VStack(alignment: .leading, spacing: compact ? 8 : 10) {

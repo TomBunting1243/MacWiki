@@ -245,10 +245,12 @@ enum TopChromeMotion {
 }
 
 struct ColumnChromeBackground: View {
+    @AppStorage(MacWikiGlassRuntime.forceLegacyFallbackKey) private var forceLegacyGlassFallback = false
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        if #available(macOS 26, *) {
+        if #available(macOS 26, *),
+           MacWikiGlassRuntime.usesNativeGlass(forceLegacyFallback: forceLegacyGlassFallback) {
             Rectangle()
                 .fill(.clear)
                 .glassEffect(
@@ -297,10 +299,12 @@ struct ColumnChromeBackground: View {
 }
 
 struct SidebarPaneBackground: View {
+    @AppStorage(MacWikiGlassRuntime.forceLegacyFallbackKey) private var forceLegacyGlassFallback = false
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        if #available(macOS 26, *) {
+        if #available(macOS 26, *),
+           MacWikiGlassRuntime.usesNativeGlass(forceLegacyFallback: forceLegacyGlassFallback) {
             Rectangle()
                 .fill(.clear)
                 .glassEffect(

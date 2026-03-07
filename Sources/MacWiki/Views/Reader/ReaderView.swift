@@ -155,6 +155,7 @@ struct ArticleView: View {
     @AppStorage(ReaderAppearanceStorageKey.horizontalPadding) private var readerHorizontalPadding: Double = ReaderAppearance.default.horizontalPadding
     @AppStorage(ReaderAppearanceStorageKey.headingScale) private var readerHeadingScale: Double = ReaderAppearance.default.headingScale
     @AppStorage("tabBarLiquidGlass") private var tabBarLiquidGlass = true
+    @AppStorage(MacWikiGlassRuntime.forceLegacyFallbackKey) private var forceLegacyGlassFallback = false
     @AppStorage("nativeHighlightingMenuEnabled") private var nativeHighlightingMenuEnabled = false
 
     init(tabId: UUID, article: Article, scrollPosition: Binding<CGFloat>) {
@@ -605,7 +606,9 @@ struct ArticleView: View {
     @ViewBuilder
     private var markAsReadPromptBackground: some View {
         let shape = RoundedRectangle(cornerRadius: ReaderMotion.promptCornerRadius, style: .continuous)
-        if #available(macOS 26, *), tabBarLiquidGlass {
+        if #available(macOS 26, *),
+           tabBarLiquidGlass &&
+            MacWikiGlassRuntime.usesNativeGlass(forceLegacyFallback: forceLegacyGlassFallback) {
             shape
                 .fill(.clear)
                 .glassEffect(
@@ -630,7 +633,9 @@ struct ArticleView: View {
     @ViewBuilder
     private var markAsReadIconBackground: some View {
         let shape = Circle()
-        if #available(macOS 26, *), tabBarLiquidGlass {
+        if #available(macOS 26, *),
+           tabBarLiquidGlass &&
+            MacWikiGlassRuntime.usesNativeGlass(forceLegacyFallback: forceLegacyGlassFallback) {
             shape
                 .fill(.clear)
                 .glassEffect(
@@ -652,7 +657,9 @@ struct ArticleView: View {
     @ViewBuilder
     private var markAsReadPrimaryActionBackground: some View {
         let shape = Capsule(style: .continuous)
-        if #available(macOS 26, *), tabBarLiquidGlass {
+        if #available(macOS 26, *),
+           tabBarLiquidGlass &&
+            MacWikiGlassRuntime.usesNativeGlass(forceLegacyFallback: forceLegacyGlassFallback) {
             shape
                 .fill(.clear)
                 .glassEffect(
@@ -676,7 +683,9 @@ struct ArticleView: View {
     @ViewBuilder
     private var markAsReadSecondaryActionBackground: some View {
         let shape = Circle()
-        if #available(macOS 26, *), tabBarLiquidGlass {
+        if #available(macOS 26, *),
+           tabBarLiquidGlass &&
+            MacWikiGlassRuntime.usesNativeGlass(forceLegacyFallback: forceLegacyGlassFallback) {
             shape
                 .fill(.clear)
                 .glassEffect(
