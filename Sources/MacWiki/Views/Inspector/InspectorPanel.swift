@@ -3,31 +3,31 @@ import SwiftData
 
 private enum InspectorModePillStyle {
     static func foregroundPrimaryOpacity(darkMode: Bool) -> Double {
-        darkMode ? 0.76 : 0.70
+        darkMode ? 0.74 : 0.68
     }
 
     static func foregroundSelectedOpacity(darkMode: Bool) -> Double {
-        darkMode ? 0.84 : 0.78
+        darkMode ? 0.86 : 0.80
     }
 
     static func foregroundHoverOpacity(darkMode: Bool) -> Double {
-        darkMode ? 0.78 : 0.72
+        darkMode ? 0.80 : 0.74
     }
 
     static func activeFillOpacity(darkMode: Bool) -> Double {
-        darkMode ? 0.055 : 0.035
+        darkMode ? 0.016 : 0.010
     }
 
     static func activeStrokeOpacity(darkMode: Bool) -> Double {
-        darkMode ? 0.10 : 0.075
+        darkMode ? 0.070 : 0.046
     }
 
     static func hoverFillOpacity(darkMode: Bool) -> Double {
-        darkMode ? 0.05 : 0.035
+        darkMode ? 0.028 : 0.018
     }
 
     static func hoverStrokeOpacity(darkMode: Bool) -> Double {
-        darkMode ? 0.10 : 0.075
+        darkMode ? 0.060 : 0.040
     }
 }
 
@@ -947,24 +947,30 @@ private struct InspectorModeControl: View {
 
     @available(macOS 26, *)
     private var nativeSegmentedControl: some View {
-        MacWikiGlassGroup(spacing: Metrics.pillSpacing) {
-            Picker("Inspector mode", selection: $selectedMode) {
-                ForEach(modes, id: \.self) { mode in
-                    Text(mode.rawValue)
-                        .tag(mode)
-                }
+        Picker("Inspector mode", selection: $selectedMode) {
+            ForEach(modes, id: \.self) { mode in
+                Text(mode.rawValue)
+                    .tag(mode)
             }
-            .labelsHidden()
-            .pickerStyle(.segmented)
-            .controlSize(.small)
-            .tint(
-                colorScheme == .dark
-                    ? Color.white.opacity(0.18)
-                    : Color.black.opacity(0.10)
-            )
-            .frame(minWidth: Metrics.nativeControlMinimumWidth)
-            .fixedSize()
         }
+        .labelsHidden()
+        .pickerStyle(.segmented)
+        .controlSize(.small)
+        .tint(
+            colorScheme == .dark
+                ? Color.white.opacity(0.14)
+                : Color.black.opacity(0.08)
+        )
+        .frame(minWidth: Metrics.nativeControlMinimumWidth)
+        .fixedSize()
+        .padding(.horizontal, 2)
+        .background {
+            RoundedRectangle(cornerRadius: Metrics.pillCornerRadius)
+                .fill(Color(nsColor: .windowBackgroundColor).opacity(colorScheme == .dark ? 0.045 : 0.024))
+                .padding(.horizontal, -2)
+                .padding(.vertical, -1)
+        }
+        .accessibilityLabel("Inspector mode")
     }
 
     private func legacySegmentedControl(darkMode: Bool) -> some View {
@@ -974,13 +980,7 @@ private struct InspectorModeControl: View {
                 let isHovered = hoveredMode == mode && !isActive
 
                 Button {
-                    if reduceMotion {
-                        selectedMode = mode
-                    } else {
-                        withAnimation(.interactiveSpring(response: 0.24, dampingFraction: 0.90, blendDuration: 0.08)) {
-                            selectedMode = mode
-                        }
-                    }
+                    selectMode(mode)
                 } label: {
                     Text(mode.rawValue)
                         .font(.system(size: labelPointSize, weight: isActive ? .semibold : .medium))
@@ -1039,26 +1039,20 @@ private struct InspectorModeControl: View {
                 .overlay {
                     RoundedRectangle(cornerRadius: Metrics.pillCornerRadius, style: .continuous)
                         .fill(
-                            Color(nsColor: .controlBackgroundColor)
-                                .opacity(darkMode ? 0.20 : 0.12)
+                            Color(nsColor: .windowBackgroundColor)
+                                .opacity(darkMode ? 0.10 : 0.055)
                         )
                 }
                 .overlay {
                     RoundedRectangle(cornerRadius: Metrics.pillCornerRadius, style: .continuous)
                         .strokeBorder(
-                            Color.primary.opacity(
-                                TopChromeControlSurface.borderOpacity(
-                                    darkMode: darkMode,
-                                    liquid: useLiquidGlass,
-                                    compactAccessory: true
-                                )
-                            ),
-                            lineWidth: 0.50
+                            Color.primary.opacity(darkMode ? 0.055 : 0.040),
+                            lineWidth: 0.46
                         )
                 }
         } else {
             RoundedRectangle(cornerRadius: Metrics.pillCornerRadius, style: .continuous)
-                .fill(Color(nsColor: .controlBackgroundColor).opacity(darkMode ? 0.68 : 0.82))
+                .fill(Color(nsColor: .controlBackgroundColor).opacity(darkMode ? 0.58 : 0.74))
         }
     }
 
@@ -1066,21 +1060,32 @@ private struct InspectorModeControl: View {
     private func activePillBackground(darkMode: Bool) -> some View {
         if useLiquidGlass {
             RoundedRectangle(cornerRadius: Metrics.pillCornerRadius, style: .continuous)
-                .fill(.ultraThinMaterial)
+                .fill(.thinMaterial)
                 .overlay {
                     RoundedRectangle(cornerRadius: Metrics.pillCornerRadius, style: .continuous)
-                        .fill(Color.accentColor.opacity(InspectorModePillStyle.activeFillOpacity(darkMode: darkMode)))
+                        .fill(Color(nsColor: .windowBackgroundColor).opacity(darkMode ? 0.14 : 0.08))
                 }
                 .overlay {
                     RoundedRectangle(cornerRadius: Metrics.pillCornerRadius, style: .continuous)
                         .strokeBorder(
                             Color.accentColor.opacity(InspectorModePillStyle.activeStrokeOpacity(darkMode: darkMode)),
-                            lineWidth: 0.58
+                            lineWidth: 0.52
                         )
+                }
+                .overlay {
+                    RoundedRectangle(cornerRadius: Metrics.pillCornerRadius, style: .continuous)
+                        .fill(Color.accentColor.opacity(InspectorModePillStyle.activeFillOpacity(darkMode: darkMode)))
                 }
         } else {
             RoundedRectangle(cornerRadius: Metrics.pillCornerRadius, style: .continuous)
-                .fill(Color.accentColor.opacity(InspectorModePillStyle.activeFillOpacity(darkMode: darkMode)))
+                .fill(Color(nsColor: .windowBackgroundColor).opacity(darkMode ? 0.18 : 0.10))
+                .overlay {
+                    RoundedRectangle(cornerRadius: Metrics.pillCornerRadius, style: .continuous)
+                        .strokeBorder(
+                            Color.accentColor.opacity(InspectorModePillStyle.activeStrokeOpacity(darkMode: darkMode)),
+                            lineWidth: 0.50
+                        )
+                }
         }
     }
 
@@ -1091,9 +1096,19 @@ private struct InspectorModeControl: View {
                 RoundedRectangle(cornerRadius: Metrics.pillCornerRadius, style: .continuous)
                     .strokeBorder(
                         Color.primary.opacity(InspectorModePillStyle.hoverStrokeOpacity(darkMode: darkMode)),
-                        lineWidth: 0.56
+                        lineWidth: 0.50
                     )
             }
+    }
+
+    private func selectMode(_ mode: InspectorMode) {
+        if reduceMotion {
+            selectedMode = mode
+        } else {
+            withAnimation(.interactiveSpring(response: 0.24, dampingFraction: 0.90, blendDuration: 0.08)) {
+                selectedMode = mode
+            }
+        }
     }
 }
 
