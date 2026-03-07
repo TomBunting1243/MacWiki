@@ -12,13 +12,13 @@ enum ColumnChromeMetrics {
     static let horizontalPadding: CGFloat = 9
     static let dividerOpacity: CGFloat = 0.065
     static let internalDividerOpacity: CGFloat = 0.035
-    static let highlightStrongOpacity: CGFloat = 0.072
-    static let highlightSoftOpacity: CGFloat = 0.018
+    static let highlightStrongOpacity: CGFloat = 0.055
+    static let highlightSoftOpacity: CGFloat = 0.012
     static let darkDividerOpacity: CGFloat = 0.038
     static let darkInternalDividerOpacity: CGFloat = 0.020
-    static let darkHighlightStrongOpacity: CGFloat = 0.018
-    static let darkHighlightSoftOpacity: CGFloat = 0.006
-    static let darkBaseTintOpacity: CGFloat = 0.06
+    static let darkHighlightStrongOpacity: CGFloat = 0.014
+    static let darkHighlightSoftOpacity: CGFloat = 0.004
+    static let darkBaseTintOpacity: CGFloat = 0.05
 
     static func dividerOpacity(for colorScheme: ColorScheme) -> CGFloat {
         colorScheme == .dark ? darkDividerOpacity : dividerOpacity
@@ -251,7 +251,17 @@ struct ColumnChromeBackground: View {
         if #available(macOS 26, *) {
             Rectangle()
                 .fill(.clear)
-                .glassEffect(.regular, in: .rect)
+                .glassEffect(
+                    .regular.tint(
+                        Color(nsColor: .windowBackgroundColor)
+                            .opacity(colorScheme == .dark ? 0.12 : 0.08)
+                    ),
+                    in: .rect
+                )
+                .overlay {
+                    Color(nsColor: .controlBackgroundColor)
+                        .opacity(colorScheme == .dark ? 0.045 : 0.028)
+                }
         } else {
             fallbackBackground
         }
@@ -293,7 +303,21 @@ struct SidebarPaneBackground: View {
         if #available(macOS 26, *) {
             Rectangle()
                 .fill(.clear)
-                .glassEffect(.regular, in: .rect)
+                .glassEffect(
+                    .regular.tint(
+                        Color(nsColor: .windowBackgroundColor)
+                            .opacity(colorScheme == .dark ? 0.16 : 0.11)
+                    ),
+                    in: .rect
+                )
+                .overlay {
+                    Color(nsColor: .windowBackgroundColor)
+                        .opacity(colorScheme == .dark ? 0.055 : 0.035)
+                }
+                .overlay {
+                    Color(nsColor: .controlBackgroundColor)
+                        .opacity(colorScheme == .dark ? 0.050 : 0.032)
+                }
         } else {
             fallbackBackground
         }

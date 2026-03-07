@@ -955,6 +955,11 @@ private struct InspectorModeControl: View {
             .labelsHidden()
             .pickerStyle(.segmented)
             .controlSize(.small)
+            .tint(
+                colorScheme == .dark
+                    ? Color.white.opacity(0.18)
+                    : Color.black.opacity(0.10)
+            )
             .frame(minWidth: Metrics.nativeControlMinimumWidth)
             .fixedSize()
         }

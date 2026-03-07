@@ -97,7 +97,7 @@ private enum TabChromeHierarchy {
     }
 
     static func activeGlassTintOpacity(darkMode: Bool) -> Double {
-        darkMode ? 0.020 : 0.016
+        darkMode ? 0.010 : 0.008
     }
 }
 
@@ -537,7 +537,15 @@ struct TabBarView: View {
     private func nativeStripAccessoryBackground(cornerRadius: CGFloat) -> some View {
         RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
             .fill(.clear)
-            .glassEffect(.regular.interactive(), in: .rect(cornerRadius: cornerRadius))
+            .glassEffect(
+                .regular
+                    .tint(
+                        Color(nsColor: .windowBackgroundColor)
+                            .opacity(colorScheme == .dark ? 0.10 : 0.07)
+                    )
+                    .interactive(),
+                in: .rect(cornerRadius: cornerRadius)
+            )
     }
     
     // MARK: - Drag Calculations (Optimized)
@@ -1258,18 +1266,29 @@ private struct DraggableTabItemView: View {
                     .fill(.clear)
                     .glassEffect(
                         .regular
-                            .tint(Color.accentColor.opacity(colorScheme == .dark ? 0.10 : 0.08))
+                            .tint(
+                                Color(nsColor: .windowBackgroundColor)
+                                    .opacity(colorScheme == .dark ? 0.10 : 0.07)
+                            )
                             .interactive(),
                         in: .rect(cornerRadius: tabCornerRadius)
                     )
                     .overlay {
                         RoundedRectangle(cornerRadius: tabCornerRadius, style: .continuous)
-                            .fill(Color.accentColor.opacity(colorScheme == .dark ? 0.035 : 0.026))
+                            .fill(Color.accentColor.opacity(colorScheme == .dark ? 0.018 : 0.012))
                     }
             } else {
                 RoundedRectangle(cornerRadius: tabCornerRadius, style: .continuous)
                     .fill(.clear)
-                    .glassEffect(.regular.interactive(), in: .rect(cornerRadius: tabCornerRadius))
+                    .glassEffect(
+                        .regular
+                            .tint(
+                                Color(nsColor: .windowBackgroundColor)
+                                    .opacity(colorScheme == .dark ? 0.08 : 0.05)
+                            )
+                            .interactive(),
+                        in: .rect(cornerRadius: tabCornerRadius)
+                    )
             }
         }
     }
