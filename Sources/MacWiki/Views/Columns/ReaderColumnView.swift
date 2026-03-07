@@ -11,6 +11,10 @@ struct ReaderColumnView: View {
         ColumnChromeMetrics.topBarHeight
     }
 
+    private var titlebarUnderlapHeight: CGFloat {
+        max(appState.windowTopObscuredHeight, 0)
+    }
+
     private var shouldShowReaderTopChrome: Bool {
         !appState.isWikiHopNavigationLocked && !appState.isFocusModeEnabled
     }
@@ -21,6 +25,7 @@ struct ReaderColumnView: View {
                 ReaderView()
                 topChromeStack
             }
+            .ignoresSafeArea(.container, edges: .top)
         } else {
             VStack(spacing: 0) {
                 if shouldShowReaderTopChrome {
@@ -35,17 +40,19 @@ struct ReaderColumnView: View {
     private var topChromeStack: some View {
         if shouldShowReaderTopChrome {
             topTabLaneContent
-            .frame(maxWidth: .infinity, alignment: .top)
-            .background {
-                ColumnChromeBackground()
-                    .allowsHitTesting(false)
-            }
-            .overlay(alignment: .bottom) {
-                Rectangle()
-                    .fill(Color.primary.opacity(ColumnChromeMetrics.dividerOpacity(for: colorScheme)))
-                    .frame(height: 0.5)
-                    .allowsHitTesting(false)
-            }
+                .frame(maxWidth: .infinity, alignment: .top)
+                .padding(.top, titlebarUnderlapHeight)
+                .background(alignment: .top) {
+                    ColumnChromeBackground()
+                        .frame(height: titlebarUnderlapHeight + topTabLaneHeight)
+                        .allowsHitTesting(false)
+                }
+                .overlay(alignment: .bottom) {
+                    Rectangle()
+                        .fill(Color.primary.opacity(ColumnChromeMetrics.dividerOpacity(for: colorScheme)))
+                        .frame(height: 0.5)
+                        .allowsHitTesting(false)
+                }
         }
     }
 

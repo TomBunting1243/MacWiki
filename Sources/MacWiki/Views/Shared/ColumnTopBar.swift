@@ -28,10 +28,12 @@ enum ColumnChromeMetrics {
         colorScheme == .dark ? darkInternalDividerOpacity : internalDividerOpacity
     }
 
-    /// Combined overlay height of the reader-owned top chrome.
-    /// The native macOS toolbar now owns the titlebar band; the reader only overlays its tab lane.
-    static func readerChromeOverlayHeight(windowTopObscuredHeight _: CGFloat) -> CGFloat {
-        return topBarHeight
+    /// Combined overlay height the reader content must clear when it underlaps
+    /// the window toolbar. The center reader now flows beneath the native
+    /// toolbar glass, so article content needs to clear both the titlebar band
+    /// and the reader-owned tab lane.
+    static func readerChromeOverlayHeight(windowTopObscuredHeight: CGFloat) -> CGFloat {
+        return max(windowTopObscuredHeight, 0) + topBarHeight
     }
 
     /// Suggested content inset that clears the reader-owned overlay chrome with comfortable breathing room.
