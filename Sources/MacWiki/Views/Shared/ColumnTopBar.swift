@@ -375,6 +375,39 @@ struct ToolbarBandBackground: View {
     }
 }
 
+struct ReaderTabLaneBackground: View {
+    @AppStorage(MacWikiGlassRuntime.forceLegacyFallbackKey) private var forceLegacyGlassFallback = false
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        if #available(macOS 26, *),
+           MacWikiGlassRuntime.usesNativeGlass(forceLegacyFallback: forceLegacyGlassFallback) {
+            Rectangle()
+                .fill(.clear)
+                .glassEffect(.regular, in: .rect)
+                .overlay {
+                    Color(nsColor: .windowBackgroundColor)
+                        .opacity(colorScheme == .dark ? 0.11 : 0.07)
+                }
+                .overlay {
+                    Color(nsColor: .controlBackgroundColor)
+                        .opacity(colorScheme == .dark ? 0.040 : 0.022)
+                }
+        } else {
+            Rectangle()
+                .fill(.thinMaterial)
+                .overlay {
+                    Color(nsColor: .windowBackgroundColor)
+                        .opacity(colorScheme == .dark ? 0.16 : 0.095)
+                }
+                .overlay {
+                    Color(nsColor: .controlBackgroundColor)
+                        .opacity(colorScheme == .dark ? 0.075 : 0.042)
+                }
+        }
+    }
+}
+
 struct WorkspaceBackdropBackground: View {
     @Environment(\.colorScheme) private var colorScheme
 

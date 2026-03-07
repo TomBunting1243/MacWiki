@@ -352,7 +352,12 @@ struct TabBarView: View {
     @ViewBuilder
     private var tabBarBackground: some View {
         if chromeStyle == .strip {
-            ColumnChromeBackground()
+            ReaderTabLaneBackground()
+                .overlay(alignment: .top) {
+                    Rectangle()
+                        .fill(Color.primary.opacity(ColumnChromeMetrics.internalDividerOpacity(for: colorScheme)))
+                        .frame(height: 0.5)
+                }
                 .overlay(alignment: .bottom) {
                     Rectangle()
                         .fill(Color.primary.opacity(ColumnChromeMetrics.dividerOpacity(for: colorScheme)))
