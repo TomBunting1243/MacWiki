@@ -86,8 +86,8 @@ struct ContentView: View {
         ZStack(alignment: .topLeading) {
             workspaceSharedBackground
             mainSplitView
-            centerToolbarBand
             sidebarTitlebarCap
+            centerCommandBar
             sidebarWindowDragOverlay
             inspectorRevealOverlay
             wikiHopOverlay
@@ -95,10 +95,6 @@ struct ContentView: View {
         }
         .toolbar(removing: .title)
         .toolbar(removing: .sidebarToggle)
-        .toolbarRole(.editor)
-        .toolbar(id: "main-window-toolbar") {
-            MainWindowToolbar()
-        }
         .toolbarBackground(.hidden, for: .windowToolbar)
         .animation(reduceMotion ? nil : PanelMotion.searchOverlayToggle, value: appState.showSearch)
         .background {
@@ -237,6 +233,7 @@ struct ContentView: View {
                         showNewTagSheet = true
                     }
                 )
+                .padding(.top, ColumnChromeMetrics.commandBarHeight)
             } else {
                 // Runtime fallback: some macOS split-view states resolve `.detailOnly`
                 // as `.doubleColumn`. Explicitly collapsing the directory column
@@ -289,7 +286,10 @@ struct ContentView: View {
                 let clampedWidth = min(QuickSearchView.idealSize.width, containerSize.width * 0.82)
                 let clampedHeight = min(QuickSearchView.idealSize.height, containerSize.height * 0.78)
                 let modalSize = CGSize(width: clampedWidth, height: clampedHeight)
-                let topInset = max(appState.windowTopObscuredHeight + 18, 28)
+                let topInset = max(
+                    appState.windowTopObscuredHeight + ColumnChromeMetrics.commandBarHeight + 18,
+                    28
+                )
 
                 ZStack(alignment: .top) {
                     Color.black.opacity(0.08)
@@ -353,16 +353,20 @@ struct ContentView: View {
     }
 
     @ViewBuilder
-    private var centerToolbarBand: some View {
+    private var centerCommandBar: some View {
         GeometryReader { proxy in
-            let topBandHeight = max(appState.windowTopObscuredHeight, 0)
+            let titlebarHeight = max(appState.windowTopObscuredHeight, 0)
             let leadingInset = appState.sidebarVisible ? resolvedListsSidebarWidth : 0
             let trailingInset = resolvedInspectorWidth
             let bandWidth = max(0, proxy.size.width - leadingInset - trailingInset)
 
-            if topBandHeight > 0.5 && bandWidth > 0.5 {
+            if titlebarHeight > 0.5 && bandWidth > 0.5 {
                 ToolbarBandBackground()
-                    .frame(width: bandWidth, height: topBandHeight, alignment: .topLeading)
+                    .frame(
+                        width: bandWidth,
+                        height: ColumnChromeMetrics.commandBarHeight,
+                        alignment: .topLeading
+                    )
                     .overlay(alignment: .leading) {
                         Rectangle()
                             .fill(roofVerticalDividerColor)
@@ -378,9 +382,10 @@ struct ContentView: View {
                             .fill(roofDividerColor)
                             .frame(height: 0.5)
                     }
-                    .offset(x: leadingInset)
-                    .ignoresSafeArea(.container, edges: .top)
-                    .allowsHitTesting(false)
+                    .overlay {
+                        MainWindowCommandBar()
+                    }
+                    .offset(x: leadingInset, y: titlebarHeight)
                     .zIndex(20)
             }
         }

@@ -15,6 +15,10 @@ struct ReaderColumnView: View {
         max(appState.windowTopObscuredHeight, 0)
     }
 
+    private var commandBarOffsetHeight: CGFloat {
+        titlebarUnderlapHeight + ColumnChromeMetrics.commandBarHeight
+    }
+
     private var shouldShowReaderTopChrome: Bool {
         !appState.isWikiHopNavigationLocked && !appState.isFocusModeEnabled
     }
@@ -41,7 +45,7 @@ struct ReaderColumnView: View {
         if shouldShowReaderTopChrome {
             topTabLaneContent
                 .frame(maxWidth: .infinity, alignment: .top)
-                .padding(.top, titlebarUnderlapHeight)
+                .padding(.top, commandBarOffsetHeight)
         }
     }
 
