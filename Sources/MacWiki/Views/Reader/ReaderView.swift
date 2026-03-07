@@ -530,7 +530,7 @@ struct ArticleView: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 9)
         .background(markAsReadPromptBackground)
-        .shadow(color: .black.opacity(colorScheme == .dark ? 0.22 : 0.10), radius: 14, y: 6)
+        .shadow(color: .black.opacity(colorScheme == .dark ? 0.16 : 0.06), radius: 10, y: 4)
         .compositingGroup()
         .frame(maxWidth: 620)
         .frame(maxWidth: .infinity)
@@ -611,21 +611,21 @@ struct ArticleView: View {
             MacWikiGlassRuntime.usesNativeGlass(forceLegacyFallback: forceLegacyGlassFallback) {
             shape
                 .fill(.clear)
-                .glassEffect(
-                    .regular.tint(
-                        Color(nsColor: .windowBackgroundColor)
-                            .opacity(colorScheme == .dark ? 0.10 : 0.06)
-                    ),
-                    in: .rect(cornerRadius: ReaderMotion.promptCornerRadius)
-                )
+                .glassEffect(.regular, in: .rect(cornerRadius: ReaderMotion.promptCornerRadius))
                 .overlay {
-                    shape.strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.10 : 0.07), lineWidth: 0.55)
+                    shape.fill(Color(nsColor: .windowBackgroundColor).opacity(colorScheme == .dark ? 0.022 : 0.014))
+                }
+                .overlay {
+                    shape.strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.075 : 0.048), lineWidth: 0.50)
                 }
         } else {
             shape
-                .fill(.regularMaterial)
+                .fill(.thinMaterial)
                 .overlay {
-                    shape.strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.12 : 0.08), lineWidth: 0.60)
+                    shape.fill(Color(nsColor: .windowBackgroundColor).opacity(colorScheme == .dark ? 0.10 : 0.06))
+                }
+                .overlay {
+                    shape.strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.09 : 0.055), lineWidth: 0.52)
                 }
         }
     }
@@ -638,18 +638,12 @@ struct ArticleView: View {
             MacWikiGlassRuntime.usesNativeGlass(forceLegacyFallback: forceLegacyGlassFallback) {
             shape
                 .fill(.clear)
-                .glassEffect(
-                    .regular.tint(
-                        Color(nsColor: .windowBackgroundColor)
-                            .opacity(colorScheme == .dark ? 0.10 : 0.06)
-                    ),
-                    in: .circle
-                )
+                .glassEffect(.regular, in: .circle)
         } else {
             shape
-                .fill(.regularMaterial)
+                .fill(.thinMaterial)
                 .overlay {
-                    shape.strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.12 : 0.08), lineWidth: 0.60)
+                    shape.strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.09 : 0.055), lineWidth: 0.52)
                 }
         }
     }
@@ -662,20 +656,15 @@ struct ArticleView: View {
             MacWikiGlassRuntime.usesNativeGlass(forceLegacyFallback: forceLegacyGlassFallback) {
             shape
                 .fill(.clear)
-                .glassEffect(
-                    .regular
-                        .tint(
-                            Color(nsColor: .windowBackgroundColor)
-                                .opacity(colorScheme == .dark ? 0.09 : 0.05)
-                        )
-                        .interactive(),
-                    in: .capsule
-                )
+                .glassEffect(.regular.interactive(), in: .capsule)
         } else {
             shape
-                .fill(.regularMaterial)
+                .fill(.thinMaterial)
                 .overlay {
-                    shape.strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.12 : 0.08), lineWidth: 0.60)
+                    shape.fill(Color(nsColor: .windowBackgroundColor).opacity(colorScheme == .dark ? 0.09 : 0.05))
+                }
+                .overlay {
+                    shape.strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.09 : 0.055), lineWidth: 0.52)
                 }
         }
     }
@@ -688,20 +677,12 @@ struct ArticleView: View {
             MacWikiGlassRuntime.usesNativeGlass(forceLegacyFallback: forceLegacyGlassFallback) {
             shape
                 .fill(.clear)
-                .glassEffect(
-                    .regular
-                        .tint(
-                            Color(nsColor: .windowBackgroundColor)
-                                .opacity(colorScheme == .dark ? 0.09 : 0.05)
-                        )
-                        .interactive(),
-                    in: .circle
-                )
+                .glassEffect(.regular.interactive(), in: .circle)
         } else {
             shape
-                .fill(.regularMaterial)
+                .fill(.thinMaterial)
                 .overlay {
-                    shape.strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.12 : 0.08), lineWidth: 0.60)
+                    shape.strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.09 : 0.055), lineWidth: 0.52)
                 }
         }
     }

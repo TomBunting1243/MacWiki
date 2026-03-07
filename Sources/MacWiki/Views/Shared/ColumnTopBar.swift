@@ -253,16 +253,10 @@ struct ColumnChromeBackground: View {
            MacWikiGlassRuntime.usesNativeGlass(forceLegacyFallback: forceLegacyGlassFallback) {
             Rectangle()
                 .fill(.clear)
-                .glassEffect(
-                    .regular.tint(
-                        Color(nsColor: .windowBackgroundColor)
-                            .opacity(colorScheme == .dark ? 0.12 : 0.08)
-                    ),
-                    in: .rect
-                )
+                .glassEffect(.regular, in: .rect)
                 .overlay {
-                    Color(nsColor: .controlBackgroundColor)
-                        .opacity(colorScheme == .dark ? 0.045 : 0.028)
+                    Color(nsColor: .windowBackgroundColor)
+                        .opacity(colorScheme == .dark ? 0.032 : 0.018)
                 }
         } else {
             fallbackBackground
@@ -270,31 +264,12 @@ struct ColumnChromeBackground: View {
     }
 
     private var fallbackBackground: some View {
-        let isDark = colorScheme == .dark
-        let strongHighlight = isDark
-            ? ColumnChromeMetrics.darkHighlightStrongOpacity
-            : ColumnChromeMetrics.highlightStrongOpacity
-        let softHighlight = isDark
-            ? ColumnChromeMetrics.darkHighlightSoftOpacity
-            : ColumnChromeMetrics.highlightSoftOpacity
-
         return Rectangle()
-            .fill(.ultraThinMaterial)
+            .fill(.thinMaterial)
             .overlay {
                 Color(nsColor: .windowBackgroundColor)
-                    .opacity(isDark ? ColumnChromeMetrics.darkBaseTintOpacity : 0.03)
+                    .opacity(colorScheme == .dark ? 0.08 : 0.05)
             }
-            .overlay(
-                LinearGradient(
-                    colors: [
-                        Color.white.opacity(strongHighlight),
-                        Color.white.opacity(softHighlight),
-                        Color.clear
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-            )
     }
 }
 
@@ -307,20 +282,10 @@ struct SidebarPaneBackground: View {
            MacWikiGlassRuntime.usesNativeGlass(forceLegacyFallback: forceLegacyGlassFallback) {
             Rectangle()
                 .fill(.clear)
-                .glassEffect(
-                    .regular.tint(
-                        Color(nsColor: .windowBackgroundColor)
-                            .opacity(colorScheme == .dark ? 0.16 : 0.11)
-                    ),
-                    in: .rect
-                )
+                .glassEffect(.regular, in: .rect)
                 .overlay {
                     Color(nsColor: .windowBackgroundColor)
-                        .opacity(colorScheme == .dark ? 0.055 : 0.035)
-                }
-                .overlay {
-                    Color(nsColor: .controlBackgroundColor)
-                        .opacity(colorScheme == .dark ? 0.050 : 0.032)
+                        .opacity(colorScheme == .dark ? 0.050 : 0.028)
                 }
         } else {
             fallbackBackground
@@ -328,35 +293,16 @@ struct SidebarPaneBackground: View {
     }
 
     private var fallbackBackground: some View {
-        let isDark = colorScheme == .dark
-        let strongHighlight = isDark
-            ? ColumnChromeMetrics.darkHighlightStrongOpacity * 0.55
-            : ColumnChromeMetrics.highlightStrongOpacity * 0.48
-        let softHighlight = isDark
-            ? ColumnChromeMetrics.darkHighlightSoftOpacity * 0.60
-            : ColumnChromeMetrics.highlightSoftOpacity * 0.52
-
         return Rectangle()
             .fill(.thinMaterial)
             .overlay {
                 Color(nsColor: .windowBackgroundColor)
-                    .opacity(isDark ? 0.14 : 0.07)
+                    .opacity(colorScheme == .dark ? 0.12 : 0.06)
             }
             .overlay {
                 Color(nsColor: .controlBackgroundColor)
-                    .opacity(isDark ? 0.12 : 0.10)
+                    .opacity(colorScheme == .dark ? 0.08 : 0.05)
             }
-            .overlay(
-                LinearGradient(
-                    colors: [
-                        Color.white.opacity(strongHighlight),
-                        Color.white.opacity(softHighlight),
-                        Color.clear
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-            )
     }
 }
 

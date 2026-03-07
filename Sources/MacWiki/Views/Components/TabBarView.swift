@@ -384,11 +384,11 @@ struct TabBarView: View {
                 nativeStripAccessoryBackground(cornerRadius: cornerRadius)
             } else if tabBarLiquidGlass {
                 let fillOpacity = darkMode
-                    ? (compactAccessory ? 0.18 : 0.20)
-                    : (compactAccessory ? 0.11 : 0.13)
+                    ? (compactAccessory ? 0.14 : 0.16)
+                    : (compactAccessory ? 0.085 : 0.10)
                 let edgeOpacity = darkMode
-                    ? (compactAccessory ? 0.065 : 0.075)
-                    : (compactAccessory ? 0.055 : 0.065)
+                    ? (compactAccessory ? 0.052 : 0.060)
+                    : (compactAccessory ? 0.044 : 0.052)
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                     .fill(.thinMaterial)
                     .overlay {
@@ -537,12 +537,7 @@ struct TabBarView: View {
         RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
             .fill(.clear)
             .glassEffect(
-                .regular
-                    .tint(
-                        Color(nsColor: .windowBackgroundColor)
-                            .opacity(colorScheme == .dark ? 0.10 : 0.07)
-                    )
-                    .interactive(),
+                .regular.interactive(),
                 in: .rect(cornerRadius: cornerRadius)
             )
     }
@@ -1194,11 +1189,11 @@ private struct DraggableTabItemView: View {
             }
         } else if tabBarLiquidGlass {
             let edgeOpacity = darkMode
-                ? (isActive ? 0.085 : (isHovered ? 0.055 : 0.036))
-                : (isActive ? 0.078 : (isHovered ? 0.052 : 0.034))
+                ? (isActive ? 0.072 : (isHovered ? 0.046 : 0.030))
+                : (isActive ? 0.066 : (isHovered ? 0.044 : 0.028))
             let neutralFillOpacity = darkMode
-                ? (isActive ? 0.22 : (isHovered ? 0.12 : 0.075))
-                : (isActive ? 0.14 : (isHovered ? 0.08 : 0.045))
+                ? (isActive ? 0.18 : (isHovered ? 0.10 : 0.055))
+                : (isActive ? 0.12 : (isHovered ? 0.065 : 0.036))
             RoundedRectangle(cornerRadius: tabCornerRadius, style: .continuous)
                 .fill(AnyShapeStyle(.thinMaterial))
                 .overlay {
@@ -1263,28 +1258,18 @@ private struct DraggableTabItemView: View {
                 RoundedRectangle(cornerRadius: tabCornerRadius, style: .continuous)
                     .fill(.clear)
                     .glassEffect(
-                        .regular
-                            .tint(
-                                Color(nsColor: .windowBackgroundColor)
-                                    .opacity(colorScheme == .dark ? 0.10 : 0.07)
-                            )
-                            .interactive(),
+                        .regular.interactive(),
                         in: .rect(cornerRadius: tabCornerRadius)
                     )
                     .overlay {
                         RoundedRectangle(cornerRadius: tabCornerRadius, style: .continuous)
-                            .fill(Color.accentColor.opacity(colorScheme == .dark ? 0.018 : 0.012))
+                            .fill(Color.accentColor.opacity(colorScheme == .dark ? 0.012 : 0.008))
                     }
             } else {
                 RoundedRectangle(cornerRadius: tabCornerRadius, style: .continuous)
                     .fill(.clear)
                     .glassEffect(
-                        .regular
-                            .tint(
-                                Color(nsColor: .windowBackgroundColor)
-                                    .opacity(colorScheme == .dark ? 0.08 : 0.05)
-                            )
-                            .interactive(),
+                        .regular.interactive(),
                         in: .rect(cornerRadius: tabCornerRadius)
                     )
             }
