@@ -3,6 +3,7 @@ import SwiftData
 
 struct MainWindowToolbar: CustomizableToolbarContent {
     private enum ItemID {
+        static let leadingDeadZone = "leading-dead-zone"
         static let sidebar = "sidebar"
         static let back = "back"
         static let forward = "forward"
@@ -18,12 +19,15 @@ struct MainWindowToolbar: CustomizableToolbarContent {
         static let pageViews = "page-views"
         static let focus = "focus"
         static let inspector = "inspector"
+        static let trailingDeadZone = "trailing-dead-zone"
     }
 
     @Environment(AppState.self) private var appState
     @Environment(\.modelContext) private var modelContext
     @Environment(\.openURL) private var openURL
     @Query(sort: \ReadingList.updatedAt, order: .reverse) private var allLists: [ReadingList]
+    @AppStorage("listsSidebarWidth") private var listsSidebarWidth: Double = 204
+    @AppStorage("inspectorWidth") private var inspectorWidth: Double = 240
 
     @State private var showSavePopover = false
     @State private var showReaderStylePopover = false
@@ -79,8 +83,24 @@ struct MainWindowToolbar: CustomizableToolbarContent {
         }
     }
 
+    private var leadingToolbarDeadZoneWidth: CGFloat {
+        guard appState.sidebarVisible else { return 0 }
+        let sidebarWidth = CGFloat(min(max(listsSidebarWidth, 176), 260))
+        return max(0, sidebarWidth - ColumnChromeMetrics.titleBarClearance)
+    }
+
+    private var trailingToolbarDeadZoneWidth: CGFloat {
+        guard appState.inspectorVisible && !appState.isFocusModeEnabled else { return 0 }
+        return CGFloat(min(max(inspectorWidth, 220), 380))
+    }
+
     var body: some CustomizableToolbarContent {
         Group {
+            ToolbarItem(id: ItemID.leadingDeadZone, placement: .navigation) {
+                toolbarDeadZone(width: leadingToolbarDeadZoneWidth)
+            }
+            .customizationBehavior(.disabled)
+
             ToolbarItem(id: ItemID.sidebar, placement: .navigation) {
                 sidebarToggleButton
             }
@@ -146,7 +166,20 @@ struct MainWindowToolbar: CustomizableToolbarContent {
             ToolbarItem(id: ItemID.inspector, placement: .primaryAction) {
                 inspectorButton
             }
+
+            ToolbarItem(id: ItemID.trailingDeadZone, placement: .primaryAction) {
+                toolbarDeadZone(width: trailingToolbarDeadZoneWidth)
+            }
+            .customizationBehavior(.disabled)
         }
+    }
+
+    private func toolbarDeadZone(width: CGFloat) -> some View {
+        Rectangle()
+            .fill(.clear)
+            .frame(width: max(width, 0), height: 1)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
     }
 
     private var sidebarToggleButton: some View {
