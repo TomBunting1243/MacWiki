@@ -52,18 +52,18 @@ private enum LinkHoverPreviewMetrics {
 
 private enum LinkHoverGlassMetrics {
     static let cornerRadius: CGFloat = 20
-    static let borderWidth: CGFloat = 0.7
     static let contentInset: CGFloat = 10
 }
 
 private enum LinkHoverSummaryPreviewMetrics {
-    static let cornerRadius: CGFloat = 16
     static let maxExtractCharacters = 360
     static let artworkHeight: CGFloat = 152
 }
 
 private struct LinkHoverPreviewPane: View {
     @Environment(\.colorScheme) private var colorScheme
+    @AppStorage("tabBarLiquidGlass") private var tabBarLiquidGlass = true
+    @AppStorage(MacWikiGlassRuntime.forceLegacyFallbackKey) private var forceLegacyGlassFallback = false
 
     let title: String
     let url: URL
@@ -74,6 +74,11 @@ private struct LinkHoverPreviewPane: View {
 
     private var isDarkMode: Bool {
         colorScheme == .dark
+    }
+
+    private var usesNativeGlass: Bool {
+        tabBarLiquidGlass &&
+            MacWikiGlassRuntime.usesNativeGlass(forceLegacyFallback: forceLegacyGlassFallback)
     }
 
     var body: some View {
@@ -87,9 +92,9 @@ private struct LinkHoverPreviewPane: View {
         .clipShape(RoundedRectangle(cornerRadius: LinkHoverGlassMetrics.cornerRadius, style: .continuous))
         .overlay(glassBorder)
         .shadow(
-            color: .black.opacity(isDarkMode ? 0.34 : 0.16),
-            radius: 20,
-            y: 12
+            color: .black.opacity(isDarkMode ? 0.18 : 0.08),
+            radius: 14,
+            y: 6
         )
         .padding(LinkHoverGlassMetrics.contentInset)
         .frame(width: LinkHoverPreviewMetrics.width, height: LinkHoverPreviewMetrics.height)
@@ -99,17 +104,17 @@ private struct LinkHoverPreviewPane: View {
     }
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        HStack(alignment: .top, spacing: 12) {
             Text(title)
-                .font(.system(size: 19, weight: .semibold, design: .rounded))
+                .font(.title3.weight(.semibold))
                 .lineLimit(4)
                 .fixedSize(horizontal: false, vertical: true)
                 .foregroundStyle(.primary)
                 .layoutPriority(1)
 
-            HStack(spacing: 8) {
-                Spacer(minLength: 0)
+            Spacer(minLength: 8)
 
+            HStack(spacing: 2) {
                 LinkHoverActionIcon(
                     systemImage: "arrow.up.forward",
                     helpText: "Open",
@@ -128,72 +133,60 @@ private struct LinkHoverPreviewPane: View {
                     action: onSave
                 )
             }
+            .padding(.horizontal, 4)
+            .padding(.vertical, 3)
+            .background(actionRailBackground)
         }
-        .padding(.horizontal, 14)
-        .padding(.top, 12)
-        .padding(.bottom, 12)
+        .padding(.horizontal, 16)
+        .padding(.top, 14)
+        .padding(.bottom, 13)
         .overlay(alignment: .bottom) {
             Rectangle()
-                .fill(Color.primary.opacity(isDarkMode ? 0.18 : 0.08))
-                .frame(height: 0.6)
+                .fill(Color.primary.opacity(isDarkMode ? 0.08 : 0.04))
+                .frame(height: 0.5)
         }
     }
 
+    @ViewBuilder
     private var glassPlane: some View {
-        RoundedRectangle(cornerRadius: LinkHoverGlassMetrics.cornerRadius, style: .continuous)
-            .fill(.ultraThinMaterial)
-            .overlay {
-                RoundedRectangle(cornerRadius: LinkHoverGlassMetrics.cornerRadius, style: .continuous)
-                    .fill(Color(nsColor: .windowBackgroundColor).opacity(isDarkMode ? 0.20 : 0.08))
-            }
-            .overlay(
-                RoundedRectangle(cornerRadius: LinkHoverGlassMetrics.cornerRadius, style: .continuous)
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                Color.white.opacity(isDarkMode ? 0.16 : 0.28),
-                                Color.white.opacity(isDarkMode ? 0.05 : 0.12),
-                                Color.clear
-                            ],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
+        let shape = RoundedRectangle(cornerRadius: LinkHoverGlassMetrics.cornerRadius, style: .continuous)
+        if #available(macOS 26, *), usesNativeGlass {
+            shape
+                .fill(.clear)
+                .glassEffect(.regular, in: .rect(cornerRadius: LinkHoverGlassMetrics.cornerRadius))
+                .overlay {
+                    shape.fill(
+                        Color(nsColor: .windowBackgroundColor)
+                            .opacity(isDarkMode ? 0.018 : 0.012)
                     )
-                    .blendMode(.screen)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: LinkHoverGlassMetrics.cornerRadius, style: .continuous)
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                Color.clear,
-                                Color.black.opacity(isDarkMode ? 0.28 : 0.08)
-                            ],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
+                }
+        } else {
+            shape
+                .fill(.thinMaterial)
+                .overlay {
+                    shape.fill(
+                        Color(nsColor: .windowBackgroundColor)
+                            .opacity(isDarkMode ? 0.085 : 0.052)
                     )
-                    .blendMode(.multiply)
-            )
+                }
+        }
     }
 
     private var glassBorder: some View {
         RoundedRectangle(cornerRadius: LinkHoverGlassMetrics.cornerRadius, style: .continuous)
             .strokeBorder(
-                LinearGradient(
-                    colors: [
-                        Color.white.opacity(isDarkMode ? 0.32 : 0.44),
-                        Color.white.opacity(isDarkMode ? 0.07 : 0.18)
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                ),
-                lineWidth: LinkHoverGlassMetrics.borderWidth
+                Color.primary.opacity(isDarkMode ? 0.080 : 0.050),
+                lineWidth: 0.55
             )
+    }
+
+    private var actionRailBackground: some View {
+        RoundedRectangle(cornerRadius: 10, style: .continuous)
+            .fill(Color(nsColor: .windowBackgroundColor).opacity(isDarkMode ? 0.10 : 0.052))
             .overlay {
-                RoundedRectangle(cornerRadius: LinkHoverGlassMetrics.cornerRadius, style: .continuous)
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
                     .strokeBorder(
-                        Color.primary.opacity(isDarkMode ? 0.16 : 0.08),
+                        Color.primary.opacity(isDarkMode ? 0.040 : 0.026),
                         lineWidth: 0.45
                     )
             }
@@ -213,64 +206,37 @@ private struct LinkHoverActionIcon: View {
     }
 
     var body: some View {
-        Button(action: action) {
-            Image(systemName: systemImage)
-                .font(.system(size: 13.5, weight: .semibold))
-                .frame(width: 32, height: 32)
-                .foregroundStyle(isHovered ? Color.accentColor : .primary)
-                .background(iconBackground)
-                .scaleEffect(isHovered ? 1.05 : 1.0)
-        }
-        .buttonStyle(.plain)
-        .help(helpText)
-        .accessibilityLabel(helpText)
-        .onHover { hovering in
-            withAnimation(.easeOut(duration: 0.15)) {
-                isHovered = hovering
+        Button(helpText, systemImage: systemImage, action: action)
+            .labelStyle(.iconOnly)
+            .buttonStyle(.plain)
+            .help(helpText)
+            .accessibilityLabel(helpText)
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundStyle(isHovered ? .primary : .secondary)
+            .frame(width: 28, height: 28)
+            .background(iconBackground)
+            .onHover { hovering in
+                withAnimation(.easeOut(duration: 0.12)) {
+                    isHovered = hovering
+                }
             }
-        }
     }
 
     private var iconBackground: some View {
         RoundedRectangle(cornerRadius: 8, style: .continuous)
-            .fill(.regularMaterial)
-            .overlay {
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(Color.accentColor.opacity(isHovered ? (isDarkMode ? 0.18 : 0.12) : 0))
-            }
-            .overlay(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                Color.white.opacity(isDarkMode ? 0.07 : 0.22),
-                                Color.clear
-                            ],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
-                    .blendMode(.screen)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .strokeBorder(
-                        Color.white.opacity(isDarkMode ? 0.20 : 0.32),
-                        lineWidth: 0.6
-                    )
+            .fill(
+                Color(nsColor: .windowBackgroundColor)
+                    .opacity(isHovered ? (isDarkMode ? 0.12 : 0.065) : 0)
             )
             .overlay {
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
                     .strokeBorder(
-                        Color.primary.opacity(isHovered ? (isDarkMode ? 0.24 : 0.16) : (isDarkMode ? 0.14 : 0.08)),
-                        lineWidth: 0.5
+                        isHovered
+                            ? Color.primary.opacity(isDarkMode ? 0.075 : 0.045)
+                            : Color.primary.opacity(isDarkMode ? 0.028 : 0.018),
+                        lineWidth: 0.45
                     )
             }
-            .shadow(
-                color: .black.opacity(isDarkMode ? 0.30 : 0.12),
-                radius: 4,
-                y: 2
-            )
     }
 }
 
@@ -345,9 +311,9 @@ private struct LinkHoverArticleSummaryPreview: View {
             currentStateView
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .padding(.horizontal, 14)
-        .padding(.top, 12)
-        .padding(.bottom, 14)
+        .padding(.horizontal, 16)
+        .padding(.top, 14)
+        .padding(.bottom, 16)
         .animation(reduceMotion ? nil : .easeOut(duration: 0.16), value: presentationState)
         .task(id: requestKey) {
             await loadSummary()
@@ -375,22 +341,24 @@ private struct LinkHoverArticleSummaryPreview: View {
 
             if let descriptionText {
                 Text(descriptionText)
-                    .font(.system(size: 13.5, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.primary.opacity(0.78))
+                    .font(.caption.weight(.semibold))
+                    .textCase(.uppercase)
+                    .tracking(0.3)
+                    .foregroundStyle(.secondary)
                     .lineLimit(2)
             }
 
             if let extractText {
                 Text(extractText)
-                    .font(.system(size: 13.5))
-                    .lineSpacing(3)
-                    .foregroundStyle(.primary.opacity(0.92))
-                    .lineLimit(6)
+                    .font(.body)
+                    .lineSpacing(4)
+                    .foregroundStyle(.primary)
+                    .lineLimit(5)
                     .fixedSize(horizontal: false, vertical: true)
             } else if !hasTextualSummary {
                 Text("A visual preview is available for this link.")
-                    .font(.system(size: 13))
-                    .foregroundStyle(.primary.opacity(0.82))
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
                     .lineSpacing(2)
             }
         }
@@ -407,10 +375,10 @@ private struct LinkHoverArticleSummaryPreview: View {
             )
 
             VStack(alignment: .leading, spacing: 8) {
-                AppLoadingSkeletonBar(width: 140, height: 10, cornerRadius: 5, tone: .neutral)
+                AppLoadingSkeletonBar(width: 110, height: 10, cornerRadius: 5, tone: .neutral)
                 AppLoadingSkeletonBar(width: nil, height: 12, cornerRadius: 6, tone: .neutral)
                 AppLoadingSkeletonBar(width: nil, height: 12, cornerRadius: 6, tone: .neutral)
-                AppLoadingSkeletonBar(width: 208, height: 12, cornerRadius: 6, tone: .neutral)
+                AppLoadingSkeletonBar(width: 224, height: 12, cornerRadius: 6, tone: .neutral)
             }
         }
     }
@@ -420,12 +388,12 @@ private struct LinkHoverArticleSummaryPreview: View {
             fallbackArtwork
 
             Text("Summary unavailable")
-                .font(.system(size: 13.5, weight: .semibold, design: .rounded))
+                .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.secondary)
 
             Text("A clean preview was not available for this link right now.")
-                .font(.system(size: 13))
-                .foregroundStyle(.primary.opacity(0.8))
+                .font(.callout)
+                .foregroundStyle(.secondary)
                 .lineSpacing(2)
         }
     }
@@ -457,37 +425,37 @@ private struct LinkHoverArticleSummaryPreview: View {
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(Color.white.opacity(colorScheme == .dark ? 0.12 : 0.28), lineWidth: 0.7)
+                .strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.07 : 0.042), lineWidth: 0.5)
         }
-        .shadow(color: .black.opacity(colorScheme == .dark ? 0.18 : 0.08), radius: 12, y: 6)
     }
 
     private var fallbackArtwork: some View {
         ZStack(alignment: .bottomLeading) {
             LinearGradient(
                 colors: [
-                    Color.accentColor.opacity(colorScheme == .dark ? 0.70 : 0.60),
-                    Color.blue.opacity(colorScheme == .dark ? 0.58 : 0.48),
-                    Color.primary.opacity(colorScheme == .dark ? 0.24 : 0.14)
+                    Color(nsColor: .windowBackgroundColor).opacity(colorScheme == .dark ? 0.92 : 0.98),
+                    Color(nsColor: .controlBackgroundColor).opacity(colorScheme == .dark ? 0.82 : 0.92),
+                    Color(nsColor: .underPageBackgroundColor).opacity(colorScheme == .dark ? 0.72 : 0.82)
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
 
-            Circle()
-                .fill(Color.white.opacity(colorScheme == .dark ? 0.10 : 0.14))
-                .frame(width: 120, height: 120)
-                .blur(radius: 14)
-                .offset(x: 36, y: -40)
+            RoundedRectangle(cornerRadius: 30, style: .continuous)
+                .fill(Color.primary.opacity(colorScheme == .dark ? 0.035 : 0.022))
+                .frame(width: 164, height: 98)
+                .rotationEffect(.degrees(-14))
+                .blur(radius: 2)
+                .offset(x: 56, y: -18)
 
             VStack(alignment: .leading, spacing: 10) {
                 Spacer(minLength: 0)
 
                 Text(artworkMonogram)
-                    .font(.system(size: 54, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.92))
+                    .font(.system(size: 46, weight: .bold, design: .rounded))
+                    .foregroundStyle(.primary.opacity(colorScheme == .dark ? 0.68 : 0.52))
             }
-            .padding(14)
+            .padding(16)
         }
     }
 
@@ -497,7 +465,7 @@ private struct LinkHoverArticleSummaryPreview: View {
                 width: nil,
                 height: LinkHoverSummaryPreviewMetrics.artworkHeight,
                 cornerRadius: 12,
-                tone: .accent
+                tone: .neutral
             )
 
             Image(systemName: "globe.americas.fill")
@@ -513,7 +481,7 @@ private struct LinkHoverArticleSummaryPreview: View {
             .fill(
                 LinearGradient(
                     colors: [
-                        Color.white.opacity(colorScheme == .dark ? 0.06 : 0.18),
+                        Color.white.opacity(colorScheme == .dark ? 0.02 : 0.08),
                         Color.clear
                     ],
                     startPoint: .topLeading,
@@ -522,7 +490,7 @@ private struct LinkHoverArticleSummaryPreview: View {
             )
             .overlay {
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(Color.black.opacity(colorScheme == .dark ? 0.12 : 0.04))
+                    .fill(Color.black.opacity(colorScheme == .dark ? 0.06 : 0.015))
             }
     }
 
