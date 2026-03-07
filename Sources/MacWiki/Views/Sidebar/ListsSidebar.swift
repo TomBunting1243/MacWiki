@@ -80,23 +80,15 @@ fileprivate enum SidebarMetrics {
         darkMode ? 0.76 : 0.70
     }
 
-    static func iconSelectedOpacity(darkMode: Bool) -> Double {
-        darkMode ? 0.84 : 0.78
-    }
-
     static func iconHoverOpacity(darkMode: Bool) -> Double {
         darkMode ? 0.76 : 0.70
     }
 
     static func iconColor(
         for colorScheme: ColorScheme,
-        isSelected: Bool,
         isHovered: Bool
     ) -> Color {
         let darkMode = colorScheme == .dark
-        if isSelected {
-            return Color.primary.opacity(iconSelectedOpacity(darkMode: darkMode))
-        }
         if isHovered {
             return Color.primary.opacity(iconHoverOpacity(darkMode: darkMode))
         }
@@ -104,22 +96,14 @@ fileprivate enum SidebarMetrics {
     }
 
     static func titleColor(
-        for colorScheme: ColorScheme,
-        isSelected: Bool
+        for colorScheme: ColorScheme
     ) -> Color {
-        if isSelected {
-            return Color.primary.opacity(iconSelectedOpacity(darkMode: colorScheme == .dark))
-        }
         return Color.primary
     }
 
     static func countColor(
-        for colorScheme: ColorScheme,
-        isSelected: Bool
+        for colorScheme: ColorScheme
     ) -> Color {
-        if isSelected {
-            return Color.primary.opacity(colorScheme == .dark ? 0.78 : 0.72)
-        }
         return Color(nsColor: .tertiaryLabelColor)
     }
 }
@@ -277,6 +261,10 @@ struct ListsSidebar: View {
 
     private var isWikiHopAvailable: Bool {
         isWikiHopPostV1Enabled && isWikiHopEnabled
+    }
+
+    private var selectedAreaIDsKey: [UUID] {
+        selectedAreaIDs.sorted(by: { $0.uuidString < $1.uuidString })
     }
 
     private var collectionsFingerprint: Int {
@@ -471,6 +459,12 @@ struct ListsSidebar: View {
         }
     }
 
+    private var sidebarTitleBarHeight: CGFloat {
+        ColumnChromeMetrics.titlebarBandHeight(
+            windowTopObscuredHeight: appState.windowTopObscuredHeight
+        )
+    }
+
     private var sidebarWithCollectionSnapshotSync: some View {
         sidebarWithDeleteDialog
             .onAppear {
@@ -495,6 +489,9 @@ struct ListsSidebar: View {
                 syncSelectionFromBindings()
             }
             .onChange(of: rootSelection) { _, _ in
+                syncSelectionFromBindings()
+            }
+            .onChange(of: selectedAreaIDsKey) { _, _ in
                 syncSelectionFromBindings()
             }
     }
@@ -547,6 +544,9 @@ struct ListsSidebar: View {
             listsSection
             labelsSection
             tagsSection
+        }
+        .safeAreaInset(edge: .top, spacing: 0) {
+            Color.clear.frame(height: sidebarTitleBarHeight)
         }
         .listStyle(.sidebar)
         .scrollContentBackground(.hidden)
@@ -668,6 +668,9 @@ struct ListsSidebar: View {
                 setRecentsSelection()
                 return
             }
+            selectedList = nil
+            selectedLabel = nil
+            selectedTag = nil
             if !selectedAreaIDs.contains(areaId) {
                 selectedAreaIDs = [areaId]
             }
@@ -1203,12 +1206,10 @@ private struct SidebarRootRowLabel: View {
         HStack(spacing: SidebarMetrics.rowSpacing) {
             if let systemImage {
                 Image(systemName: systemImage)
-                    .symbolVariant(isSelected ? .fill : .none)
                     .font(SidebarMetrics.itemIconFont.weight(.semibold))
                     .foregroundStyle(
                         SidebarMetrics.iconColor(
                             for: colorScheme,
-                            isSelected: isSelected,
                             isHovered: isHovered
                         )
                     )
@@ -1217,7 +1218,7 @@ private struct SidebarRootRowLabel: View {
 
             Text(title)
                 .font(SidebarMetrics.itemFont)
-                .foregroundStyle(SidebarMetrics.titleColor(for: colorScheme, isSelected: isSelected))
+                .foregroundStyle(SidebarMetrics.titleColor(for: colorScheme))
                 .lineLimit(1)
             Spacer(minLength: 0)
         }
@@ -1249,12 +1250,10 @@ private struct ListRowView: View {
     var body: some View {
         HStack(spacing: SidebarMetrics.rowSpacing) {
             Image(systemName: list.icon)
-                .symbolVariant(isSelected ? .fill : .none)
                 .font(SidebarMetrics.itemIconFont.weight(.semibold))
                 .foregroundStyle(
                     SidebarMetrics.iconColor(
                         for: colorScheme,
-                        isSelected: isSelected,
                         isHovered: isHovered
                     )
                 )
@@ -1262,7 +1261,7 @@ private struct ListRowView: View {
 
             Text(list.name)
                 .font(SidebarMetrics.itemFont)
-                .foregroundStyle(SidebarMetrics.titleColor(for: colorScheme, isSelected: isSelected))
+                .foregroundStyle(SidebarMetrics.titleColor(for: colorScheme))
                 .lineLimit(1)
 
             Spacer(minLength: 0)
@@ -1371,7 +1370,7 @@ private struct LabelRowView: View {
 
             Text(label.name)
                 .font(SidebarMetrics.itemFont)
-                .foregroundStyle(SidebarMetrics.titleColor(for: colorScheme, isSelected: isSelected))
+                .foregroundStyle(SidebarMetrics.titleColor(for: colorScheme))
                 .lineLimit(1)
 
             Spacer(minLength: 0)
@@ -1448,12 +1447,10 @@ private struct TagRowView: View {
     var body: some View {
         HStack(spacing: SidebarMetrics.rowSpacing) {
             Image(systemName: "tag")
-                .symbolVariant(isSelected ? .fill : .none)
                 .font(SidebarMetrics.itemIconFont)
                 .foregroundStyle(
                     SidebarMetrics.iconColor(
                         for: colorScheme,
-                        isSelected: isSelected,
                         isHovered: isHovered
                     )
                 )
@@ -1461,7 +1458,7 @@ private struct TagRowView: View {
 
             Text(tag.name)
                 .font(SidebarMetrics.itemFont)
-                .foregroundStyle(SidebarMetrics.titleColor(for: colorScheme, isSelected: isSelected))
+                .foregroundStyle(SidebarMetrics.titleColor(for: colorScheme))
                 .lineLimit(1)
 
             Spacer(minLength: 0)
@@ -1505,7 +1502,7 @@ private struct SidebarCountBadge: View {
     var body: some View {
         Text("\(count)")
             .font(SidebarMetrics.itemFont)
-            .foregroundStyle(SidebarMetrics.countColor(for: colorScheme, isSelected: isSelected))
+            .foregroundStyle(SidebarMetrics.countColor(for: colorScheme))
             .monospacedDigit()
             .frame(minWidth: 22, alignment: .trailing)
     }
@@ -1617,21 +1614,19 @@ private struct AreaRowView<ListRow: View>: View {
         } label: {
             HStack(spacing: SidebarMetrics.rowSpacing) {
                 Image(systemName: area.icon)
-                    .symbolVariant(isSelected ? .fill : .none)
                     .font(SidebarMetrics.itemIconFont)
                     .foregroundStyle(
                         isTargeted
                             ? Color.accentColor
                             : SidebarMetrics.iconColor(
                                 for: colorScheme,
-                                isSelected: isSelected,
                                 isHovered: isHovered
                             )
                     )
                     .frame(width: SidebarMetrics.itemIconWidth, alignment: .center)
                 Text(area.name)
                     .font(SidebarMetrics.itemFont)
-                    .foregroundStyle(SidebarMetrics.titleColor(for: colorScheme, isSelected: isSelected))
+                    .foregroundStyle(SidebarMetrics.titleColor(for: colorScheme))
 
                 Spacer()
 
