@@ -256,7 +256,11 @@ struct ColumnChromeBackground: View {
                 .glassEffect(.regular, in: .rect)
                 .overlay {
                     Color(nsColor: .windowBackgroundColor)
-                        .opacity(colorScheme == .dark ? 0.032 : 0.018)
+                        .opacity(colorScheme == .dark ? 0.082 : 0.050)
+                }
+                .overlay {
+                    Color(nsColor: .controlBackgroundColor)
+                        .opacity(colorScheme == .dark ? 0.028 : 0.016)
                 }
         } else {
             fallbackBackground
@@ -268,7 +272,11 @@ struct ColumnChromeBackground: View {
             .fill(.thinMaterial)
             .overlay {
                 Color(nsColor: .windowBackgroundColor)
-                    .opacity(colorScheme == .dark ? 0.08 : 0.05)
+                    .opacity(colorScheme == .dark ? 0.12 : 0.075)
+            }
+            .overlay {
+                Color(nsColor: .controlBackgroundColor)
+                    .opacity(colorScheme == .dark ? 0.06 : 0.035)
             }
     }
 }
@@ -285,7 +293,11 @@ struct SidebarPaneBackground: View {
                 .glassEffect(.regular, in: .rect)
                 .overlay {
                     Color(nsColor: .windowBackgroundColor)
-                        .opacity(colorScheme == .dark ? 0.050 : 0.028)
+                        .opacity(colorScheme == .dark ? 0.092 : 0.058)
+                }
+                .overlay {
+                    Color(nsColor: .controlBackgroundColor)
+                        .opacity(colorScheme == .dark ? 0.032 : 0.020)
                 }
         } else {
             fallbackBackground
@@ -297,11 +309,23 @@ struct SidebarPaneBackground: View {
             .fill(.thinMaterial)
             .overlay {
                 Color(nsColor: .windowBackgroundColor)
-                    .opacity(colorScheme == .dark ? 0.12 : 0.06)
+                    .opacity(colorScheme == .dark ? 0.14 : 0.085)
             }
             .overlay {
                 Color(nsColor: .controlBackgroundColor)
-                    .opacity(colorScheme == .dark ? 0.08 : 0.05)
+                    .opacity(colorScheme == .dark ? 0.09 : 0.055)
+            }
+    }
+}
+
+struct WorkspaceBackdropBackground: View {
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        Color(nsColor: .windowBackgroundColor)
+            .overlay {
+                Color(nsColor: .controlBackgroundColor)
+                    .opacity(colorScheme == .dark ? 0.10 : 0.038)
             }
     }
 }
