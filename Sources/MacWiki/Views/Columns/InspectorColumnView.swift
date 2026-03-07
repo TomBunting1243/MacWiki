@@ -71,7 +71,7 @@ struct InspectorColumnView: View {
                     Color(nsColor: .windowBackgroundColor)
                         .opacity(glassTintOpacity)
                 }
-                .ignoresSafeArea(.container, edges: .bottom)
+                .ignoresSafeArea(.container, edges: [.top, .bottom])
         }
         .background {
             GeometryReader { proxy in

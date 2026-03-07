@@ -290,17 +290,8 @@ struct InspectorPanel: View {
         return "\(title)|\(highlightFingerprint)|\(stateTagFingerprint)"
     }
 
-    /// Height for the top spacer that pushes the tab bar below the toolbar area.
-    private var inspectorTopBarHeight: CGFloat {
-        max(appState.windowTopObscuredHeight, ColumnChromeMetrics.topBarHeight)
-    }
-
-    private var inspectorTopSpacerHeight: CGFloat {
-        max(0, inspectorTopBarHeight - ColumnChromeMetrics.topBarHeight)
-    }
-
     private var inspectorChromeHeight: CGFloat {
-        inspectorTopSpacerHeight + InspectorLayout.headerBarHeight
+        InspectorLayout.headerBarHeight
     }
 
     private var sectionFillOpacity: Double {
@@ -313,12 +304,6 @@ struct InspectorPanel: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Spacer fills the toolbar/titlebar region
-            if inspectorTopSpacerHeight > 0 {
-                WindowDragHandle(minLength: 80)
-                    .frame(height: inspectorTopSpacerHeight)
-            }
-
             inspectorHeaderBar
 
             // Content area
