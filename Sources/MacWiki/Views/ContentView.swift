@@ -93,27 +93,13 @@ struct ContentView: View {
     var body: some View {
         ZStack(alignment: .topLeading) {
             workspaceSharedBackground
-            mainSplitView
+            mainWindowContent
             sidebarWindowDragOverlay
             inspectorRevealOverlay
             wikiHopOverlay
             searchOverlay
         }
-        .toolbar(removing: .title)
-        .toolbar(removing: .sidebarToggle)
-        .toolbarRole(.editor)
-        .toolbar(id: "main-window-toolbar") {
-            MainWindowToolbar()
-        }
-        .toolbarBackground(.visible, for: .windowToolbar)
         .animation(reduceMotion ? nil : PanelMotion.searchOverlayToggle, value: appState.showSearch)
-        .background {
-            WindowTopObscuredHeightReader()
-            WindowToolbarTrackingSeparators(
-                sidebarVisible: appState.sidebarVisible,
-                inspectorVisible: shouldPresentInspectorColumn
-            )
-        }
         .contentSheets(
             editingLabel: $editingLabel, 
             showNewLabelSheet: $showNewLabelSheet, 
@@ -204,6 +190,24 @@ struct ContentView: View {
         }
     }
 
+    private var mainWindowContent: some View {
+        mainSplitView
+            .toolbar(removing: .title)
+            .toolbar(removing: .sidebarToggle)
+            .toolbarRole(.editor)
+            .toolbar(id: "main-window-toolbar") {
+                MainWindowToolbar()
+            }
+            .toolbarBackground(.visible, for: .windowToolbar)
+            .background {
+                WindowTopObscuredHeightReader()
+                WindowToolbarTrackingSeparators(
+                    sidebarVisible: appState.sidebarVisible,
+                    inspectorVisible: shouldPresentInspectorColumn
+                )
+            }
+    }
+
     // MARK: - Layout Components
     
     @ViewBuilder
@@ -264,16 +268,6 @@ struct ContentView: View {
             WorkspaceBackdropBackground()
                 .ignoresSafeArea()
         }
-    }
-    
-    private var mainDetailView: some View {
-        ReaderColumnView(
-            tabBarLiquidGlass: tabBarLiquidGlass,
-            onNewLabelWithArticle: { article in
-                articleForNewLabel = article
-                showNewLabelSheet = true
-            }
-        )
         .inspector(isPresented: inspectorPresentedBinding) {
             InspectorPanel(
                 showNewLabelSheet: $showNewLabelSheet,
@@ -286,6 +280,16 @@ struct ContentView: View {
                 max: 380
             )
         }
+    }
+    
+    private var mainDetailView: some View {
+        ReaderColumnView(
+            tabBarLiquidGlass: tabBarLiquidGlass,
+            onNewLabelWithArticle: { article in
+                articleForNewLabel = article
+                showNewLabelSheet = true
+            }
+        )
     }
     
     @ViewBuilder
