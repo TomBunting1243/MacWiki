@@ -25,7 +25,6 @@ struct MainWindowToolbar: CustomizableToolbarContent {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.openURL) private var openURL
     @Query(sort: \ReadingList.updatedAt, order: .reverse) private var allLists: [ReadingList]
-
     @State private var showSavePopover = false
     @State private var showReaderStylePopover = false
     @State private var showStatsPopover = false
@@ -144,6 +143,10 @@ struct MainWindowToolbar: CustomizableToolbarContent {
             }
             .defaultCustomization(.hidden)
 
+            ToolbarItem(id: ItemID.inspector, placement: .primaryAction) {
+                inspectorButton
+            }
+
             if #available(macOS 26, *) {
                 ToolbarItem(id: ItemID.inspectorBoundary, placement: .primaryAction) {
                     Color.clear
@@ -163,12 +166,18 @@ struct MainWindowToolbar: CustomizableToolbarContent {
                 .customizationBehavior(.disabled)
             }
 
-            if #available(macOS 26, *) {
-                ToolbarSpacer(.flexible, placement: .primaryAction)
-            }
-
-            ToolbarItem(id: ItemID.inspector, placement: .primaryAction) {
-                inspectorButton
+            if appState.inspectorVisible && !appState.isFocusModeEnabled {
+                if #available(macOS 26, *) {
+                    ToolbarSpacer(.flexible, placement: .primaryAction)
+                } else {
+                    ToolbarItem(id: "inspector-reserve", placement: .primaryAction) {
+                        Color.clear
+                            .frame(width: 280, height: 1)
+                            .allowsHitTesting(false)
+                            .accessibilityHidden(true)
+                    }
+                    .customizationBehavior(.disabled)
+                }
             }
         }
     }
