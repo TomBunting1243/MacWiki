@@ -163,6 +163,10 @@ struct MainWindowToolbar: CustomizableToolbarContent {
                 .customizationBehavior(.disabled)
             }
 
+            if #available(macOS 26, *) {
+                ToolbarSpacer(.flexible, placement: .primaryAction)
+            }
+
             ToolbarItem(id: ItemID.inspector, placement: .primaryAction) {
                 inspectorButton
             }
