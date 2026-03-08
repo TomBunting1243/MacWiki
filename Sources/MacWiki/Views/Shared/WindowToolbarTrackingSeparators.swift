@@ -34,7 +34,7 @@ struct WindowToolbarTrackingSeparators: NSViewRepresentable {
     final class Coordinator {
         private enum ToolbarAnchor {
             static let sidebar = NSToolbarItem.Identifier("sidebar")
-            static let inspector = NSToolbarItem.Identifier("inspector")
+            static let inspectorBoundary = NSToolbarItem.Identifier("inspector-boundary")
         }
 
         var sidebarVisible = true
@@ -55,7 +55,7 @@ struct WindowToolbarTrackingSeparators: NSViewRepresentable {
             synchronize(
                 toolbar: toolbar,
                 identifier: .inspectorTrackingSeparator,
-                after: ToolbarAnchor.inspector,
+                after: ToolbarAnchor.inspectorBoundary,
                 isEnabled: inspectorVisible
             )
         }
