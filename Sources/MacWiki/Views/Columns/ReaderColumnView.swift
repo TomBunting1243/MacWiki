@@ -53,7 +53,7 @@ struct ReaderColumnView: View {
     }
 
     private var tabBarTop: some View {
-        TabBarView(chromeStyle: .strip, onNewLabelWithArticle: onNewLabelWithArticle)
+        TabBarView(chromeStyle: .toolbar, onNewLabelWithArticle: onNewLabelWithArticle)
     }
 
     private var tabBarStandalone: some View {
