@@ -20,7 +20,6 @@ struct ContentView: View {
     @State private var selectedLabel: Label?
     @State private var selectedTag: Tag?
     @State private var rootSelection: SidebarRootSelection = .recents
-    @State private var columnVisibility: NavigationSplitViewVisibility = .all
     
     // Label management (Shared)
     @State private var showNewLabelSheet = false
@@ -37,8 +36,6 @@ struct ContentView: View {
     @AppStorage(ExperimentFlag.wikiHopPOCEnabled.key) private var wikiHopPOCEnabled = false
     @AppStorage("features.wikiHopPostV1Enabled") private var wikiHopPostV1Enabled = false
     @State private var suppressInitialImplicitAnimations = true
-    @State private var pendingDetailOnlyEnforcement = false
-    @State private var detailOnlyEnforcementRetryCount = 0
     @State private var hasAppliedLaunchQAHarnessOverrides = false
 
     private var isWikiHopAvailable: Bool {
@@ -48,7 +45,6 @@ struct ContentView: View {
     private enum PanelMotion {
         static let sidebarToggle = ColumnMotion.sidebarVisibility
         static let inspectorToggle = ColumnMotion.inspectorVisibility
-        static let detailOnlyEnforcementRetryLimit = 1
         static let searchOverlayToggle = Animation.spring(response: 0.24, dampingFraction: 0.88)
         static let wikiHopSummaryFade = Animation.easeInOut(duration: 0.3)
     }
@@ -65,29 +61,12 @@ struct ContentView: View {
         CGFloat(min(max(listsSidebarWidth, 176), 260))
     }
 
-    /// Sidebar toggle collapses all navigation columns in reader mode.
-    private var collapsedNavigationVisibility: NavigationSplitViewVisibility {
-        .detailOnly
-    }
-
     private var shouldPresentInspectorColumn: Bool {
         !appState.isFocusModeEnabled && appState.inspectorVisible
     }
 
     private var resolvedInspectorIdealWidth: CGFloat {
         CGFloat(min(max(inspectorWidth, 220), 380))
-    }
-
-    private var inspectorPresentedBinding: Binding<Bool> {
-        Binding(
-            get: { shouldPresentInspectorColumn },
-            set: { newValue in
-                guard !appState.isFocusModeEnabled else { return }
-                if appState.inspectorVisible != newValue {
-                    appState.inspectorVisible = newValue
-                }
-            }
-        )
     }
 
     var body: some View {
@@ -116,17 +95,10 @@ struct ContentView: View {
         .onAppear {
             applyLaunchQAHarnessOverridesIfNeeded()
             enforceWikiHopAvailabilityIfNeeded()
-            syncSidebarVisibilityFromState()
             guard suppressInitialImplicitAnimations else { return }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
                 suppressInitialImplicitAnimations = false
             }
-        }
-        .onChange(of: appState.sidebarVisible) { _, _ in
-            syncSidebarVisibilityFromState()
-        }
-        .onChange(of: appState.isFocusModeEnabled) { _, _ in
-            syncSidebarVisibilityFromState()
         }
         .onChange(of: appState.showSearch) { _, isShowingSearch in
             guard isShowingSearch else { return }
@@ -150,28 +122,6 @@ struct ContentView: View {
             guard let article = notification.userInfo?["article"] as? Article else { return }
             articleForNewTag = article
             showNewTagSheet = true
-        }
-        .onChange(of: columnVisibility) { _, newValue in
-            let resolvedSidebarVisible: Bool?
-            switch newValue {
-            case .all:
-                resolvedSidebarVisible = true
-            case .doubleColumn, .detailOnly:
-                resolvedSidebarVisible = false
-            case .automatic:
-                resolvedSidebarVisible = nil
-            default:
-                resolvedSidebarVisible = nil
-            }
-
-            if let resolvedSidebarVisible,
-               appState.sidebarVisible != resolvedSidebarVisible {
-                performAnimation(PanelMotion.sidebarToggle) {
-                    appState.sidebarVisible = resolvedSidebarVisible
-                }
-            }
-
-            enforceDetailOnlyCollapseIfNeeded(for: newValue)
         }
         .onChange(of: appState.isWikiHopNavigationLocked) { _, _ in
             if appState.isWikiHopNavigationLocked {
@@ -212,84 +162,31 @@ struct ContentView: View {
     
     @ViewBuilder
     private var mainSplitView: some View {
-        NavigationSplitView(
-            columnVisibility: $columnVisibility
-        ) {
-            ListsColumnView(
-                selectedList: $selectedList,
-                selectedLabel: $selectedLabel,
-                selectedTag: $selectedTag,
-                rootSelection: $rootSelection,
-                preferredWidth: resolvedListsSidebarWidth,
-                onEditLabel: { label in editingLabel = label },
-                onAddNewLabel: { showNewLabelSheet = true }
-            )
-            .background {
-                GeometryReader { geometry in
-                    Color.clear
-                        .preference(key: ListsSidebarWidthPreferenceKey.self, value: geometry.size.width)
-                }
+        AppKitMainSplitView(
+            selectedList: $selectedList,
+            selectedLabel: $selectedLabel,
+            selectedTag: $selectedTag,
+            rootSelection: $rootSelection,
+            showNewLabelSheet: $showNewLabelSheet,
+            articleForNewLabel: $articleForNewLabel,
+            listsSidebarWidth: resolvedListsSidebarWidth,
+            inspectorIdealWidth: resolvedInspectorIdealWidth,
+            tabBarLiquidGlass: tabBarLiquidGlass,
+            onEditLabel: { label in editingLabel = label },
+            onAddNewLabel: { showNewLabelSheet = true },
+            onNewLabelWithArticle: { article in
+                articleForNewLabel = article
+                showNewLabelSheet = true
+            },
+            onNewTagWithArticle: { article in
+                articleForNewTag = article
+                showNewTagSheet = true
             }
-        } content: {
-            if appState.sidebarVisible {
-                DirectoryColumnView(
-                    selectedList: $selectedList,
-                    rootSelection: $rootSelection,
-                    selectedLabel: selectedLabel,
-                    selectedTag: selectedTag,
-                    onNewLabelWithArticle: { article in
-                        articleForNewLabel = article
-                        showNewLabelSheet = true
-                    },
-                    onNewTagWithArticle: { article in
-                        articleForNewTag = article
-                        showNewTagSheet = true
-                    }
-                )
-            } else {
-                // Runtime fallback: some macOS split-view states resolve `.detailOnly`
-                // as `.doubleColumn`. Explicitly collapsing the directory column
-                // guarantees the toolbar sidebar toggle hides both left columns.
-                Color.clear
-                    .navigationSplitViewColumnWidth(min: 0, ideal: 0, max: 1)
-            }
-        } detail: {
-            mainDetailView
-        }
-        .onPreferenceChange(ListsSidebarWidthPreferenceKey.self) { newWidth in
-            guard appState.sidebarVisible else { return }
-            guard newWidth > 1 else { return }
-            let clamped = min(max(newWidth, 176), 260)
-            if abs(resolvedListsSidebarWidth - clamped) > 0.5 {
-                listsSidebarWidth = Double(clamped)
-            }
-        }
+        )
         .background {
             WorkspaceBackdropBackground()
                 .ignoresSafeArea()
         }
-        .inspector(isPresented: inspectorPresentedBinding) {
-            InspectorPanel(
-                showNewLabelSheet: $showNewLabelSheet,
-                articleForNewLabel: $articleForNewLabel,
-                currentArticleTitle: appState.currentArticle?.title
-            )
-            .inspectorColumnWidth(
-                min: 220,
-                ideal: resolvedInspectorIdealWidth,
-                max: 380
-            )
-        }
-    }
-    
-    private var mainDetailView: some View {
-        ReaderColumnView(
-            tabBarLiquidGlass: tabBarLiquidGlass,
-            onNewLabelWithArticle: { article in
-                articleForNewLabel = article
-                showNewLabelSheet = true
-            }
-        )
     }
     
     @ViewBuilder
@@ -416,23 +313,6 @@ struct ContentView: View {
         }
     }
 
-    private func syncSidebarVisibilityFromState() {
-        let targetVisibility: NavigationSplitViewVisibility = appState.sidebarVisible ? .all : collapsedNavigationVisibility
-
-        if appState.sidebarVisible {
-            pendingDetailOnlyEnforcement = false
-            detailOnlyEnforcementRetryCount = 0
-        } else {
-            pendingDetailOnlyEnforcement = true
-            detailOnlyEnforcementRetryCount = 0
-        }
-
-        guard columnVisibility != targetVisibility else { return }
-        performAnimation(PanelMotion.sidebarToggle) {
-            columnVisibility = targetVisibility
-        }
-    }
-
     private func enforceWikiHopAvailabilityIfNeeded() {
         if !wikiHopPostV1Enabled, wikiHopPOCEnabled {
             appState.setWikiHopExperimentEnabled(false)
@@ -447,44 +327,6 @@ struct ContentView: View {
         guard !isWikiHopAvailable else { return }
         guard rootSelection == .wikiHop else { return }
         rootSelection = .recents
-    }
-
-    private func enforceDetailOnlyCollapseIfNeeded(for visibility: NavigationSplitViewVisibility) {
-        let targetCollapsedVisibility = collapsedNavigationVisibility
-
-        guard pendingDetailOnlyEnforcement else { return }
-        guard !appState.sidebarVisible else {
-            pendingDetailOnlyEnforcement = false
-            detailOnlyEnforcementRetryCount = 0
-            return
-        }
-
-        guard visibility != targetCollapsedVisibility else {
-            pendingDetailOnlyEnforcement = false
-            detailOnlyEnforcementRetryCount = 0
-            return
-        }
-
-        guard detailOnlyEnforcementRetryCount < PanelMotion.detailOnlyEnforcementRetryLimit else {
-            pendingDetailOnlyEnforcement = false
-            return
-        }
-
-        detailOnlyEnforcementRetryCount += 1
-
-        DispatchQueue.main.async {
-            guard pendingDetailOnlyEnforcement else { return }
-            guard !appState.sidebarVisible else { return }
-            guard columnVisibility != targetCollapsedVisibility else {
-                pendingDetailOnlyEnforcement = false
-                detailOnlyEnforcementRetryCount = 0
-                return
-            }
-
-            performAnimation(PanelMotion.sidebarToggle) {
-                columnVisibility = targetCollapsedVisibility
-            }
-        }
     }
 
     private func revealSidebarForEmbeddedSearchIfNeeded() {
@@ -527,13 +369,5 @@ extension ContentView {
                 appState.sidebarVisible = false
             }
         }
-    }
-}
-
-private struct ListsSidebarWidthPreferenceKey: PreferenceKey {
-    static let defaultValue: CGFloat = 0
-
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = nextValue()
     }
 }
