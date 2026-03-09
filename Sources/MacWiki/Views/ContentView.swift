@@ -148,6 +148,7 @@ struct ContentView: View {
             .toolbar(id: "main-window-toolbar") {
                 MainWindowToolbar()
             }
+            .toolbarBackground(.ultraThinMaterial, for: .windowToolbar)
             .background {
                 WindowTopObscuredHeightReader()
             }
@@ -179,10 +180,6 @@ struct ContentView: View {
             }
         )
         .ignoresSafeArea(.container, edges: .top)
-        .background {
-            WorkspaceBackdropBackground()
-                .ignoresSafeArea()
-        }
     }
     
     @ViewBuilder
@@ -240,7 +237,7 @@ struct ContentView: View {
     @ViewBuilder
     private var workspaceSharedBackground: some View {
         WorkspaceBackdropBackground()
-            .ignoresSafeArea()
+            .ignoresSafeArea(.container, edges: [.leading, .trailing, .bottom])
     }
 
     private var chromeRevealTopPadding: CGFloat {

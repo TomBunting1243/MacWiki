@@ -291,6 +291,10 @@ struct SidebarPaneBackground: View {
     @AppStorage(MacWikiGlassRuntime.forceLegacyFallbackKey) private var forceLegacyGlassFallback = false
     @Environment(\.colorScheme) private var colorScheme
 
+    private var accentTint: Color {
+        Color(nsColor: .controlAccentColor)
+    }
+
     var body: some View {
         if #available(macOS 26, *),
            MacWikiGlassRuntime.usesNativeGlass(forceLegacyFallback: forceLegacyGlassFallback) {
@@ -298,12 +302,23 @@ struct SidebarPaneBackground: View {
                 .fill(.clear)
                 .glassEffect(.regular, in: .rect)
                 .overlay {
+                    LinearGradient(
+                        colors: [
+                            accentTint.opacity(colorScheme == .dark ? 0.072 : 0.055),
+                            accentTint.opacity(colorScheme == .dark ? 0.034 : 0.024),
+                            Color.clear
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                }
+                .overlay {
                     Color(nsColor: .windowBackgroundColor)
-                        .opacity(colorScheme == .dark ? 0.092 : 0.058)
+                        .opacity(colorScheme == .dark ? 0.11 : 0.075)
                 }
                 .overlay {
                     Color(nsColor: .controlBackgroundColor)
-                        .opacity(colorScheme == .dark ? 0.032 : 0.020)
+                        .opacity(colorScheme == .dark ? 0.046 : 0.032)
                 }
         } else {
             fallbackBackground
@@ -314,12 +329,23 @@ struct SidebarPaneBackground: View {
         return Rectangle()
             .fill(.thinMaterial)
             .overlay {
+                LinearGradient(
+                    colors: [
+                        accentTint.opacity(colorScheme == .dark ? 0.095 : 0.072),
+                        accentTint.opacity(colorScheme == .dark ? 0.045 : 0.030),
+                        Color.clear
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            }
+            .overlay {
                 Color(nsColor: .windowBackgroundColor)
-                    .opacity(colorScheme == .dark ? 0.14 : 0.085)
+                    .opacity(colorScheme == .dark ? 0.17 : 0.10)
             }
             .overlay {
                 Color(nsColor: .controlBackgroundColor)
-                    .opacity(colorScheme == .dark ? 0.09 : 0.055)
+                    .opacity(colorScheme == .dark ? 0.11 : 0.070)
             }
     }
 }
@@ -419,7 +445,7 @@ struct WorkspaceBackdropBackground: View {
         Color(nsColor: .windowBackgroundColor)
             .overlay {
                 Color(nsColor: .controlBackgroundColor)
-                    .opacity(colorScheme == .dark ? 0.10 : 0.038)
+                    .opacity(colorScheme == .dark ? 0.08 : 0.026)
             }
     }
 }
