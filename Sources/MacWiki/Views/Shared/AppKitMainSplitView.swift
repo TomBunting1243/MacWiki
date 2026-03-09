@@ -262,6 +262,7 @@ final class MainWindowSplitViewController: NSSplitViewController {
         guard let window = view.window, let toolbar = window.toolbar else { return }
 
         window.styleMask.insert(.fullSizeContentView)
+        window.titlebarAppearsTransparent = true
 
         synchronizeTrackingSeparator(
             toolbar: toolbar,

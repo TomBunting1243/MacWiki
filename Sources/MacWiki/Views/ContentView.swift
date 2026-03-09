@@ -148,8 +148,6 @@ struct ContentView: View {
             .toolbar(id: "main-window-toolbar") {
                 MainWindowToolbar()
             }
-            .toolbarBackground(.ultraThinMaterial, for: .windowToolbar)
-            .toolbarBackground(.visible, for: .windowToolbar)
             .background {
                 WindowTopObscuredHeightReader()
             }
