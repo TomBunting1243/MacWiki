@@ -101,6 +101,11 @@ struct AppKitMainSplitView: NSViewControllerRepresentable {
 
 @MainActor
 final class MainWindowSplitViewController: NSSplitViewController {
+    private enum ToolbarAnchor {
+        static let sidebar = NSToolbarItem.Identifier("sidebar")
+        static let inspectorBoundary = NSToolbarItem.Identifier("inspector-boundary")
+    }
+
     struct Configuration {
         let listsRootView: AnyView
         let directoryRootView: AnyView
@@ -149,9 +154,15 @@ final class MainWindowSplitViewController: NSSplitViewController {
         inspectorWidthConstraint.isActive = true
     }
 
+    override func viewDidAppear() {
+        super.viewDidAppear()
+        configureWindowChrome()
+    }
+
     override func viewDidLayout() {
         super.viewDidLayout()
         publishColumnWidths()
+        configureWindowChrome()
     }
 
     func update(configuration: Configuration) {
@@ -170,6 +181,8 @@ final class MainWindowSplitViewController: NSSplitViewController {
             inspectorVisible: configuration.inspectorVisible,
             animated: configuration.animateTransitions
         )
+
+        configureWindowChrome()
     }
 
     private func configureSplitItems() {
@@ -178,6 +191,7 @@ final class MainWindowSplitViewController: NSSplitViewController {
         sidebarItem.minimumThickness = 176
         sidebarItem.maximumThickness = 260
         sidebarItem.allowsFullHeightLayout = true
+        sidebarItem.titlebarSeparatorStyle = .none
 
         directoryItem.canCollapse = true
         directoryItem.canCollapseFromWindowResize = true
@@ -194,6 +208,7 @@ final class MainWindowSplitViewController: NSSplitViewController {
         inspectorItem.minimumThickness = 220
         inspectorItem.maximumThickness = 380
         inspectorItem.allowsFullHeightLayout = true
+        inspectorItem.titlebarSeparatorStyle = .none
     }
 
     private func applyCollapsedState(
@@ -209,6 +224,7 @@ final class MainWindowSplitViewController: NSSplitViewController {
 
         guard animated else {
             applyChanges()
+            configureWindowChrome()
             return
         }
 
@@ -217,6 +233,10 @@ final class MainWindowSplitViewController: NSSplitViewController {
             self.sidebarItem.animator().isCollapsed = !navigationColumnsVisible
             self.directoryItem.animator().isCollapsed = !navigationColumnsVisible
             self.inspectorItem.animator().isCollapsed = !inspectorVisible
+        } completionHandler: {
+            Task { @MainActor in
+                self.configureWindowChrome()
+            }
         }
     }
 
@@ -236,5 +256,82 @@ final class MainWindowSplitViewController: NSSplitViewController {
                 configuration.onInspectorWidthChange(width)
             }
         }
+    }
+
+    private func configureWindowChrome() {
+        guard let window = view.window, let toolbar = window.toolbar else { return }
+
+        window.styleMask.insert(.fullSizeContentView)
+
+        synchronizeTrackingSeparator(
+            toolbar: toolbar,
+            identifier: .sidebarTrackingSeparator,
+            after: ToolbarAnchor.sidebar,
+            dividerIndex: dividerIndex(after: sidebarItem)
+        )
+
+        synchronizeTrackingSeparator(
+            toolbar: toolbar,
+            identifier: .inspectorTrackingSeparator,
+            after: ToolbarAnchor.inspectorBoundary,
+            dividerIndex: dividerIndex(before: inspectorItem)
+        )
+    }
+
+    private func dividerIndex(after item: NSSplitViewItem) -> Int? {
+        let visibleItems = splitViewItems.filter { !$0.isCollapsed }
+        guard let visibleIndex = visibleItems.firstIndex(where: { $0 === item }),
+              visibleIndex < visibleItems.count - 1 else {
+            return nil
+        }
+
+        return visibleIndex
+    }
+
+    private func dividerIndex(before item: NSSplitViewItem) -> Int? {
+        let visibleItems = splitViewItems.filter { !$0.isCollapsed }
+        guard let visibleIndex = visibleItems.firstIndex(where: { $0 === item }),
+              visibleIndex > 0 else {
+            return nil
+        }
+
+        return visibleIndex - 1
+    }
+
+    private func synchronizeTrackingSeparator(
+        toolbar: NSToolbar,
+        identifier: NSToolbarItem.Identifier,
+        after anchor: NSToolbarItem.Identifier,
+        dividerIndex: Int?
+    ) {
+        let existingIndex = toolbar.items.firstIndex { $0.itemIdentifier == identifier }
+
+        guard let dividerIndex,
+              let anchorIndex = toolbar.items.firstIndex(where: { $0.itemIdentifier == anchor }) else {
+            if let existingIndex {
+                toolbar.removeItem(at: existingIndex)
+            }
+            return
+        }
+
+        let desiredIndex = anchorIndex + 1
+
+        if let existingIndex, existingIndex != desiredIndex {
+            toolbar.removeItem(at: existingIndex)
+            let adjustedIndex = min(
+                max(0, existingIndex < desiredIndex ? desiredIndex - 1 : desiredIndex),
+                toolbar.items.count
+            )
+            toolbar.insertItem(withItemIdentifier: identifier, at: adjustedIndex)
+        } else if existingIndex == nil {
+            toolbar.insertItem(withItemIdentifier: identifier, at: min(desiredIndex, toolbar.items.count))
+        }
+
+        guard let trackingItem = toolbar.items.first(where: { $0.itemIdentifier == identifier }) as? NSTrackingSeparatorToolbarItem else {
+            return
+        }
+
+        trackingItem.splitView = splitView
+        trackingItem.dividerIndex = dividerIndex
     }
 }

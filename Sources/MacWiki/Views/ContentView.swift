@@ -152,10 +152,6 @@ struct ContentView: View {
             .toolbarBackground(.visible, for: .windowToolbar)
             .background {
                 WindowTopObscuredHeightReader()
-                WindowToolbarTrackingSeparators(
-                    sidebarVisible: appState.sidebarVisible,
-                    inspectorVisible: shouldPresentInspectorColumn
-                )
             }
     }
 
