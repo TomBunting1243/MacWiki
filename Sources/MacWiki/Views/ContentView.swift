@@ -31,6 +31,7 @@ struct ContentView: View {
     @State private var articleForNewTag: Article?
     @AppStorage("tabBarLiquidGlass") private var tabBarLiquidGlass = true
     @AppStorage("listsSidebarWidth") private var listsSidebarWidth: Double = 204
+    @AppStorage("directoryColumnWidth") private var directoryColumnWidth: Double = 272
     @AppStorage("inspectorWidth") private var inspectorWidth: Double = 240
     @AppStorage("searchPresentationMode") private var searchPresentationMode: SearchPresentationMode = .overlay
     @AppStorage(ExperimentFlag.wikiHopPOCEnabled.key) private var wikiHopPOCEnabled = false
@@ -65,6 +66,10 @@ struct ContentView: View {
         !appState.isFocusModeEnabled && appState.inspectorVisible
     }
 
+    private var resolvedDirectoryIdealWidth: CGFloat {
+        CGFloat(min(max(directoryColumnWidth, 212), 360))
+    }
+
     private var resolvedInspectorIdealWidth: CGFloat {
         CGFloat(min(max(inspectorWidth, 220), 380))
     }
@@ -73,6 +78,7 @@ struct ContentView: View {
         ZStack(alignment: .topLeading) {
             workspaceSharedBackground
             mainWindowContent
+            paneTitlebarCaps
             centerCommandBarOverlay
             sidebarWindowDragOverlay
             inspectorRevealOverlay
@@ -161,6 +167,7 @@ struct ContentView: View {
             showNewLabelSheet: $showNewLabelSheet,
             articleForNewLabel: $articleForNewLabel,
             listsSidebarWidth: resolvedListsSidebarWidth,
+            directoryIdealWidth: resolvedDirectoryIdealWidth,
             inspectorIdealWidth: resolvedInspectorIdealWidth,
             tabBarLiquidGlass: tabBarLiquidGlass,
             onEditLabel: { label in editingLabel = label },
@@ -250,11 +257,19 @@ struct ContentView: View {
     }
 
     private var commandBarLeadingPadding: CGFloat {
-        appState.sidebarVisible ? resolvedListsSidebarWidth + 10 : 12
+        appState.sidebarVisible
+            ? (resolvedListsSidebarWidth + resolvedDirectoryIdealWidth + 12)
+            : 12
     }
 
     private var commandBarTrailingPadding: CGFloat {
-        shouldPresentInspectorColumn ? resolvedInspectorIdealWidth + 10 : 12
+        shouldPresentInspectorColumn ? resolvedInspectorIdealWidth + 12 : 12
+    }
+
+    private var titlebarBandHeight: CGFloat {
+        ColumnChromeMetrics.titlebarBandHeight(
+            windowTopObscuredHeight: appState.windowTopObscuredHeight
+        )
     }
 
     private var sidebarDragHeight: CGFloat {
@@ -291,6 +306,55 @@ struct ContentView: View {
             .ignoresSafeArea(.container, edges: .top)
             .allowsHitTesting(true)
             .zIndex(35)
+    }
+
+    @ViewBuilder
+    private var paneTitlebarCaps: some View {
+        ZStack(alignment: .topLeading) {
+            if appState.sidebarVisible {
+                sidebarTitlebarCap
+            }
+
+            if shouldPresentInspectorColumn {
+                inspectorTitlebarCap
+            }
+        }
+        .allowsHitTesting(false)
+        .zIndex(20)
+    }
+
+    private var sidebarTitlebarCap: some View {
+        SidebarPaneBackground()
+            .frame(width: resolvedListsSidebarWidth, height: titlebarBandHeight)
+            .overlay(alignment: .bottom) {
+                Rectangle()
+                    .fill(Color.primary.opacity(ColumnChromeMetrics.dividerOpacity(for: colorScheme)))
+                    .frame(height: 0.5)
+            }
+            .overlay(alignment: .trailing) {
+                Rectangle()
+                    .fill(Color.primary.opacity(ColumnChromeMetrics.dividerOpacity(for: colorScheme)))
+                    .frame(width: 0.5)
+            }
+            .ignoresSafeArea(.container, edges: .top)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    private var inspectorTitlebarCap: some View {
+        SidebarPaneBackground()
+            .frame(width: resolvedInspectorIdealWidth, height: titlebarBandHeight)
+            .overlay(alignment: .bottom) {
+                Rectangle()
+                    .fill(Color.primary.opacity(ColumnChromeMetrics.dividerOpacity(for: colorScheme)))
+                    .frame(height: 0.5)
+            }
+            .overlay(alignment: .leading) {
+                Rectangle()
+                    .fill(Color.primary.opacity(ColumnChromeMetrics.dividerOpacity(for: colorScheme)))
+                    .frame(width: 0.5)
+            }
+            .ignoresSafeArea(.container, edges: .top)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
     }
 
     @ViewBuilder

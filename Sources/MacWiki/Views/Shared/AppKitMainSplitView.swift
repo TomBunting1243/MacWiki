@@ -15,6 +15,7 @@ struct AppKitMainSplitView: NSViewControllerRepresentable {
     @Binding var articleForNewLabel: SavedArticle?
 
     let listsSidebarWidth: CGFloat
+    let directoryIdealWidth: CGFloat
     let inspectorIdealWidth: CGFloat
     let tabBarLiquidGlass: Bool
     let onEditLabel: (Label) -> Void
@@ -79,6 +80,7 @@ struct AppKitMainSplitView: NSViewControllerRepresentable {
             navigationColumnsVisible: appState.sidebarVisible,
             inspectorVisible: appState.inspectorVisible && !appState.isFocusModeEnabled,
             listsSidebarWidth: listsSidebarWidth,
+            directoryIdealWidth: directoryIdealWidth,
             inspectorIdealWidth: inspectorIdealWidth,
             animateTransitions: !reduceMotion,
             onListsSidebarWidthChange: { newWidth in
@@ -86,6 +88,13 @@ struct AppKitMainSplitView: NSViewControllerRepresentable {
                 guard clamped.isFinite, clamped > 0 else { return }
                 if abs(listsSidebarWidth - clamped) > 0.5 {
                     UserDefaults.standard.set(Double(clamped), forKey: "listsSidebarWidth")
+                }
+            },
+            onDirectoryWidthChange: { newWidth in
+                let clamped = min(max(newWidth, 212), 360)
+                guard clamped.isFinite, clamped > 0 else { return }
+                if abs(directoryIdealWidth - clamped) > 0.5 {
+                    UserDefaults.standard.set(Double(clamped), forKey: "directoryColumnWidth")
                 }
             },
             onInspectorWidthChange: { newWidth in
@@ -114,9 +123,11 @@ final class MainWindowSplitViewController: NSSplitViewController {
         let navigationColumnsVisible: Bool
         let inspectorVisible: Bool
         let listsSidebarWidth: CGFloat
+        let directoryIdealWidth: CGFloat
         let inspectorIdealWidth: CGFloat
         let animateTransitions: Bool
         let onListsSidebarWidthChange: (CGFloat) -> Void
+        let onDirectoryWidthChange: (CGFloat) -> Void
         let onInspectorWidthChange: (CGFloat) -> Void
     }
 
@@ -174,6 +185,7 @@ final class MainWindowSplitViewController: NSSplitViewController {
         inspectorHostingController.rootView = configuration.inspectorRootView
 
         sidebarWidthConstraint.constant = configuration.listsSidebarWidth
+        directoryWidthConstraint.constant = configuration.directoryIdealWidth
         inspectorWidthConstraint.constant = configuration.inspectorIdealWidth
 
         applyCollapsedState(
@@ -247,6 +259,13 @@ final class MainWindowSplitViewController: NSSplitViewController {
             let width = listsHostingController.view.frame.width
             if width.isFinite, width > 0 {
                 configuration.onListsSidebarWidthChange(width)
+            }
+        }
+
+        if !directoryItem.isCollapsed {
+            let width = directoryHostingController.view.frame.width
+            if width.isFinite, width > 0 {
+                configuration.onDirectoryWidthChange(width)
             }
         }
 
