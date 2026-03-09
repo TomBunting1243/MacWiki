@@ -178,6 +178,7 @@ struct ContentView: View {
                 showNewTagSheet = true
             }
         )
+        .ignoresSafeArea(.container, edges: .top)
         .background {
             WorkspaceBackdropBackground()
                 .ignoresSafeArea()
