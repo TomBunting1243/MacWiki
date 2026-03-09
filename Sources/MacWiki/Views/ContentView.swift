@@ -73,6 +73,7 @@ struct ContentView: View {
         ZStack(alignment: .topLeading) {
             workspaceSharedBackground
             mainWindowContent
+            centerCommandBarOverlay
             sidebarWindowDragOverlay
             inspectorRevealOverlay
             wikiHopOverlay
@@ -143,12 +144,6 @@ struct ContentView: View {
     private var mainWindowContent: some View {
         mainSplitView
             .toolbar(removing: .title)
-            .toolbar(removing: .sidebarToggle)
-            .toolbarRole(.editor)
-            .toolbar(id: "main-window-toolbar") {
-                MainWindowToolbar()
-            }
-            .toolbarBackground(.ultraThinMaterial, for: .windowToolbar)
             .background {
                 WindowTopObscuredHeightReader()
             }
@@ -245,6 +240,23 @@ struct ContentView: View {
         return max(6, (topObscuredHeight - ChromeIconMetrics.buttonSize) * 0.5)
     }
 
+    private var commandBarTopPadding: CGFloat {
+        max(
+            6,
+            (ColumnChromeMetrics.titlebarBandHeight(
+                windowTopObscuredHeight: appState.windowTopObscuredHeight
+            ) - ColumnChromeMetrics.commandBarHeight) * 0.5
+        )
+    }
+
+    private var commandBarLeadingPadding: CGFloat {
+        appState.sidebarVisible ? resolvedListsSidebarWidth + 10 : 12
+    }
+
+    private var commandBarTrailingPadding: CGFloat {
+        shouldPresentInspectorColumn ? resolvedInspectorIdealWidth + 10 : 12
+    }
+
     private var sidebarDragHeight: CGFloat {
         max(
             appState.windowTopObscuredHeight + ColumnChromeMetrics.topBarHeight + 8,
@@ -266,6 +278,19 @@ struct ContentView: View {
                 .ignoresSafeArea(.container, edges: .top)
                 .zIndex(45)
         }
+    }
+
+    @ViewBuilder
+    private var centerCommandBarOverlay: some View {
+        MainWindowCommandBar()
+            .frame(height: ColumnChromeMetrics.commandBarHeight)
+            .padding(.top, commandBarTopPadding)
+            .padding(.leading, commandBarLeadingPadding)
+            .padding(.trailing, commandBarTrailingPadding)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .ignoresSafeArea(.container, edges: .top)
+            .allowsHitTesting(true)
+            .zIndex(35)
     }
 
     @ViewBuilder

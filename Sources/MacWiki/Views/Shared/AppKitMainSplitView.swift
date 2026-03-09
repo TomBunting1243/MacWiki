@@ -259,11 +259,14 @@ final class MainWindowSplitViewController: NSSplitViewController {
     }
 
     private func configureWindowChrome() {
-        guard let window = view.window, let toolbar = window.toolbar else { return }
+        guard let window = view.window else { return }
 
         window.styleMask.insert(.fullSizeContentView)
         window.titlebarAppearsTransparent = true
+        window.titleVisibility = .hidden
         window.toolbarStyle = .automatic
+
+        guard let toolbar = window.toolbar else { return }
 
         synchronizeTrackingSeparator(
             toolbar: toolbar,

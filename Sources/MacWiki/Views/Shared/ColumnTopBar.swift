@@ -1,6 +1,7 @@
 import SwiftUI
 
 enum ColumnChromeMetrics {
+    static let commandBarHeight: CGFloat = 44
     static let topBarHeight: CGFloat = 32
     /// Tiny downward optical nudge so grouped toolbar controls appear centered
     /// against the lane highlight/divider stack.
@@ -33,9 +34,9 @@ enum ColumnChromeMetrics {
     }
 
     /// Combined overlay height the reader content must clear when it underlaps
-    /// the window toolbar. The center reader now flows beneath the native
-    /// toolbar glass, so article content needs to clear both the titlebar band
-    /// and the reader-owned tab lane.
+    /// the titlebar band. The custom command bar now lives inside the titlebar
+    /// slice, so reader content only needs to clear the titlebar itself and
+    /// the reader-owned tab lane beneath it.
     static func readerChromeOverlayHeight(windowTopObscuredHeight: CGFloat) -> CGFloat {
         titlebarBandHeight(windowTopObscuredHeight: windowTopObscuredHeight) + topBarHeight
     }
