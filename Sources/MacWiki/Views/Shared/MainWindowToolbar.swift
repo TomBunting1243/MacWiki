@@ -143,10 +143,6 @@ struct MainWindowToolbar: CustomizableToolbarContent {
             }
             .defaultCustomization(.hidden)
 
-            ToolbarItem(id: ItemID.inspector, placement: .primaryAction) {
-                inspectorButton
-            }
-
             if #available(macOS 26, *) {
                 ToolbarItem(id: ItemID.inspectorBoundary, placement: .primaryAction) {
                     Color.clear
@@ -172,12 +168,16 @@ struct MainWindowToolbar: CustomizableToolbarContent {
                 } else {
                     ToolbarItem(id: "inspector-reserve", placement: .primaryAction) {
                         Color.clear
-                            .frame(width: 280, height: 1)
+                            .frame(width: 88, height: 1)
                             .allowsHitTesting(false)
                             .accessibilityHidden(true)
                     }
                     .customizationBehavior(.disabled)
                 }
+            }
+
+            ToolbarItem(id: ItemID.inspector, placement: .primaryAction) {
+                inspectorButton
             }
         }
     }
