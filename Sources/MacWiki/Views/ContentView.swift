@@ -13,8 +13,10 @@ struct ContentView: View {
     }
 
     @Environment(AppState.self) private var appState
+    @Environment(\.modelContext) private var modelContext
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.openURL) private var openURL
     @State private var selectedList: ReadingList?
     @State private var selectedLabel: Label?
     @State private var selectedTag: Tag?
@@ -142,13 +144,6 @@ struct ContentView: View {
 
     private var mainWindowContent: some View {
         mainSplitView
-            .toolbar(removing: .title)
-            .toolbar(removing: .sidebarToggle)
-            .toolbarRole(.editor)
-            .toolbar {
-                MainWindowToolbar()
-            }
-            .toolbarBackground(.visible, for: .windowToolbar)
             .background {
                 WindowTopObscuredHeightReader()
             }
@@ -169,6 +164,16 @@ struct ContentView: View {
             directoryIdealWidth: resolvedDirectoryIdealWidth,
             inspectorIdealWidth: resolvedInspectorIdealWidth,
             tabBarLiquidGlass: tabBarLiquidGlass,
+            commandBarRootView: AnyView(
+                MainWindowCommandBar()
+                    .environment(appState)
+                    .environment(\.modelContext, modelContext)
+                    .environment(\.openURL, openURL)
+            ),
+            sidebarAccessoryRootView: AnyView(
+                SidebarTitlebarAccessory()
+                    .environment(appState)
+            ),
             onEditLabel: { label in editingLabel = label },
             onAddNewLabel: { showNewLabelSheet = true },
             onNewLabelWithArticle: { article in
