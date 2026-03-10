@@ -2,16 +2,16 @@ import SwiftUI
 import SwiftData
 
 private enum WindowCommandBarMetrics {
-    static let horizontalPadding: CGFloat = 6
-    static let clusterSpacing: CGFloat = 8
-    static let groupHeight: CGFloat = 30
-    static let buttonSize: CGFloat = 26
-    static let groupInset: CGFloat = 2
-    static let buttonSpacing: CGFloat = 1
-    static let principalHorizontalPadding: CGFloat = 16
-    static let principalMinimumWidth: CGFloat = 132
-    static let principalMaximumWidth: CGFloat = 248
-    static let pillCornerRadius: CGFloat = 10
+    static let horizontalPadding: CGFloat = 2
+    static let clusterSpacing: CGFloat = 12
+    static let groupHeight: CGFloat = 32
+    static let buttonSize: CGFloat = 28
+    static let groupInset: CGFloat = 3
+    static let buttonSpacing: CGFloat = 0
+    static let principalHorizontalPadding: CGFloat = 18
+    static let principalMinimumWidth: CGFloat = 148
+    static let principalMaximumWidth: CGFloat = 260
+    static let pillCornerRadius: CGFloat = 11
 }
 
 struct MainWindowCommandBar: View {
@@ -126,7 +126,7 @@ struct MainWindowCommandBar: View {
     private var principalCluster: some View {
         HStack(spacing: 8) {
             Text(principalTitle)
-                .font(.system(size: 14, weight: .semibold))
+                .font(.system(size: 15, weight: .semibold))
                 .lineLimit(1)
                 .truncationMode(.tail)
                 .allowsTightening(true)
@@ -204,9 +204,9 @@ struct MainWindowCommandBar: View {
 
     private func commandBarIcon(systemImage: String) -> some View {
         Image(systemName: systemImage)
-            .font(.system(size: 14, weight: .regular))
+            .font(.system(size: 15, weight: .regular))
             .symbolRenderingMode(.hierarchical)
-            .foregroundStyle(Color.primary.opacity(colorScheme == .dark ? 0.82 : 0.72))
+            .foregroundStyle(Color.primary.opacity(colorScheme == .dark ? 0.86 : 0.76))
             .frame(width: WindowCommandBarMetrics.buttonSize, height: WindowCommandBarMetrics.buttonSize)
             .contentShape(Rectangle())
     }
@@ -374,17 +374,17 @@ private struct CommandBarPillBackground: View {
                 .glassEffect(.regular.interactive(false), in: shape)
                 .overlay {
                     Color(nsColor: .controlBackgroundColor)
-                        .opacity(colorScheme == .dark ? 0.10 : 0.07)
+                        .opacity(colorScheme == .dark ? 0.085 : 0.055)
                 }
                 .overlay {
                     shape
-                        .strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.08 : 0.045), lineWidth: 0.5)
+                        .strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.07 : 0.04), lineWidth: 0.5)
                 }
         } else {
             shape
                 .fill(
                     Color(nsColor: .controlBackgroundColor)
-                        .opacity(colorScheme == .dark ? 0.80 : 0.90)
+                        .opacity(colorScheme == .dark ? 0.78 : 0.88)
                 )
                 .background {
                     shape
@@ -392,11 +392,11 @@ private struct CommandBarPillBackground: View {
                 }
                 .overlay {
                     Color(nsColor: .windowBackgroundColor)
-                        .opacity(colorScheme == .dark ? 0.08 : 0.025)
+                        .opacity(colorScheme == .dark ? 0.07 : 0.02)
                 }
                 .overlay {
                     shape
-                        .strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.09 : 0.055), lineWidth: 0.5)
+                        .strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.085 : 0.05), lineWidth: 0.5)
                 }
         }
     }
