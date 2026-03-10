@@ -3,15 +3,15 @@ import SwiftData
 
 private enum WindowCommandBarMetrics {
     static let horizontalPadding: CGFloat = 4
-    static let clusterSpacing: CGFloat = 10
-    static let groupHeight: CGFloat = 34
-    static let buttonSize: CGFloat = 30
-    static let groupInset: CGFloat = 4
-    static let buttonSpacing: CGFloat = 0
-    static let principalHorizontalPadding: CGFloat = 14
+    static let clusterSpacing: CGFloat = 14
+    static let groupHeight: CGFloat = 36
+    static let buttonSize: CGFloat = 32
+    static let groupInset: CGFloat = 6
+    static let buttonSpacing: CGFloat = 1
+    static let principalHorizontalPadding: CGFloat = 12
     static let principalMinimumWidth: CGFloat = 136
     static let principalMaximumWidth: CGFloat = 240
-    static let pillCornerRadius: CGFloat = 12
+    static let pillCornerRadius: CGFloat = 13
 }
 
 struct MainWindowCommandBar: View {
@@ -201,9 +201,9 @@ struct MainWindowCommandBar: View {
 
     private func commandBarIcon(systemImage: String) -> some View {
         Image(systemName: systemImage)
-            .font(.system(size: 16, weight: .regular))
+            .font(.system(size: 17, weight: .regular))
             .symbolRenderingMode(.hierarchical)
-            .foregroundStyle(Color.primary.opacity(colorScheme == .dark ? 0.90 : 0.80))
+            .foregroundStyle(Color.primary.opacity(colorScheme == .dark ? 0.92 : 0.86))
             .frame(width: WindowCommandBarMetrics.buttonSize, height: WindowCommandBarMetrics.buttonSize)
             .contentShape(Rectangle())
     }
@@ -371,30 +371,32 @@ private struct CommandBarPillBackground: View {
                 .glassEffect(.regular.interactive(false), in: shape)
                 .overlay {
                     Color(nsColor: .controlBackgroundColor)
-                        .opacity(colorScheme == .dark ? 0.055 : 0.035)
+                        .opacity(colorScheme == .dark ? 0.14 : 0.14)
                 }
                 .overlay {
                     shape
-                        .strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.050 : 0.030), lineWidth: 0.5)
+                        .strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.11 : 0.08), lineWidth: 0.6)
                 }
+                .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.18 : 0.08), radius: 8, y: 1)
         } else {
             shape
                 .fill(
                     Color(nsColor: .controlBackgroundColor)
-                        .opacity(colorScheme == .dark ? 0.68 : 0.82)
+                        .opacity(colorScheme == .dark ? 0.82 : 0.97)
                 )
                 .background {
                     shape
-                        .fill(.ultraThinMaterial)
+                        .fill(.thinMaterial)
                 }
                 .overlay {
                     Color(nsColor: .windowBackgroundColor)
-                        .opacity(colorScheme == .dark ? 0.045 : 0.018)
+                        .opacity(colorScheme == .dark ? 0.10 : 0.07)
                 }
                 .overlay {
                     shape
-                        .strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.055 : 0.035), lineWidth: 0.5)
+                        .strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.12 : 0.07), lineWidth: 0.6)
                 }
+                .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.18 : 0.08), radius: 8, y: 1)
         }
     }
 }

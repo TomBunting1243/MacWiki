@@ -18,8 +18,6 @@ struct AppKitMainSplitView: NSViewControllerRepresentable {
     let directoryIdealWidth: CGFloat
     let inspectorIdealWidth: CGFloat
     let tabBarLiquidGlass: Bool
-    let commandBarRootView: AnyView
-    let sidebarAccessoryRootView: AnyView
     let onEditLabel: (Label) -> Void
     let onAddNewLabel: () -> Void
     let onNewLabelWithArticle: (SavedArticle) -> Void
@@ -79,8 +77,6 @@ struct AppKitMainSplitView: NSViewControllerRepresentable {
                 .environment(appState)
                 .environment(\.modelContext, modelContext)
             ),
-            commandBarRootView: commandBarRootView,
-            sidebarAccessoryRootView: sidebarAccessoryRootView,
             navigationColumnsVisible: appState.sidebarVisible,
             inspectorVisible: appState.inspectorVisible && !appState.isFocusModeEnabled,
             listsSidebarWidth: listsSidebarWidth,
@@ -119,8 +115,6 @@ final class MainWindowSplitViewController: NSSplitViewController {
         let directoryRootView: AnyView
         let readerRootView: AnyView
         let inspectorRootView: AnyView
-        let commandBarRootView: AnyView
-        let sidebarAccessoryRootView: AnyView
         let navigationColumnsVisible: Bool
         let inspectorVisible: Bool
         let listsSidebarWidth: CGFloat
@@ -147,11 +141,6 @@ final class MainWindowSplitViewController: NSSplitViewController {
     private lazy var inspectorWidthConstraint = inspectorHostingController.view.widthAnchor.constraint(equalToConstant: 240)
 
     private var currentConfiguration: Configuration?
-    private let sidebarTitlebarFillView = PassthroughHostingView(rootView: AnyView(EmptyView()))
-    private let inspectorTitlebarFillView = PassthroughHostingView(rootView: AnyView(EmptyView()))
-    private let commandBarHostingView = NSHostingView(rootView: AnyView(EmptyView()))
-    private let sidebarAccessoryHostingView = NSHostingView(rootView: AnyView(EmptyView()))
-
     override func viewDidLoad() {
         super.viewDidLoad()
 
@@ -290,94 +279,6 @@ final class MainWindowSplitViewController: NSSplitViewController {
         window.titleVisibility = .hidden
         window.toolbarStyle = .automatic
         window.isMovableByWindowBackground = false
-
-        configureTitlebarSectionBackgrounds(in: window)
-    }
-
-    private func configureTitlebarSectionBackgrounds(in window: NSWindow) {
-        guard let titlebarContainerView = window.standardWindowButton(.closeButton)?.superview else { return }
-
-        installTitlebarFillView(sidebarTitlebarFillView, in: titlebarContainerView)
-        installTitlebarFillView(inspectorTitlebarFillView, in: titlebarContainerView)
-        installTitlebarFillView(commandBarHostingView, in: titlebarContainerView)
-        installTitlebarFillView(sidebarAccessoryHostingView, in: titlebarContainerView)
-
-        let titlebarHeight = titlebarContainerView.bounds.height
-        let titlebarWidth = titlebarContainerView.bounds.width
-        let sidebarWidth = sidebarItem.isCollapsed ? 0 : listsHostingController.view.frame.width
-        let inspectorWidth = inspectorItem.isCollapsed ? 0 : inspectorHostingController.view.frame.width
-        let centerX = sidebarWidth
-        let centerWidth = max(0, titlebarWidth - sidebarWidth - inspectorWidth)
-
-        sidebarTitlebarFillView.rootView = AnyView(TitlebarSectionFill(edge: .leading))
-        sidebarTitlebarFillView.frame = NSRect(x: 0, y: 0, width: sidebarWidth, height: titlebarHeight)
-        sidebarTitlebarFillView.isHidden = sidebarWidth <= 0
-
-        if let configuration = currentConfiguration {
-            sidebarAccessoryHostingView.rootView = configuration.sidebarAccessoryRootView
-        }
-        let sidebarAccessoryWidth: CGFloat = 42
-        sidebarAccessoryHostingView.frame = NSRect(
-            x: max(0, sidebarWidth - sidebarAccessoryWidth - 8),
-            y: 0,
-            width: sidebarAccessoryWidth,
-            height: titlebarHeight
-        )
-        sidebarAccessoryHostingView.isHidden = sidebarWidth <= 0
-
-        inspectorTitlebarFillView.rootView = AnyView(TitlebarSectionFill(edge: .trailing))
-        inspectorTitlebarFillView.frame = NSRect(
-            x: max(0, titlebarWidth - inspectorWidth),
-            y: 0,
-            width: inspectorWidth,
-            height: titlebarHeight
-        )
-        inspectorTitlebarFillView.isHidden = inspectorWidth <= 0
-
-        if let configuration = currentConfiguration {
-            commandBarHostingView.rootView = AnyView(
-                TitlebarCommandBarContainer(content: configuration.commandBarRootView)
-            )
-        }
-        commandBarHostingView.frame = NSRect(x: centerX, y: 0, width: centerWidth, height: titlebarHeight)
-        commandBarHostingView.isHidden = centerWidth <= 0
-    }
-
-    private func installTitlebarFillView(_ fillView: NSView, in containerView: NSView) {
-        guard fillView.superview !== containerView else { return }
-
-        let titlebarBackgroundView = containerView.subviews.first {
-            String(describing: type(of: $0)) == "NSTitlebarBackgroundView"
-        }
-
-        if let titlebarBackgroundView {
-            containerView.addSubview(fillView, positioned: .above, relativeTo: titlebarBackgroundView)
-        } else if let anchorView = containerView.subviews.first {
-            containerView.addSubview(fillView, positioned: .below, relativeTo: anchorView)
-        } else {
-            containerView.addSubview(fillView)
-        }
-    }
-}
-
-private struct TitlebarCommandBarContainer: View {
-    let content: AnyView
-
-    var body: some View {
-        ZStack(alignment: .topLeading) {
-            ToolbarBandBackground()
-                .overlay(alignment: .bottom) {
-                    Rectangle()
-                        .fill(Color.primary.opacity(ColumnChromeMetrics.dividerOpacity))
-                        .frame(height: 0.5)
-                }
-
-            content
-                .frame(height: ColumnChromeMetrics.commandBarHeight)
-                .padding(.top, ColumnChromeMetrics.commandBarTopGap)
-                .padding(.horizontal, 12)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        }
     }
 }
 
@@ -403,36 +304,5 @@ struct SidebarTitlebarAccessory: View {
         .buttonStyle(.plain)
         .help("Hide Navigation Columns")
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-    }
-}
-
-private final class PassthroughHostingView<Content: View>: NSHostingView<Content> {
-    override func hitTest(_ point: NSPoint) -> NSView? {
-        nil
-    }
-}
-
-private struct TitlebarSectionFill: View {
-    enum Edge {
-        case leading
-        case trailing
-    }
-
-    let edge: Edge
-
-    var body: some View {
-        Group {
-            if edge == .leading {
-                SidebarPaneBackground()
-            } else {
-                PaneTitlebarCapBackground(flavor: .inspector)
-            }
-        }
-        .overlay(alignment: edge == .leading ? .trailing : .leading) {
-            Rectangle()
-                .fill(Color.primary.opacity(0.065))
-                .frame(width: 0.5)
-        }
-        .allowsHitTesting(false)
     }
 }

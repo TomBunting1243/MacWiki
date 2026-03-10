@@ -16,7 +16,6 @@ struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(\.openURL) private var openURL
     @State private var selectedList: ReadingList?
     @State private var selectedLabel: Label?
     @State private var selectedTag: Tag?
@@ -75,6 +74,7 @@ struct ContentView: View {
         ZStack(alignment: .topLeading) {
             workspaceSharedBackground
             mainWindowContent
+            titlebarRoofOverlay
             sidebarWindowDragOverlay
             inspectorRevealOverlay
             wikiHopOverlay
@@ -164,16 +164,6 @@ struct ContentView: View {
             directoryIdealWidth: resolvedDirectoryIdealWidth,
             inspectorIdealWidth: resolvedInspectorIdealWidth,
             tabBarLiquidGlass: tabBarLiquidGlass,
-            commandBarRootView: AnyView(
-                MainWindowCommandBar()
-                    .environment(appState)
-                    .environment(\.modelContext, modelContext)
-                    .environment(\.openURL, openURL)
-            ),
-            sidebarAccessoryRootView: AnyView(
-                SidebarTitlebarAccessory()
-                    .environment(appState)
-            ),
             onEditLabel: { label in editingLabel = label },
             onAddNewLabel: { showNewLabelSheet = true },
             onNewLabelWithArticle: { article in
@@ -243,6 +233,66 @@ struct ContentView: View {
     private var workspaceSharedBackground: some View {
         WorkspaceBackdropBackground()
             .ignoresSafeArea(.container, edges: [.leading, .trailing, .bottom])
+    }
+
+    private var visibleInspectorWidth: CGFloat {
+        appState.inspectorVisible && !appState.isFocusModeEnabled ? resolvedInspectorIdealWidth : 0
+    }
+
+    private var titlebarBandHeight: CGFloat {
+        ColumnChromeMetrics.titlebarBandHeight(windowTopObscuredHeight: appState.windowTopObscuredHeight)
+    }
+
+    private var commandBarTopPadding: CGFloat {
+        max(6, (titlebarBandHeight - ColumnChromeMetrics.commandBarHeight) * 0.5)
+    }
+
+    @ViewBuilder
+    private var titlebarRoofOverlay: some View {
+        let sidebarWidth = appState.sidebarVisible ? resolvedListsSidebarWidth : 0
+        let inspectorWidth = visibleInspectorWidth
+
+        ZStack(alignment: .topLeading) {
+            if sidebarWidth > 0 {
+                SidebarPaneBackground()
+                    .frame(width: sidebarWidth, height: titlebarBandHeight)
+                    .overlay(alignment: .trailing) {
+                        Rectangle()
+                            .fill(Color.primary.opacity(0.065))
+                            .frame(width: 0.5)
+                    }
+                    .ignoresSafeArea(.container, edges: .top)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+
+                SidebarTitlebarAccessory()
+                    .environment(appState)
+                    .frame(width: sidebarWidth, height: titlebarBandHeight, alignment: .trailing)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            }
+
+            if inspectorWidth > 0 {
+                PaneTitlebarCapBackground(flavor: .inspector)
+                    .frame(width: inspectorWidth, height: titlebarBandHeight)
+                    .overlay(alignment: .leading) {
+                        Rectangle()
+                            .fill(Color.primary.opacity(0.065))
+                            .frame(width: 0.5)
+                    }
+                    .ignoresSafeArea(.container, edges: .top)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+            }
+
+            MainWindowCommandBar()
+                .environment(appState)
+                .environment(\.modelContext, modelContext)
+                .frame(height: ColumnChromeMetrics.commandBarHeight)
+                .padding(.top, commandBarTopPadding)
+                .padding(.leading, sidebarWidth + 12)
+                .padding(.trailing, inspectorWidth + 12)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        }
+        .ignoresSafeArea(.container, edges: .top)
+        .zIndex(35)
     }
 
     private var chromeRevealTopPadding: CGFloat {
