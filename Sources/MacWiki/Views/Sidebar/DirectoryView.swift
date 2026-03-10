@@ -745,6 +745,10 @@ struct DirectoryView: View {
         directoryTitleBarHeight
     }
 
+    private var directoryCommandBarInsetHeight: CGFloat {
+        ColumnChromeMetrics.commandBarTopGap + ColumnChromeMetrics.commandBarHeight
+    }
+
     private var directoryList: some View {
         ZStack(alignment: .top) {
             Group {
@@ -755,13 +759,14 @@ struct DirectoryView: View {
                     // Push scroll content below the chrome overlay (or at least
                     // below the traffic-lights region when there is no chrome).
                     Color.clear.frame(height: shouldShowTopDirectoryChrome
-                        ? directoryTopChromeHeight
-                        : ColumnChromeMetrics.trafficLightsClearance)
+                        ? (directoryCommandBarInsetHeight + directoryTopChromeHeight)
+                        : (directoryCommandBarInsetHeight + ColumnChromeMetrics.trafficLightsClearance))
                 }
                 .scrollContentBackground(.hidden)
 
                 if shouldShowTopDirectoryChrome {
                     directoryTopChrome
+                        .padding(.top, directoryCommandBarInsetHeight)
                 }
 
                 if shouldShowRecentsEmptyStateOverlay {
@@ -776,8 +781,8 @@ struct DirectoryView: View {
                 SidebarTimeTravelSkeletonOverlay(
                     dateLabel: discoverTimeMachineLongDateLabel,
                     topInset: shouldShowTopDirectoryChrome
-                        ? directoryTopChromeHeight
-                        : ColumnChromeMetrics.trafficLightsClearance
+                        ? (directoryCommandBarInsetHeight + directoryTopChromeHeight)
+                        : (directoryCommandBarInsetHeight + ColumnChromeMetrics.trafficLightsClearance)
                 )
                 .transition(AppLoadingMotion.overlayTransition(reduceMotion: reduceMotion, anchor: .top))
                 .zIndex(1)
@@ -844,8 +849,8 @@ struct DirectoryView: View {
         VStack(spacing: 0) {
             Color.clear.frame(
                 height: shouldShowTopDirectoryChrome
-                    ? directoryTopChromeHeight
-                    : ColumnChromeMetrics.trafficLightsClearance
+                    ? (directoryCommandBarInsetHeight + directoryTopChromeHeight)
+                    : (directoryCommandBarInsetHeight + ColumnChromeMetrics.trafficLightsClearance)
             )
 
             ColumnEmptyStateView(
@@ -1339,25 +1344,11 @@ struct DirectoryView: View {
     }
 
     private func taggedArticleTitles(for tag: Tag) -> [String] {
-        var latestByTitle: [String: Date] = [:]
-
-        for highlight in highlights where highlight.tags.contains(where: { $0.id == tag.id }) {
-            let current = latestByTitle[highlight.articleTitle] ?? .distantPast
-            if highlight.createdAt > current {
-                latestByTitle[highlight.articleTitle] = highlight.createdAt
-            }
-        }
-
-        for state in articleStates where state.tags.contains(where: { $0.id == tag.id }) {
-            let current = latestByTitle[state.articleTitle] ?? .distantPast
-            if state.updatedAt > current {
-                latestByTitle[state.articleTitle] = state.updatedAt
-            }
-        }
-
-        return latestByTitle
-            .sorted { $0.value > $1.value }
-            .map(\.key)
+        TagArticlesSnapshot.titlesByRecency(
+            for: tag,
+            articleStates: articleStates,
+            highlights: highlights
+        )
     }
 
     private func taggedArticles(for tag: Tag) -> [Article] {

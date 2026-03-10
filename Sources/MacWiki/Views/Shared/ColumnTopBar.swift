@@ -2,6 +2,7 @@ import SwiftUI
 
 enum ColumnChromeMetrics {
     static let commandBarHeight: CGFloat = 44
+    static let commandBarTopGap: CGFloat = 6
     static let topBarHeight: CGFloat = 32
     /// Tiny downward optical nudge so grouped toolbar controls appear centered
     /// against the lane highlight/divider stack.
@@ -34,11 +35,13 @@ enum ColumnChromeMetrics {
     }
 
     /// Combined overlay height the reader content must clear when it underlaps
-    /// the titlebar band. The custom command bar now lives inside the titlebar
-    /// slice, so reader content only needs to clear the titlebar itself and
-    /// the reader-owned tab lane beneath it.
+    /// the titlebar band. The visible command bar lives on its own row beneath
+    /// the titlebar slice, and the tab lane sits beneath that.
     static func readerChromeOverlayHeight(windowTopObscuredHeight: CGFloat) -> CGFloat {
-        titlebarBandHeight(windowTopObscuredHeight: windowTopObscuredHeight) + topBarHeight
+        titlebarBandHeight(windowTopObscuredHeight: windowTopObscuredHeight) +
+        commandBarTopGap +
+        commandBarHeight +
+        topBarHeight
     }
 
     /// Suggested content inset that clears the reader-owned overlay chrome with comfortable breathing room.
@@ -347,6 +350,40 @@ struct SidebarPaneBackground: View {
             .overlay {
                 Color(nsColor: .controlBackgroundColor)
                     .opacity(colorScheme == .dark ? 0.11 : 0.070)
+            }
+    }
+}
+
+struct PaneTitlebarCapBackground: View {
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var accentTint: Color {
+        Color(nsColor: .controlAccentColor)
+    }
+
+    var body: some View {
+        Rectangle()
+            .fill(
+                Color(nsColor: colorScheme == .dark ? .underPageBackgroundColor : .controlBackgroundColor)
+            )
+            .overlay {
+                LinearGradient(
+                    colors: [
+                        accentTint.opacity(colorScheme == .dark ? 0.085 : 0.11),
+                        accentTint.opacity(colorScheme == .dark ? 0.040 : 0.050),
+                        Color.clear
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            }
+            .overlay {
+                Color(nsColor: .windowBackgroundColor)
+                    .opacity(colorScheme == .dark ? 0.08 : 0.035)
+            }
+            .overlay {
+                Color(nsColor: .controlBackgroundColor)
+                    .opacity(colorScheme == .dark ? 0.04 : 0.06)
             }
     }
 }

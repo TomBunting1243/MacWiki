@@ -78,7 +78,6 @@ struct ContentView: View {
         ZStack(alignment: .topLeading) {
             workspaceSharedBackground
             mainWindowContent
-            paneTitlebarCaps
             centerCommandBarOverlay
             sidebarWindowDragOverlay
             inspectorRevealOverlay
@@ -247,18 +246,9 @@ struct ContentView: View {
         return max(6, (topObscuredHeight - ChromeIconMetrics.buttonSize) * 0.5)
     }
 
-    private var commandBarTopPadding: CGFloat {
-        max(
-            6,
-            (ColumnChromeMetrics.titlebarBandHeight(
-                windowTopObscuredHeight: appState.windowTopObscuredHeight
-            ) - ColumnChromeMetrics.commandBarHeight) * 0.5
-        )
-    }
-
     private var commandBarLeadingPadding: CGFloat {
         appState.sidebarVisible
-            ? (resolvedListsSidebarWidth + resolvedDirectoryIdealWidth + 12)
+            ? (resolvedListsSidebarWidth + 12)
             : 12
     }
 
@@ -270,6 +260,10 @@ struct ContentView: View {
         ColumnChromeMetrics.titlebarBandHeight(
             windowTopObscuredHeight: appState.windowTopObscuredHeight
         )
+    }
+
+    private var commandBarBandHeight: CGFloat {
+        ColumnChromeMetrics.commandBarTopGap + ColumnChromeMetrics.commandBarHeight
     }
 
     private var sidebarDragHeight: CGFloat {
@@ -297,64 +291,25 @@ struct ContentView: View {
 
     @ViewBuilder
     private var centerCommandBarOverlay: some View {
-        MainWindowCommandBar()
-            .frame(height: ColumnChromeMetrics.commandBarHeight)
-            .padding(.top, commandBarTopPadding)
-            .padding(.leading, commandBarLeadingPadding)
-            .padding(.trailing, commandBarTrailingPadding)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .ignoresSafeArea(.container, edges: .top)
-            .allowsHitTesting(true)
-            .zIndex(35)
-    }
-
-    @ViewBuilder
-    private var paneTitlebarCaps: some View {
         ZStack(alignment: .topLeading) {
-            if appState.sidebarVisible {
-                sidebarTitlebarCap
-            }
+            ToolbarBandBackground()
+                .overlay(alignment: .bottom) {
+                    Rectangle()
+                        .fill(Color.primary.opacity(ColumnChromeMetrics.dividerOpacity(for: colorScheme)))
+                        .frame(height: 0.5)
+                }
 
-            if shouldPresentInspectorColumn {
-                inspectorTitlebarCap
-            }
+            MainWindowCommandBar()
+                .frame(height: ColumnChromeMetrics.commandBarHeight)
+                .padding(.top, ColumnChromeMetrics.commandBarTopGap)
         }
-        .allowsHitTesting(false)
-        .zIndex(20)
-    }
-
-    private var sidebarTitlebarCap: some View {
-        SidebarPaneBackground()
-            .frame(width: resolvedListsSidebarWidth, height: titlebarBandHeight)
-            .overlay(alignment: .bottom) {
-                Rectangle()
-                    .fill(Color.primary.opacity(ColumnChromeMetrics.dividerOpacity(for: colorScheme)))
-                    .frame(height: 0.5)
-            }
-            .overlay(alignment: .trailing) {
-                Rectangle()
-                    .fill(Color.primary.opacity(ColumnChromeMetrics.dividerOpacity(for: colorScheme)))
-                    .frame(width: 0.5)
-            }
-            .ignoresSafeArea(.container, edges: .top)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    }
-
-    private var inspectorTitlebarCap: some View {
-        SidebarPaneBackground()
-            .frame(width: resolvedInspectorIdealWidth, height: titlebarBandHeight)
-            .overlay(alignment: .bottom) {
-                Rectangle()
-                    .fill(Color.primary.opacity(ColumnChromeMetrics.dividerOpacity(for: colorScheme)))
-                    .frame(height: 0.5)
-            }
-            .overlay(alignment: .leading) {
-                Rectangle()
-                    .fill(Color.primary.opacity(ColumnChromeMetrics.dividerOpacity(for: colorScheme)))
-                    .frame(width: 0.5)
-            }
-            .ignoresSafeArea(.container, edges: .top)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+        .frame(height: commandBarBandHeight)
+        .padding(.top, ColumnChromeMetrics.commandBarTopGap)
+        .padding(.leading, commandBarLeadingPadding)
+        .padding(.trailing, commandBarTrailingPadding)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .allowsHitTesting(true)
+        .zIndex(35)
     }
 
     @ViewBuilder

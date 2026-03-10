@@ -2,13 +2,15 @@ import SwiftUI
 import SwiftData
 
 private enum WindowCommandBarMetrics {
-    static let height: CGFloat = 44
-    static let groupHeight: CGFloat = 34
-    static let buttonSize: CGFloat = 30
-    static let horizontalPadding: CGFloat = 12
-    static let groupInset: CGFloat = 4
+    static let horizontalPadding: CGFloat = 8
     static let clusterSpacing: CGFloat = 10
-    static let buttonSpacing: CGFloat = 1
+    static let groupHeight: CGFloat = 30
+    static let buttonSize: CGFloat = 26
+    static let groupInset: CGFloat = 3
+    static let buttonSpacing: CGFloat = 0
+    static let principalHorizontalPadding: CGFloat = 14
+    static let principalMinimumWidth: CGFloat = 132
+    static let principalMaximumWidth: CGFloat = 280
 }
 
 struct MainWindowCommandBar: View {
@@ -82,36 +84,36 @@ struct MainWindowCommandBar: View {
     private var leadingCluster: some View {
         commandCluster {
             iconButton(
+                title: appState.sidebarVisible ? "Hide Navigation Columns" : "Show Navigation Columns",
                 systemImage: "sidebar.leading",
-                help: appState.sidebarVisible ? "Hide Navigation Columns" : "Show Navigation Columns",
                 isDisabled: appState.isWikiHopNavigationLocked,
                 action: toggleSidebar
             )
 
             iconButton(
+                title: "Back",
                 systemImage: "chevron.left",
-                help: "Back",
                 isDisabled: currentTab?.canGoBack != true,
                 action: appState.goBack
             )
 
             iconButton(
+                title: "Forward",
                 systemImage: "chevron.right",
-                help: "Forward",
                 isDisabled: currentTab?.canGoForward != true,
                 action: appState.goForward
             )
 
             iconButton(
+                title: "Search Wikipedia",
                 systemImage: "magnifyingglass",
-                help: "Search Wikipedia",
                 isDisabled: appState.isWikiHopNavigationLocked || appState.isFocusModeEnabled,
                 action: startSearch
             )
 
             iconButton(
+                title: "Find in Page",
                 systemImage: "magnifyingglass.circle",
-                help: "Find in Page",
                 isDisabled: !hasArticle || appState.isFocusModeEnabled,
                 action: toggleFindOnPage
             )
@@ -126,8 +128,11 @@ struct MainWindowCommandBar: View {
                 .truncationMode(.tail)
                 .allowsTightening(true)
         }
-        .padding(.horizontal, 14)
-        .frame(minWidth: 118, maxWidth: 280)
+        .padding(.horizontal, WindowCommandBarMetrics.principalHorizontalPadding)
+        .frame(
+            minWidth: WindowCommandBarMetrics.principalMinimumWidth,
+            maxWidth: WindowCommandBarMetrics.principalMaximumWidth
+        )
         .frame(height: WindowCommandBarMetrics.groupHeight)
         .background {
             CommandBarPillBackground()
@@ -138,8 +143,8 @@ struct MainWindowCommandBar: View {
     private var trailingCluster: some View {
         commandCluster {
             iconButton(
+                title: "New Tab",
                 systemImage: "plus",
-                help: "New Tab",
                 isDisabled: appState.isWikiHopNavigationLocked,
                 action: appState.createNewTab
             )
@@ -147,8 +152,8 @@ struct MainWindowCommandBar: View {
             saveButton
 
             iconButton(
+                title: isRead ? "Mark as Unread" : "Mark as Read",
                 systemImage: isRead ? "checkmark.circle.fill" : "circle",
-                help: isRead ? "Mark as Unread" : "Mark as Read",
                 isDisabled: !hasArticle,
                 action: toggleRead
             )
@@ -160,8 +165,8 @@ struct MainWindowCommandBar: View {
             moreMenu
 
             iconButton(
+                title: appState.inspectorVisible ? "Hide Inspector" : "Show Inspector",
                 systemImage: "sidebar.trailing",
-                help: appState.inspectorVisible ? "Hide Inspector" : "Show Inspector",
                 isDisabled: appState.isFocusModeEnabled,
                 action: toggleInspector
             )
@@ -181,8 +186,8 @@ struct MainWindowCommandBar: View {
     }
 
     private func iconButton(
+        title: String,
         systemImage: String,
-        help: String,
         isDisabled: Bool = false,
         action: @escaping () -> Void
     ) -> some View {
@@ -191,18 +196,14 @@ struct MainWindowCommandBar: View {
         }
         .buttonStyle(.plain)
         .disabled(isDisabled)
-        .help(help)
+        .help(title)
     }
 
     private func commandBarIcon(systemImage: String) -> some View {
         Image(systemName: systemImage)
-            .font(.system(size: 15, weight: .regular))
-            .foregroundStyle(Color.primary.opacity(colorScheme == .dark ? 0.92 : 0.82))
+            .font(.system(size: 14, weight: .regular))
+            .foregroundStyle(Color.primary.opacity(colorScheme == .dark ? 0.90 : 0.80))
             .frame(width: WindowCommandBarMetrics.buttonSize, height: WindowCommandBarMetrics.buttonSize)
-            .background {
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(.clear)
-            }
             .contentShape(Rectangle())
     }
 
@@ -358,7 +359,7 @@ private struct CommandBarPillBackground: View {
     @Environment(\.colorScheme) private var colorScheme
 
     private var shape: some InsettableShape {
-        RoundedRectangle(cornerRadius: 12, style: .continuous)
+        RoundedRectangle(cornerRadius: 11, style: .continuous)
     }
 
     var body: some View {
@@ -369,18 +370,18 @@ private struct CommandBarPillBackground: View {
                 .glassEffect(.regular.interactive(false), in: shape)
                 .overlay {
                     Color(nsColor: .controlBackgroundColor)
-                        .opacity(colorScheme == .dark ? 0.18 : 0.16)
+                        .opacity(colorScheme == .dark ? 0.15 : 0.12)
                 }
                 .overlay {
                     shape
                         .strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.10 : 0.06), lineWidth: 0.5)
                 }
-                .shadow(color: .black.opacity(colorScheme == .dark ? 0.18 : 0.06), radius: 8, y: 1)
+                .shadow(color: .black.opacity(colorScheme == .dark ? 0.10 : 0.025), radius: 3, y: 0.5)
         } else {
             shape
                 .fill(
                     Color(nsColor: .controlBackgroundColor)
-                        .opacity(colorScheme == .dark ? 0.82 : 0.88)
+                        .opacity(colorScheme == .dark ? 0.84 : 0.92)
                 )
                 .background {
                     shape
@@ -394,7 +395,7 @@ private struct CommandBarPillBackground: View {
                     shape
                         .strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.12 : 0.08), lineWidth: 0.55)
                 }
-                .shadow(color: .black.opacity(colorScheme == .dark ? 0.16 : 0.05), radius: 8, y: 1)
+                .shadow(color: .black.opacity(colorScheme == .dark ? 0.09 : 0.02), radius: 3, y: 0.5)
         }
     }
 }

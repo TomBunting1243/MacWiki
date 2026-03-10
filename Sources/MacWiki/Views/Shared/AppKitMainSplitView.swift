@@ -146,6 +146,8 @@ final class MainWindowSplitViewController: NSSplitViewController {
     private lazy var inspectorWidthConstraint = inspectorHostingController.view.widthAnchor.constraint(equalToConstant: 240)
 
     private var currentConfiguration: Configuration?
+    private let sidebarTitlebarFillView = PassthroughHostingView(rootView: AnyView(EmptyView()))
+    private let inspectorTitlebarFillView = PassthroughHostingView(rootView: AnyView(EmptyView()))
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -285,6 +287,8 @@ final class MainWindowSplitViewController: NSSplitViewController {
         window.titleVisibility = .hidden
         window.toolbarStyle = .automatic
 
+        configureTitlebarSectionBackgrounds(in: window)
+
         guard let toolbar = window.toolbar else { return }
 
         synchronizeTrackingSeparator(
@@ -357,5 +361,83 @@ final class MainWindowSplitViewController: NSSplitViewController {
 
         trackingItem.splitView = splitView
         trackingItem.dividerIndex = dividerIndex
+    }
+
+    private func configureTitlebarSectionBackgrounds(in window: NSWindow) {
+        guard let titlebarContainerView = window.standardWindowButton(.closeButton)?.superview else { return }
+
+        installTitlebarFillView(sidebarTitlebarFillView, in: titlebarContainerView)
+        installTitlebarFillView(inspectorTitlebarFillView, in: titlebarContainerView)
+
+        let titlebarHeight = titlebarContainerView.bounds.height
+        let titlebarWidth = titlebarContainerView.bounds.width
+        let sidebarWidth = sidebarItem.isCollapsed ? 0 : listsHostingController.view.frame.width
+        let inspectorWidth = inspectorItem.isCollapsed ? 0 : inspectorHostingController.view.frame.width
+
+        sidebarTitlebarFillView.rootView = AnyView(
+            TitlebarSectionFill(edge: .leading)
+        )
+        sidebarTitlebarFillView.frame = NSRect(x: 0, y: 0, width: sidebarWidth, height: titlebarHeight)
+        sidebarTitlebarFillView.isHidden = sidebarWidth <= 0
+
+        inspectorTitlebarFillView.rootView = AnyView(
+            TitlebarSectionFill(edge: .trailing)
+        )
+        inspectorTitlebarFillView.frame = NSRect(
+            x: max(0, titlebarWidth - inspectorWidth),
+            y: 0,
+            width: inspectorWidth,
+            height: titlebarHeight
+        )
+        inspectorTitlebarFillView.isHidden = inspectorWidth <= 0
+    }
+
+    private func installTitlebarFillView(_ fillView: NSView, in containerView: NSView) {
+        guard fillView.superview !== containerView else { return }
+        if let anchorView = containerView.subviews.first {
+            containerView.addSubview(fillView, positioned: .below, relativeTo: anchorView)
+        } else {
+            containerView.addSubview(fillView)
+        }
+    }
+}
+
+private final class PassthroughHostingView<Content: View>: NSHostingView<Content> {
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        nil
+    }
+}
+
+private struct TitlebarSectionFill: View {
+    enum Edge {
+        case leading
+        case trailing
+    }
+
+    let edge: Edge
+
+    var body: some View {
+        PaneTitlebarCapBackground()
+            .overlay(alignment: .bottom) {
+                dividerLine(axis: .horizontal)
+            }
+            .overlay(alignment: edge == .leading ? .trailing : .leading) {
+                dividerLine(axis: .vertical)
+            }
+        .allowsHitTesting(false)
+    }
+
+    @ViewBuilder
+    private func dividerLine(axis: Axis) -> some View {
+        switch axis {
+        case .horizontal:
+            Rectangle()
+                .fill(Color.primary.opacity(0.065))
+                .frame(height: 0.5)
+        case .vertical:
+            Rectangle()
+                .fill(Color.primary.opacity(0.065))
+                .frame(width: 0.5)
+        }
     }
 }
