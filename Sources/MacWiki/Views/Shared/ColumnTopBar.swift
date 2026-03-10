@@ -35,12 +35,11 @@ enum ColumnChromeMetrics {
     }
 
     /// Combined overlay height the reader content must clear when it underlaps
-    /// the titlebar band. The visible command bar lives on its own row beneath
-    /// the titlebar slice, and the tab lane sits beneath that.
+    /// the titlebar band. The visible command bar now lives inside the titlebar
+    /// slice itself, so the reader only needs to clear that band plus its own
+    /// tab lane.
     static func readerChromeOverlayHeight(windowTopObscuredHeight: CGFloat) -> CGFloat {
         titlebarBandHeight(windowTopObscuredHeight: windowTopObscuredHeight) +
-        commandBarTopGap +
-        commandBarHeight +
         topBarHeight
     }
 

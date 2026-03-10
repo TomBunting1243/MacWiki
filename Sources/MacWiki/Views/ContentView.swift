@@ -13,9 +13,10 @@ struct ContentView: View {
     }
 
     @Environment(AppState.self) private var appState
+    @Environment(\.modelContext) private var modelContext
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @AppStorage(MacWikiGlassRuntime.forceLegacyFallbackKey) private var forceLegacyGlassFallback = false
+    @Environment(\.openURL) private var openURL
     @State private var selectedList: ReadingList?
     @State private var selectedLabel: Label?
     @State private var selectedTag: Tag?
@@ -62,10 +63,6 @@ struct ContentView: View {
         CGFloat(min(max(listsSidebarWidth, 176), 260))
     }
 
-    private var shouldPresentInspectorColumn: Bool {
-        !appState.isFocusModeEnabled && appState.inspectorVisible
-    }
-
     private var resolvedDirectoryIdealWidth: CGFloat {
         CGFloat(min(max(directoryColumnWidth, 212), 360))
     }
@@ -78,7 +75,6 @@ struct ContentView: View {
         ZStack(alignment: .topLeading) {
             workspaceSharedBackground
             mainWindowContent
-            centerCommandBarOverlay
             sidebarWindowDragOverlay
             inspectorRevealOverlay
             wikiHopOverlay
@@ -169,6 +165,12 @@ struct ContentView: View {
             directoryIdealWidth: resolvedDirectoryIdealWidth,
             inspectorIdealWidth: resolvedInspectorIdealWidth,
             tabBarLiquidGlass: tabBarLiquidGlass,
+            commandBarRootView: AnyView(
+                MainWindowCommandBar()
+                    .environment(appState)
+                    .environment(\.modelContext, modelContext)
+                    .environment(\.openURL, openURL)
+            ),
             onEditLabel: { label in editingLabel = label },
             onAddNewLabel: { showNewLabelSheet = true },
             onNewLabelWithArticle: { article in
@@ -246,26 +248,6 @@ struct ContentView: View {
         return max(6, (topObscuredHeight - ChromeIconMetrics.buttonSize) * 0.5)
     }
 
-    private var commandBarLeadingPadding: CGFloat {
-        appState.sidebarVisible
-            ? (resolvedListsSidebarWidth + 12)
-            : 12
-    }
-
-    private var commandBarTrailingPadding: CGFloat {
-        shouldPresentInspectorColumn ? resolvedInspectorIdealWidth + 12 : 12
-    }
-
-    private var titlebarBandHeight: CGFloat {
-        ColumnChromeMetrics.titlebarBandHeight(
-            windowTopObscuredHeight: appState.windowTopObscuredHeight
-        )
-    }
-
-    private var commandBarBandHeight: CGFloat {
-        ColumnChromeMetrics.commandBarTopGap + ColumnChromeMetrics.commandBarHeight
-    }
-
     private var sidebarDragHeight: CGFloat {
         max(
             appState.windowTopObscuredHeight + ColumnChromeMetrics.topBarHeight + 8,
@@ -287,29 +269,6 @@ struct ContentView: View {
                 .ignoresSafeArea(.container, edges: .top)
                 .zIndex(45)
         }
-    }
-
-    @ViewBuilder
-    private var centerCommandBarOverlay: some View {
-        ZStack(alignment: .topLeading) {
-            ToolbarBandBackground()
-                .overlay(alignment: .bottom) {
-                    Rectangle()
-                        .fill(Color.primary.opacity(ColumnChromeMetrics.dividerOpacity(for: colorScheme)))
-                        .frame(height: 0.5)
-                }
-
-            MainWindowCommandBar()
-                .frame(height: ColumnChromeMetrics.commandBarHeight)
-                .padding(.top, ColumnChromeMetrics.commandBarTopGap)
-        }
-        .frame(height: commandBarBandHeight)
-        .padding(.top, ColumnChromeMetrics.commandBarTopGap)
-        .padding(.leading, commandBarLeadingPadding)
-        .padding(.trailing, commandBarTrailingPadding)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .allowsHitTesting(true)
-        .zIndex(35)
     }
 
     @ViewBuilder

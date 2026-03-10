@@ -745,10 +745,6 @@ struct DirectoryView: View {
         directoryTitleBarHeight
     }
 
-    private var directoryCommandBarInsetHeight: CGFloat {
-        ColumnChromeMetrics.commandBarTopGap + ColumnChromeMetrics.commandBarHeight
-    }
-
     private var directoryList: some View {
         ZStack(alignment: .top) {
             Group {
@@ -759,14 +755,13 @@ struct DirectoryView: View {
                     // Push scroll content below the chrome overlay (or at least
                     // below the traffic-lights region when there is no chrome).
                     Color.clear.frame(height: shouldShowTopDirectoryChrome
-                        ? (directoryCommandBarInsetHeight + directoryTopChromeHeight)
-                        : (directoryCommandBarInsetHeight + ColumnChromeMetrics.trafficLightsClearance))
+                        ? directoryTopChromeHeight
+                        : ColumnChromeMetrics.trafficLightsClearance)
                 }
                 .scrollContentBackground(.hidden)
 
                 if shouldShowTopDirectoryChrome {
                     directoryTopChrome
-                        .padding(.top, directoryCommandBarInsetHeight)
                 }
 
                 if shouldShowRecentsEmptyStateOverlay {
@@ -781,8 +776,8 @@ struct DirectoryView: View {
                 SidebarTimeTravelSkeletonOverlay(
                     dateLabel: discoverTimeMachineLongDateLabel,
                     topInset: shouldShowTopDirectoryChrome
-                        ? (directoryCommandBarInsetHeight + directoryTopChromeHeight)
-                        : (directoryCommandBarInsetHeight + ColumnChromeMetrics.trafficLightsClearance)
+                        ? directoryTopChromeHeight
+                        : ColumnChromeMetrics.trafficLightsClearance
                 )
                 .transition(AppLoadingMotion.overlayTransition(reduceMotion: reduceMotion, anchor: .top))
                 .zIndex(1)
@@ -849,8 +844,8 @@ struct DirectoryView: View {
         VStack(spacing: 0) {
             Color.clear.frame(
                 height: shouldShowTopDirectoryChrome
-                    ? (directoryCommandBarInsetHeight + directoryTopChromeHeight)
-                    : (directoryCommandBarInsetHeight + ColumnChromeMetrics.trafficLightsClearance)
+                    ? directoryTopChromeHeight
+                    : ColumnChromeMetrics.trafficLightsClearance
             )
 
             ColumnEmptyStateView(

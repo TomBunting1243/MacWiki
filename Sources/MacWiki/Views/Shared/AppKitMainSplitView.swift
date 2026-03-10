@@ -18,6 +18,7 @@ struct AppKitMainSplitView: NSViewControllerRepresentable {
     let directoryIdealWidth: CGFloat
     let inspectorIdealWidth: CGFloat
     let tabBarLiquidGlass: Bool
+    let commandBarRootView: AnyView
     let onEditLabel: (Label) -> Void
     let onAddNewLabel: () -> Void
     let onNewLabelWithArticle: (SavedArticle) -> Void
@@ -77,6 +78,7 @@ struct AppKitMainSplitView: NSViewControllerRepresentable {
                 .environment(appState)
                 .environment(\.modelContext, modelContext)
             ),
+            commandBarRootView: commandBarRootView,
             navigationColumnsVisible: appState.sidebarVisible,
             inspectorVisible: appState.inspectorVisible && !appState.isFocusModeEnabled,
             listsSidebarWidth: listsSidebarWidth,
@@ -120,6 +122,7 @@ final class MainWindowSplitViewController: NSSplitViewController {
         let directoryRootView: AnyView
         let readerRootView: AnyView
         let inspectorRootView: AnyView
+        let commandBarRootView: AnyView
         let navigationColumnsVisible: Bool
         let inspectorVisible: Bool
         let listsSidebarWidth: CGFloat
@@ -148,6 +151,7 @@ final class MainWindowSplitViewController: NSSplitViewController {
     private var currentConfiguration: Configuration?
     private let sidebarTitlebarFillView = PassthroughHostingView(rootView: AnyView(EmptyView()))
     private let inspectorTitlebarFillView = PassthroughHostingView(rootView: AnyView(EmptyView()))
+    private let commandBarHostingView = NSHostingView(rootView: AnyView(EmptyView()))
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -368,11 +372,14 @@ final class MainWindowSplitViewController: NSSplitViewController {
 
         installTitlebarFillView(sidebarTitlebarFillView, in: titlebarContainerView)
         installTitlebarFillView(inspectorTitlebarFillView, in: titlebarContainerView)
+        installTitlebarFillView(commandBarHostingView, in: titlebarContainerView)
 
         let titlebarHeight = titlebarContainerView.bounds.height
         let titlebarWidth = titlebarContainerView.bounds.width
         let sidebarWidth = sidebarItem.isCollapsed ? 0 : listsHostingController.view.frame.width
         let inspectorWidth = inspectorItem.isCollapsed ? 0 : inspectorHostingController.view.frame.width
+        let centerX = sidebarWidth
+        let centerWidth = max(0, titlebarWidth - sidebarWidth - inspectorWidth)
 
         sidebarTitlebarFillView.rootView = AnyView(
             TitlebarSectionFill(edge: .leading)
@@ -390,6 +397,14 @@ final class MainWindowSplitViewController: NSSplitViewController {
             height: titlebarHeight
         )
         inspectorTitlebarFillView.isHidden = inspectorWidth <= 0
+
+        if let configuration = currentConfiguration {
+            commandBarHostingView.rootView = AnyView(
+                TitlebarCommandBarContainer(content: configuration.commandBarRootView)
+            )
+        }
+        commandBarHostingView.frame = NSRect(x: centerX, y: 0, width: centerWidth, height: titlebarHeight)
+        commandBarHostingView.isHidden = centerWidth <= 0
     }
 
     private func installTitlebarFillView(_ fillView: NSView, in containerView: NSView) {
@@ -398,6 +413,27 @@ final class MainWindowSplitViewController: NSSplitViewController {
             containerView.addSubview(fillView, positioned: .below, relativeTo: anchorView)
         } else {
             containerView.addSubview(fillView)
+        }
+    }
+}
+
+private struct TitlebarCommandBarContainer: View {
+    let content: AnyView
+
+    var body: some View {
+        ZStack(alignment: .topLeading) {
+            ToolbarBandBackground()
+                .overlay(alignment: .bottom) {
+                    Rectangle()
+                        .fill(Color.primary.opacity(ColumnChromeMetrics.dividerOpacity))
+                        .frame(height: 0.5)
+                }
+
+            content
+                .frame(height: ColumnChromeMetrics.commandBarHeight)
+                .padding(.top, ColumnChromeMetrics.commandBarTopGap)
+                .padding(.horizontal, 12)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
     }
 }

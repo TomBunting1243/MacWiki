@@ -43,12 +43,7 @@ struct ReaderColumnView: View {
         if shouldShowReaderTopChrome {
             topTabLaneContent
                 .frame(maxWidth: .infinity, alignment: .top)
-                .padding(
-                    .top,
-                    titlebarUnderlapHeight +
-                    ColumnChromeMetrics.commandBarTopGap +
-                    ColumnChromeMetrics.commandBarHeight
-                )
+                .padding(.top, titlebarUnderlapHeight)
         }
     }
 
