@@ -8,9 +8,9 @@ private enum WindowCommandBarMetrics {
     static let buttonSize: CGFloat = 28
     static let groupInset: CGFloat = 3
     static let buttonSpacing: CGFloat = 0
-    static let principalHorizontalPadding: CGFloat = 18
-    static let principalMinimumWidth: CGFloat = 148
-    static let principalMaximumWidth: CGFloat = 260
+    static let principalHorizontalPadding: CGFloat = 12
+    static let principalMinimumWidth: CGFloat = 120
+    static let principalMaximumWidth: CGFloat = 220
     static let pillCornerRadius: CGFloat = 11
 }
 
@@ -137,9 +137,6 @@ struct MainWindowCommandBar: View {
             maxWidth: WindowCommandBarMetrics.principalMaximumWidth
         )
         .frame(height: WindowCommandBarMetrics.groupHeight)
-        .background {
-            CommandBarPillBackground()
-        }
         .help(principalTitle)
     }
 
