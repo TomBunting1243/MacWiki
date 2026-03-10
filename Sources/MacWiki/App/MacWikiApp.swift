@@ -230,7 +230,6 @@ struct MacWikiApp: App {
         }
         .modelContainer(bootstrap.modelContainer)
         .restorationBehavior(.disabled)
-        .windowStyle(.hiddenTitleBar)
         .windowBackgroundDragBehavior(.enabled)
         .defaultSize(
             width: Self.launchWindowSize.width,
