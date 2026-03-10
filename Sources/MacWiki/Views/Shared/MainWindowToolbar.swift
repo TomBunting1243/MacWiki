@@ -17,7 +17,6 @@ struct MainWindowToolbar: CustomizableToolbarContent {
         static let browser = "browser"
         static let pageViews = "page-views"
         static let focus = "focus"
-        static let inspectorBoundary = "inspector-boundary"
         static let inspector = "inspector"
     }
 
@@ -142,39 +141,6 @@ struct MainWindowToolbar: CustomizableToolbarContent {
                 focusButton
             }
             .defaultCustomization(.hidden)
-
-            if #available(macOS 26, *) {
-                ToolbarItem(id: ItemID.inspectorBoundary, placement: .primaryAction) {
-                    Color.clear
-                        .frame(width: 1, height: 1)
-                        .allowsHitTesting(false)
-                        .accessibilityHidden(true)
-                }
-                .sharedBackgroundVisibility(.hidden)
-                .customizationBehavior(.disabled)
-            } else {
-                ToolbarItem(id: ItemID.inspectorBoundary, placement: .primaryAction) {
-                    Color.clear
-                        .frame(width: 1, height: 1)
-                        .allowsHitTesting(false)
-                        .accessibilityHidden(true)
-                }
-                .customizationBehavior(.disabled)
-            }
-
-            if appState.inspectorVisible && !appState.isFocusModeEnabled {
-                if #available(macOS 26, *) {
-                    ToolbarSpacer(.flexible, placement: .primaryAction)
-                } else {
-                    ToolbarItem(id: "inspector-reserve", placement: .primaryAction) {
-                        Color.clear
-                            .frame(width: 88, height: 1)
-                            .allowsHitTesting(false)
-                            .accessibilityHidden(true)
-                    }
-                    .customizationBehavior(.disabled)
-                }
-            }
 
             ToolbarItem(id: ItemID.inspector, placement: .primaryAction) {
                 inspectorButton
