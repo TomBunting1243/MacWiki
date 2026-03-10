@@ -354,6 +354,12 @@ struct SidebarPaneBackground: View {
 }
 
 struct PaneTitlebarCapBackground: View {
+    enum Flavor {
+        case sidebar
+        case inspector
+    }
+
+    let flavor: Flavor
     @Environment(\.colorScheme) private var colorScheme
 
     private var accentTint: Color {
@@ -368,8 +374,8 @@ struct PaneTitlebarCapBackground: View {
             .overlay {
                 LinearGradient(
                     colors: [
-                        accentTint.opacity(colorScheme == .dark ? 0.085 : 0.11),
-                        accentTint.opacity(colorScheme == .dark ? 0.040 : 0.050),
+                        accentTint.opacity(leadingAccentOpacity),
+                        accentTint.opacity(trailingAccentOpacity),
                         Color.clear
                     ],
                     startPoint: .topLeading,
@@ -378,12 +384,38 @@ struct PaneTitlebarCapBackground: View {
             }
             .overlay {
                 Color(nsColor: .windowBackgroundColor)
-                    .opacity(colorScheme == .dark ? 0.08 : 0.035)
+                    .opacity(colorScheme == .dark ? 0.072 : 0.026)
             }
             .overlay {
                 Color(nsColor: .controlBackgroundColor)
-                    .opacity(colorScheme == .dark ? 0.04 : 0.06)
+                    .opacity(colorScheme == .dark ? 0.028 : 0.045)
             }
+    }
+
+    private var leadingAccentOpacity: Double {
+        switch (flavor, colorScheme) {
+        case (.sidebar, .dark):
+            return 0.11
+        case (.sidebar, _):
+            return 0.16
+        case (.inspector, .dark):
+            return 0.055
+        case (.inspector, _):
+            return 0.075
+        }
+    }
+
+    private var trailingAccentOpacity: Double {
+        switch (flavor, colorScheme) {
+        case (.sidebar, .dark):
+            return 0.052
+        case (.sidebar, _):
+            return 0.072
+        case (.inspector, .dark):
+            return 0.026
+        case (.inspector, _):
+            return 0.034
+        }
     }
 }
 
