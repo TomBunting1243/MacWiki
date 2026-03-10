@@ -171,6 +171,10 @@ struct ContentView: View {
                     .environment(\.modelContext, modelContext)
                     .environment(\.openURL, openURL)
             ),
+            sidebarAccessoryRootView: AnyView(
+                SidebarTitlebarAccessory()
+                    .environment(appState)
+            ),
             onEditLabel: { label in editingLabel = label },
             onAddNewLabel: { showNewLabelSheet = true },
             onNewLabelWithArticle: { article in

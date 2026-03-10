@@ -19,6 +19,7 @@ struct AppKitMainSplitView: NSViewControllerRepresentable {
     let inspectorIdealWidth: CGFloat
     let tabBarLiquidGlass: Bool
     let commandBarRootView: AnyView
+    let sidebarAccessoryRootView: AnyView
     let onEditLabel: (Label) -> Void
     let onAddNewLabel: () -> Void
     let onNewLabelWithArticle: (SavedArticle) -> Void
@@ -79,6 +80,7 @@ struct AppKitMainSplitView: NSViewControllerRepresentable {
                 .environment(\.modelContext, modelContext)
             ),
             commandBarRootView: commandBarRootView,
+            sidebarAccessoryRootView: sidebarAccessoryRootView,
             navigationColumnsVisible: appState.sidebarVisible,
             inspectorVisible: appState.inspectorVisible && !appState.isFocusModeEnabled,
             listsSidebarWidth: listsSidebarWidth,
@@ -123,6 +125,7 @@ final class MainWindowSplitViewController: NSSplitViewController {
         let readerRootView: AnyView
         let inspectorRootView: AnyView
         let commandBarRootView: AnyView
+        let sidebarAccessoryRootView: AnyView
         let navigationColumnsVisible: Bool
         let inspectorVisible: Bool
         let listsSidebarWidth: CGFloat
@@ -152,6 +155,7 @@ final class MainWindowSplitViewController: NSSplitViewController {
     private let sidebarTitlebarFillView = PassthroughHostingView(rootView: AnyView(EmptyView()))
     private let inspectorTitlebarFillView = PassthroughHostingView(rootView: AnyView(EmptyView()))
     private let commandBarHostingView = NSHostingView(rootView: AnyView(EmptyView()))
+    private let sidebarAccessoryHostingView = NSHostingView(rootView: AnyView(EmptyView()))
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -373,6 +377,7 @@ final class MainWindowSplitViewController: NSSplitViewController {
         installTitlebarFillView(sidebarTitlebarFillView, in: titlebarContainerView)
         installTitlebarFillView(inspectorTitlebarFillView, in: titlebarContainerView)
         installTitlebarFillView(commandBarHostingView, in: titlebarContainerView)
+        installTitlebarFillView(sidebarAccessoryHostingView, in: titlebarContainerView)
 
         let titlebarHeight = titlebarContainerView.bounds.height
         let titlebarWidth = titlebarContainerView.bounds.width
@@ -386,6 +391,18 @@ final class MainWindowSplitViewController: NSSplitViewController {
         )
         sidebarTitlebarFillView.frame = NSRect(x: 0, y: 0, width: sidebarWidth, height: titlebarHeight)
         sidebarTitlebarFillView.isHidden = sidebarWidth <= 0
+
+        if let configuration = currentConfiguration {
+            sidebarAccessoryHostingView.rootView = configuration.sidebarAccessoryRootView
+        }
+        let sidebarAccessoryWidth: CGFloat = 42
+        sidebarAccessoryHostingView.frame = NSRect(
+            x: max(0, sidebarWidth - sidebarAccessoryWidth - 8),
+            y: 0,
+            width: sidebarAccessoryWidth,
+            height: titlebarHeight
+        )
+        sidebarAccessoryHostingView.isHidden = sidebarWidth <= 0
 
         inspectorTitlebarFillView.rootView = AnyView(
             TitlebarSectionFill(edge: .trailing)
@@ -438,6 +455,31 @@ private struct TitlebarCommandBarContainer: View {
     }
 }
 
+struct SidebarTitlebarAccessory: View {
+    @Environment(AppState.self) private var appState
+
+    var body: some View {
+        Button {
+            withAnimation(ColumnMotion.sidebarVisibility) {
+                appState.sidebarVisible = false
+            }
+        } label: {
+            Image(systemName: "sidebar.leading")
+                .font(.system(size: 13, weight: .regular))
+                .symbolRenderingMode(.hierarchical)
+                .foregroundStyle(Color.primary.opacity(0.78))
+                .frame(width: 28, height: 28)
+                .background {
+                    RoundedRectangle(cornerRadius: 9, style: .continuous)
+                        .fill(.clear)
+                }
+        }
+        .buttonStyle(.plain)
+        .help("Hide Navigation Columns")
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+    }
+}
+
 private final class PassthroughHostingView<Content: View>: NSHostingView<Content> {
     override func hitTest(_ point: NSPoint) -> NSView? {
         nil
@@ -453,7 +495,7 @@ private struct TitlebarSectionFill: View {
     let edge: Edge
 
     var body: some View {
-        PaneTitlebarCapBackground()
+        SidebarPaneBackground()
             .overlay(alignment: .bottom) {
                 dividerLine(axis: .horizontal)
             }

@@ -84,12 +84,14 @@ struct MainWindowCommandBar: View {
 
     private var leadingCluster: some View {
         commandCluster {
-            iconButton(
-                title: appState.sidebarVisible ? "Hide Navigation Columns" : "Show Navigation Columns",
-                systemImage: "sidebar.leading",
-                isDisabled: appState.isWikiHopNavigationLocked,
-                action: toggleSidebar
-            )
+            if !appState.sidebarVisible {
+                iconButton(
+                    title: "Show Navigation Columns",
+                    systemImage: "sidebar.leading",
+                    isDisabled: appState.isWikiHopNavigationLocked,
+                    action: toggleSidebar
+                )
+            }
 
             iconButton(
                 title: "Back",
