@@ -426,7 +426,13 @@ final class MainWindowSplitViewController: NSSplitViewController {
 
     private func installTitlebarFillView(_ fillView: NSView, in containerView: NSView) {
         guard fillView.superview !== containerView else { return }
-        if let anchorView = containerView.subviews.first {
+        let titlebarBackgroundView = containerView.subviews.first {
+            String(describing: type(of: $0)) == "NSTitlebarBackgroundView"
+        }
+
+        if let titlebarBackgroundView {
+            containerView.addSubview(fillView, positioned: .above, relativeTo: titlebarBackgroundView)
+        } else if let anchorView = containerView.subviews.first {
             containerView.addSubview(fillView, positioned: .below, relativeTo: anchorView)
         } else {
             containerView.addSubview(fillView)

@@ -4,8 +4,8 @@ import SwiftData
 private enum WindowCommandBarMetrics {
     static let horizontalPadding: CGFloat = 6
     static let clusterSpacing: CGFloat = 8
-    static let groupHeight: CGFloat = 28
-    static let buttonSize: CGFloat = 24
+    static let groupHeight: CGFloat = 30
+    static let buttonSize: CGFloat = 26
     static let groupInset: CGFloat = 2
     static let buttonSpacing: CGFloat = 1
     static let principalHorizontalPadding: CGFloat = 16
@@ -204,7 +204,7 @@ struct MainWindowCommandBar: View {
 
     private func commandBarIcon(systemImage: String) -> some View {
         Image(systemName: systemImage)
-            .font(.system(size: 13, weight: .regular))
+            .font(.system(size: 14, weight: .regular))
             .symbolRenderingMode(.hierarchical)
             .foregroundStyle(Color.primary.opacity(colorScheme == .dark ? 0.82 : 0.72))
             .frame(width: WindowCommandBarMetrics.buttonSize, height: WindowCommandBarMetrics.buttonSize)
