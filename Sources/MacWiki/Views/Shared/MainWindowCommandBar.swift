@@ -2,15 +2,16 @@ import SwiftUI
 import SwiftData
 
 private enum WindowCommandBarMetrics {
-    static let horizontalPadding: CGFloat = 8
-    static let clusterSpacing: CGFloat = 10
-    static let groupHeight: CGFloat = 30
-    static let buttonSize: CGFloat = 26
-    static let groupInset: CGFloat = 3
-    static let buttonSpacing: CGFloat = 0
-    static let principalHorizontalPadding: CGFloat = 14
+    static let horizontalPadding: CGFloat = 6
+    static let clusterSpacing: CGFloat = 8
+    static let groupHeight: CGFloat = 28
+    static let buttonSize: CGFloat = 24
+    static let groupInset: CGFloat = 2
+    static let buttonSpacing: CGFloat = 1
+    static let principalHorizontalPadding: CGFloat = 16
     static let principalMinimumWidth: CGFloat = 132
-    static let principalMaximumWidth: CGFloat = 280
+    static let principalMaximumWidth: CGFloat = 248
+    static let pillCornerRadius: CGFloat = 10
 }
 
 struct MainWindowCommandBar: View {
@@ -123,7 +124,7 @@ struct MainWindowCommandBar: View {
     private var principalCluster: some View {
         HStack(spacing: 8) {
             Text(principalTitle)
-                .font(.system(size: 15, weight: .semibold))
+                .font(.system(size: 14, weight: .semibold))
                 .lineLimit(1)
                 .truncationMode(.tail)
                 .allowsTightening(true)
@@ -201,8 +202,9 @@ struct MainWindowCommandBar: View {
 
     private func commandBarIcon(systemImage: String) -> some View {
         Image(systemName: systemImage)
-            .font(.system(size: 14, weight: .regular))
-            .foregroundStyle(Color.primary.opacity(colorScheme == .dark ? 0.90 : 0.80))
+            .font(.system(size: 13, weight: .regular))
+            .symbolRenderingMode(.hierarchical)
+            .foregroundStyle(Color.primary.opacity(colorScheme == .dark ? 0.82 : 0.72))
             .frame(width: WindowCommandBarMetrics.buttonSize, height: WindowCommandBarMetrics.buttonSize)
             .contentShape(Rectangle())
     }
@@ -359,7 +361,7 @@ private struct CommandBarPillBackground: View {
     @Environment(\.colorScheme) private var colorScheme
 
     private var shape: some InsettableShape {
-        RoundedRectangle(cornerRadius: 11, style: .continuous)
+        RoundedRectangle(cornerRadius: WindowCommandBarMetrics.pillCornerRadius, style: .continuous)
     }
 
     var body: some View {
@@ -370,18 +372,17 @@ private struct CommandBarPillBackground: View {
                 .glassEffect(.regular.interactive(false), in: shape)
                 .overlay {
                     Color(nsColor: .controlBackgroundColor)
-                        .opacity(colorScheme == .dark ? 0.15 : 0.12)
+                        .opacity(colorScheme == .dark ? 0.10 : 0.07)
                 }
                 .overlay {
                     shape
-                        .strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.10 : 0.06), lineWidth: 0.5)
+                        .strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.08 : 0.045), lineWidth: 0.5)
                 }
-                .shadow(color: .black.opacity(colorScheme == .dark ? 0.10 : 0.025), radius: 3, y: 0.5)
         } else {
             shape
                 .fill(
                     Color(nsColor: .controlBackgroundColor)
-                        .opacity(colorScheme == .dark ? 0.84 : 0.92)
+                        .opacity(colorScheme == .dark ? 0.80 : 0.90)
                 )
                 .background {
                     shape
@@ -389,13 +390,12 @@ private struct CommandBarPillBackground: View {
                 }
                 .overlay {
                     Color(nsColor: .windowBackgroundColor)
-                        .opacity(colorScheme == .dark ? 0.10 : 0.03)
+                        .opacity(colorScheme == .dark ? 0.08 : 0.025)
                 }
                 .overlay {
                     shape
-                        .strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.12 : 0.08), lineWidth: 0.55)
+                        .strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.09 : 0.055), lineWidth: 0.5)
                 }
-                .shadow(color: .black.opacity(colorScheme == .dark ? 0.09 : 0.02), radius: 3, y: 0.5)
         }
     }
 }
