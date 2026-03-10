@@ -495,7 +495,13 @@ private struct TitlebarSectionFill: View {
     let edge: Edge
 
     var body: some View {
-        PaneTitlebarCapBackground(flavor: edge == .leading ? .sidebar : .inspector)
+        Group {
+            if edge == .leading {
+                SidebarPaneBackground()
+            } else {
+                PaneTitlebarCapBackground(flavor: .inspector)
+            }
+        }
             .overlay(alignment: edge == .leading ? .trailing : .leading) {
                 dividerLine(axis: .vertical)
             }
