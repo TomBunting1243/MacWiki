@@ -106,6 +106,15 @@ struct MacWikiApp: App {
         let defaults = UserDefaults.standard
         let entries = defaults.dictionaryRepresentation()
         let visibleFrames = NSScreen.screens.map(\.visibleFrame)
+        let shellLayoutMigrationKey = "mainWindow.shellLayoutVersion"
+        let currentShellLayoutVersion = 1
+
+        if defaults.integer(forKey: shellLayoutMigrationKey) < currentShellLayoutVersion {
+            defaults.removeObject(forKey: "mainWindow.sidebarWidth")
+            defaults.removeObject(forKey: "mainWindow.directoryWidth")
+            defaults.removeObject(forKey: "mainWindow.inspectorWidth")
+            defaults.set(currentShellLayoutVersion, forKey: shellLayoutMigrationKey)
+        }
 
         for (key, value) in entries {
             if key.hasPrefix("NSWindow Frame SwiftUI."),
@@ -122,6 +131,27 @@ struct MacWikiApp: App {
                 // Removing split autosave avoids stale frame inflation across launches.
                 defaults.removeObject(forKey: key)
             }
+        }
+
+        sanitizePersistedSplitWidth(defaults, key: "mainWindow.sidebarWidth", minimum: 180, maximum: 240)
+        sanitizePersistedSplitWidth(defaults, key: "mainWindow.directoryWidth", minimum: 260, maximum: 420)
+        sanitizePersistedSplitWidth(defaults, key: "mainWindow.inspectorWidth", minimum: 260, maximum: 340)
+    }
+
+    private static func sanitizePersistedSplitWidth(
+        _ defaults: UserDefaults,
+        key: String,
+        minimum: Double,
+        maximum: Double
+    ) {
+        guard let storedValue = defaults.object(forKey: key) as? Double else { return }
+        guard storedValue.isFinite else {
+            defaults.removeObject(forKey: key)
+            return
+        }
+
+        if storedValue < minimum || storedValue > maximum {
+            defaults.removeObject(forKey: key)
         }
     }
 
@@ -207,7 +237,8 @@ struct MacWikiApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
-                .environment(appState)
+                .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
+                .toolbar(removing: .title)
                 .alert(item: $launchIssue) { issue in
                     Alert(
                         title: Text(issue.title),
@@ -227,6 +258,7 @@ struct MacWikiApp: App {
                         appState.flushSaveNow()
                     }
                 }
+                .environment(appState)
         }
         .modelContainer(bootstrap.modelContainer)
         .restorationBehavior(.disabled)

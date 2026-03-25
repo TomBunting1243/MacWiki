@@ -1,16 +1,12 @@
 import SwiftUI
+import AppKit
 
 enum ColumnChromeMetrics {
-    static let commandBarHeight: CGFloat = 44
-    static let commandBarTopGap: CGFloat = 6
+    static let titlebarBandHeight: CGFloat = 52
     static let topBarHeight: CGFloat = 32
     /// Tiny downward optical nudge so grouped toolbar controls appear centered
     /// against the lane highlight/divider stack.
     static let readerToolbarOpticalYOffset: CGFloat = 0.6
-    /// Minimum blank space to clear the traffic-light buttons (used by sidebar).
-    static let trafficLightsClearance: CGFloat = 38
-    /// Minimum title-bar height when content (text) sits below traffic lights.
-    static let titleBarClearance: CGFloat = 52
     static let horizontalPadding: CGFloat = 9
     static let dividerOpacity: CGFloat = 0.065
     static let internalDividerOpacity: CGFloat = 0.035
@@ -26,29 +22,21 @@ enum ColumnChromeMetrics {
         colorScheme == .dark ? darkDividerOpacity : dividerOpacity
     }
 
-    static func titlebarBandHeight(windowTopObscuredHeight: CGFloat) -> CGFloat {
-        max(windowTopObscuredHeight, titleBarClearance)
-    }
-
     static func internalDividerOpacity(for colorScheme: ColorScheme) -> CGFloat {
         colorScheme == .dark ? darkInternalDividerOpacity : internalDividerOpacity
     }
 
     /// Combined overlay height the reader content must clear when it underlaps
-    /// the titlebar band. The visible command bar now lives inside the titlebar
-    /// slice itself, so the reader only needs to clear that band plus its own
-    /// tab lane.
-    static func readerChromeOverlayHeight(windowTopObscuredHeight: CGFloat) -> CGFloat {
-        titlebarBandHeight(windowTopObscuredHeight: windowTopObscuredHeight) +
-        topBarHeight
+    /// the top tab lane and the unified titlebar band above it.
+    static func readerChromeOverlayHeight() -> CGFloat {
+        titlebarBandHeight + topBarHeight
     }
 
     /// Suggested content inset that clears the reader-owned overlay chrome with comfortable breathing room.
     static func readerContentTopInset(
-        windowTopObscuredHeight: CGFloat,
         additionalSpacing: CGFloat = 12
     ) -> CGFloat {
-        readerChromeOverlayHeight(windowTopObscuredHeight: windowTopObscuredHeight) + additionalSpacing
+        readerChromeOverlayHeight() + additionalSpacing
     }
 }
 
@@ -253,129 +241,270 @@ enum TopChromeMotion {
     }
 }
 
-struct ColumnChromeBackground: View {
-    @AppStorage(MacWikiGlassRuntime.forceLegacyFallbackKey) private var forceLegacyGlassFallback = false
-    @Environment(\.colorScheme) private var colorScheme
+private struct WindowMaterialBackground: NSViewRepresentable {
+    let material: NSVisualEffectView.Material
+    var blendingMode: NSVisualEffectView.BlendingMode = .withinWindow
 
-    var body: some View {
-        if #available(macOS 26, *),
-           MacWikiGlassRuntime.usesNativeGlass(forceLegacyFallback: forceLegacyGlassFallback) {
-            Rectangle()
-                .fill(.clear)
-                .glassEffect(.regular, in: .rect)
-                .overlay {
-                    Color(nsColor: .windowBackgroundColor)
-                        .opacity(colorScheme == .dark ? 0.082 : 0.050)
-                }
-                .overlay {
-                    Color(nsColor: .controlBackgroundColor)
-                        .opacity(colorScheme == .dark ? 0.028 : 0.016)
-                }
-        } else {
-            fallbackBackground
-        }
+    func makeNSView(context: Context) -> NSVisualEffectView {
+        let view = NSVisualEffectView()
+        view.material = material
+        view.blendingMode = blendingMode
+        view.state = .active
+        view.isEmphasized = false
+        return view
     }
 
-    private var fallbackBackground: some View {
-        return Rectangle()
-            .fill(.thinMaterial)
-            .overlay {
-                Color(nsColor: .windowBackgroundColor)
-                    .opacity(colorScheme == .dark ? 0.12 : 0.075)
+    func updateNSView(_ view: NSVisualEffectView, context: Context) {
+        view.material = material
+        view.blendingMode = blendingMode
+        view.state = .active
+        view.isEmphasized = false
+    }
+}
+
+private struct AppKitGlassBackground: NSViewRepresentable {
+    let cornerRadius: CGFloat
+
+    func makeNSView(context: Context) -> HostView {
+        let view = HostView()
+        view.configure(cornerRadius: cornerRadius)
+        return view
+    }
+
+    func updateNSView(_ view: HostView, context: Context) {
+        view.configure(cornerRadius: cornerRadius)
+    }
+
+    @MainActor
+    final class HostView: NSView {
+        private var hostedEffectView: NSView?
+
+        func configure(cornerRadius: CGFloat) {
+            let effectView = resolvedEffectView()
+            if effectView.superview !== self {
+                hostedEffectView?.removeFromSuperview()
+                effectView.frame = bounds
+                effectView.autoresizingMask = [.width, .height]
+                addSubview(effectView)
+                hostedEffectView = effectView
             }
-            .overlay {
-                Color(nsColor: .controlBackgroundColor)
-                    .opacity(colorScheme == .dark ? 0.06 : 0.035)
+
+            if #available(macOS 26, *),
+               let glassView = effectView as? NSGlassEffectView {
+                glassView.cornerRadius = cornerRadius
+                glassView.style = .regular
+                glassView.tintColor = nil
+            } else if let visualEffectView = effectView as? NSVisualEffectView {
+                visualEffectView.material = .sidebar
+                visualEffectView.blendingMode = .withinWindow
+                visualEffectView.state = .active
+                visualEffectView.isEmphasized = false
             }
+        }
+
+        override func layout() {
+            super.layout()
+            hostedEffectView?.frame = bounds
+        }
+
+        private func resolvedEffectView() -> NSView {
+            if #available(macOS 26, *),
+               let glassView = hostedEffectView as? NSGlassEffectView {
+                return glassView
+            }
+
+            if let visualEffectView = hostedEffectView as? NSVisualEffectView {
+                return visualEffectView
+            }
+
+            if #available(macOS 26, *) {
+                let glassView = NSGlassEffectView(frame: bounds)
+                glassView.contentView = NSView(frame: bounds)
+                glassView.contentView?.wantsLayer = true
+                glassView.contentView?.layer?.backgroundColor = NSColor.clear.cgColor
+                return glassView
+            }
+
+            let visualEffectView = NSVisualEffectView(frame: bounds)
+            return visualEffectView
+        }
+    }
+}
+
+struct CornerAdaptedInsetsReader: NSViewRepresentable {
+    let onChange: (EdgeInsets) -> Void
+
+    func makeNSView(context: Context) -> ObserverView {
+        let view = ObserverView()
+        view.onChange = onChange
+        return view
+    }
+
+    func updateNSView(_ view: ObserverView, context: Context) {
+        view.onChange = onChange
+        view.reportInsetsIfNeeded()
+    }
+
+    @MainActor
+    final class ObserverView: NSView {
+        var onChange: ((EdgeInsets) -> Void)?
+        private var lastReportedInsets = EdgeInsets()
+        private var hasReportedInsets = false
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            reportInsetsIfNeeded()
+        }
+
+        override func layout() {
+            super.layout()
+            reportInsetsIfNeeded()
+        }
+
+        func reportInsetsIfNeeded() {
+            let resolvedInsets = resolvedCornerInsets()
+            guard !hasReportedInsets || !edgeInsetsEqual(lastReportedInsets, resolvedInsets) else {
+                return
+            }
+
+            hasReportedInsets = true
+            lastReportedInsets = resolvedInsets
+
+            DispatchQueue.main.async { [resolvedInsets, onChange] in
+                onChange?(resolvedInsets)
+            }
+        }
+
+        private func resolvedCornerInsets() -> EdgeInsets {
+            let fallbackInsets: NSEdgeInsets
+            if #available(macOS 26, *) {
+                fallbackInsets = edgeInsets(for: .margins(cornerAdaptation: .horizontal))
+            } else {
+                fallbackInsets = safeAreaInsets
+            }
+
+            if let trafficLightInsets = resolvedTrafficLightInsets() {
+                return EdgeInsets(
+                    top: trafficLightInsets.top,
+                    leading: trafficLightInsets.leading,
+                    bottom: fallbackInsets.bottom,
+                    trailing: fallbackInsets.right
+                )
+            }
+
+            return EdgeInsets(
+                top: fallbackInsets.top,
+                leading: fallbackInsets.left,
+                bottom: fallbackInsets.bottom,
+                trailing: fallbackInsets.right
+            )
+        }
+
+        private func resolvedTrafficLightInsets() -> EdgeInsets? {
+            guard let window else { return nil }
+
+            let buttons = [
+                NSWindow.ButtonType.closeButton,
+                .miniaturizeButton,
+                .zoomButton
+            ].compactMap { buttonType -> NSButton? in
+                guard let button = window.standardWindowButton(buttonType), !button.isHidden else {
+                    return nil
+                }
+                return button
+            }
+
+            guard !buttons.isEmpty else { return nil }
+
+            var unionRect: NSRect?
+            for button in buttons {
+                let buttonRect = convert(button.bounds, from: button)
+                unionRect = unionRect.map { $0.union(buttonRect) } ?? buttonRect
+            }
+
+            guard let unionRect else { return nil }
+
+            return EdgeInsets(
+                top: max(10, bounds.maxY - unionRect.minY + 8),
+                leading: max(10, unionRect.maxX + 12),
+                bottom: 0,
+                trailing: 0
+            )
+        }
+
+        private func edgeInsetsEqual(_ lhs: EdgeInsets, _ rhs: EdgeInsets) -> Bool {
+            abs(lhs.top - rhs.top) < 0.5 &&
+            abs(lhs.leading - rhs.leading) < 0.5 &&
+            abs(lhs.bottom - rhs.bottom) < 0.5 &&
+            abs(lhs.trailing - rhs.trailing) < 0.5
+        }
     }
 }
 
 struct SidebarPaneBackground: View {
+    var body: some View {
+        WindowMaterialBackground(material: .sidebar)
+    }
+}
+
+struct LeadingSidebarFloatingPaneBackground: View {
     @AppStorage(MacWikiGlassRuntime.forceLegacyFallbackKey) private var forceLegacyGlassFallback = false
     @Environment(\.colorScheme) private var colorScheme
 
-    private var accentTint: Color {
-        Color(nsColor: .controlAccentColor)
+    private enum Metrics {
+        static let cornerRadius: CGFloat = 24
+    }
+
+    private var panelShape: UnevenRoundedRectangle {
+        UnevenRoundedRectangle(
+            topLeadingRadius: Metrics.cornerRadius,
+            bottomLeadingRadius: Metrics.cornerRadius,
+            bottomTrailingRadius: Metrics.cornerRadius,
+            topTrailingRadius: Metrics.cornerRadius,
+            style: .continuous
+        )
     }
 
     var body: some View {
         if #available(macOS 26, *),
            MacWikiGlassRuntime.usesNativeGlass(forceLegacyFallback: forceLegacyGlassFallback) {
-            Rectangle()
-                .fill(.clear)
-                .glassEffect(.regular, in: .rect)
-                .overlay {
-                    LinearGradient(
-                        colors: [
-                            accentTint.opacity(colorScheme == .dark ? 0.072 : 0.055),
-                            accentTint.opacity(colorScheme == .dark ? 0.034 : 0.024),
-                            Color.clear
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                }
-                .overlay {
-                    Color(nsColor: .windowBackgroundColor)
-                        .opacity(colorScheme == .dark ? 0.11 : 0.075)
-                }
-                .overlay {
-                    Color(nsColor: .controlBackgroundColor)
-                        .opacity(colorScheme == .dark ? 0.046 : 0.032)
-                }
+            AppKitGlassBackground(cornerRadius: Metrics.cornerRadius)
         } else {
-            fallbackBackground
+            panelShape
+                .fill(.thinMaterial)
+                .overlay {
+                    panelShape
+                        .strokeBorder(
+                            Color.white.opacity(colorScheme == .dark ? 0.035 : 0.055),
+                            lineWidth: 0.6
+                        )
+                }
         }
-    }
-
-    private var fallbackBackground: some View {
-        return Rectangle()
-            .fill(.thinMaterial)
-            .overlay {
-                LinearGradient(
-                    colors: [
-                        accentTint.opacity(colorScheme == .dark ? 0.095 : 0.072),
-                        accentTint.opacity(colorScheme == .dark ? 0.045 : 0.030),
-                        Color.clear
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-            }
-            .overlay {
-                Color(nsColor: .windowBackgroundColor)
-                    .opacity(colorScheme == .dark ? 0.17 : 0.10)
-            }
-            .overlay {
-                Color(nsColor: .controlBackgroundColor)
-                    .opacity(colorScheme == .dark ? 0.11 : 0.070)
-            }
     }
 }
 
-struct PaneTitlebarCapBackground: View {
-    enum Flavor {
-        case sidebar
-        case inspector
-    }
-
-    let flavor: Flavor
+struct TitlebarSectionBackground: View {
     @Environment(\.colorScheme) private var colorScheme
-
     private var accentTint: Color {
         Color(nsColor: .controlAccentColor)
+    }
+
+    private var baseFill: Color {
+        Color(nsColor: colorScheme == .dark ? .underPageBackgroundColor : .controlBackgroundColor)
     }
 
     var body: some View {
         Rectangle()
-            .fill(
-                Color(nsColor: colorScheme == .dark ? .underPageBackgroundColor : .controlBackgroundColor)
-            )
+            .fill(baseFill)
+            .overlay {
+                Color(nsColor: .controlBackgroundColor)
+                    .opacity(colorScheme == .dark ? 0.34 : 0.28)
+            }
             .overlay {
                 LinearGradient(
                     colors: [
-                        accentTint.opacity(leadingAccentOpacity),
-                        accentTint.opacity(trailingAccentOpacity),
+                        accentTint.opacity(colorScheme == .dark ? 0.10 : 0.085),
+                        accentTint.opacity(colorScheme == .dark ? 0.045 : 0.036),
                         Color.clear
                     ],
                     startPoint: .topLeading,
@@ -384,93 +513,8 @@ struct PaneTitlebarCapBackground: View {
             }
             .overlay {
                 Color(nsColor: .windowBackgroundColor)
-                    .opacity(colorScheme == .dark ? 0.072 : 0.026)
+                    .opacity(colorScheme == .dark ? 0.04 : 0.03)
             }
-            .overlay {
-                Color(nsColor: .controlBackgroundColor)
-                    .opacity(colorScheme == .dark ? 0.028 : 0.045)
-            }
-    }
-
-    private var leadingAccentOpacity: Double {
-        switch (flavor, colorScheme) {
-        case (.sidebar, .dark):
-            return 0.11
-        case (.sidebar, _):
-            return 0.16
-        case (.inspector, .dark):
-            return 0.055
-        case (.inspector, _):
-            return 0.075
-        }
-    }
-
-    private var trailingAccentOpacity: Double {
-        switch (flavor, colorScheme) {
-        case (.sidebar, .dark):
-            return 0.052
-        case (.sidebar, _):
-            return 0.072
-        case (.inspector, .dark):
-            return 0.026
-        case (.inspector, _):
-            return 0.034
-        }
-    }
-}
-
-struct ToolbarBandBackground: View {
-    @AppStorage(MacWikiGlassRuntime.forceLegacyFallbackKey) private var forceLegacyGlassFallback = false
-    @Environment(\.colorScheme) private var colorScheme
-
-    private var accentTint: Color {
-        Color(nsColor: .controlAccentColor)
-    }
-
-    var body: some View {
-        if #available(macOS 26, *),
-           MacWikiGlassRuntime.usesNativeGlass(forceLegacyFallback: forceLegacyGlassFallback) {
-            Rectangle()
-                .fill(.clear)
-                .glassEffect(.regular, in: .rect)
-                .overlay {
-                    toolbarTintOverlay
-                }
-                .overlay {
-                    Color(nsColor: .windowBackgroundColor)
-                        .opacity(colorScheme == .dark ? 0.045 : 0.026)
-                }
-                .overlay {
-                    Color(nsColor: .controlBackgroundColor)
-                        .opacity(colorScheme == .dark ? 0.016 : 0.008)
-                }
-        } else {
-            Rectangle()
-                .fill(.thinMaterial)
-                .overlay {
-                    toolbarTintOverlay
-                }
-                .overlay {
-                    Color(nsColor: .windowBackgroundColor)
-                        .opacity(colorScheme == .dark ? 0.075 : 0.042)
-                }
-                .overlay {
-                    Color(nsColor: .controlBackgroundColor)
-                        .opacity(colorScheme == .dark ? 0.026 : 0.014)
-                }
-        }
-    }
-
-    private var toolbarTintOverlay: some View {
-        LinearGradient(
-            colors: [
-                accentTint.opacity(colorScheme == .dark ? 0.078 : 0.032),
-                accentTint.opacity(colorScheme == .dark ? 0.034 : 0.014),
-                Color.clear
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
     }
 }
 
@@ -516,58 +560,5 @@ struct WorkspaceBackdropBackground: View {
                 Color(nsColor: .controlBackgroundColor)
                     .opacity(colorScheme == .dark ? 0.08 : 0.026)
             }
-    }
-}
-
-struct ColumnTopChrome<Content: View>: View {
-    private let content: Content
-    @Environment(\.colorScheme) private var colorScheme
-
-    init(@ViewBuilder content: () -> Content) {
-        self.content = content()
-    }
-
-    var body: some View {
-        content
-            .padding(.horizontal, ColumnChromeMetrics.horizontalPadding)
-            .frame(height: ColumnChromeMetrics.topBarHeight)
-            .frame(maxWidth: .infinity)
-            .background {
-                ColumnChromeBackground()
-            }
-            .overlay(alignment: .bottom) {
-                Rectangle()
-                    .fill(Color.primary.opacity(ColumnChromeMetrics.dividerOpacity(for: colorScheme)))
-                    .frame(height: 0.5)
-            }
-    }
-}
-
-struct ColumnTopBar<Leading: View, Trailing: View>: View {
-    private let leading: Leading
-    private let trailing: Trailing
-
-    init(
-        @ViewBuilder leading: () -> Leading,
-        @ViewBuilder trailing: () -> Trailing
-    ) {
-        self.leading = leading()
-        self.trailing = trailing()
-    }
-
-    var body: some View {
-        ColumnTopChrome {
-            HStack(spacing: 8) {
-                leading
-                Spacer(minLength: 0)
-                trailing
-            }
-        }
-    }
-}
-
-extension ColumnTopBar where Trailing == EmptyView {
-    init(@ViewBuilder leading: () -> Leading) {
-        self.init(leading: leading, trailing: { EmptyView() })
     }
 }
