@@ -28,5 +28,6 @@ struct ListsColumnView: View {
         }
         .ignoresSafeArea(.container, edges: [.top, .leading, .bottom])
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .navigationSplitViewColumnWidth(min: 176, ideal: 220, max: 260)
     }
 }
