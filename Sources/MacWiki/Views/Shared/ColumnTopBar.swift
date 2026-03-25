@@ -2,7 +2,7 @@ import SwiftUI
 import AppKit
 
 enum ColumnChromeMetrics {
-    static let titlebarBandHeight: CGFloat = 52
+    static let titlebarBandHeight: CGFloat = 40
     static let topBarHeight: CGFloat = 32
     /// Tiny downward optical nudge so grouped toolbar controls appear centered
     /// against the lane highlight/divider stack.

@@ -375,8 +375,10 @@ final class MainWindowSplitViewController: NSSplitViewController, NSToolbarDeleg
 
     private func configureWindowChrome() {
         guard let window = view.window else { return }
-        window.toolbarStyle = .unified
+        window.styleMask.insert(.fullSizeContentView)
+        window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true
+        window.toolbarStyle = .unifiedCompact
     }
 
     private func refreshToolbarContent() {
