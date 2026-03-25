@@ -10,24 +10,15 @@ struct ListsColumnView: View {
     let onAddNewLabel: () -> Void
 
     var body: some View {
-        ZStack(alignment: .topLeading) {
-            SidebarPaneBackground()
-                .ignoresSafeArea(.container, edges: [.top, .leading, .bottom])
-
-            ListsSidebar(
-                selectedList: $selectedList,
-                selectedLabel: $selectedLabel,
-                selectedTag: $selectedTag,
-                rootSelection: $rootSelection,
-                onEditLabel: onEditLabel,
-                onAddNewLabel: onAddNewLabel
-            )
-            .safeAreaInset(edge: .top, spacing: 0) {
-                Color.clear.frame(height: ColumnChromeMetrics.titlebarBandHeight)
-            }
-        }
+        ListsSidebar(
+            selectedList: $selectedList,
+            selectedLabel: $selectedLabel,
+            selectedTag: $selectedTag,
+            rootSelection: $rootSelection,
+            onEditLabel: onEditLabel,
+            onAddNewLabel: onAddNewLabel
+        )
         .ignoresSafeArea(.container, edges: [.top, .leading, .bottom])
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .navigationSplitViewColumnWidth(min: 176, ideal: 220, max: 260)
     }
 }
