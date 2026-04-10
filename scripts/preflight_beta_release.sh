@@ -87,13 +87,16 @@ else
   echo "[3/6] Secret-pattern scan skipped."
 fi
 
-echo "[4/6] Running build/test gates..."
+echo "[4/7] Running build/test gates..."
 swift build
 swift test
 swift build -c release
 
+echo "[5/7] Running maintainability check (advisory unless placeholder residue fails)..."
+./scripts/check_maintainability.sh
+
 if [[ "$RUN_PACKAGING" -eq 1 ]]; then
-  echo "[5/6] Packaging beta .app artifact..."
+  echo "[6/7] Packaging beta .app artifact..."
   PACKAGE_ARGS=(--skip-build)
   if [[ -n "$PACKAGE_VERSION" ]]; then
     PACKAGE_ARGS+=(--version "$PACKAGE_VERSION")
@@ -103,10 +106,10 @@ if [[ "$RUN_PACKAGING" -eq 1 ]]; then
   fi
   ./scripts/package_beta_app.sh "${PACKAGE_ARGS[@]}"
 else
-  echo "[5/6] Packaging skipped."
+  echo "[6/7] Packaging skipped."
 fi
 
-echo "[6/6] Recording status..."
+echo "[7/7] Recording status..."
 if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   git status --short
 else

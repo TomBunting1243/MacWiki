@@ -22,19 +22,24 @@ This file is a thin entrypoint for ${tool_name}.
 
 ## Canonical Instructions
 
-1. Read \`.agent/AGENT_RULES.md\` (authoritative)
-2. Run \`.agent/workflows/quickstart.md\` at session start
-3. Run \`.agent/workflows/session-handoff.md\` at session end
+1. Read \`.agent/AGENT_RULES.md\` first. It is authoritative.
+2. Use \`.agent/workflows/quickstart.md\` to decide how much context to load for this request.
+3. Run \`.agent/workflows/commit-ready.md\` only when work is close to landing.
+4. Run \`.agent/workflows/session-handoff.md\` only when the session is actually ending.
 
 If this file conflicts with \`.agent/AGENT_RULES.md\`, canonical rules win.
 
-## Required Obsidian Context
+## Context Policy
 
-Use Obsidian CLI as first entry point and target the correct vault:
+- Default to narrow startup: inspect the relevant code first.
+- Read \`Projects/MacWiki/MacWiki.md\` and the latest development log only for resume work, ambiguous feature work, or project-state questions.
+- Use Obsidian CLI first with \`vault="Jack"\`. If the CLI bridge is disabled, fall back to direct vault file reads/patches.
 
-\`obsidian vault="Jack" read path="Projects/MacWiki/MacWiki.md"\`
+## Additional Workflows
 
-Then read the latest development log note in \`Projects/MacWiki/03 Development Log/\`.
+- \`.agent/workflows/build.md\` for build, run, and clean
+- \`.agent/workflows/test.md\` for test execution
+- \`.agent/workflows/code-review.md\` for review and self-review
 ADAPTER
 }
 

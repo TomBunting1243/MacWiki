@@ -5,6 +5,10 @@ private enum ReaderMotion {
     static let surfaceSwap = Animation.easeOut(duration: 0.22)
     static let surfaceInsertionScale: CGFloat = 0.995
     static let webRevealDuration: Double = 0.20
+    static let hoverPreviewRevealDuration: Double = 0.16
+    static let hoverPreviewInsertionScale: CGFloat = 0.985
+    static let hoverPreviewHapticDelay: Double = 0.08
+    static let hoverPreviewHapticCooldown: TimeInterval = 0.30
     static let skeletonRevealDuration: Double = AppLoadingMotion.skeletonRevealDuration
     static let skeletonHideDuration: Double = AppLoadingMotion.skeletonHideDuration
     static let promptSpring = Animation.spring(response: 0.3, dampingFraction: 0.8)
@@ -15,6 +19,87 @@ private enum ReaderMotion {
     static let promptSecondaryDismissResponse: Double = 0.22
     static let promptSecondaryDismissDamping: Double = 0.88
     static let promptCornerRadius: CGFloat = 21
+}
+
+private enum LinkHoverOverlayMetrics {
+    static let edgeInset: CGFloat = 14
+    static let attachmentGap: CGFloat = 12
+    static let leadingBias: CGFloat = 28
+}
+
+private struct ReaderLinkHoverPreviewOverlay: View {
+    let request: WebViewLinkHoverRequest
+    let onOpen: () -> Void
+    let onOpenInNewTab: () -> Void
+    let onSave: () -> Void
+    var onReveal: () -> Void = {}
+    var onHoverStateChange: (Bool) -> Void = { _ in }
+    @State private var preferredPreviewHeight: CGFloat = LinkHoverPreviewMetrics.height
+
+    var body: some View {
+        GeometryReader { proxy in
+            let previewSize = resolvedPreviewSize(in: proxy.size)
+            let previewOrigin = resolvedPreviewOrigin(for: previewSize, in: proxy.size)
+
+            LinkHoverPreviewPane(
+                title: request.articleTitle ?? "Article",
+                url: request.url,
+                onOpen: onOpen,
+                onOpenInNewTab: onOpenInNewTab,
+                onSave: onSave,
+                previewSize: previewSize,
+                onPreferredHeightChange: { newHeight in
+                    let clampedHeight = min(
+                        max(newHeight, LinkHoverPreviewMetrics.height),
+                        max(0, proxy.size.height - (LinkHoverOverlayMetrics.edgeInset * 2))
+                    )
+                    guard abs(preferredPreviewHeight - clampedHeight) > 0.5 else { return }
+                    preferredPreviewHeight = clampedHeight
+                },
+                onHoverStateChange: onHoverStateChange
+            )
+            .position(
+                x: previewOrigin.x + (previewSize.width * 0.5),
+                y: previewOrigin.y + (previewSize.height * 0.5)
+            )
+            .onAppear(perform: onReveal)
+            .onChange(of: request.signature) { oldSignature, newSignature in
+                guard oldSignature != newSignature else { return }
+                preferredPreviewHeight = LinkHoverPreviewMetrics.height
+                onReveal()
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    private func resolvedPreviewSize(in container: CGSize) -> CGSize {
+        let availableWidth = max(0, container.width - (LinkHoverOverlayMetrics.edgeInset * 2))
+        let availableHeight = max(0, container.height - (LinkHoverOverlayMetrics.edgeInset * 2))
+        return CGSize(
+            width: min(LinkHoverPreviewMetrics.width, availableWidth),
+            height: min(max(preferredPreviewHeight, LinkHoverPreviewMetrics.height), availableHeight)
+        )
+    }
+
+    private func resolvedPreviewOrigin(for previewSize: CGSize, in container: CGSize) -> CGPoint {
+        let minX = LinkHoverOverlayMetrics.edgeInset
+        let maxX = max(minX, container.width - previewSize.width - LinkHoverOverlayMetrics.edgeInset)
+        let preferredX = request.point.x - LinkHoverOverlayMetrics.leadingBias
+        let originX = min(max(preferredX, minX), maxX)
+
+        let minY = LinkHoverOverlayMetrics.edgeInset
+        let maxY = max(minY, container.height - previewSize.height - LinkHoverOverlayMetrics.edgeInset)
+        let preferredBelowY = request.point.y + LinkHoverOverlayMetrics.attachmentGap
+        let preferredAboveY = request.point.y - previewSize.height - LinkHoverOverlayMetrics.attachmentGap
+        let originY: CGFloat
+        if preferredBelowY <= maxY {
+            originY = min(max(preferredBelowY, minY), maxY)
+        } else {
+            originY = min(max(preferredAboveY, minY), maxY)
+        }
+
+        return CGPoint(x: originX, y: originY)
+    }
 }
 
 /// Reader view - shows article content or new tab page
@@ -29,18 +114,16 @@ struct ReaderView: View {
             if let activeId = appState.activeTabId,
                let index = appState.openTabs.firstIndex(where: { $0.id == activeId }) {
                 let activeTab = appState.openTabs[index]
-                let activeHistoryItemID = activeTab.history.indices.contains(activeTab.currentIndex)
-                    ? activeTab.history[activeTab.currentIndex].id
-                    : nil
+                let activeHistoryItemID = activeTab.currentHistoryItem?.id
 
-                if activeTab.isNewTab {
+                if activeTab.isPlaceholder {
                     // Show new tab page with search
                     NewTabPageView()
-                } else {
+                } else if let article = activeTab.currentArticle {
                     // Show article content
                     ArticleView(
                         tabId: activeId,
-                        article: activeTab.article,
+                        article: article,
                         scrollPosition: Binding(
                             get: {
                                 appState.scrollPosition(
@@ -57,6 +140,8 @@ struct ReaderView: View {
                             }
                         )
                     )
+                } else {
+                    NewTabPageView()
                 }
             } else {
                 ContentUnavailableView(
@@ -94,7 +179,7 @@ struct ReaderView: View {
             return "reader-surface-empty"
         }
 
-        if tab.isNewTab {
+        if tab.isPlaceholder {
             return "reader-surface-discover-\(activeId.uuidString)"
         }
         return "reader-surface-article-\(activeId.uuidString)-\(tab.article.id)"
@@ -125,6 +210,7 @@ struct ArticleView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.readerChromeMetrics) private var readerChromeMetrics
     @Query(sort: \ReadingList.updatedAt, order: .reverse) private var allLists: [ReadingList]
     @Query private var highlightsForArticle: [Highlight]
 
@@ -137,6 +223,7 @@ struct ArticleView: View {
     @State private var loadingSkeletonShownAt: TimeInterval = 0
     @State private var skeletonVisibilityTicket = UUID()
     @State private var articleViewportWidth: CGFloat = 960
+    @State private var topObscuredHeight: CGFloat = 38
     @State private var suppressLoadingSkeletonForCurrentOpen = false
     @State private var errorMessage: String?
     @State private var preferImmediateWebReveal = false
@@ -147,6 +234,10 @@ struct ArticleView: View {
     @State private var promptPolicy = ReaderPromptPolicy()
     @State private var openTimer = ArticleOpenTimer()
     @State private var pendingHydratedMetadata: PendingHydratedMetadata?
+    @State private var linkHoverPreviewRequest: WebViewLinkHoverRequest?
+    @State private var isHoveringLinkHoverPreview = false
+    @State private var pendingLinkHoverRevealHapticTask: Task<Void, Never>?
+    @State private var lastLinkHoverRevealHapticTimestamp: TimeInterval = 0
     @AppStorage(ReaderAppearanceStorageKey.fontPreset) private var readerFontPreset: ReaderFontPreset = .system
     @AppStorage(ReaderAppearanceStorageKey.fontSize) private var readerFontSize: Double = ReaderAppearance.default.fontSize
     @AppStorage(ReaderAppearanceStorageKey.lineHeight) private var readerLineHeight: Double = ReaderAppearance.default.lineHeight
@@ -154,9 +245,9 @@ struct ArticleView: View {
     @AppStorage(ReaderAppearanceStorageKey.contentWidth) private var readerContentWidth: Double = ReaderAppearance.default.contentWidth
     @AppStorage(ReaderAppearanceStorageKey.horizontalPadding) private var readerHorizontalPadding: Double = ReaderAppearance.default.horizontalPadding
     @AppStorage(ReaderAppearanceStorageKey.headingScale) private var readerHeadingScale: Double = ReaderAppearance.default.headingScale
-    @AppStorage("tabBarLiquidGlass") private var tabBarLiquidGlass = true
+    @AppStorage(AppStorageKey.Chrome.tabBarLiquidGlass) private var tabBarLiquidGlass = true
     @AppStorage(MacWikiGlassRuntime.forceLegacyFallbackKey) private var forceLegacyGlassFallback = false
-    @AppStorage("nativeHighlightingMenuEnabled") private var nativeHighlightingMenuEnabled = false
+    @AppStorage(AppStorageKey.Chrome.nativeHighlightingMenuEnabled) private var nativeHighlightingMenuEnabled = false
 
     init(tabId: UUID, article: Article, scrollPosition: Binding<CGFloat>) {
         self.tabId = tabId
@@ -200,27 +291,16 @@ struct ArticleView: View {
         )
     }
 
-    private var effectiveReaderAppearance: ReaderAppearance {
-        guard appState.isFocusModeEnabled else { return readerAppearance }
-        return ReaderAppearance(
-            fontPreset: readerFontPreset,
-            fontSize: readerFontSize,
-            lineHeight: readerLineHeight,
-            paragraphSpacing: readerParagraphSpacing,
-            // Keep article content effectively unconstrained in focus mode.
-            contentWidth: 10_000,
-            // Preserve edge breathing room while maximizing line real estate.
-            horizontalPadding: 16,
-            headingScale: readerHeadingScale
-        )
+    private var resolvedReaderAppearance: ReaderAppearance {
+        readerAppearance.resolvedForViewportWidth(Double(articleViewportWidth))
     }
 
-    private var resolvedReaderAppearance: ReaderAppearance {
-        effectiveReaderAppearance.resolvedForViewportWidth(Double(articleViewportWidth))
+    private var resolvedTopObscuredHeight: CGFloat {
+        max(topObscuredHeight, readerChromeMetrics.topObscuredHeight)
     }
 
     private var readerTopInset: CGFloat {
-        let hasToolbarControls = !appState.isWikiHopNavigationLocked && !appState.isFocusModeEnabled
+        let hasToolbarControls = !appState.isWikiHopNavigationLocked
         let compactWidthBoost: CGFloat
         switch articleViewportWidth {
         case ..<520:
@@ -234,21 +314,15 @@ struct ArticleView: View {
         }
         let resolved: CGFloat
         if hasToolbarControls {
-            // In liquid-glass mode the top chrome overlays the reader, so keep
-            // a modest inset that allows visible underflow beneath the glass.
-            resolved = tabBarLiquidGlass
-                ? ColumnChromeMetrics.readerContentTopInset(
-                    windowTopObscuredHeight: appState.windowTopObscuredHeight,
-                    additionalSpacing: 14 + compactWidthBoost
-                )
-                : (92 + compactWidthBoost)
+            resolved = resolvedTopObscuredHeight + 10 + compactWidthBoost
         } else {
-            resolved = max(0, appState.windowTopObscuredHeight) + 8
+            resolved = resolvedTopObscuredHeight + 8
         }
         return max(resolved, 0)
     }
 
     private var findOnPageTopPadding: CGFloat {
+        let hasToolbarControls = !appState.isWikiHopNavigationLocked
         let compactWidthBoost: CGFloat
         switch articleViewportWidth {
         case ..<680:
@@ -256,15 +330,10 @@ struct ArticleView: View {
         default:
             compactWidthBoost = 0
         }
-        if tabBarLiquidGlass &&
-            !appState.isWikiHopNavigationLocked &&
-            !appState.isFocusModeEnabled {
-            // Clear the full liquid reader chrome stack (titlebar spacer + toolbar + tab lane).
-            return ColumnChromeMetrics.readerChromeOverlayHeight(
-                windowTopObscuredHeight: appState.windowTopObscuredHeight
-            ) + 8 + compactWidthBoost
+        if hasToolbarControls {
+            return resolvedTopObscuredHeight + 8 + compactWidthBoost
         }
-        return 10 + compactWidthBoost
+        return max(10, resolvedTopObscuredHeight + 10) + compactWidthBoost
     }
 
     private var usesNativeFindNavigator: Bool {
@@ -276,17 +345,9 @@ struct ArticleView: View {
 
     private var findNavigatorPresentedBinding: Binding<Bool> {
         Binding(
-            get: { appState.showFindOnPage && !appState.isFocusModeEnabled },
+            get: { appState.showFindOnPage },
             set: { appState.showFindOnPage = $0 }
         )
-    }
-
-    private var focusTOCOverlayBottomPadding: CGFloat {
-        let base: CGFloat = 14
-        if showMarkAsReadPrompt && isArticleUnreadState {
-            return base + 64
-        }
-        return base
     }
 
     private var shouldShowLoadingSkeleton: Bool {
@@ -304,12 +365,14 @@ struct ArticleView: View {
         reduceMotion ? .identity : .opacity.combined(with: .move(edge: .top))
     }
 
-    private var focusTOCTransition: AnyTransition {
+    private var markPromptTransition: AnyTransition {
         reduceMotion ? .identity : .move(edge: .bottom).combined(with: .opacity)
     }
 
-    private var markPromptTransition: AnyTransition {
-        reduceMotion ? .identity : .move(edge: .bottom).combined(with: .opacity)
+    private var linkHoverPreviewTransition: AnyTransition {
+        reduceMotion
+            ? .identity
+            : .opacity.combined(with: .scale(scale: ReaderMotion.hoverPreviewInsertionScale, anchor: .topLeading))
     }
     
     var body: some View {
@@ -324,9 +387,13 @@ struct ArticleView: View {
                 Color.clear
                     .onAppear {
                         updateArticleViewportWidth(proxy.size.width)
+                        updateTopObscuredHeight(proxy.safeAreaInsets.top)
                     }
                     .onChange(of: proxy.size.width) { _, newWidth in
                         updateArticleViewportWidth(newWidth)
+                    }
+                    .onChange(of: proxy.safeAreaInsets.top) { _, newTopInset in
+                        updateTopObscuredHeight(newTopInset)
                     }
             }
         }
@@ -337,7 +404,7 @@ struct ArticleView: View {
             }
         }
         .overlay(alignment: .topTrailing) {
-            if !usesNativeFindNavigator && appState.showFindOnPage && !appState.isFocusModeEnabled {
+            if !usesNativeFindNavigator && appState.showFindOnPage {
                 FindOnPageBarView(
                     tabID: tabId,
                     availableWidth: max(articleViewportWidth - 32, 0)
@@ -346,15 +413,6 @@ struct ArticleView: View {
                     .padding(.trailing, 16)
                     .transition(findTransition)
                     .zIndex(6)
-            }
-        }
-        .overlay(alignment: .bottomLeading) {
-            if appState.isFocusModeEnabled {
-                ReaderFocusTOCView(items: appState.currentArticleTableOfContents)
-                    .padding(.bottom, focusTOCOverlayBottomPadding)
-                    .padding(.leading, 14)
-                    .transition(focusTOCTransition)
-                    .zIndex(7)
             }
         }
         .overlay(alignment: .bottom) {
@@ -368,6 +426,7 @@ struct ArticleView: View {
         .task(id: "\(tabId.uuidString)-\(article.id)") {
             articleLoader.cancelPendingMetadataHydration()
             pendingHydratedMetadata = nil
+            updateLinkHoverPreview(nil)
             hasPublishedLiveReadingProgressForCurrentOpen = false
             articleLoader.cancelPendingPinSync()
             articleLoader.schedulePinSync(shouldPinArticleBodyCache, forArticleTitle: article.title)
@@ -398,6 +457,7 @@ struct ArticleView: View {
             articleLoader.cancelPendingMetadataHydration()
             articleLoader.cancelPendingPinSync()
             pendingHydratedMetadata = nil
+            updateLinkHoverPreview(nil)
             hasPublishedLiveReadingProgressForCurrentOpen = false
         }
         .onChange(of: article.title) { oldTitle, newTitle in
@@ -437,10 +497,6 @@ struct ArticleView: View {
             reduceMotion ? nil : ReaderMotion.promptSpring,
             value: showMarkAsReadPrompt
         )
-        .onExitCommand {
-            guard appState.isFocusModeEnabled else { return }
-            appState.setFocusModeEnabled(false)
-        }
     }
 
     @ViewBuilder
@@ -509,16 +565,46 @@ struct ArticleView: View {
                     publishLiveReadingProgressIfNeeded()
                     applyPendingHydratedMetadataIfNeeded()
                 },
+                onLinkHoverPreviewChange: { request in
+                    guard appState.currentArticle?.title == article.title || request == nil else { return }
+                    updateLinkHoverPreview(request)
+                },
+                linkHoverPreviewOverlayHovering: isHoveringLinkHoverPreview,
+                activeLinkHoverPreviewSignature: linkHoverPreviewRequest?.signature,
                 nativeHighlightingMenuEnabled: nativeHighlightingMenuEnabled,
                 openTimer: $openTimer,
                 appState: appState,
                 inspectorVisible: appState.inspectorVisible,
                 inspectorMode: appState.inspectorMode,
-                focusModeEnabled: appState.isFocusModeEnabled,
                 findOnPageRequestID: usesNativeFindNavigator ? nil : appState.pendingFindOnPageRequest?.requestID
             )
             .id(tabId)
             .clipped()
+            .overlay(alignment: .topLeading) {
+                if let request = linkHoverPreviewRequest {
+                    ReaderLinkHoverPreviewOverlay(
+                        request: request,
+                        onOpen: {
+                            openLinkHoverPreview(request, inNewTab: false)
+                        },
+                        onOpenInNewTab: {
+                            openLinkHoverPreview(request, inNewTab: true)
+                        },
+                        onSave: {
+                            saveLinkHoverPreview(request)
+                        },
+                        onReveal: {
+                            scheduleLinkHoverRevealHapticIfNeeded()
+                        },
+                        onHoverStateChange: { hovering in
+                            isHoveringLinkHoverPreview = hovering
+                        }
+                    )
+                    .environment(appState)
+                    .transition(linkHoverPreviewTransition)
+                    .zIndex(7)
+                }
+            }
             .overlay {
                 // Highlight toolbar overlay
                 if !nativeHighlightingMenuEnabled {
@@ -529,7 +615,6 @@ struct ArticleView: View {
             if #available(macOS 26, *) {
                 webView
                     .findNavigator(isPresented: findNavigatorPresentedBinding)
-                    .findDisabled(appState.isFocusModeEnabled)
             } else {
                 webView
             }
@@ -780,6 +865,12 @@ struct ArticleView: View {
         )
         .allowsHitTesting(false)
     }
+
+    private func updateTopObscuredHeight(_ newValue: CGFloat) {
+        let resolved = max(0, newValue)
+        guard abs(topObscuredHeight - resolved) > 0.5 else { return }
+        topObscuredHeight = resolved
+    }
     
     private func errorView(_ error: String) -> some View {
         ContentUnavailableView(
@@ -986,6 +1077,68 @@ struct ArticleView: View {
     private func openLinkedArticle(title: String) {
         let linkedArticle = Article(id: title, title: title)
         appState.openArticle(linkedArticle, inNewTab: false)
+    }
+
+    private func openLinkHoverPreview(_ request: WebViewLinkHoverRequest, inNewTab: Bool) {
+        updateLinkHoverPreview(nil)
+        guard let article = hoverPreviewArticle(for: request) else {
+            _ = SystemBridge.openURLExternally(request.url)
+            return
+        }
+
+        if inNewTab {
+            appState.openArticleInNewTab(article)
+        } else {
+            appState.openArticle(article, inNewTab: false)
+        }
+    }
+
+    private func saveLinkHoverPreview(_ request: WebViewLinkHoverRequest) {
+        updateLinkHoverPreview(nil)
+        guard let article = hoverPreviewArticle(for: request) else { return }
+        appState.presentOptionClickSavePrompt(for: article)
+    }
+
+    private func hoverPreviewArticle(for request: WebViewLinkHoverRequest) -> Article? {
+        guard let rawTitle = request.articleTitle?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !rawTitle.isEmpty else {
+            return nil
+        }
+        return Article(id: rawTitle, title: rawTitle)
+    }
+
+    private func updateLinkHoverPreview(_ request: WebViewLinkHoverRequest?) {
+        let updates = {
+            linkHoverPreviewRequest = request
+            if request == nil {
+                pendingLinkHoverRevealHapticTask?.cancel()
+                pendingLinkHoverRevealHapticTask = nil
+                isHoveringLinkHoverPreview = false
+            }
+        }
+
+        if reduceMotion {
+            updates()
+        } else {
+            withAnimation(.easeOut(duration: ReaderMotion.hoverPreviewRevealDuration), updates)
+        }
+    }
+
+    private func scheduleLinkHoverRevealHapticIfNeeded() {
+        pendingLinkHoverRevealHapticTask?.cancel()
+
+        let delay = reduceMotion ? 0 : ReaderMotion.hoverPreviewHapticDelay
+        pendingLinkHoverRevealHapticTask = Task { @MainActor in
+            if delay > 0 {
+                try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+            }
+            guard !Task.isCancelled else { return }
+
+            let now = ProcessInfo.processInfo.systemUptime
+            guard now - lastLinkHoverRevealHapticTimestamp >= ReaderMotion.hoverPreviewHapticCooldown else { return }
+            lastLinkHoverRevealHapticTimestamp = now
+            pendingLinkHoverRevealHapticTask = nil
+        }
     }
 
     private func updateArticleViewportWidth(_ width: CGFloat) {

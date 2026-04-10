@@ -1,6 +1,10 @@
 import SwiftUI
 
 struct DirectoryColumnView: View {
+    private enum Chrome {
+        static let topInset: CGFloat = 0
+    }
+
     @Binding var selectedList: ReadingList?
     @Binding var rootSelection: SidebarRootSelection
 
@@ -10,14 +14,21 @@ struct DirectoryColumnView: View {
     let onNewTagWithArticle: (Article) -> Void
 
     var body: some View {
-        DirectoryView(
-            selectedList: $selectedList,
-            rootSelection: $rootSelection,
-            selectedLabel: selectedLabel,
-            selectedTag: selectedTag,
-            onNewLabelWithArticle: onNewLabelWithArticle,
-            onNewTagWithArticle: onNewTagWithArticle
-        )
-        .navigationSplitViewColumnWidth(min: 212, ideal: 272, max: 360)
+        ZStack(alignment: .topLeading) {
+            SidebarPaneBackground()
+
+            DirectoryView(
+                selectedList: $selectedList,
+                rootSelection: $rootSelection,
+                selectedLabel: selectedLabel,
+                selectedTag: selectedTag,
+                onNewLabelWithArticle: onNewLabelWithArticle,
+                onNewTagWithArticle: onNewTagWithArticle
+            )
+            .padding(.top, Chrome.topInset)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .navigationSplitViewColumnWidth(min: 260, ideal: 320, max: 420)
     }
 }

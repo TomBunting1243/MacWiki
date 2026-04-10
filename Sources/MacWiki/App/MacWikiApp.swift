@@ -107,12 +107,24 @@ struct MacWikiApp: App {
         let entries = defaults.dictionaryRepresentation()
         let visibleFrames = NSScreen.screens.map(\.visibleFrame)
         let shellLayoutMigrationKey = "mainWindow.shellLayoutVersion"
-        let currentShellLayoutVersion = 1
+        let currentShellLayoutVersion = 12
 
         if defaults.integer(forKey: shellLayoutMigrationKey) < currentShellLayoutVersion {
             defaults.removeObject(forKey: "mainWindow.sidebarWidth")
             defaults.removeObject(forKey: "mainWindow.directoryWidth")
             defaults.removeObject(forKey: "mainWindow.inspectorWidth")
+            defaults.removeObject(forKey: "NSToolbar Configuration main-window-toolbar")
+            defaults.removeObject(forKey: "NSToolbar Configuration main-window-toolbar-v2")
+            defaults.removeObject(forKey: "NSToolbar Configuration main-window-toolbar-v3")
+            defaults.removeObject(forKey: "NSToolbar Configuration main-window-toolbar-v4")
+            defaults.removeObject(forKey: "NSToolbar Configuration main-window-toolbar-v5")
+            defaults.removeObject(forKey: "NSToolbar Configuration main-window-toolbar-v6")
+            defaults.removeObject(forKey: "NSToolbar Configuration main-window-toolbar-v7")
+            defaults.removeObject(forKey: "NSToolbar Configuration main-window-toolbar-v8")
+            defaults.removeObject(forKey: "NSToolbar Configuration main-window-toolbar-v9")
+            defaults.removeObject(forKey: "NSToolbar Configuration main-window-toolbar-v10")
+            defaults.removeObject(forKey: "NSToolbar Configuration main-window-toolbar-v11")
+            defaults.removeObject(forKey: "NSToolbar Configuration main-window-toolbar-v12")
             defaults.set(currentShellLayoutVersion, forKey: shellLayoutMigrationKey)
         }
 
@@ -133,7 +145,7 @@ struct MacWikiApp: App {
             }
         }
 
-        sanitizePersistedSplitWidth(defaults, key: "mainWindow.sidebarWidth", minimum: 180, maximum: 240)
+        sanitizePersistedSplitWidth(defaults, key: "mainWindow.sidebarWidth", minimum: 180, maximum: 320)
         sanitizePersistedSplitWidth(defaults, key: "mainWindow.directoryWidth", minimum: 260, maximum: 420)
         sanitizePersistedSplitWidth(defaults, key: "mainWindow.inspectorWidth", minimum: 260, maximum: 340)
     }
@@ -237,8 +249,8 @@ struct MacWikiApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
-                .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
                 .toolbar(removing: .title)
+                .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
                 .alert(item: $launchIssue) { issue in
                     Alert(
                         title: Text(issue.title),
@@ -263,7 +275,6 @@ struct MacWikiApp: App {
         .modelContainer(bootstrap.modelContainer)
         .restorationBehavior(.disabled)
         .windowBackgroundDragBehavior(.enabled)
-        .windowStyle(.hiddenTitleBar)
         .defaultSize(
             width: Self.launchWindowSize.width,
             height: Self.launchWindowSize.height
@@ -284,15 +295,13 @@ struct MacWikiApp: App {
                     appState.startSearch(context: .navigation)
                 }
                 .keyboardShortcut("k", modifiers: .command)
-                .disabled(appState.isWikiHopNavigationLocked || appState.isFocusModeEnabled)
+                .disabled(appState.isWikiHopNavigationLocked)
 
                 Button("Find in Page") {
-                    guard !appState.isFocusModeEnabled else { return }
-                    appState.showFindOnPage = true
-                    appState.findOnPageMatchFound = nil
+                    appState.presentFindOnPage()
                 }
                 .keyboardShortcut("f", modifiers: .command)
-                .disabled(appState.currentArticle == nil || appState.isFocusModeEnabled)
+                .disabled(appState.currentArticle == nil)
             }
             
             // Tab commands
@@ -377,13 +386,6 @@ struct MacWikiApp: App {
                     appState.toggleInspectorVisibility()
                 }
                 .keyboardShortcut("i", modifiers: [.command, .shift])
-                .disabled(appState.isFocusModeEnabled)
-
-                Button(appState.isFocusModeEnabled ? "Exit Focus Mode" : "Enter Focus Mode") {
-                    appState.toggleFocusMode()
-                }
-                .keyboardShortcut("f", modifiers: [.command, .shift])
-                .disabled(appState.currentArticle == nil || appState.isWikiHopNavigationLocked)
             }
 
             // Reader typography shortcuts

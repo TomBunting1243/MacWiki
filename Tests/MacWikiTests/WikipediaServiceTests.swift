@@ -8,6 +8,12 @@ import Testing
 struct WikipediaServiceTests {
     
     let service = WikipediaService()
+
+    private var utcCalendar: Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        return calendar
+    }
     
     @Test func searchReturnsResults() async throws {
         let results = try await service.search("Swift programming")
@@ -20,6 +26,41 @@ struct WikipediaServiceTests {
         let results = try await service.search("")
         
         #expect(results.isEmpty, "Empty query should return no results")
+    }
+
+    @Test func pageviewsWindowStartClampsToArticleCreationDay() {
+        let requestedStart = utcCalendar.date(from: DateComponents(year: 2015, month: 7, day: 1))!
+        let firstRevision = utcCalendar.date(from: DateComponents(year: 2020, month: 12, day: 8, hour: 22))!
+
+        let resolved = WikipediaService.clampedPageviewsWindowStart(
+            requestedStart: requestedStart,
+            firstRevisionDate: firstRevision,
+            datasetStart: requestedStart,
+            calendar: utcCalendar
+        )
+
+        #expect(
+            resolved == utcCalendar.date(from: DateComponents(year: 2020, month: 12, day: 8))!,
+            "Pageview history should not start before the article's first revision day"
+        )
+    }
+
+    @Test func pageviewsWindowStartRespectsDatasetFloor() {
+        let requestedStart = utcCalendar.date(from: DateComponents(year: 2014, month: 1, day: 1))!
+        let datasetStart = utcCalendar.date(from: DateComponents(year: 2015, month: 7, day: 1))!
+        let firstRevision = utcCalendar.date(from: DateComponents(year: 2008, month: 2, day: 7, hour: 5))!
+
+        let resolved = WikipediaService.clampedPageviewsWindowStart(
+            requestedStart: requestedStart,
+            firstRevisionDate: firstRevision,
+            datasetStart: datasetStart,
+            calendar: utcCalendar
+        )
+
+        #expect(
+            resolved == datasetStart,
+            "The Wikimedia dataset floor should still win when the article predates the pageview API"
+        )
     }
     
     @Test func fetchArticleReturnsHTML() async throws {

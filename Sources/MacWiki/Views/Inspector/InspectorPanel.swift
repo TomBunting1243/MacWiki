@@ -37,11 +37,10 @@ struct InspectorPanel: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.openURL) private var openURL
     @Environment(\.colorScheme) private var colorScheme
-    @AppStorage("tabBarLiquidGlass") private var tabBarLiquidGlass = true
-    @AppStorage("inspectorTOCPresentation") private var tocPresentation: InspectorTableOfContentsPresentation = .standard
-    @AppStorage("inspectorInfoSplitRatio") private var infoSplitRatioSetting: Double = 0
-    @AppStorage("inspectorMetadataSectionHeight") private var metadataSectionHeightSetting: Double = 0
-    @AppStorage("inspectorTOCSectionHeight") private var tocSectionHeightSetting: Double = 0
+    @AppStorage(AppStorageKey.Chrome.tabBarLiquidGlass) private var tabBarLiquidGlass = true
+    @AppStorage(AppStorageKey.Inspector.infoSplitRatio) private var infoSplitRatioSetting: Double = 0
+    @AppStorage(AppStorageKey.Inspector.metadataSectionHeight) private var metadataSectionHeightSetting: Double = 0
+    @AppStorage(AppStorageKey.Inspector.tocSectionHeight) private var tocSectionHeightSetting: Double = 0
     @Query(sort: \ReadingList.updatedAt, order: .reverse) private var allLists: [ReadingList]
     @Query(sort: \Label.sortOrder) private var allLabels: [Label]
     @Query(sort: \Tag.sortOrder) private var allTags: [Tag]
@@ -89,12 +88,10 @@ struct InspectorPanel: View {
         static let infoSplitBudgetRatio: CGFloat = 0.58
         static let infoSplitBudgetRange: ClosedRange<CGFloat> = 280...620
         static let infoSplitFallbackBudget: CGFloat = 420
-        static let floatingTOCMetadataBottomInset: CGFloat = 72
     }
 
     private var usesSplitLayout: Bool {
-        tocPresentation == .standard
-            && !appState.currentArticleMetadata.isEmpty
+        !appState.currentArticleMetadata.isEmpty
             && !appState.currentArticleTableOfContents.isEmpty
     }
 
@@ -229,24 +226,6 @@ struct InspectorPanel: View {
         return estimatedMetadataSectionHeight
     }
 
-    private var metadataSectionMaxHeight: CGFloat {
-        tocPresentation == .liquidDock ? .infinity : metadataSectionHeight
-    }
-
-    private var metadataScrollBottomInset: CGFloat {
-        guard tocPresentation == .liquidDock,
-              appState.inspectorMode == .info,
-              appState.currentArticle != nil,
-              !appState.currentArticleTableOfContents.isEmpty else {
-            return 0
-        }
-        return InspectorLayout.floatingTOCMetadataBottomInset
-    }
-
-    private var tocPresentationAnimation: Animation {
-        .interactiveSpring(response: 0.32, dampingFraction: 0.89, blendDuration: 0.08)
-    }
-
     private var standardTOCTransition: AnyTransition {
         .asymmetric(
             insertion: .opacity
@@ -255,26 +234,6 @@ struct InspectorPanel: View {
             removal: .opacity
                 .combined(with: .move(edge: .bottom))
                 .combined(with: .scale(scale: 0.985, anchor: .top))
-        )
-    }
-
-    private var floatingTOCTransition: AnyTransition {
-        .asymmetric(
-            insertion: .opacity
-                .combined(with: .move(edge: .bottom))
-                .combined(with: .scale(scale: 0.97, anchor: .bottom)),
-            removal: .opacity
-                .combined(with: .move(edge: .bottom))
-                .combined(with: .scale(scale: 0.97, anchor: .bottom))
-        )
-    }
-
-    private var animatedTOCPresentationBinding: Binding<InspectorTableOfContentsPresentation> {
-        Binding(
-            get: { tocPresentation },
-            set: { newValue in
-                setTOCPresentation(newValue)
-            }
         )
     }
 
@@ -304,12 +263,14 @@ struct InspectorPanel: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            inspectorHeaderBar
+            if showsInspectorHeaderBar {
+                inspectorHeaderBar
+            }
 
             // Content area
             inspectorContent
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                .padding(.top, InspectorLayout.contentTopPadding)
+                .padding(.top, showsInspectorHeaderBar ? InspectorLayout.contentTopPadding : 0)
         }
         .overlay(alignment: .bottom) {
             if appState.isHighlightRehydrateInProgress {
@@ -350,12 +311,13 @@ struct InspectorPanel: View {
             sanitizePersistedSplitSettingsIfNeeded()
         }
     }
+
+    private var showsInspectorHeaderBar: Bool {
+        appState.currentArticle != nil
+    }
     
     private var inspectorHeaderBar: some View {
         ZStack {
-            WindowDragHandle(minLength: 80)
-                .frame(maxWidth: .infinity)
-
             HStack(spacing: 0) {
                 Spacer(minLength: 0)
                 inspectorModeSelector
@@ -428,7 +390,7 @@ struct InspectorPanel: View {
                                 metadataSection
                             }
 
-                            if tocPresentation == .standard, !appState.currentArticleTableOfContents.isEmpty {
+                            if !appState.currentArticleTableOfContents.isEmpty {
                                 tableOfContentsSection
                                     .transition(standardTOCTransition)
                             }
@@ -464,21 +426,6 @@ struct InspectorPanel: View {
         .task(id: appState.currentArticle?.title) {
             await loadOrCreateArticleState()
         }
-        .overlay(alignment: .bottom) {
-            if tocPresentation == .liquidDock,
-               appState.inspectorMode == .info,
-               appState.currentArticle != nil,
-               !appState.currentArticleTableOfContents.isEmpty {
-                InspectorTableOfContentsDockView(
-                    items: appState.currentArticleTableOfContents,
-                    presentation: animatedTOCPresentationBinding
-                )
-                .padding(.horizontal, 16)
-                .transition(floatingTOCTransition)
-                .zIndex(2)
-            }
-        }
-        .animation(tocPresentationAnimation, value: tocPresentation)
     }
 
     private var tableOfContentsSection: some View {
@@ -487,25 +434,6 @@ struct InspectorPanel: View {
                 Text("Contents")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
-
-                Spacer(minLength: 0)
-
-                Button {
-                    setTOCPresentation(.liquidDock)
-                } label: {
-                    Image(systemName: "rectangle.stack")
-                        .font(.system(size: 11, weight: .semibold))
-                        .symbolRenderingMode(.hierarchical)
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 7)
-                    .padding(.vertical, 4)
-                    .background(Color.gray.opacity(0.12), in: Capsule())
-                    .overlay {
-                        Capsule()
-                            .strokeBorder(Color.white.opacity(colorScheme == .dark ? 0.10 : 0.14), lineWidth: 0.8)
-                    }
-                }
-                .buttonStyle(.plain)
             }
 
             ScrollViewReader { proxy in
@@ -579,15 +507,8 @@ struct InspectorPanel: View {
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-            Group {
-                if tocPresentation == .standard {
-                    metadataScrollContent
-                        .frame(height: metadataSectionHeight, alignment: .top)
-                } else {
-                    metadataScrollContent
-                        .frame(maxHeight: metadataSectionMaxHeight, alignment: .top)
-                }
-            }
+            metadataScrollContent
+                .frame(height: metadataSectionHeight, alignment: .top)
 
             if usesSplitLayout {
                 SectionResizeHandle(
@@ -615,7 +536,6 @@ struct InspectorPanel: View {
     private var metadataScrollContent: some View {
         ScrollView {
             MetadataView(items: appState.currentArticleMetadata)
-                .padding(.bottom, metadataScrollBottomInset)
         }
         // Handle links: Wikipedia = navigate in app, External = Safari
         .environment(\.openURL, OpenURLAction { url in
@@ -632,13 +552,6 @@ struct InspectorPanel: View {
             openURL(url)
             return .handled
         })
-    }
-
-    private func setTOCPresentation(_ newValue: InspectorTableOfContentsPresentation) {
-        guard tocPresentation != newValue else { return }
-        withAnimation(tocPresentationAnimation) {
-            tocPresentation = newValue
-        }
     }
 
     @ViewBuilder
@@ -921,131 +834,197 @@ private struct InspectorModeControl: View {
     @Namespace private var activeModeNamespace
 
     private enum Metrics {
-        static let minimumSegmentWidth: CGFloat = 50
+        static let minimumSegmentWidth: CGFloat = 32
         static let segmentHorizontalPadding: CGFloat = 10
-        static let segmentVerticalPadding: CGFloat = 5
-        static let pillSpacing: CGFloat = 3
-        static let pillCornerRadius: CGFloat = 10
-        static let railHorizontalPadding: CGFloat = 3
-        static let railVerticalPadding: CGFloat = 2
-        static let railHeight: CGFloat = 32
-        static let nativeControlMinimumWidth: CGFloat = 230
+        static let segmentVerticalPadding: CGFloat = 6
+        static let pillSpacing: CGFloat = 4
+        static let pillCornerRadius: CGFloat = 12
+        static let railHorizontalPadding: CGFloat = 4
+        static let railVerticalPadding: CGFloat = 4
+        static let railHeight: CGFloat = 38
     }
 
     var body: some View {
-        if #available(macOS 26, *),
-           MacWikiGlassRuntime.usesNativeGlass(forceLegacyFallback: forceLegacyGlassFallback) {
-            nativeSegmentedControl
+        glassySegmentedControl(darkMode: colorScheme == .dark)
+    }
+
+    private var usesNativeGlass: Bool {
+        useLiquidGlass &&
+            MacWikiGlassRuntime.usesNativeGlass(forceLegacyFallback: forceLegacyGlassFallback)
+    }
+
+    @ViewBuilder
+    private func glassySegmentedControl(darkMode: Bool) -> some View {
+        if #available(macOS 26, *), usesNativeGlass {
+            nativeGlassySegmentedControl(darkMode: darkMode)
         } else {
-            legacySegmentedControl(darkMode: colorScheme == .dark)
+            fallbackGlassySegmentedControl(darkMode: darkMode)
         }
     }
 
-    @available(macOS 26, *)
-    private var nativeSegmentedControl: some View {
-        Picker("Inspector mode", selection: $selectedMode) {
-            ForEach(modes, id: \.self) { mode in
-                Text(mode.rawValue)
-                    .tag(mode)
+    private func fallbackGlassySegmentedControl(darkMode: Bool) -> some View {
+        MacWikiGlassGroup(spacing: Metrics.pillSpacing) {
+            HStack(spacing: Metrics.pillSpacing) {
+                ForEach(modes, id: \.self) { mode in
+                    fallbackModeButton(mode, darkMode: darkMode)
+                }
             }
-        }
-        .labelsHidden()
-        .pickerStyle(.segmented)
-        .controlSize(.small)
-        .tint(
-            colorScheme == .dark
-                ? Color.white.opacity(0.14)
-                : Color.black.opacity(0.08)
-        )
-        .frame(minWidth: Metrics.nativeControlMinimumWidth)
-        .fixedSize()
-        .padding(.horizontal, 2)
-        .background {
-            RoundedRectangle(cornerRadius: Metrics.pillCornerRadius)
-                .fill(Color(nsColor: .windowBackgroundColor).opacity(colorScheme == .dark ? 0.045 : 0.024))
-                .padding(.horizontal, -2)
-                .padding(.vertical, -1)
+            .padding(.horizontal, Metrics.railHorizontalPadding)
+            .padding(.vertical, Metrics.railVerticalPadding)
+            .frame(height: Metrics.railHeight)
+            .background {
+                railBackground(darkMode: darkMode)
+            }
         }
         .accessibilityLabel("Inspector mode")
     }
 
-    private func legacySegmentedControl(darkMode: Bool) -> some View {
-        HStack(spacing: Metrics.pillSpacing) {
-            ForEach(modes, id: \.self) { mode in
-                let isActive = selectedMode == mode
-                let isHovered = hoveredMode == mode && !isActive
-
-                Button {
-                    selectMode(mode)
-                } label: {
-                    Text(mode.rawValue)
-                        .font(.system(size: labelPointSize, weight: isActive ? .semibold : .medium))
-                        .foregroundStyle(foregroundColor(isActive: isActive, isHovered: isHovered, darkMode: darkMode))
-                        .lineLimit(1)
-                        .frame(minWidth: Metrics.minimumSegmentWidth)
-                        .padding(.horizontal, Metrics.segmentHorizontalPadding)
-                        .padding(.vertical, Metrics.segmentVerticalPadding)
-                        .contentShape(Rectangle())
+    @available(macOS 26, *)
+    private func nativeGlassySegmentedControl(darkMode: Bool) -> some View {
+        MacWikiGlassGroup(spacing: Metrics.pillSpacing) {
+            HStack(spacing: Metrics.pillSpacing) {
+                ForEach(modes, id: \.self) { mode in
+                    nativeModeButton(mode, darkMode: darkMode)
                 }
-                .buttonStyle(.plain)
-                .background {
-                    if isActive {
-                        activePillBackground(darkMode: darkMode)
-                            .matchedGeometryEffect(id: "inspector-mode-active-pill", in: activeModeNamespace)
-                    } else if isHovered {
-                        hoverPillBackground(darkMode: darkMode)
-                    }
-                }
-                .clipShape(RoundedRectangle(cornerRadius: Metrics.pillCornerRadius, style: .continuous))
-                .contentShape(RoundedRectangle(cornerRadius: Metrics.pillCornerRadius, style: .continuous))
-                .onHover { hovering in
-                    if hovering {
-                        hoveredMode = mode
-                    } else if hoveredMode == mode {
-                        hoveredMode = nil
-                    }
-                }
-                .help(mode.rawValue)
-                .accessibilityLabel(mode.rawValue)
             }
         }
-        .padding(.horizontal, Metrics.railHorizontalPadding)
-        .padding(.vertical, Metrics.railVerticalPadding)
-        .frame(height: Metrics.railHeight)
-        .background {
-            railBackground(darkMode: darkMode)
+        .accessibilityLabel("Inspector mode")
+    }
+
+    private func fallbackModeButton(_ mode: InspectorMode, darkMode: Bool) -> some View {
+        let isActive = selectedMode == mode
+        let isHovered = hoveredMode == mode && !isActive
+
+        return Button {
+            selectMode(mode)
+        } label: {
+            modeSymbol(mode, isActive: isActive, isHovered: isHovered, darkMode: darkMode)
+                .frame(minWidth: Metrics.minimumSegmentWidth)
+                .padding(.horizontal, Metrics.segmentHorizontalPadding)
+                .padding(.vertical, Metrics.segmentVerticalPadding)
+                .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
+        .background {
+            if isActive {
+                activePillBackground(darkMode: darkMode)
+                    .matchedGeometryEffect(id: "inspector-mode-active-pill", in: activeModeNamespace)
+            } else if isHovered {
+                hoverPillBackground(darkMode: darkMode)
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: Metrics.pillCornerRadius, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: Metrics.pillCornerRadius, style: .continuous))
+        .onHover { hovering in
+            if hovering {
+                hoveredMode = mode
+            } else if hoveredMode == mode {
+                hoveredMode = nil
+            }
+        }
+        .help(mode.rawValue)
+        .accessibilityLabel(mode.rawValue)
+    }
+
+    @available(macOS 26, *)
+    private func nativeModeButton(_ mode: InspectorMode, darkMode: Bool) -> some View {
+        let isActive = selectedMode == mode
+        let isHovered = hoveredMode == mode && !isActive
+
+        return Button {
+            selectMode(mode)
+        } label: {
+            modeSymbol(mode, isActive: isActive, isHovered: isHovered, darkMode: darkMode)
+                .frame(minWidth: Metrics.minimumSegmentWidth)
+                .padding(.horizontal, Metrics.segmentHorizontalPadding)
+                .padding(.vertical, Metrics.segmentVerticalPadding)
+        }
+        .buttonStyle(.plain)
+        .glassEffect(.regular.interactive(), in: .capsule)
+        .overlay {
+            Capsule()
+                .fill(
+                    Color.white.opacity(
+                        darkMode
+                            ? (isActive ? 0.08 : (isHovered ? 0.040 : 0.022))
+                            : (isActive ? 0.26 : (isHovered ? 0.12 : 0.07))
+                    )
+                )
+        }
+        .overlay {
+            if isActive {
+                Capsule()
+                    .fill(Color.accentColor.opacity(darkMode ? 0.18 : 0.10))
+            }
+        }
+        .overlay {
+            Capsule()
+                .strokeBorder(
+                    Color.white.opacity(
+                        darkMode
+                            ? (isActive ? 0.16 : (isHovered ? 0.10 : 0.08))
+                            : (isActive ? 0.15 : (isHovered ? 0.10 : 0.08))
+                    ),
+                    lineWidth: isActive ? 0.9 : 0.7
+                )
+        }
+        .shadow(
+            color: Color.black.opacity(
+                darkMode
+                    ? (isActive ? 0.16 : 0.08)
+                    : (isActive ? 0.05 : 0.02)
+            ),
+            radius: isActive ? 7 : 4,
+            y: isActive ? 3 : 1
+        )
+        .onHover { hovering in
+            if hovering {
+                hoveredMode = mode
+            } else if hoveredMode == mode {
+                hoveredMode = nil
+            }
+        }
+        .help(mode.rawValue)
+        .accessibilityLabel(mode.rawValue)
+    }
+
+    private func modeSymbol(
+        _ mode: InspectorMode,
+        isActive: Bool,
+        isHovered: Bool,
+        darkMode: Bool
+    ) -> some View {
+        Image(systemName: isActive ? mode.selectedIconName : mode.iconName)
+            .symbolRenderingMode(.hierarchical)
+            .font(.system(size: 13, weight: isActive ? .semibold : .medium))
+            .foregroundStyle(foregroundColor(isActive: isActive, isHovered: isHovered, darkMode: darkMode))
     }
 
     private func foregroundColor(isActive: Bool, isHovered: Bool, darkMode: Bool) -> Color {
         if isActive {
-            return Color.primary.opacity(InspectorModePillStyle.foregroundSelectedOpacity(darkMode: darkMode))
+            return darkMode
+                ? Color.white.opacity(0.94)
+                : Color.primary.opacity(0.84)
         }
         if isHovered {
-            return Color.primary.opacity(InspectorModePillStyle.foregroundHoverOpacity(darkMode: darkMode))
+            return Color.primary.opacity(darkMode ? 0.84 : 0.68)
         }
-        return Color.primary.opacity(InspectorModePillStyle.foregroundPrimaryOpacity(darkMode: darkMode))
+        if usesNativeGlass {
+            return .primary
+        }
+        return Color.primary.opacity(darkMode ? 0.58 : 0.28)
     }
 
     @ViewBuilder
     private func railBackground(darkMode: Bool) -> some View {
-        if useLiquidGlass {
-            RoundedRectangle(cornerRadius: Metrics.pillCornerRadius, style: .continuous)
-                .fill(.thinMaterial)
-                .overlay {
-                    RoundedRectangle(cornerRadius: Metrics.pillCornerRadius, style: .continuous)
-                        .fill(
-                            Color(nsColor: .windowBackgroundColor)
-                                .opacity(darkMode ? 0.10 : 0.055)
-                        )
-                }
-                .overlay {
-                    RoundedRectangle(cornerRadius: Metrics.pillCornerRadius, style: .continuous)
-                        .strokeBorder(
-                            Color.primary.opacity(darkMode ? 0.055 : 0.040),
-                            lineWidth: 0.46
-                        )
-                }
+        if usesNativeGlass {
+            if #available(macOS 26, *) {
+                nativeRailBackground(darkMode: darkMode)
+            } else {
+                fallbackRailBackground(darkMode: darkMode)
+            }
+        } else if useLiquidGlass {
+            fallbackRailBackground(darkMode: darkMode)
         } else {
             RoundedRectangle(cornerRadius: Metrics.pillCornerRadius, style: .continuous)
                 .fill(Color(nsColor: .controlBackgroundColor).opacity(darkMode ? 0.58 : 0.74))
@@ -1054,47 +1033,133 @@ private struct InspectorModeControl: View {
 
     @ViewBuilder
     private func activePillBackground(darkMode: Bool) -> some View {
-        if useLiquidGlass {
-            RoundedRectangle(cornerRadius: Metrics.pillCornerRadius, style: .continuous)
-                .fill(.thinMaterial)
-                .overlay {
-                    RoundedRectangle(cornerRadius: Metrics.pillCornerRadius, style: .continuous)
-                        .fill(Color(nsColor: .windowBackgroundColor).opacity(darkMode ? 0.14 : 0.08))
-                }
-                .overlay {
-                    RoundedRectangle(cornerRadius: Metrics.pillCornerRadius, style: .continuous)
-                        .strokeBorder(
-                            Color.accentColor.opacity(InspectorModePillStyle.activeStrokeOpacity(darkMode: darkMode)),
-                            lineWidth: 0.52
-                        )
-                }
-                .overlay {
-                    RoundedRectangle(cornerRadius: Metrics.pillCornerRadius, style: .continuous)
-                        .fill(Color.accentColor.opacity(InspectorModePillStyle.activeFillOpacity(darkMode: darkMode)))
-                }
+        if usesNativeGlass {
+            if #available(macOS 26, *) {
+                nativeActivePillBackground(darkMode: darkMode)
+            } else {
+                fallbackActivePillBackground(darkMode: darkMode)
+            }
+        } else if useLiquidGlass {
+            fallbackActivePillBackground(darkMode: darkMode)
         } else {
-            RoundedRectangle(cornerRadius: Metrics.pillCornerRadius, style: .continuous)
-                .fill(Color(nsColor: .windowBackgroundColor).opacity(darkMode ? 0.18 : 0.10))
-                .overlay {
-                    RoundedRectangle(cornerRadius: Metrics.pillCornerRadius, style: .continuous)
-                        .strokeBorder(
-                            Color.accentColor.opacity(InspectorModePillStyle.activeStrokeOpacity(darkMode: darkMode)),
-                            lineWidth: 0.50
-                        )
-                }
+            fallbackActivePillBackground(darkMode: darkMode)
         }
     }
 
     private func hoverPillBackground(darkMode: Bool) -> some View {
         RoundedRectangle(cornerRadius: Metrics.pillCornerRadius, style: .continuous)
-            .fill(Color.primary.opacity(InspectorModePillStyle.hoverFillOpacity(darkMode: darkMode)))
+            .fill(Color.primary.opacity(darkMode ? 0.060 : 0.030))
             .overlay {
                 RoundedRectangle(cornerRadius: Metrics.pillCornerRadius, style: .continuous)
                     .strokeBorder(
-                        Color.primary.opacity(InspectorModePillStyle.hoverStrokeOpacity(darkMode: darkMode)),
+                        Color.primary.opacity(darkMode ? 0.075 : 0.045),
                         lineWidth: 0.50
                     )
             }
+    }
+
+    private func fallbackRailBackground(darkMode: Bool) -> some View {
+        RoundedRectangle(cornerRadius: Metrics.pillCornerRadius, style: .continuous)
+            .fill(Color(nsColor: .windowBackgroundColor).opacity(darkMode ? 0.10 : 0.045))
+            .overlay {
+                RoundedRectangle(cornerRadius: Metrics.pillCornerRadius, style: .continuous)
+                    .strokeBorder(
+                        Color.primary.opacity(darkMode ? 0.060 : 0.038),
+                        lineWidth: 0.5
+                    )
+            }
+    }
+
+    private func fallbackActivePillBackground(darkMode: Bool) -> some View {
+        RoundedRectangle(cornerRadius: Metrics.pillCornerRadius, style: .continuous)
+            .fill(
+                LinearGradient(
+                    colors: darkMode
+                        ? [
+                            Color.white.opacity(0.16),
+                            Color.accentColor.opacity(0.22)
+                        ]
+                        : [
+                            Color.white.opacity(0.70),
+                            Color.accentColor.opacity(0.14)
+                        ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: Metrics.pillCornerRadius, style: .continuous)
+                    .strokeBorder(
+                        darkMode
+                            ? Color.white.opacity(0.16)
+                            : Color.primary.opacity(0.08),
+                        lineWidth: 0.6
+                    )
+            }
+            .overlay {
+                RoundedRectangle(cornerRadius: Metrics.pillCornerRadius, style: .continuous)
+                    .fill(
+                        darkMode
+                            ? Color.accentColor.opacity(0.10)
+                            : Color.white.opacity(0.22)
+                    )
+            }
+    }
+
+    @available(macOS 26, *)
+    private func nativeRailBackground(darkMode: Bool) -> some View {
+        Color.clear
+            .glassEffect(.regular, in: .capsule)
+            .overlay {
+                Capsule()
+                    .fill(Color.white.opacity(darkMode ? 0.015 : 0.06))
+            }
+            .overlay {
+                Capsule()
+                    .strokeBorder(
+                        Color.white.opacity(darkMode ? 0.10 : 0.14),
+                        lineWidth: 0.7
+                    )
+            }
+    }
+
+    @available(macOS 26, *)
+    private func nativeActivePillBackground(darkMode: Bool) -> some View {
+        Capsule()
+            .fill(Color.clear)
+            .glassEffect(.regular.interactive(), in: .capsule)
+            .overlay {
+                Capsule()
+                    .fill(
+                        darkMode
+                            ? Color.white.opacity(0.08)
+                            : Color.white.opacity(0.48)
+                    )
+            }
+            .overlay {
+                Capsule()
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color.white.opacity(darkMode ? 0.22 : 0.64),
+                                Color.accentColor.opacity(darkMode ? 0.24 : 0.12)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .blendMode(.screen)
+            }
+            .overlay {
+                Capsule()
+                    .strokeBorder(
+                        darkMode
+                            ? Color.white.opacity(0.20)
+                            : Color.primary.opacity(0.08),
+                        lineWidth: 0.9
+                    )
+            }
+            .shadow(color: Color.black.opacity(darkMode ? 0.20 : 0.05), radius: 8, y: 3)
     }
 
     private func selectMode(_ mode: InspectorMode) {

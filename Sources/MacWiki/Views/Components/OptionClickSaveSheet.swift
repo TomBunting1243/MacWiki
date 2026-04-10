@@ -14,7 +14,7 @@ struct OptionClickSaveSheet: View {
     let article: Article
     var onComplete: (() -> Void)? = nil
 
-    @AppStorage("optionClickSave.defaultListID") private var defaultListID: String = ""
+    @AppStorage(AppStorageKey.OptionClickSave.defaultListID) private var defaultListID: String = ""
 
     @State private var selectedListID: UUID?
     @State private var selectedTagID: UUID?

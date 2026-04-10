@@ -3,7 +3,7 @@ import SwiftUI
 struct FindOnPageBarView: View {
     @Environment(AppState.self) private var appState
     @Environment(\.colorScheme) private var colorScheme
-    @AppStorage("tabBarLiquidGlass") private var tabBarLiquidGlass = true
+    @AppStorage(AppStorageKey.Chrome.tabBarLiquidGlass) private var tabBarLiquidGlass = true
     @AppStorage(MacWikiGlassRuntime.forceLegacyFallbackKey) private var forceLegacyGlassFallback = false
     let tabID: UUID
     let availableWidth: CGFloat
@@ -295,14 +295,12 @@ struct FindOnPageBarView: View {
 
     private func clearQuery() {
         appState.findOnPageQuery = ""
-        appState.findOnPageMatchFound = nil
-        appState.findOnPageMatchCount = nil
+        appState.clearFindOnPageResults()
         issueFind(query: "", backwards: false)
     }
 
     private func issueFind(query: String, backwards: Bool) {
-        appState.pendingFindOnPageRequest = AppState.FindOnPageRequest(
-            requestID: UUID(),
+        appState.issueFindOnPageRequest(
             tabID: tabID,
             query: query,
             backwards: backwards
@@ -327,10 +325,6 @@ struct FindOnPageBarView: View {
         findTask?.cancel()
         findTask = nil
 
-        appState.showFindOnPage = false
-        appState.findOnPageQuery = ""
-        appState.findOnPageMatchFound = nil
-        appState.findOnPageMatchCount = nil
-        issueFind(query: "", backwards: false)
+        appState.dismissFindOnPage(activeTabID: tabID, clearsWebSelection: true)
     }
 }

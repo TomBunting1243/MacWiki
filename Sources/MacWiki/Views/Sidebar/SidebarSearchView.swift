@@ -140,24 +140,6 @@ struct SidebarSearchView: View {
 
     @FocusState private var isSearchFieldFocused: Bool
 
-    private var usesCompactHeaderChrome: Bool {
-        appState.sidebarVisible
-    }
-
-    private var titleBarHeight: CGFloat {
-        if usesCompactHeaderChrome {
-            return ColumnChromeMetrics.topBarHeight
-        }
-        return max(
-            appState.windowTopObscuredHeight,
-            ColumnChromeMetrics.titleBarClearance + 14
-        )
-    }
-
-    private var titleBarBottomPadding: CGFloat {
-        usesCompactHeaderChrome ? 0 : SidebarSearchMetrics.titleBottomPadding
-    }
-
     private var articleLookup: ArticleLookupIndex {
         articleLookupSnapshot
     }
@@ -364,10 +346,6 @@ struct SidebarSearchView: View {
                 headerBar(layoutClass: layoutClass)
                 resultsContent(layoutClass: layoutClass)
             }
-            .background {
-                SidebarPaneBackground()
-                    .ignoresSafeArea(.container, edges: .bottom)
-            }
         }
         .onAppear {
             refreshArticleLookupSnapshot()
@@ -423,71 +401,6 @@ struct SidebarSearchView: View {
         let isCompactLayout = layoutClass == .compact
 
         return VStack(spacing: 0) {
-            headerTitleBar
-
-            Rectangle()
-                .fill(Color.primary.opacity(ColumnChromeMetrics.internalDividerOpacity(for: colorScheme)))
-                .frame(height: 0.5)
-
-            ZStack {
-                WindowDragHandle(minLength: 80)
-                    .frame(maxWidth: .infinity)
-
-                HStack(spacing: SidebarSearchMetrics.controlsSpacing(for: layoutClass)) {
-                    searchField(layoutClass: layoutClass)
-
-                    if !isCompactLayout {
-                        Text("esc")
-                            .font(.system(size: 10, weight: .medium, design: .rounded))
-                            .foregroundStyle(.tertiary)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 3)
-                            .background(
-                                RoundedRectangle(cornerRadius: SidebarSearchMetrics.badgeCornerRadius, style: .continuous)
-                                    .fill(.quaternary)
-                            )
-                    }
-
-                    Button {
-                        dismissSearch()
-                    } label: {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(.secondary)
-                            .frame(width: ChromeIconMetrics.compactButtonSize, height: ChromeIconMetrics.compactButtonSize)
-                            .background(
-                                RoundedRectangle(cornerRadius: TopChromeControlMetrics.accessoryCornerRadius(compact: true), style: .continuous)
-                                    .fill(Color.primary.opacity(colorScheme == .dark ? 0.18 : 0.08))
-                            )
-                    }
-                    .buttonStyle(.plain)
-                    .help("Close Search")
-                }
-                .padding(.horizontal, ColumnChromeMetrics.horizontalPadding)
-            }
-            .frame(height: ColumnChromeMetrics.topBarHeight)
-
-            Rectangle()
-                .fill(Color.primary.opacity(ColumnChromeMetrics.internalDividerOpacity(for: colorScheme)))
-                .frame(height: 0.5)
-
-            resultsControlsBar(layoutClass: layoutClass)
-        }
-        .background {
-            ColumnChromeBackground()
-        }
-        .overlay(alignment: .bottom) {
-            Rectangle()
-                .fill(Color.primary.opacity(ColumnChromeMetrics.dividerOpacity(for: colorScheme)))
-                .frame(height: 0.5)
-        }
-    }
-
-    private var headerTitleBar: some View {
-        ZStack(alignment: usesCompactHeaderChrome ? .leading : .bottomLeading) {
-            WindowDragHandle(minLength: 140)
-                .frame(maxWidth: .infinity)
-
             HStack(spacing: 8) {
                 Text("Search")
                     .font(.system(size: 14, weight: .semibold))
@@ -501,19 +414,65 @@ struct SidebarSearchView: View {
                     .foregroundStyle(.tertiary)
             }
             .padding(.horizontal, ColumnChromeMetrics.horizontalPadding)
-            .padding(.bottom, titleBarBottomPadding)
-        }
-        .frame(height: titleBarHeight)
-    }
-
-    private func resultsControlsBar(layoutClass: SidebarSearchLayoutClass) -> some View {
-        let showScopeCounts = layoutClass != .compact
-
-        return ZStack {
-            WindowDragHandle(minLength: 80)
-                .frame(maxWidth: .infinity)
+            .padding(.top, 10)
+            .padding(.bottom, 6)
 
             HStack(spacing: SidebarSearchMetrics.controlsSpacing(for: layoutClass)) {
+                searchField(layoutClass: layoutClass)
+
+                if !isCompactLayout {
+                    Text("esc")
+                        .font(.system(size: 10, weight: .medium, design: .rounded))
+                        .foregroundStyle(.tertiary)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 3)
+                        .background(
+                            RoundedRectangle(cornerRadius: SidebarSearchMetrics.badgeCornerRadius, style: .continuous)
+                                .fill(.quaternary)
+                        )
+                }
+
+                Button {
+                    dismissSearch()
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .frame(width: ChromeIconMetrics.compactButtonSize, height: ChromeIconMetrics.compactButtonSize)
+                        .background(
+                            RoundedRectangle(cornerRadius: TopChromeControlMetrics.accessoryCornerRadius(compact: true), style: .continuous)
+                                .fill(Color.primary.opacity(colorScheme == .dark ? 0.18 : 0.08))
+                        )
+                }
+                .buttonStyle(.plain)
+                .help("Close Search")
+            }
+            .padding(.horizontal, ColumnChromeMetrics.horizontalPadding)
+            .padding(.bottom, 8)
+
+            resultsControlsRow(layoutClass: layoutClass)
+                .padding(.horizontal, ColumnChromeMetrics.horizontalPadding)
+                .padding(.bottom, 8)
+        }
+        .background(.bar)
+        .overlay(alignment: .bottom) {
+            Rectangle()
+                .fill(Color.primary.opacity(ColumnChromeMetrics.dividerOpacity(for: colorScheme)))
+                .frame(height: 0.5)
+        }
+    }
+
+    private func resultsControlsRow(layoutClass: SidebarSearchLayoutClass) -> some View {
+        let showScopeCounts = layoutClass != .compact
+        let countText = Text(visibleResultCount, format: .number)
+            .font(.system(size: 13, weight: .semibold))
+            .monospacedDigit()
+            .foregroundStyle(.secondary)
+        let labelText = Text(visibleResultCount == 1 ? "result" : "results")
+            .font(.system(size: 12, weight: .medium))
+            .foregroundStyle(.tertiary)
+
+        return HStack(spacing: SidebarSearchMetrics.controlsSpacing(for: layoutClass)) {
                 Button {
                     readFilter = (readFilter == .unread) ? .all : .unread
                 } label: {
@@ -528,14 +487,7 @@ struct SidebarSearchView: View {
 
                 Spacer(minLength: 0)
 
-                Text("\(visibleResultCount)")
-                    .font(.system(size: 13, weight: .semibold))
-                    .monospacedDigit()
-                    .foregroundStyle(.secondary)
-                + Text(" ")
-                + Text(visibleResultCount == 1 ? "result" : "results")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(.tertiary)
+                Text("\(countText) \(labelText)")
 
                 if showScopeCounts && readFilter == .unread && sourceResultCount != visibleResultCount {
                     Text("·")
@@ -606,10 +558,7 @@ struct SidebarSearchView: View {
                 }
                 .menuStyle(.borderlessButton)
                 .help("Actions")
-            }
-            .padding(.horizontal, ColumnChromeMetrics.horizontalPadding)
         }
-        .frame(height: ColumnChromeMetrics.topBarHeight - 2)
     }
 
     private func searchField(layoutClass: SidebarSearchLayoutClass) -> some View {

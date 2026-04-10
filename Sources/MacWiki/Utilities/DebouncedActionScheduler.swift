@@ -13,9 +13,14 @@ final class DebouncedActionScheduler {
         task?.cancel()
         let delay = self.delay
         task = Task { @MainActor [weak self] in
-            try? await Task.sleep(for: delay)
-            guard !Task.isCancelled else { return }
-            self?.task = nil
+            do {
+                try await Task.sleep(for: delay)
+            } catch {
+                return
+            }
+
+            guard !Task.isCancelled, let self else { return }
+            self.task = nil
             action()
         }
     }

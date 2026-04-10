@@ -264,7 +264,7 @@ document.addEventListener('contextmenu', function (e) {
     }
 }, true);
 
-// Link hover previews (native popover bridge)
+// Link hover previews (SwiftUI floating-overlay bridge)
 (function () {
     if (window._macwikiLinkHoverPreviewInstalled) return;
     window._macwikiLinkHoverPreviewInstalled = true;
@@ -2733,16 +2733,20 @@ window._macwikiTagReferenceSections();
     style.textContent = `
         /* CSS Custom Highlight API styles */
         ::highlight(macwiki-yellow) {
-            background-color: rgba(255, 213, 0, 0.40);
+            background-color: rgba(255, 219, 77, 0.42);
+            color: inherit;
         }
         ::highlight(macwiki-blue) {
-            background-color: rgba(59, 130, 246, 0.35);
+            background-color: rgba(132, 205, 255, 0.40);
+            color: inherit;
         }
         ::highlight(macwiki-pink) {
-            background-color: rgba(236, 72, 153, 0.35);
+            background-color: rgba(255, 154, 190, 0.38);
+            color: inherit;
         }
         ::highlight(macwiki-orange) {
-            background-color: rgba(249, 115, 22, 0.40);
+            background-color: rgba(255, 184, 102, 0.42);
+            color: inherit;
         }
 
         /* Fallback for older browsers using mark elements */
@@ -2750,6 +2754,8 @@ window._macwikiTagReferenceSections();
             border-radius: 3px;
             padding: 2px 1px;
             margin: 0 -1px;
+            color: inherit;
+            -webkit-text-fill-color: currentColor;
             cursor: pointer;
             transition: filter 0.15s ease, box-shadow 0.15s ease;
             box-decoration-break: clone;
@@ -2778,10 +2784,10 @@ window.hasCSSHighlights = function () {
 
 // Map color names to CSS highlight names
 function getHighlightName(color) {
-    if (color.includes('255, 213, 0') || color.includes('yellow')) return 'macwiki-yellow';
-    if (color.includes('59, 130, 246') || color.includes('blue')) return 'macwiki-blue';
-    if (color.includes('236, 72, 153') || color.includes('pink')) return 'macwiki-pink';
-    if (color.includes('249, 115, 22') || color.includes('orange')) return 'macwiki-orange';
+    if (color.includes('255, 219, 77') || color.includes('255, 213, 0') || color.includes('yellow')) return 'macwiki-yellow';
+    if (color.includes('132, 205, 255') || color.includes('59, 130, 246') || color.includes('blue')) return 'macwiki-blue';
+    if (color.includes('255, 154, 190') || color.includes('236, 72, 153') || color.includes('pink')) return 'macwiki-pink';
+    if (color.includes('255, 184, 102') || color.includes('249, 115, 22') || color.includes('orange')) return 'macwiki-orange';
     return 'macwiki-yellow'; // default
 }
 

@@ -202,6 +202,7 @@ func listsSidebarSnapshotFingerprint(
         hasher.combine(area.name)
         hasher.combine(area.icon)
         hasher.combine(area.parentId)
+        hasher.combine(area.isExpanded)
         hasher.combine(area.sortOrder)
         hasher.combine(area.createdAt.timeIntervalSinceReferenceDate.bitPattern)
     }

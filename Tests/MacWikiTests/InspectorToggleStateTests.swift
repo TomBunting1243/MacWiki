@@ -17,21 +17,6 @@ struct InspectorToggleStateTests {
         }
     }
 
-    @Test func inspectorToggleIsIgnoredDuringFocusMode() {
-        let appState = AppState()
-        openSampleArticle(in: appState)
-        appState.inspectorVisible = true
-
-        appState.setFocusModeEnabled(true)
-        #expect(appState.inspectorVisible == false)
-
-        appState.toggleInspectorVisibility()
-        #expect(appState.inspectorVisible == false)
-
-        appState.setFocusModeEnabled(false)
-        #expect(appState.inspectorVisible == true)
-    }
-
     private func openSampleArticle(in appState: AppState) {
         appState.openArticle(Article(id: "inspector-toggle-sample", title: "Inspector Toggle Sample"))
     }

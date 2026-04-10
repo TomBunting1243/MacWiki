@@ -10,13 +10,13 @@ struct HighlightRowView: View {
     @Environment(AppState.self) private var appState
     @Environment(\.modelContext) private var modelContext
     @Environment(\.colorScheme) private var colorScheme
-    @AppStorage("highlightMarkerStyle") private var highlightMarkerStyle: HighlightMarkerStyle = .dot
+    @AppStorage(AppStorageKey.Highlights.markerStyle) private var highlightMarkerStyle: HighlightMarkerStyle = .dot
     @State private var isEditing = false
     @State private var editedNote = ""
     @State private var isHovered = false
     @State private var isExpanded = false
     @State private var showNewTagSheet = false
-    @AppStorage("highlightHeaderWrap") private var highlightHeaderWrap = false
+    @AppStorage(AppStorageKey.Highlights.headerWrap) private var highlightHeaderWrap = false
     @FocusState private var isNoteEditorFocused: Bool
 
     private var isSelected: Bool {
@@ -369,7 +369,7 @@ struct HighlightRowView: View {
 
         let prefix = before.isEmpty ? "" : "\(before) "
         let suffix = after.isEmpty ? "" : " \(after)"
-        return Text("…") + Text(prefix) + Text(suffix) + Text("…")
+        return Text("…\(prefix)\(suffix)…")
     }
 
     private func jumpToHighlight() {

@@ -406,11 +406,11 @@ extension ArticleContextMenuContent {
         self.onRemove = onRemove
         
         self.onCopyTitle = {
-            _ = SystemBridge.copyText(article.title)
+            ArticleLinkActions.copyTitle(article.title)
         }
         
         self.onCopyLink = {
-            _ = SystemBridge.copyText(WikipediaURLBuilder.articleURLString(forTitle: article.title))
+            ArticleLinkActions.copyWikipediaLink(forTitle: article.title)
         }
     }
 }

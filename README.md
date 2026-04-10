@@ -12,10 +12,12 @@ MacWiki reimagines Wikipedia reading on macOS with:
 
 ## Requirements
 
-- macOS 15.0+ (Sequoia)
-- Xcode 16+ (optional, for debugging)
-- Swift 6.0+
+- macOS 26.0+
+- Xcode 26+ (optional, for debugging)
+- Swift 6.2+
 - Apple Developer account (for App Store distribution)
+
+MacWiki intentionally targets macOS 26 and newer so the app can lean on the current SwiftUI, AppKit, and Liquid Glass system behavior without carrying older-system compatibility branches.
 
 ## Quick Start
 

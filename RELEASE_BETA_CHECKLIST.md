@@ -38,7 +38,7 @@ For the full guided publish flow (prompts + GitHub release upload), run:
 - [ ] App name, version, and build metadata are correct (`Info.plist`).
 - [ ] Settings opens from `Cmd+,`.
 - [ ] About panel includes app name/version plus license/trademark links.
-- [ ] Keyboard-first flows work (`Cmd+K`, `Cmd+T`, `Cmd+Shift+I`, focus mode).
+- [ ] Keyboard-first flows work (`Cmd+K`, `Cmd+T`, `Cmd+Shift+I`).
 - [ ] VoiceOver smoke pass on core navigation surfaces.
 - [ ] Empty/error/loading states are legible in light and dark appearances.
 

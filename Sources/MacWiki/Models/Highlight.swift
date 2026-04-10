@@ -119,7 +119,7 @@ final class Highlight {
     }
 }
 
-/// Available highlight colors - optimized for both light and dark modes
+/// Available highlight colors tuned to feel closer to native marker ink than link tint.
 enum HighlightColor: String, CaseIterable, Codable {
     case yellow = "Yellow"
     case blue = "Blue"
@@ -129,30 +129,30 @@ enum HighlightColor: String, CaseIterable, Codable {
     /// CSS color value for rendering in WebView (works in both light/dark modes)
     var cssColor: String {
         switch self {
-        case .yellow: return "rgba(255, 213, 0, 0.28)"   // Softer opacity for text legibility
-        case .blue: return "rgba(59, 130, 246, 0.26)"    // Tailwind blue-500, softened
-        case .pink: return "rgba(236, 72, 153, 0.26)"    // Tailwind pink-500, softened
-        case .orange: return "rgba(249, 115, 22, 0.28)"  // Tailwind orange-500, softened
+        case .yellow: return "rgba(255, 219, 77, 0.36)"
+        case .blue: return "rgba(132, 205, 255, 0.34)"
+        case .pink: return "rgba(255, 154, 190, 0.32)"
+        case .orange: return "rgba(255, 184, 102, 0.36)"
         }
     }
 
     /// SwiftUI color for UI elements (toolbar, inspector)
     var swiftUIColor: Color {
         switch self {
-        case .yellow: return Color(red: 1.0, green: 0.84, blue: 0.0)   // Matches CSS
-        case .blue: return Color(red: 0.23, green: 0.51, blue: 0.96)   // Matches CSS
-        case .pink: return Color(red: 0.93, green: 0.28, blue: 0.60)   // Matches CSS
-        case .orange: return Color(red: 0.98, green: 0.45, blue: 0.09) // Matches CSS
+        case .yellow: return Color(red: 1.0, green: 0.86, blue: 0.30)
+        case .blue: return Color(red: 0.52, green: 0.80, blue: 0.98)
+        case .pink: return Color(red: 0.96, green: 0.52, blue: 0.70)
+        case .orange: return Color(red: 0.98, green: 0.64, blue: 0.30)
         }
     }
 
     /// Darker variant for borders/accents
     var accentColor: Color {
         switch self {
-        case .yellow: return Color(red: 0.85, green: 0.65, blue: 0.0)
-        case .blue: return Color(red: 0.15, green: 0.39, blue: 0.85)
-        case .pink: return Color(red: 0.83, green: 0.18, blue: 0.50)
-        case .orange: return Color(red: 0.88, green: 0.35, blue: 0.0)
+        case .yellow: return Color(red: 0.86, green: 0.67, blue: 0.10)
+        case .blue: return Color(red: 0.24, green: 0.55, blue: 0.83)
+        case .pink: return Color(red: 0.80, green: 0.31, blue: 0.50)
+        case .orange: return Color(red: 0.86, green: 0.45, blue: 0.10)
         }
     }
 

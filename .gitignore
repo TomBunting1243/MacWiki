@@ -8,11 +8,13 @@ Package.resolved
 
 # Xcode user and build data
 DerivedData/
+.derivedData/
 *.xcworkspace/xcuserdata/
 *.xcodeproj/xcuserdata/
 xcuserdata/
 
 # Local tool/editor state
+.codex/
 .claude/
 .agent/
 AGENTS.md
@@ -28,4 +30,6 @@ default.profraw
 
 # Temporary logs/artifacts
 *.log
+__pycache__/
+*.pyc
 dist/

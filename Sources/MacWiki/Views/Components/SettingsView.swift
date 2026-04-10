@@ -6,10 +6,10 @@ struct SettingsView: View {
     @Environment(AppState.self) private var appState
     @Environment(\.modelContext) private var modelContext
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @AppStorage("labelDisplayMode") private var labelDisplayMode: LabelDisplayMode = .rowHighlight
-    @AppStorage("highlightMarkerStyle") private var highlightMarkerStyle: HighlightMarkerStyle = .dot
-    @AppStorage("highlightHeaderWrap") private var highlightHeaderWrap = false
-    @AppStorage("nativeHighlightingMenuEnabled") private var nativeHighlightingMenuEnabled = false
+    @AppStorage(AppStorageKey.Labels.displayMode) private var labelDisplayMode: LabelDisplayMode = .rowHighlight
+    @AppStorage(AppStorageKey.Highlights.markerStyle) private var highlightMarkerStyle: HighlightMarkerStyle = .dot
+    @AppStorage(AppStorageKey.Highlights.headerWrap) private var highlightHeaderWrap = false
+    @AppStorage(AppStorageKey.Chrome.nativeHighlightingMenuEnabled) private var nativeHighlightingMenuEnabled = false
     @AppStorage(ReaderAppearanceStorageKey.fontPreset) private var readerFontPreset: ReaderFontPreset = .system
     @AppStorage(ReaderAppearanceStorageKey.fontSize) private var readerFontSize: Double = ReaderAppearance.default.fontSize
     @AppStorage(ReaderAppearanceStorageKey.lineHeight) private var readerLineHeight: Double = ReaderAppearance.default.lineHeight
@@ -17,10 +17,10 @@ struct SettingsView: View {
     @AppStorage(ReaderAppearanceStorageKey.contentWidth) private var readerContentWidth: Double = ReaderAppearance.default.contentWidth
     @AppStorage(ReaderAppearanceStorageKey.horizontalPadding) private var readerHorizontalPadding: Double = ReaderAppearance.default.horizontalPadding
     @AppStorage(ReaderAppearanceStorageKey.headingScale) private var readerHeadingScale: Double = ReaderAppearance.default.headingScale
-    @AppStorage("discoverOpenMode") private var discoverOpenMode: DiscoverOpenMode = .sidebar
-    @AppStorage("searchPresentationMode") private var searchPresentationMode: SearchPresentationMode = .overlay
-    @AppStorage("recentsScope") private var recentsScope: RecentsScope = .currentTab
-    @AppStorage("tabBarLiquidGlass") private var tabBarLiquidGlass = true
+    @AppStorage(AppStorageKey.Discover.openMode) private var discoverOpenMode: DiscoverOpenMode = .sidebar
+    @AppStorage(AppStorageKey.Search.presentationMode) private var searchPresentationMode: SearchPresentationMode = .overlay
+    @AppStorage(AppStorageKey.Recents.scope) private var recentsScope: RecentsScope = .currentTab
+    @AppStorage(AppStorageKey.Chrome.tabBarLiquidGlass) private var tabBarLiquidGlass = true
     @AppStorage(MacWikiGlassRuntime.forceLegacyFallbackKey) private var forceLegacyGlassFallback = false
     @AppStorage(TabAccompanimentStorageKey.showSavedMarker) private var showSavedTabMarker = true
     @AppStorage(TabAccompanimentStorageKey.showHighlightMarker) private var showHighlightTabMarker = true
@@ -28,7 +28,7 @@ struct SettingsView: View {
     @AppStorage(TabAccompanimentStorageKey.showProgressTrack) private var showTabProgressTrack = true
     @AppStorage(TabAccompanimentStorageKey.showActiveDepth) private var showTabActiveDepth = true
     @AppStorage(ExperimentFlag.wikiHopPOCEnabled.key) private var wikiHopPOCEnabled = false
-    @AppStorage("features.wikiHopPostV1Enabled") private var wikiHopPostV1Enabled = false
+    @AppStorage(AppStorageKey.Features.wikiHopPostV1Enabled) private var wikiHopPostV1Enabled = false
     @State private var cacheMetrics: WikipediaService.CacheMetrics?
     @State private var performanceMetrics = PerformanceMetricsStore.shared
     @State private var isCacheActionRunning = false
@@ -537,7 +537,7 @@ struct SettingsView: View {
             settingDescription("Wrap enables long highlight section titles to continue on multiple lines. Native menu uses macOS text-selection highlighting in the article view.")
 
             GroupBox("Toolbar") {
-                Text("Open `View > Customize Toolbar…` from the menu bar to show, hide, and rearrange toolbar controls.")
+                Text("The toolbar layout is fixed in the current build so navigation and reading controls stay in consistent positions.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)

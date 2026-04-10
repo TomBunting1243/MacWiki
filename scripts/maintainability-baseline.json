@@ -1,0 +1,33 @@
+{
+  "thresholds": {
+    "swiftui_view_lines": 500,
+    "service_lines": 1000
+  },
+  "placeholder_patterns": [
+    "remains same"
+  ],
+  "approved_appstorage_key_definition_files": [
+    "Sources/MacWiki/Models/ExperimentFlag.swift",
+    "Sources/MacWiki/Models/ReaderAppearance.swift",
+    "Sources/MacWiki/Models/TabAccompanimentSettings.swift",
+    "Sources/MacWiki/Utilities/AppStorageKey.swift"
+  ],
+  "duplicate_helper_functions": [
+    "copyToClipboard",
+    "wikipediaURLString",
+    "copyWikipediaLink",
+    "copyTitle"
+  ],
+  "duplicate_helper_scope_files": [
+    "Sources/MacWiki/Views/Components/TabBarView.swift",
+    "Sources/MacWiki/Views/Home/DiscoverNewTabPageView.swift",
+    "Sources/MacWiki/Views/Sidebar/DirectoryView.swift"
+  ],
+  "hotspots": {
+    "Sources/MacWiki/App/AppState.swift": 1444,
+    "Sources/MacWiki/Services/WikipediaService.swift": 2984,
+    "Sources/MacWiki/Views/Components/WebView.swift": 4697,
+    "Sources/MacWiki/Views/Home/DiscoverNewTabPageView.swift": 4560,
+    "Sources/MacWiki/Views/Sidebar/DirectoryView.swift": 5473
+  }
+}

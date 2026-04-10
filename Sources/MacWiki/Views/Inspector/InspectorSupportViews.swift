@@ -98,17 +98,17 @@ struct InspectorLabelSection: View {
                 .font(.system(size: 9, weight: .semibold))
                 .foregroundStyle(.tertiary)
         }
-        .padding(.horizontal, 12)
-        .frame(height: 29)
+        .padding(.horizontal, 11)
+        .frame(height: 27)
         .contentShape(Capsule())
         .background(
             Capsule()
-                .fill(color?.opacity(0.09) ?? Color.secondary.opacity(0.05))
+                .fill(color?.opacity(0.06) ?? Color.secondary.opacity(0.032))
         )
         .overlay {
             Capsule()
                 .strokeBorder(
-                    color?.opacity(isHovered ? 0.36 : 0.22) ?? Color.primary.opacity(isHovered ? 0.16 : 0.08),
+                    color?.opacity(isHovered ? 0.28 : 0.16) ?? Color.primary.opacity(isHovered ? 0.11 : 0.055),
                     lineWidth: isHovered ? 1.0 : 0.8
                 )
         }

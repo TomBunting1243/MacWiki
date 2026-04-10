@@ -1,4 +1,5 @@
 import SwiftUI
+
 /// Main content view implementing the four-column layout
 ///
 /// Layout:
@@ -13,8 +14,6 @@ struct ContentView: View {
     }
 
     @Environment(AppState.self) private var appState
-    @Environment(\.modelContext) private var modelContext
-    @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var selectedList: ReadingList?
     @State private var selectedLabel: Label?
@@ -29,13 +28,9 @@ struct ContentView: View {
     // Tag management (Shared)
     @State private var showNewTagSheet = false
     @State private var articleForNewTag: Article?
-    @AppStorage("tabBarLiquidGlass") private var tabBarLiquidGlass = true
-    @AppStorage("listsSidebarWidth") private var listsSidebarWidth: Double = 204
-    @AppStorage("directoryColumnWidth") private var directoryColumnWidth: Double = 272
-    @AppStorage("inspectorWidth") private var inspectorWidth: Double = 240
-    @AppStorage("searchPresentationMode") private var searchPresentationMode: SearchPresentationMode = .overlay
+    @AppStorage(AppStorageKey.Search.presentationMode) private var searchPresentationMode: SearchPresentationMode = .overlay
     @AppStorage(ExperimentFlag.wikiHopPOCEnabled.key) private var wikiHopPOCEnabled = false
-    @AppStorage("features.wikiHopPostV1Enabled") private var wikiHopPostV1Enabled = false
+    @AppStorage(AppStorageKey.Features.wikiHopPostV1Enabled) private var wikiHopPostV1Enabled = false
     @State private var suppressInitialImplicitAnimations = true
     @State private var hasAppliedLaunchQAHarnessOverrides = false
 
@@ -45,7 +40,6 @@ struct ContentView: View {
 
     private enum PanelMotion {
         static let sidebarToggle = ColumnMotion.sidebarVisibility
-        static let inspectorToggle = ColumnMotion.inspectorVisibility
         static let searchOverlayToggle = Animation.spring(response: 0.24, dampingFraction: 0.88)
         static let wikiHopSummaryFade = Animation.easeInOut(duration: 0.3)
     }
@@ -58,25 +52,10 @@ struct ContentView: View {
         }
     }
 
-    private var resolvedListsSidebarWidth: CGFloat {
-        CGFloat(min(max(listsSidebarWidth, 176), 260))
-    }
-
-    private var resolvedDirectoryIdealWidth: CGFloat {
-        CGFloat(min(max(directoryColumnWidth, 212), 360))
-    }
-
-    private var resolvedInspectorIdealWidth: CGFloat {
-        CGFloat(min(max(inspectorWidth, 220), 380))
-    }
-
     var body: some View {
         ZStack(alignment: .topLeading) {
             workspaceSharedBackground
             mainWindowContent
-            titlebarRoofOverlay
-            sidebarWindowDragOverlay
-            inspectorRevealOverlay
             wikiHopOverlay
             searchOverlay
         }
@@ -88,12 +67,6 @@ struct ContentView: View {
             showNewTagSheet: $showNewTagSheet,
             articleForNewTag: $articleForNewTag
         )
-        .onPreferenceChange(WindowTopObscuredHeightPreferenceKey.self) { newValue in
-            let resolved = max(0, newValue)
-            if abs(appState.windowTopObscuredHeight - resolved) > 0.5 {
-                appState.windowTopObscuredHeight = resolved
-            }
-        }
         .onAppear {
             applyLaunchQAHarnessOverridesIfNeeded()
             enforceWikiHopAvailabilityIfNeeded()
@@ -128,9 +101,9 @@ struct ContentView: View {
         .onChange(of: appState.isWikiHopNavigationLocked) { _, _ in
             if appState.isWikiHopNavigationLocked {
                 // Determine if we need to force close
-                if appState.sidebarVisible {
+                if appState.listsSidebarVisible || appState.directoryColumnVisible {
                     performAnimation(PanelMotion.sidebarToggle) {
-                        appState.sidebarVisible = false
+                        appState.setNavigationColumnsVisible(false)
                     }
                 }
             }
@@ -144,26 +117,19 @@ struct ContentView: View {
 
     private var mainWindowContent: some View {
         mainSplitView
-            .background {
-                WindowTopObscuredHeightReader()
-            }
     }
 
     // MARK: - Layout Components
     
     @ViewBuilder
     private var mainSplitView: some View {
-        AppKitMainSplitView(
+        MainWindowShell(
             selectedList: $selectedList,
             selectedLabel: $selectedLabel,
             selectedTag: $selectedTag,
             rootSelection: $rootSelection,
             showNewLabelSheet: $showNewLabelSheet,
             articleForNewLabel: $articleForNewLabel,
-            listsSidebarWidth: resolvedListsSidebarWidth,
-            directoryIdealWidth: resolvedDirectoryIdealWidth,
-            inspectorIdealWidth: resolvedInspectorIdealWidth,
-            tabBarLiquidGlass: tabBarLiquidGlass,
             onEditLabel: { label in editingLabel = label },
             onAddNewLabel: { showNewLabelSheet = true },
             onNewLabelWithArticle: { article in
@@ -185,7 +151,7 @@ struct ContentView: View {
                 let clampedWidth = min(QuickSearchView.idealSize.width, containerSize.width * 0.82)
                 let clampedHeight = min(QuickSearchView.idealSize.height, containerSize.height * 0.78)
                 let modalSize = CGSize(width: clampedWidth, height: clampedHeight)
-                let topInset = max(appState.windowTopObscuredHeight + 18, 28)
+                let topInset = max(proxy.safeAreaInsets.top + 18, 28)
 
                 ZStack(alignment: .top) {
                     Color.black.opacity(0.08)
@@ -235,132 +201,6 @@ struct ContentView: View {
             .ignoresSafeArea(.container, edges: [.leading, .trailing, .bottom])
     }
 
-    private var visibleInspectorWidth: CGFloat {
-        appState.inspectorVisible && !appState.isFocusModeEnabled ? resolvedInspectorIdealWidth : 0
-    }
-
-    private var titlebarBandHeight: CGFloat {
-        ColumnChromeMetrics.titlebarBandHeight(windowTopObscuredHeight: appState.windowTopObscuredHeight)
-    }
-
-    private var commandBarTopPadding: CGFloat {
-        max(6, (titlebarBandHeight - ColumnChromeMetrics.commandBarHeight) * 0.5)
-    }
-
-    @ViewBuilder
-    private var titlebarRoofOverlay: some View {
-        let sidebarWidth = appState.sidebarVisible ? resolvedListsSidebarWidth : 0
-        let inspectorWidth = visibleInspectorWidth
-
-        ZStack(alignment: .topLeading) {
-            if sidebarWidth > 0 {
-                SidebarPaneBackground()
-                    .frame(width: sidebarWidth, height: titlebarBandHeight)
-                    .overlay(alignment: .trailing) {
-                        Rectangle()
-                            .fill(Color.primary.opacity(0.065))
-                            .frame(width: 0.5)
-                    }
-                    .ignoresSafeArea(.container, edges: .top)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-
-                SidebarTitlebarAccessory()
-                    .environment(appState)
-                    .frame(width: sidebarWidth, height: titlebarBandHeight, alignment: .trailing)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            }
-
-            if inspectorWidth > 0 {
-                PaneTitlebarCapBackground(flavor: .inspector)
-                    .frame(width: inspectorWidth, height: titlebarBandHeight)
-                    .overlay(alignment: .leading) {
-                        Rectangle()
-                            .fill(Color.primary.opacity(0.065))
-                            .frame(width: 0.5)
-                    }
-                    .ignoresSafeArea(.container, edges: .top)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-            }
-
-            MainWindowCommandBar()
-                .environment(appState)
-                .environment(\.modelContext, modelContext)
-                .frame(height: ColumnChromeMetrics.commandBarHeight)
-                .padding(.top, commandBarTopPadding)
-                .padding(.leading, sidebarWidth + 12)
-                .padding(.trailing, inspectorWidth + 12)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        }
-        .ignoresSafeArea(.container, edges: .top)
-        .zIndex(35)
-    }
-
-    private var chromeRevealTopPadding: CGFloat {
-        let topObscuredHeight = max(appState.windowTopObscuredHeight, ColumnChromeMetrics.topBarHeight)
-        return max(6, (topObscuredHeight - ChromeIconMetrics.buttonSize) * 0.5)
-    }
-
-    private var sidebarDragHeight: CGFloat {
-        max(
-            appState.windowTopObscuredHeight + ColumnChromeMetrics.topBarHeight + 8,
-            ColumnChromeMetrics.titleBarClearance + ColumnChromeMetrics.topBarHeight + 8
-        )
-    }
-
-    private var sidebarDragWidth: CGFloat {
-        let reservedTrailingControls: CGFloat = 52
-        return max(96, resolvedListsSidebarWidth - reservedTrailingControls)
-    }
-
-    @ViewBuilder
-    private var sidebarWindowDragOverlay: some View {
-        if appState.sidebarVisible {
-            WindowDragHandle(minLength: sidebarDragWidth)
-                .frame(width: sidebarDragWidth, height: sidebarDragHeight, alignment: .leading)
-                .frame(maxWidth: .infinity, alignment: .topLeading)
-                .ignoresSafeArea(.container, edges: .top)
-                .zIndex(45)
-        }
-    }
-
-    @ViewBuilder
-    private var inspectorRevealOverlay: some View {
-        if !appState.inspectorVisible && appState.isWikiHopNavigationLocked {
-            HStack {
-                Spacer(minLength: 0)
-                    .allowsHitTesting(false)
-                Button {
-                    performAnimation(PanelMotion.inspectorToggle) {
-                        appState.inspectorVisible = true
-                    }
-                } label: {
-                    Image(systemName: "sidebar.trailing")
-                        .font(.system(size: ChromeIconMetrics.symbolPointSize, weight: ChromeIconMetrics.regularWeight))
-                        .imageScale(.medium)
-                        .foregroundStyle(Color.primary.opacity(0.84))
-                        .frame(width: 34, height: ChromeIconMetrics.buttonSize)
-                        .background(
-                            Capsule(style: .continuous)
-                                .fill(.ultraThinMaterial)
-                                .overlay {
-                                    Color(nsColor: .windowBackgroundColor)
-                                        .opacity(colorScheme == .dark ? 0.14 : 0.06)
-                                }
-                        )
-                        .overlay(
-                            Capsule(style: .continuous)
-                                .strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.14 : 0.10), lineWidth: 0.7)
-                        )
-                }
-                .buttonStyle(.plain)
-                .help("Show Inspector")
-                .padding(.trailing, 14)
-            }
-            .padding(.top, chromeRevealTopPadding)
-            .zIndex(50)
-        }
-    }
-
     private func enforceWikiHopAvailabilityIfNeeded() {
         if !wikiHopPostV1Enabled, wikiHopPOCEnabled {
             appState.setWikiHopExperimentEnabled(false)
@@ -380,12 +220,11 @@ struct ContentView: View {
     private func revealSidebarForEmbeddedSearchIfNeeded() {
         guard appState.showSearch else { return }
         guard searchPresentationMode == .sidebar else { return }
-        guard !appState.isFocusModeEnabled else { return }
-        guard !appState.sidebarVisible else { return }
+        guard !appState.listsSidebarVisible || !appState.directoryColumnVisible else { return }
         guard !appState.isWikiHopNavigationLocked else { return }
 
         performAnimation(PanelMotion.sidebarToggle) {
-            appState.sidebarVisible = true
+            appState.setNavigationColumnsVisible(true)
         }
     }
 
@@ -412,9 +251,9 @@ struct ContentView: View {
 extension ContentView {
     // Add logic to enforce sidebar hidden state when locked
     func enforceWikiHopSidebar() {
-        if appState.isWikiHopNavigationLocked && appState.sidebarVisible {
+        if appState.isWikiHopNavigationLocked && (appState.listsSidebarVisible || appState.directoryColumnVisible) {
             performAnimation(PanelMotion.sidebarToggle) {
-                appState.sidebarVisible = false
+                appState.setNavigationColumnsVisible(false)
             }
         }
     }

@@ -3,21 +3,30 @@ import SwiftData
 
 enum TabBarChromeStyle {
     case standalone
-    case toolbar
+    case titlebarAccessory
     case strip
+
+    var isCompactChrome: Bool {
+        switch self {
+        case .standalone:
+            return false
+        case .titlebarAccessory, .strip:
+            return true
+        }
+    }
 
     var height: CGFloat {
         switch self {
         case .standalone: return 52
-        case .toolbar: return ColumnChromeMetrics.topBarHeight
-        case .strip: return ColumnChromeMetrics.topBarHeight
+        case .titlebarAccessory: return 34
+        case .strip: return 32
         }
     }
 
     var horizontalPadding: CGFloat {
         switch self {
         case .standalone: return 16
-        case .toolbar: return 14
+        case .titlebarAccessory: return 10
         case .strip: return 14
         }
     }
@@ -25,7 +34,7 @@ enum TabBarChromeStyle {
     var verticalPadding: CGFloat {
         switch self {
         case .standalone: return 10
-        case .toolbar: return 2
+        case .titlebarAccessory: return 3
         case .strip: return 2
         }
     }
@@ -33,7 +42,7 @@ enum TabBarChromeStyle {
     var tabMaxWidth: CGFloat {
         switch self {
         case .standalone: return 240
-        case .toolbar: return 240
+        case .titlebarAccessory: return 240
         case .strip: return 240
         }
     }
@@ -41,7 +50,7 @@ enum TabBarChromeStyle {
     var tabMinWidth: CGFloat {
         switch self {
         case .standalone: return 160
-        case .toolbar: return 120
+        case .titlebarAccessory: return 128
         case .strip: return 120
         }
     }
@@ -49,7 +58,7 @@ enum TabBarChromeStyle {
     var newTabButtonSize: CGFloat {
         switch self {
         case .standalone: return 32
-        case .toolbar: return 32
+        case .titlebarAccessory: return 28
         case .strip: return 24
         }
     }
@@ -107,7 +116,7 @@ struct TabBarView: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage(MacWikiGlassRuntime.forceLegacyFallbackKey) private var forceLegacyGlassFallback = false
-    @AppStorage("tabBarLiquidGlass") private var tabBarLiquidGlass = true
+    @AppStorage(AppStorageKey.Chrome.tabBarLiquidGlass) private var tabBarLiquidGlass = true
     @AppStorage(TabAccompanimentStorageKey.showSavedMarker) private var showSavedTabMarker = true
     @AppStorage(TabAccompanimentStorageKey.showHighlightMarker) private var showHighlightTabMarker = true
     @AppStorage(TabAccompanimentStorageKey.showReadMarker) private var showReadTabMarker = true
@@ -117,6 +126,7 @@ struct TabBarView: View {
     @Query(sort: \Label.sortOrder) private var allLabels: [Label]
     @Query(sort: \Highlight.updatedAt, order: .reverse) private var highlights: [Highlight]
     let chromeStyle: TabBarChromeStyle
+    let showsTopDivider: Bool
     let onNewLabelWithArticle: (SavedArticle) -> Void
     
     // MARK: - Drag State
@@ -189,7 +199,7 @@ struct TabBarView: View {
             + (showsOverflowMenu ? (chromeStyle == .strip ? chromeStyle.newTabButtonSize + 8 : chromeStyle.newTabButtonSize + 12) : 0)
         let available = max(200, viewport - buttonReserve)
 
-        if chromeStyle == .strip || chromeStyle == .toolbar {
+        if chromeStyle.isCompactChrome {
             // Proportional sizing: each tab gets an equal share, clamped to min/max.
             let tabCount = max(1, appState.openTabs.count)
             let totalSpacing = tabSpacing * CGFloat(max(0, tabCount - 1))
@@ -209,9 +219,11 @@ struct TabBarView: View {
 
     init(
         chromeStyle: TabBarChromeStyle = .standalone,
+        showsTopDivider: Bool = true,
         onNewLabelWithArticle: @escaping (SavedArticle) -> Void
     ) {
         self.chromeStyle = chromeStyle
+        self.showsTopDivider = showsTopDivider
         self.onNewLabelWithArticle = onNewLabelWithArticle
     }
 
@@ -227,7 +239,7 @@ struct TabBarView: View {
         let savedTitles = savedArticleTitleSet
         let highlightedTitles = highlightedArticleTitleSet
 
-        HStack(spacing: (chromeStyle == .strip || chromeStyle == .toolbar) ? 8 : 8) {
+        HStack(spacing: 8) {
             ScrollViewReader { proxy in
                 ScrollView(.horizontal) {
                     MacWikiGlassGroup(spacing: tabSpacing) {
@@ -354,17 +366,24 @@ struct TabBarView: View {
         if chromeStyle == .strip {
             ReaderTabLaneBackground()
                 .overlay(alignment: .top) {
-                    Rectangle()
-                        .fill(Color.primary.opacity(ColumnChromeMetrics.internalDividerOpacity(for: colorScheme)))
-                        .frame(height: 0.5)
+                    if showsTopDivider {
+                        Rectangle()
+                            .fill(Color.primary.opacity(ColumnChromeMetrics.internalDividerOpacity(for: colorScheme)))
+                            .frame(height: 0.5)
+                    }
                 }
                 .overlay(alignment: .bottom) {
                     Rectangle()
                         .fill(Color.primary.opacity(ColumnChromeMetrics.dividerOpacity(for: colorScheme)))
                         .frame(height: 0.5)
                 }
-        } else if chromeStyle == .toolbar {
-            Color.clear
+        } else if chromeStyle == .titlebarAccessory {
+            ReaderTabLaneBackground()
+                .overlay(alignment: .bottom) {
+                    Rectangle()
+                        .fill(Color.primary.opacity(ColumnChromeMetrics.dividerOpacity(for: colorScheme)))
+                        .frame(height: 0.5)
+                }
         } else if chromeStyle == .standalone {
             if tabBarLiquidGlass {
                 Rectangle().fill(.ultraThinMaterial)
@@ -382,7 +401,7 @@ struct TabBarView: View {
     @ViewBuilder
     private func stripAccessoryBackground() -> some View {
         let darkMode = colorScheme == .dark
-        if chromeStyle == .strip || chromeStyle == .toolbar {
+        if chromeStyle.isCompactChrome {
             let cornerRadius = stripAccessoryCornerRadius
             let compactAccessory = chromeStyle == .strip
             if #available(macOS 26, *), usesNativeGlassAccessories {
@@ -464,7 +483,7 @@ struct TabBarView: View {
                     }
                 } label: {
                     SwiftUI.Label {
-                        Text(tab.article.title)
+                        Text(tab.title)
                             .lineLimit(1)
                     } icon: {
                         Image(systemName: appState.activeTabId == tab.id ? "checkmark.circle.fill" : "circle")
@@ -473,7 +492,7 @@ struct TabBarView: View {
             }
         } label: {
             stripAccessoryLabel(
-                systemImage: chromeStyle == .strip || chromeStyle == .toolbar ? "chevron.down" : "chevron.down.circle",
+                systemImage: chromeStyle.isCompactChrome ? "chevron.down" : "chevron.down.circle",
                 imageScale: .small
             )
         }
@@ -506,7 +525,7 @@ struct TabBarView: View {
 
     @ViewBuilder
     private func stripAccessoryLabel(systemImage: String, imageScale: Image.Scale) -> some View {
-        if chromeStyle == .strip || chromeStyle == .toolbar {
+        if chromeStyle.isCompactChrome {
             Image(systemName: systemImage)
                 .font(.system(size: ChromeIconMetrics.symbolPointSize, weight: ChromeIconMetrics.regularWeight))
                 .imageScale(imageScale)
@@ -534,7 +553,7 @@ struct TabBarView: View {
     private var usesNativeGlassAccessories: Bool {
         guard tabBarLiquidGlass else { return false }
         return MacWikiGlassRuntime.usesNativeGlass(forceLegacyFallback: forceLegacyGlassFallback) &&
-            (chromeStyle == .strip || chromeStyle == .toolbar)
+            chromeStyle.isCompactChrome
     }
 
     @available(macOS 26, *)
@@ -586,6 +605,7 @@ struct TabBarView: View {
         
         // Only trigger neighbor animations when target actually changes
         if newTarget != currentTargetIndex {
+            triggerReorderHaptic()
             performAnimation(interactionProfile.neighborShift) {
                 currentTargetIndex = newTarget
             }
@@ -694,6 +714,11 @@ struct TabBarView: View {
         lastDragAutoScrollTimestamp = now
     }
 
+    private func triggerReorderHaptic() {
+        // SwiftUI owns the interaction now; keep reorder motion visual-only until a
+        // view-scoped sensoryFeedback trigger is introduced for this drag path.
+    }
+
     private func updateTabsViewportWidth(_ newWidth: CGFloat) {
         guard abs(tabsViewportWidth - newWidth) > 0.5 else { return }
         tabsViewportWidth = newWidth
@@ -712,22 +737,22 @@ struct TabBarView: View {
     }
 
     private func normalizedTitle(for tab: ArticleTab) -> String {
-        ReadStateSync.normalizedTitle(tab.article.title)
+        ReadStateSync.normalizedTitle(tab.title)
     }
 
     private func isSaved(_ tab: ArticleTab, savedTitles: Set<String>) -> Bool {
-        guard !tab.isNewTab else { return false }
+        guard !tab.isPlaceholder else { return false }
         return savedTitles.contains(normalizedTitle(for: tab))
     }
 
     private func hasHighlights(_ tab: ArticleTab, highlightedTitles: Set<String>) -> Bool {
-        guard !tab.isNewTab else { return false }
+        guard !tab.isPlaceholder else { return false }
         return highlightedTitles.contains(normalizedTitle(for: tab))
     }
 
     private func readingProgress(for tab: ArticleTab) -> Double {
-        guard !tab.isNewTab else { return 0 }
-        if tab.article.isRead {
+        guard let article = tab.currentArticle else { return 0 }
+        if article.isRead {
             return 1
         }
         let normalized = normalizedTitle(for: tab)
@@ -759,9 +784,9 @@ private struct TabInteractionProfile {
         chromeStyle: TabBarChromeStyle,
         reduceMotion: Bool
     ) -> TabInteractionProfile {
-        let fallbackWidth: CGFloat = (chromeStyle == .toolbar || chromeStyle == .strip) ? 720 : 900
+        let fallbackWidth: CGFloat = chromeStyle.isCompactChrome ? 720 : 900
         let width = viewportWidth > 0 ? viewportWidth : fallbackWidth
-        let isStrip = chromeStyle == .strip || chromeStyle == .toolbar
+        let isStrip = chromeStyle.isCompactChrome
         let density = TopChromeMotion.Density.resolve(for: width)
 
         if reduceMotion {
@@ -933,7 +958,8 @@ private struct DraggableTabItemView: View {
     }
 
     private var matchingSavedArticle: SavedArticle? {
-        let targetTitle = ReadStateSync.normalizedTitle(tab.article.title)
+        guard let article = tab.currentArticle else { return nil }
+        let targetTitle = ReadStateSync.normalizedTitle(article.title)
         for list in lists {
             if let article = list.articles.first(where: {
                 ReadStateSync.normalizedTitle($0.title) == targetTitle
@@ -975,11 +1001,11 @@ private struct DraggableTabItemView: View {
         if !showsFavicon && !showCloseButton {
             return 0
         }
-        return tabWidth < 95 ? 5 : ((chromeStyle == .strip || chromeStyle == .toolbar) ? 6 : 8)
+        return tabWidth < 95 ? 5 : (chromeStyle.isCompactChrome ? 6 : 8)
     }
 
     private var horizontalPadding: CGFloat {
-        tabWidth < 95 ? 8 : ((chromeStyle == .strip || chromeStyle == .toolbar) ? 9 : 11)
+        tabWidth < 95 ? 8 : (chromeStyle.isCompactChrome ? 9 : 11)
     }
 
     private var normalizedProgress: Double {
@@ -987,7 +1013,7 @@ private struct DraggableTabItemView: View {
     }
 
     private var isReadComplete: Bool {
-        normalizedProgress >= 0.995 || tab.article.isRead
+        normalizedProgress >= 0.995 || tab.currentArticle?.isRead == true
     }
 
     private var showsSavedMarker: Bool {
@@ -1003,8 +1029,8 @@ private struct DraggableTabItemView: View {
     }
 
     private var showsSemanticStatusCluster: Bool {
-        !tab.isNewTab &&
-        (chromeStyle == .strip || chromeStyle == .toolbar) &&
+        !tab.isPlaceholder &&
+        chromeStyle.isCompactChrome &&
         tabWidth >= 132 &&
         isActive &&
         (showsSavedMarker || showsHighlightMarker || showsReadMarker)
@@ -1012,8 +1038,8 @@ private struct DraggableTabItemView: View {
 
     private var showsProgressTrack: Bool {
         showProgressTrack &&
-        !tab.isNewTab &&
-        (chromeStyle == .strip || chromeStyle == .toolbar) &&
+        !tab.isPlaceholder &&
+        chromeStyle.isCompactChrome &&
         tabWidth >= 132 &&
         isActive &&
         (normalizedProgress > 0.12 || isReadComplete)
@@ -1023,34 +1049,41 @@ private struct DraggableTabItemView: View {
         switch chromeStyle {
         case .standalone:
             return 34
-        case .toolbar:
-            return 28
+        case .titlebarAccessory:
+            return 30
         case .strip:
             return 28
         }
     }
 
     private var tabCornerRadius: CGFloat {
-        (chromeStyle == .strip || chromeStyle == .toolbar) ? 6 : 9
+        switch chromeStyle {
+        case .standalone:
+            return 9
+        case .titlebarAccessory:
+            return 8
+        case .strip:
+            return 6
+        }
     }
 
     private var closeButtonSize: CGFloat {
-        (chromeStyle == .strip || chromeStyle == .toolbar) ? 18 : 18
+        chromeStyle.isCompactChrome ? 18 : 18
     }
 
     private var closeGlyphSize: CGFloat {
-        (chromeStyle == .strip || chromeStyle == .toolbar) ? 9 : 10
+        chromeStyle.isCompactChrome ? 9 : 10
     }
 
     private var closeButtonBackgroundOpacity: CGFloat {
-        guard (chromeStyle == .strip || chromeStyle == .toolbar) else { return 0 }
+        guard chromeStyle.isCompactChrome else { return 0 }
         return 0
     }
 
     private var hasMicroLift: Bool {
         !reduceMotion &&
         showActiveDepth &&
-        (chromeStyle == .strip || chromeStyle == .toolbar) && isActive && !isDragged
+        chromeStyle.isCompactChrome && isActive && !isDragged
     }
 
     private var restingShadowOpacity: Double {
@@ -1070,7 +1103,7 @@ private struct DraggableTabItemView: View {
     }
 
     private var activeStrokeWidth: CGFloat {
-        (chromeStyle == .strip || chromeStyle == .toolbar) ? 0.0 : 1.0
+        chromeStyle.isCompactChrome ? 0.0 : 1.0
     }
     
     var body: some View {
@@ -1127,7 +1160,7 @@ private struct DraggableTabItemView: View {
             }
             .buttonStyle(.plain)
             .accessibilityElement(children: .combine)
-            .accessibilityLabel(tab.article.title)
+            .accessibilityLabel(tab.title)
             .accessibilityValue(isActive ? "Active tab" : "Tab")
             .accessibilityHint("Opens this tab")
 
@@ -1181,7 +1214,7 @@ private struct DraggableTabItemView: View {
     }
 
     private var usesStripGlassCells: Bool {
-        chromeStyle == .strip || chromeStyle == .toolbar
+        chromeStyle.isCompactChrome
     }
 
     private var showsStripDivider: Bool {
@@ -1197,14 +1230,22 @@ private struct DraggableTabItemView: View {
             } else {
                 RoundedRectangle(cornerRadius: tabCornerRadius, style: .continuous)
                     .fill(Color.clear)
+                    .overlay {
+                        RoundedRectangle(cornerRadius: tabCornerRadius, style: .continuous)
+                            .strokeBorder(
+                                Color.primary.opacity(colorScheme == .dark ? 0.040 : 0.055),
+                                lineWidth: 0.42
+                            )
+                    }
             }
         } else if tabBarLiquidGlass {
+            let accessoryStyle = chromeStyle == .titlebarAccessory
             let edgeOpacity = darkMode
-                ? (isActive ? 0.072 : (isHovered ? 0.046 : 0.030))
-                : (isActive ? 0.066 : (isHovered ? 0.044 : 0.028))
+                ? (isActive ? (accessoryStyle ? 0.058 : 0.072) : (isHovered ? (accessoryStyle ? 0.040 : 0.046) : (accessoryStyle ? 0.024 : 0.030)))
+                : (isActive ? (accessoryStyle ? 0.052 : 0.066) : (isHovered ? (accessoryStyle ? 0.036 : 0.044) : (accessoryStyle ? 0.020 : 0.028)))
             let neutralFillOpacity = darkMode
-                ? (isActive ? 0.18 : (isHovered ? 0.10 : 0.055))
-                : (isActive ? 0.12 : (isHovered ? 0.065 : 0.036))
+                ? (isActive ? (accessoryStyle ? 0.14 : 0.18) : (isHovered ? (accessoryStyle ? 0.075 : 0.10) : (accessoryStyle ? 0.038 : 0.055)))
+                : (isActive ? (accessoryStyle ? 0.095 : 0.12) : (isHovered ? (accessoryStyle ? 0.050 : 0.065) : (accessoryStyle ? 0.026 : 0.036)))
             RoundedRectangle(cornerRadius: tabCornerRadius, style: .continuous)
                 .fill(AnyShapeStyle(.thinMaterial))
                 .overlay {
@@ -1219,7 +1260,7 @@ private struct DraggableTabItemView: View {
                 }
                 .overlay(
                     RoundedRectangle(cornerRadius: tabCornerRadius, style: .continuous)
-                        .strokeBorder(Color.primary.opacity(edgeOpacity), lineWidth: isActive ? 0.46 : 0.38)
+                        .strokeBorder(Color.primary.opacity(edgeOpacity + (isActive ? 0 : 0.010)), lineWidth: isActive ? 0.46 : 0.44)
                 )
         } else {
             let fillOpacity: CGFloat = {
@@ -1249,8 +1290,8 @@ private struct DraggableTabItemView: View {
                 .overlay(
                     RoundedRectangle(cornerRadius: tabCornerRadius, style: .continuous)
                         .strokeBorder(
-                            (darkMode ? Color.white : Color.black).opacity(strokeOpacity),
-                            lineWidth: isActive ? 0.50 : 0.42
+                            (darkMode ? Color.white : Color.black).opacity(isActive ? strokeOpacity : strokeOpacity + 0.014),
+                            lineWidth: isActive ? 0.50 : 0.46
                         )
                 )
         }
@@ -1259,7 +1300,7 @@ private struct DraggableTabItemView: View {
     private var usesNativeStripGlassCells: Bool {
         guard tabBarLiquidGlass else { return false }
         return MacWikiGlassRuntime.usesNativeGlass(forceLegacyFallback: forceLegacyGlassFallback) &&
-            (chromeStyle == .strip || chromeStyle == .toolbar)
+            chromeStyle.isCompactChrome
     }
 
     @ViewBuilder
@@ -1270,7 +1311,7 @@ private struct DraggableTabItemView: View {
                 RoundedRectangle(cornerRadius: tabCornerRadius, style: .continuous)
                     .fill(
                         Color(nsColor: .controlBackgroundColor)
-                            .opacity(darkMode ? 0.38 : 0.72)
+                            .opacity(chromeStyle == .titlebarAccessory ? (darkMode ? 0.30 : 0.62) : (darkMode ? 0.38 : 0.72))
                     )
                     .overlay {
                         RoundedRectangle(cornerRadius: tabCornerRadius, style: .continuous)
@@ -1287,7 +1328,7 @@ private struct DraggableTabItemView: View {
                 RoundedRectangle(cornerRadius: tabCornerRadius, style: .continuous)
                     .fill(
                         Color(nsColor: .windowBackgroundColor)
-                            .opacity(darkMode ? 0.10 : 0.20)
+                            .opacity(chromeStyle == .titlebarAccessory ? (darkMode ? 0.08 : 0.16) : (darkMode ? 0.10 : 0.20))
                     )
                     .overlay {
                         RoundedRectangle(cornerRadius: tabCornerRadius, style: .continuous)
@@ -1335,7 +1376,7 @@ private struct DraggableTabItemView: View {
     
     private var dragGesture: some Gesture {
         DragGesture(
-            minimumDistance: (chromeStyle == .strip || chromeStyle == .toolbar) ? 1 : interactionProfile.dragStartDistance,
+            minimumDistance: chromeStyle.isCompactChrome ? 1 : interactionProfile.dragStartDistance,
             coordinateSpace: .named("TabBarSpace")
         )
             .updating($isDragActive) { _, state, _ in
@@ -1350,7 +1391,7 @@ private struct DraggableTabItemView: View {
     }
     
     private var faviconView: some View {
-        CachedThumbnailImage(url: tab.article.thumbnailURL, targetSize: CGSize(width: 16, height: 16)) { image in
+        CachedThumbnailImage(url: tab.currentArticle?.thumbnailURL, targetSize: CGSize(width: 16, height: 16)) { image in
             image
                 .resizable()
                 .aspectRatio(contentMode: .fill)
@@ -1418,7 +1459,7 @@ private struct DraggableTabItemView: View {
     }
     
     private var titleView: some View {
-        Text(tab.article.title)
+        Text(tab.title)
             .font(
                 .system(
                     size: chromeStyle == .strip ? (tabWidth < 95 ? 12 : 12.5) : (tabWidth < 95 ? 12 : 13),
@@ -1432,7 +1473,7 @@ private struct DraggableTabItemView: View {
     }
 
     private var titleForegroundStyle: AnyShapeStyle {
-        if chromeStyle == .strip {
+        if chromeStyle.isCompactChrome {
             let darkMode = colorScheme == .dark
             if isActive {
                 return AnyShapeStyle(Color.primary.opacity(TabChromeHierarchy.titleActiveOpacity(darkMode: darkMode)))
@@ -1465,7 +1506,7 @@ private struct DraggableTabItemView: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Close Tab")
-            .accessibilityHint("Closes \(tab.article.title)")
+            .accessibilityHint("Closes \(tab.title)")
             .transition(
                 reduceMotion
                     ? .opacity
@@ -1476,7 +1517,7 @@ private struct DraggableTabItemView: View {
 
     private func syncCloseButton(animated: Bool = true) {
         let shouldShow: Bool
-        if chromeStyle == .strip || chromeStyle == .toolbar {
+        if chromeStyle.isCompactChrome {
             shouldShow = isHovered && !isDragged
         } else {
             shouldShow = (isHovered || isActive) && !isDragged
@@ -1500,6 +1541,7 @@ private struct DraggableTabItemView: View {
         } label: {
             SwiftUI.Label("Duplicate Tab", systemImage: "plus.square.on.square")
         }
+        .disabled(tab.isPlaceholder)
         
         Divider()
         
@@ -1528,18 +1570,8 @@ private struct DraggableTabItemView: View {
         }
         
         Divider()
-        
-        Button {
-            copyToClipboard(tab.article.title)
-        } label: {
-            SwiftUI.Label("Copy Title", systemImage: "doc.on.doc")
-        }
-        
-        Button {
-            copyToClipboard(wikipediaURLString(for: tab.article.title))
-        } label: {
-            SwiftUI.Label("Copy Wikipedia Link", systemImage: "link")
-        }
+
+        ArticleQuickActionsMenuContent(title: tab.title)
         
         Divider()
         
@@ -1601,20 +1633,21 @@ private struct DraggableTabItemView: View {
     }
     
     private func saveToList(_ list: ReadingList) {
-        let normalized = ReadStateSync.normalizedTitle(tab.article.title)
+        guard let sourceArticle = tab.currentArticle else { return }
+        let normalized = ReadStateSync.normalizedTitle(sourceArticle.title)
         if list.articles.contains(where: { ReadStateSync.normalizedTitle($0.title) == normalized }) {
             return
         }
 
         let article = SavedArticle(
-            title: tab.article.title,
-            description: tab.article.description,
-            extract: tab.article.extract,
-            thumbnailURL: tab.article.thumbnailURL,
+            title: sourceArticle.title,
+            description: sourceArticle.description,
+            extract: sourceArticle.extract,
+            thumbnailURL: sourceArticle.thumbnailURL,
             list: list,
-            wordCount: tab.article.wordCount
+            wordCount: sourceArticle.wordCount
         )
-        article.isRead = ReadStateSync.resolveReadState(for: tab.article, in: modelContext)
+        article.isRead = ReadStateSync.resolveReadState(for: sourceArticle, in: modelContext)
         list.articles.append(article)
         list.updatedAt = Date()
         
@@ -1623,20 +1656,13 @@ private struct DraggableTabItemView: View {
     }
     
     private func duplicateTab() {
-        appState.duplicateTab(with: tab.article)
+        appState.tabSessionStore.duplicateTab(id: tab.id)
     }
     
     private func closeOtherTabs() {
         appState.closeOtherTabs(keeping: tab.id)
     }
     
-    private func copyToClipboard(_ text: String) {
-        _ = SystemBridge.copyText(text)
-    }
-
-    private func wikipediaURLString(for title: String) -> String {
-        WikipediaURLBuilder.articleURLString(forTitle: title)
-    }
 }
 
 // MARK: - Extensions

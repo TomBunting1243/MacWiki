@@ -23,5 +23,9 @@ jobs:
       - name: Test
         run: swift test
 
+      - name: Maintainability Check (Advisory)
+        continue-on-error: true
+        run: ./scripts/check_maintainability.sh
+
       - name: Build (Release)
         run: swift build -c release

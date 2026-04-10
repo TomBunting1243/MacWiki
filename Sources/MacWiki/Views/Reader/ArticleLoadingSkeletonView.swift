@@ -27,19 +27,10 @@ struct ArticleLoadingSkeletonView: View {
     let articleTitle: String
     let phase: Phase
 
-    @AppStorage("tabBarLiquidGlass") private var tabBarLiquidGlass = true
-    @Environment(AppState.self) private var appState
+    @Environment(\.readerChromeMetrics) private var readerChromeMetrics
 
-    private func resolvedTopPadding(for availableWidth: CGFloat) -> CGFloat {
-        // In liquid-glass mode, the reader content underlaps the titlebar clearance + tab lane.
-        // Keep the skeleton status capsule clear of the chrome and add a compact-width bump.
-        guard tabBarLiquidGlass, !appState.isWikiHopNavigationLocked else {
-            switch availableWidth {
-            case ..<520: return 30
-            case ..<680: return 26
-            default: return 24
-            }
-        }
+    private func resolvedTopPadding(for availableWidth: CGFloat, topSafeArea: CGFloat) -> CGFloat {
+        let chromeInset = max(topSafeArea, readerChromeMetrics.topObscuredHeight)
         let compactWidthBoost: CGFloat
         switch availableWidth {
         case ..<520:
@@ -51,16 +42,13 @@ struct ArticleLoadingSkeletonView: View {
         default:
             compactWidthBoost = 0
         }
-        return ColumnChromeMetrics.readerContentTopInset(
-            windowTopObscuredHeight: appState.windowTopObscuredHeight,
-            additionalSpacing: 20 + compactWidthBoost
-        )
+        return chromeInset + 18 + compactWidthBoost
     }
 
     var body: some View {
         GeometryReader { proxy in
             let columnWidth = max(320, min(920, proxy.size.width - 40))
-            let topPadding = resolvedTopPadding(for: proxy.size.width)
+            let topPadding = resolvedTopPadding(for: proxy.size.width, topSafeArea: proxy.safeAreaInsets.top)
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {

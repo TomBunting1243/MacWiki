@@ -1,162 +1,12 @@
 import SwiftUI
 import SwiftData
 
-fileprivate enum SidebarDensityPreset: String, CaseIterable {
-    case music = "music"
-    case comfortable = "comfortable"
-
-    var title: String {
-        switch self {
-        case .music:
-            return "Compact"
-        case .comfortable:
-            return "Comfortable"
-        }
-    }
+private enum SidebarChrome {
+    static let headerAccessorySize: CGFloat = 18
+    static let hoverCornerRadius: CGFloat = 7
 }
 
-fileprivate enum SidebarMetrics {
-    private static var densityPreset: SidebarDensityPreset {
-        if let raw = UserDefaults.standard.string(forKey: "sidebarDensityPreset"),
-           let preset = SidebarDensityPreset(rawValue: raw) {
-            return preset
-        }
-        return .comfortable
-    }
-
-    static var itemFontSize: CGFloat {
-        densityPreset == .music ? 12.6 : 13
-    }
-
-    static var sectionHeaderFont: Font {
-        densityPreset == .music
-            ? Font.system(size: 10.25, weight: .semibold)
-            : Font.system(size: 11, weight: .semibold)
-    }
-
-    static var itemFont: Font {
-        Font.system(size: itemFontSize, weight: .regular)
-    }
-
-    static var itemIconFont: Font {
-        Font.system(size: itemFontSize, weight: .regular)
-    }
-
-    static var sectionHeaderHeight: CGFloat {
-        densityPreset == .music ? 24 : 28
-    }
-
-    static var itemIconWidth: CGFloat {
-        16
-    }
-
-    static var trailingControlSize: CGFloat {
-        densityPreset == .music ? 22 : 26
-    }
-
-    static var rowSpacing: CGFloat {
-        densityPreset == .music ? 6 : 7
-    }
-
-    static var rowCornerRadius: CGFloat {
-        11
-    }
-
-    static var rowMinimumHitHeight: CGFloat {
-        densityPreset == .music ? 26 : 28
-    }
-
-    static var rowInsets: EdgeInsets {
-        densityPreset == .music
-            ? EdgeInsets(top: 2, leading: 11, bottom: 2, trailing: 11)
-            : EdgeInsets(top: 3, leading: 12, bottom: 3, trailing: 12)
-    }
-
-    static var emptyStateVerticalPadding: CGFloat {
-        densityPreset == .music ? 4 : 6
-    }
-
-    static func iconPrimaryOpacity(darkMode: Bool) -> Double {
-        darkMode ? 0.76 : 0.70
-    }
-
-    static func iconHoverOpacity(darkMode: Bool) -> Double {
-        darkMode ? 0.76 : 0.70
-    }
-
-    static func iconColor(
-        for colorScheme: ColorScheme,
-        isHovered: Bool
-    ) -> Color {
-        let darkMode = colorScheme == .dark
-        if isHovered {
-            return Color.primary.opacity(iconHoverOpacity(darkMode: darkMode))
-        }
-        return Color.primary.opacity(iconPrimaryOpacity(darkMode: darkMode))
-    }
-
-    static func titleColor(
-        for colorScheme: ColorScheme
-    ) -> Color {
-        return Color.primary
-    }
-
-    static func countColor(
-        for colorScheme: ColorScheme
-    ) -> Color {
-        return Color(nsColor: .tertiaryLabelColor)
-    }
-}
-
-private struct SidebarRowSurface: View {
-    @Environment(\.colorScheme) private var colorScheme
-    @Environment(\.controlActiveState) private var controlActiveState
-
-    var isSelected: Bool = false
-    var isHovered: Bool = false
-    var isDropTarget: Bool = false
-
-    private var dropTargetFill: Color {
-        Color.accentColor.opacity(0.14)
-    }
-
-    private var hoverFill: Color {
-        let isKeyWindow = controlActiveState == .key
-        return colorScheme == .dark
-            ? Color.white.opacity(isKeyWindow ? 0.045 : 0.030)
-            : Color.black.opacity(isKeyWindow ? 0.022 : 0.014)
-    }
-
-    private var hoverStroke: Color {
-        let isKeyWindow = controlActiveState == .key
-        return colorScheme == .dark
-            ? Color.white.opacity(isKeyWindow ? 0.068 : 0.048)
-            : Color.black.opacity(isKeyWindow ? 0.038 : 0.024)
-    }
-
-    var body: some View {
-        RoundedRectangle(cornerRadius: SidebarMetrics.rowCornerRadius, style: .continuous)
-            .fill(
-                isDropTarget
-                    ? dropTargetFill
-                    : ((isHovered && !isSelected) ? hoverFill : Color.clear)
-            )
-            .overlay {
-                if isDropTarget || (isHovered && !isSelected) {
-                    RoundedRectangle(cornerRadius: SidebarMetrics.rowCornerRadius, style: .continuous)
-                        .strokeBorder(
-                            isDropTarget
-                                ? Color.accentColor.opacity(0.20)
-                                : hoverStroke,
-                            lineWidth: 0.60
-                        )
-                }
-            }
-            .padding(.horizontal, 2)
-    }
-}
-
-private enum SidebarSelectionID: Hashable {
+enum SidebarSelectionID: Hashable {
     case search
     case root(SidebarRootSelection)
     case list(UUID)
@@ -176,11 +26,56 @@ private struct PendingAreaDeletion {
     }
 }
 
+private struct SidebarHoverRowModifier: ViewModifier {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.controlActiveState) private var controlActiveState
+
+    let isSelected: Bool
+
+    @State private var isHovered = false
+
+    private var hoverFill: Color {
+        guard isHovered && !isSelected else { return .clear }
+        let isKeyWindow = controlActiveState == .key
+        if colorScheme == .dark {
+            return Color.white.opacity(isKeyWindow ? 0.060 : 0.040)
+        }
+        return Color.black.opacity(isKeyWindow ? 0.032 : 0.022)
+    }
+
+    private var hoverStroke: Color {
+        guard isHovered && !isSelected else { return .clear }
+        let isKeyWindow = controlActiveState == .key
+        if colorScheme == .dark {
+            return Color.white.opacity(isKeyWindow ? 0.10 : 0.07)
+        }
+        return Color.black.opacity(isKeyWindow ? 0.055 : 0.04)
+    }
+
+    func body(content: Content) -> some View {
+        content
+            .padding(.horizontal, 6)
+            .padding(.vertical, 3)
+            .background {
+                RoundedRectangle(cornerRadius: SidebarChrome.hoverCornerRadius, style: .continuous)
+                    .fill(hoverFill)
+                    .overlay {
+                        RoundedRectangle(cornerRadius: SidebarChrome.hoverCornerRadius, style: .continuous)
+                            .strokeBorder(hoverStroke, lineWidth: 0.75)
+                    }
+            }
+            .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: isHovered)
+            .onHover { hovering in
+                guard hovering != isHovered else { return }
+                isHovered = hovering
+            }
+    }
+}
+
 /// Lists sidebar with reading lists management
 struct ListsSidebar: View {
     @Environment(AppState.self) private var appState
-    @Environment(\.colorScheme) private var colorScheme
-    @Environment(\.controlActiveState) private var controlActiveState
     @Environment(\.modelContext) private var modelContext
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Query private var lists: [ReadingList]
@@ -188,27 +83,27 @@ struct ListsSidebar: View {
     @Query private var savedArticles: [SavedArticle]
     @Query(sort: \Highlight.createdAt, order: .reverse) private var highlights: [Highlight]
     @Query(sort: \ArticleState.updatedAt, order: .reverse) private var articleStates: [ArticleState]
-    
+
     @Binding var selectedList: ReadingList?
     @Binding var selectedLabel: Label?
     @Binding var selectedTag: Tag?
     @Binding var rootSelection: SidebarRootSelection
     @State private var showNewListSheet = false
     @State private var showNewAreaSheet = false
-    @State private var sidebarSelection: SidebarSelectionID?
+    @State private var sidebarSelectionSet: Set<SidebarSelectionID> = []
+    @State private var topObscuredHeight: CGFloat = 38
     @State private var selectedAreaIDs: Set<UUID> = []
-    @AppStorage("sidebarSortOrder") private var sortOrder: ListSortOrder = .updatedDate
-    @AppStorage("sidebarDensityPreset") private var sidebarDensityPreset: SidebarDensityPreset = .comfortable
-    
+    @AppStorage(AppStorageKey.ListsSidebar.sortOrder) private var sortOrder: ListSortOrder = .updatedDate
+
     // Editing state for lists
     @State private var editingList: ReadingList?
     @State private var editingName: String = ""
     @State private var showRenameAlert = false
     @State private var iconPickerList: ReadingList?
     @State private var showIconPickerSheet = false
-    @AppStorage("discoverOpenMode") private var discoverOpenMode: DiscoverOpenMode = .sidebar
+    @AppStorage(AppStorageKey.Discover.openMode) private var discoverOpenMode: DiscoverOpenMode = .sidebar
     @AppStorage(ExperimentFlag.wikiHopPOCEnabled.key) private var isWikiHopEnabled = false
-    @AppStorage("features.wikiHopPostV1Enabled") private var isWikiHopPostV1Enabled = false
+    @AppStorage(AppStorageKey.Features.wikiHopPostV1Enabled) private var isWikiHopPostV1Enabled = false
 
     // Editing state for areas
     @State private var editingArea: Area?
@@ -225,7 +120,7 @@ struct ListsSidebar: View {
 
     @Query(sort: \Label.sortOrder) private var labels: [Label]
     @Query(sort: \Tag.sortOrder) private var tags: [Tag]
-    
+
     let onEditLabel: (Label) -> Void
     let onAddNewLabel: () -> Void
 
@@ -237,26 +132,26 @@ struct ListsSidebar: View {
         editingAreaName.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    private var resolvedSelection: SidebarSelectionID {
+    private var resolvedSelectionSet: Set<SidebarSelectionID> {
         if appState.showSearch {
-            return .search
+            return [.search]
         }
         if let listId = selectedList?.id {
-            return .list(listId)
+            return [.list(listId)]
         }
         if let labelId = selectedLabel?.id {
-            return .label(labelId)
+            return [.label(labelId)]
         }
         if let tagId = selectedTag?.id {
-            return .tag(tagId)
+            return [.tag(tagId)]
         }
-        if let areaId = selectedAreaIDs.sorted(by: { $0.uuidString < $1.uuidString }).first {
-            return .area(areaId)
+        if !selectedAreaIDs.isEmpty {
+            return Set(selectedAreaIDs.map(SidebarSelectionID.area))
         }
         if rootSelection == .wikiHop && !isWikiHopAvailable {
-            return .root(.recents)
+            return [.root(.recents)]
         }
-        return .root(rootSelection)
+        return [.root(rootSelection)]
     }
 
     private var isWikiHopAvailable: Bool {
@@ -265,6 +160,14 @@ struct ListsSidebar: View {
 
     private var selectedAreaIDsKey: [UUID] {
         selectedAreaIDs.sorted(by: { $0.uuidString < $1.uuidString })
+    }
+
+    private var sidebarSections: [ListsSidebarTreeSection] {
+        ListsSidebarTreeBuilder.build(
+            snapshot: collectionsSnapshot,
+            isSearchDisabled: appState.isWikiHopNavigationLocked,
+            isWikiHopAvailable: isWikiHopAvailable
+        )
     }
 
     private var collectionsFingerprint: Int {
@@ -296,12 +199,12 @@ struct ListsSidebar: View {
     private var sortedLists: [ReadingList] {
         collectionsSnapshot.sortedLists
     }
-    
+
     /// Lists not in any area
     private var rootLevelLists: [ReadingList] {
         collectionsSnapshot.rootLevelLists
     }
-    
+
     /// Lists within a specific area
     private func listsInArea(_ area: Area) -> [ReadingList] {
         collectionsSnapshot.lists(in: area)
@@ -503,9 +406,8 @@ struct ListsSidebar: View {
             .onChange(of: areas.map(\.id)) { _, currentAreaIDs in
                 selectedAreaIDs.formIntersection(Set(currentAreaIDs))
             }
-            .onChange(of: sidebarSelection) { _, newValue in
-                guard let newValue else { return }
-                applySelection(newValue)
+            .onChange(of: sidebarSelectionSet) { oldValue, newValue in
+                handleSidebarSelectionChange(from: oldValue, to: newValue)
             }
             .onChange(of: showAreaDeleteContentsPrompt) { _, isPresented in
                 if !isPresented {
@@ -525,32 +427,87 @@ struct ListsSidebar: View {
         .onReceive(NotificationCenter.default.publisher(for: .macWikiRequestNewFolder)) { _ in
             showNewAreaSheet = true
         }
-        .background {
-            SidebarPaneBackground()
-                .ignoresSafeArea(.container, edges: [.top, .bottom])
-        }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
     private var sidebarList: some View {
-        List(selection: $sidebarSelection) {
-            exploreSection
-            listsSection
-            labelsSection
-            tagsSection
+        List(selection: $sidebarSelectionSet) {
+            ForEach(sidebarSections) { section in
+                sidebarSectionView(section)
+            }
         }
         .listStyle(.sidebar)
         .scrollContentBackground(.hidden)
-        .tint(.clear)
+        .contentMargins(.top, max(0, topObscuredHeight), for: .scrollIndicators)
         .transaction { transaction in
-            // Avoid style/layout flash while SwiftData-backed sidebar content hydrates.
             transaction.animation = nil
         }
         .animation(reduceMotion ? nil : .easeOut(duration: 0.16), value: isWikiHopAvailable)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .onDeleteCommand {
-            guard !selectedAreaIDs.isEmpty else { return }
-            requestAreaDeletion(for: selectedAreaIDs)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(Color.clear)
+        .background {
+            GeometryReader { proxy in
+                Color.clear
+                    .onAppear {
+                        updateTopObscuredHeight(proxy.safeAreaInsets.top)
+                    }
+                    .onChange(of: proxy.safeAreaInsets.top) { _, newValue in
+                        updateTopObscuredHeight(newValue)
+                    }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func sidebarSectionView(_ section: ListsSidebarTreeSection) -> some View {
+        switch section.kind {
+        case .explore:
+            Section {
+                ForEach(section.nodes) { node in
+                    sidebarNodeView(node)
+                }
+            } header: {
+                sidebarSectionHeader("Explore")
+            }
+        case .lists:
+            Section {
+                if !section.nodes.isEmpty {
+                    ForEach(section.nodes) { node in
+                        sidebarNodeView(node)
+                    }
+                }
+            } header: {
+                sidebarSectionHeader("Lists") {
+                    sidebarLibraryMenu
+                }
+            }
+            .dropDestination(for: String.self) { items, _ in
+                guard let idString = items.first,
+                      let uuid = UUID(uuidString: idString) else {
+                    return false
+                }
+                return moveItemToRoot(uuid)
+            }
+        case .labels:
+            Section {
+                if !section.nodes.isEmpty {
+                    ForEach(section.nodes) { node in
+                        sidebarNodeView(node)
+                    }
+                }
+            } header: {
+                sidebarSectionHeader("Labels")
+            }
+        case .tags:
+            Section {
+                if !section.nodes.isEmpty {
+                    ForEach(section.nodes) { node in
+                        sidebarNodeView(node)
+                    }
+                }
+            } header: {
+                sidebarSectionHeader("Tags")
+            }
         }
     }
 
@@ -558,88 +515,190 @@ struct ListsSidebar: View {
         _ title: String,
         @ViewBuilder accessory: () -> Accessory
     ) -> some View {
-        HStack(spacing: SidebarMetrics.rowSpacing) {
+        HStack(spacing: 6) {
             Text(title)
-                .font(SidebarMetrics.sectionHeaderFont)
+                .font(.caption.weight(.semibold))
                 .foregroundStyle(.tertiary)
                 .textCase(nil)
             Spacer(minLength: 0)
             accessory()
         }
-        .padding(.horizontal, 4)
-        .frame(minHeight: SidebarMetrics.sectionHeaderHeight, alignment: .leading)
+        .textCase(nil)
     }
 
     private func sidebarSectionHeader(_ title: String) -> some View {
         sidebarSectionHeader(title) { EmptyView() }
     }
 
-    private func sidebarAddButton(action: @escaping () -> Void, help: String) -> some View {
-        Button(help, systemImage: "plus", action: action)
-            .labelStyle(.iconOnly)
-            .font(.system(size: SidebarMetrics.itemFontSize, weight: .semibold))
-            .imageScale(.medium)
-            .foregroundStyle(.secondary)
-            .frame(
-                width: SidebarMetrics.trailingControlSize,
-                height: SidebarMetrics.trailingControlSize,
-                alignment: .center
+    private var sidebarLibraryMenu: some View {
+        Menu {
+            Button("New List") {
+                showNewListSheet = true
+            }
+            Button("New Folder") {
+                showNewAreaSheet = true
+            }
+
+            Divider()
+
+            Button("New Label") {
+                onAddNewLabel()
+            }
+            Button("New Tag") {
+                showNewTagSheet = true
+            }
+
+            Divider()
+
+            Picker("Sort", selection: $sortOrder) {
+                ForEach(ListSortOrder.allCases, id: \.self) { order in
+                    Text(order.rawValue).tag(order)
+                }
+            }
+        } label: {
+            Image(systemName: "ellipsis.circle")
+                .labelStyle(.iconOnly)
+                .font(.caption.weight(.semibold))
+                .imageScale(.small)
+                .foregroundStyle(.secondary)
+                .frame(
+                    width: SidebarChrome.headerAccessorySize,
+                    height: SidebarChrome.headerAccessorySize,
+                    alignment: .center
+                )
+                .contentShape(Rectangle())
+        }
+        .menuStyle(.borderlessButton)
+        .help("Sidebar Actions")
+        .accessibilityIdentifier("sidebar-actions-menu")
+    }
+
+    private func rootRowLabel(_ title: String, systemImage: String? = nil) -> some View {
+        Group {
+            if let systemImage {
+                SwiftUI.Label(title, systemImage: systemImage)
+            } else {
+                Text(title)
+            }
+        }
+        .lineLimit(1)
+    }
+
+    @ViewBuilder
+    private func sidebarNodeView(_ node: ListsSidebarTreeNode) -> some View {
+        switch node.kind {
+        case .search(let isDisabled):
+            sidebarSelectableRow(
+                selection: .search,
+                isSelected: sidebarSelectionSet.contains(.search),
+                isDisabled: isDisabled
+            ) {
+                rootRowLabel("Search", systemImage: "magnifyingglass")
+            }
+        case .root(let selection):
+            sidebarSelectableRow(
+                selection: .root(selection),
+                isSelected: sidebarSelectionSet.contains(.root(selection))
+            ) {
+                rootRowLabel(rootTitle(for: selection), systemImage: rootSystemImage(for: selection))
+            }
+        case .list(let list):
+            listRow(for: list)
+        case .label(let label):
+            sidebarSelectableRow(
+                selection: .label(label.id),
+                isSelected: sidebarSelectionSet.contains(.label(label.id))
+            ) {
+                LabelRowView(
+                    label: label,
+                    articleCount: labelArticleCounts[label.id] ?? 0,
+                    onPersistChange: requestModelContextSave,
+                    onRename: {
+                        onEditLabel(label)
+                    },
+                    onDelete: {
+                        deleteLabel(label.id)
+                    }
+                )
+            }
+        case .tag(let tag):
+            sidebarSelectableRow(
+                selection: .tag(tag.id),
+                isSelected: sidebarSelectionSet.contains(.tag(tag.id))
+            ) {
+                TagRowView(
+                    tag: tag,
+                    articleCount: tagArticleCounts[tag.id] ?? 0,
+                    onRename: {
+                        editingTag = tag
+                    },
+                    onDelete: {
+                        deleteTag(tag.id)
+                    }
+                )
+            }
+        case .area(let area):
+            AreaRowView(
+                area: area,
+                lists: listsInArea(area),
+                childAreas: childAreas(of: area),
+                parentAreaByID: collectionsSnapshot.parentAreaByID,
+                selectedList: $selectedList,
+                selectedAreaIDs: $selectedAreaIDs,
+                listRow: listRow,
+                listsInArea: listsInArea,
+                childAreasOf: childAreas,
+                onRename: { areaToRename in
+                    editingArea = areaToRename
+                    editingAreaName = areaToRename.name
+                    showAreaRenameAlert = true
+                },
+                onRequestDelete: { areaIDs in
+                    requestAreaDeletion(for: areaIDs)
+                },
+                onPersistChange: requestModelContextSave,
+                onCollapseHidingSelectedList: {
+                    setRecentsSelection()
+                },
+                isSelected: selectedAreaIDs.contains(area.id)
             )
-            .contentShape(Rectangle())
-        .buttonStyle(.borderless)
-        .help(help)
+        }
     }
 
-    private func sidebarAccessoryGlyph(_ systemName: String) -> some View {
-        Image(systemName: systemName)
-            .font(.system(size: SidebarMetrics.itemFontSize, weight: .semibold))
-            .imageScale(.medium)
-            .foregroundStyle(.secondary)
-            .frame(
-                width: SidebarMetrics.trailingControlSize,
-                height: SidebarMetrics.trailingControlSize,
-                alignment: .center
-            )
-            .contentShape(Rectangle())
-    }
-
-    private func rootRowLabel(_ title: String, systemImage: String? = nil, isSelected: Bool = false) -> some View {
-        SidebarRootRowLabel(
-            title: title,
-            systemImage: systemImage,
-            isSelected: isSelected
-        )
-    }
-
-    private func rootSelectionItem(
-        _ title: String,
-        systemImage: String,
+    private func sidebarSelectableRow<Content: View>(
         selection: SidebarSelectionID,
-        isSelected: Bool,
-        isDisabled: Bool = false
+        isSelected: Bool = false,
+        isDisabled: Bool = false,
+        @ViewBuilder label: () -> Content
     ) -> some View {
-        rootRowLabel(
-            title,
-            systemImage: systemImage,
-            isSelected: isSelected
-        )
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .listRowInsets(SidebarMetrics.rowInsets)
-        .tag(selection)
-        .disabled(isDisabled)
+        label()
+            .contentShape(Rectangle())
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .modifier(SidebarHoverRowModifier(isSelected: isSelected))
+            .tag(selection)
+            .disabled(isDisabled)
     }
 
-    private func selectableRootItem(
-        _ title: String,
-        systemImage: String,
-        selection: SidebarRootSelection
-    ) -> some View {
-        rootSelectionItem(
-            title,
-            systemImage: systemImage,
-            selection: .root(selection),
-            isSelected: resolvedSelection == .root(selection)
-        )
+    private func rootTitle(for selection: SidebarRootSelection) -> String {
+        switch selection {
+        case .discover:
+            return "Discover"
+        case .recents:
+            return "Recents"
+        case .wikiHop:
+            return "Wiki-Hop"
+        }
+    }
+
+    private func rootSystemImage(for selection: SidebarRootSelection) -> String {
+        switch selection {
+        case .discover:
+            return "sparkles"
+        case .recents:
+            return "clock"
+        case .wikiHop:
+            return "figure.walk"
+        }
     }
 
     private func applySelection(_ selection: SidebarSelectionID) {
@@ -714,9 +773,9 @@ struct ListsSidebar: View {
     }
 
     private func syncSelectionFromBindings() {
-        let resolved = resolvedSelection
-        guard sidebarSelection != resolved else { return }
-        sidebarSelection = resolved
+        let resolved = resolvedSelectionSet
+        guard sidebarSelectionSet != resolved else { return }
+        sidebarSelectionSet = resolved
     }
 
     private func setRecentsSelection() {
@@ -726,10 +785,99 @@ struct ListsSidebar: View {
         selectedTag = nil
         selectedAreaIDs.removeAll()
         rootSelection = .recents
-        let fallback: SidebarSelectionID = .root(.recents)
-        if sidebarSelection != fallback {
-            sidebarSelection = fallback
+        let fallback: Set<SidebarSelectionID> = [.root(.recents)]
+        if sidebarSelectionSet != fallback {
+            sidebarSelectionSet = fallback
         }
+    }
+
+    private func handleSidebarSelectionChange(
+        from oldValue: Set<SidebarSelectionID>,
+        to newValue: Set<SidebarSelectionID>
+    ) {
+        guard !newValue.isEmpty else {
+            syncSelectionFromBindings()
+            return
+        }
+
+        let addedSelections = newValue.subtracting(oldValue)
+        let nonAreaSelections = newValue.filter {
+            if case .area = $0 { return false }
+            return true
+        }
+
+        if let selection = preferredSelection(in: Set(nonAreaSelections), preferring: addedSelections) {
+            selectedAreaIDs.removeAll()
+            applySelection(selection)
+            let canonical: Set<SidebarSelectionID> = [selection]
+            if sidebarSelectionSet != canonical {
+                sidebarSelectionSet = canonical
+            }
+            return
+        }
+
+        let areaIDs = Set(newValue.compactMap { selection -> UUID? in
+            if case .area(let areaID) = selection {
+                return areaID
+            }
+            return nil
+        })
+
+        guard !areaIDs.isEmpty else {
+            syncSelectionFromBindings()
+            return
+        }
+
+        appState.showSearch = false
+        selectedList = nil
+        selectedLabel = nil
+        selectedTag = nil
+        selectedAreaIDs = areaIDs
+
+        let canonical = Set(areaIDs.map(SidebarSelectionID.area))
+        if sidebarSelectionSet != canonical {
+            sidebarSelectionSet = canonical
+        }
+    }
+
+    private func preferredSelection(
+        in selections: Set<SidebarSelectionID>,
+        preferring addedSelections: Set<SidebarSelectionID>
+    ) -> SidebarSelectionID? {
+        let preferredSelections = addedSelections
+            .intersection(selections)
+            .sorted(by: compareSidebarSelections(_:_:))
+        if let preferred = preferredSelections.first {
+            return preferred
+        }
+        return selections.sorted(by: compareSidebarSelections(_:_:)).first
+    }
+
+    private func compareSidebarSelections(_ lhs: SidebarSelectionID, _ rhs: SidebarSelectionID) -> Bool {
+        sidebarSelectionSortKey(lhs) < sidebarSelectionSortKey(rhs)
+    }
+
+    private func sidebarSelectionSortKey(_ selection: SidebarSelectionID) -> String {
+        switch selection {
+        case .search:
+            return "0-search"
+        case .root(let root):
+            return "1-root-\(rootTitle(for: root))"
+        case .list(let id):
+            return "2-list-\(id.uuidString)"
+        case .label(let id):
+            return "3-label-\(id.uuidString)"
+        case .tag(let id):
+            return "4-tag-\(id.uuidString)"
+        case .area(let id):
+            return "5-area-\(id.uuidString)"
+        }
+    }
+
+    private func updateTopObscuredHeight(_ proposedHeight: CGFloat) {
+        let resolved = max(0, proposedHeight)
+        guard abs(topObscuredHeight - resolved) > 0.5 else { return }
+        topObscuredHeight = resolved
     }
 
     private func enforceWikiHopSelectionGuard() {
@@ -737,255 +885,50 @@ struct ListsSidebar: View {
         guard rootSelection == .wikiHop else { return }
         setRecentsSelection()
     }
-    
-    // MARK: - Sections
-
-    @ViewBuilder
-    private var exploreSection: some View {
-        Section {
-            selectableRootItem("Discover", systemImage: "sparkles", selection: .discover)
-
-            rootSelectionItem(
-                "Search",
-                systemImage: "magnifyingglass",
-                selection: .search,
-                isSelected: appState.showSearch,
-                isDisabled: appState.isWikiHopNavigationLocked
-            )
-
-            selectableRootItem("Recents", systemImage: "clock", selection: .recents)
-
-            if isWikiHopAvailable {
-                selectableRootItem("Wiki-Hop", systemImage: "figure.walk", selection: .wikiHop)
-            }
-        } header: {
-            sidebarSectionHeader("Explore")
-        }
-    }
-    
-    @ViewBuilder
-    private var listsSection: some View {
-        Section {
-            // Root-level lists (not in any area)
-            if rootLevelLists.isEmpty && rootAreas.isEmpty {
-                Text("No lists")
-                    .foregroundStyle(.secondary)
-                    .font(SidebarMetrics.itemFont)
-                    .padding(.vertical, SidebarMetrics.emptyStateVerticalPadding)
-                    .listRowInsets(SidebarMetrics.rowInsets)
-            } else {
-                // Show areas with their lists (recursive)
-                ForEach(rootAreas) { area in
-                    AreaRowView(
-                        area: area,
-                        lists: listsInArea(area),
-                        childAreas: childAreas(of: area),
-                        parentAreaByID: collectionsSnapshot.parentAreaByID,
-                        selectedList: $selectedList,
-                        selectedAreaIDs: $selectedAreaIDs,
-                        sidebarSelection: $sidebarSelection,
-                        listRow: listRow,
-                        listsInArea: listsInArea,
-                        childAreasOf: childAreas,
-                        onRename: { areaToRename in
-                            editingArea = areaToRename
-                            editingAreaName = areaToRename.name
-                            showAreaRenameAlert = true
-                        },
-                        onRequestDelete: { areaIDs in
-                            requestAreaDeletion(for: areaIDs)
-                        },
-                        onPersistChange: requestModelContextSave,
-                        onCollapseHidingSelectedList: {
-                            setRecentsSelection()
-                        }
-                    )
-                }
-                
-                // Root-level lists
-                ForEach(rootLevelLists) { list in
-                    listRow(for: list)
-                }
-                .onMove(perform: moveList)
-            }
-        } header: {
-            sidebarSectionHeader("Lists") {
-                Menu {
-                    Button("New List") {
-                        showNewListSheet = true
-                    }
-                    Button("New Folder") {
-                        showNewAreaSheet = true
-                    }
-                    Divider()
-                    Picker("Sort", selection: $sortOrder) {
-                        ForEach(ListSortOrder.allCases, id: \.self) { order in
-                            Text(order.rawValue).tag(order)
-                        }
-                    }
-                    Divider()
-                    Picker("Density", selection: $sidebarDensityPreset) {
-                        ForEach(SidebarDensityPreset.allCases, id: \.self) { preset in
-                            Text(preset.title).tag(preset)
-                        }
-                    }
-                } label: {
-                    SwiftUI.Label("Lists Options", systemImage: "plus")
-                        .labelStyle(.iconOnly)
-                        .font(.system(size: SidebarMetrics.itemFontSize, weight: .semibold))
-                        .imageScale(.medium)
-                        .foregroundStyle(.secondary)
-                        .frame(
-                            width: SidebarMetrics.trailingControlSize,
-                            height: SidebarMetrics.trailingControlSize,
-                            alignment: .center
-                        )
-                        .contentShape(Rectangle())
-                        .accessibilityIdentifier("lists-options-menu")
-                }
-                .menuStyle(.borderlessButton)
-                .help("List Options")
-                .accessibilityIdentifier("lists-options-menu")
-            }
-        }
-    }
-    
-    @ViewBuilder
-    private var labelsSection: some View {
-        Section {
-            if sortedLabels.isEmpty {
-                Text("No labels")
-                    .foregroundStyle(.secondary)
-                    .font(SidebarMetrics.itemFont)
-                    .padding(.vertical, SidebarMetrics.emptyStateVerticalPadding)
-                    .listRowInsets(SidebarMetrics.rowInsets)
-            } else {
-                ForEach(sortedLabels) { label in
-                    LabelRowView(
-                        label: label,
-                        isSelected: sidebarSelection == .label(label.id),
-                        articleCount: labelArticleCounts[label.id] ?? 0,
-                        onPersistChange: requestModelContextSave,
-                        onRename: {
-                            onEditLabel(label)
-                        },
-                        onDelete: {
-                            // Clear labelId from all articles with this label
-                            let targetLabelId = label.id
-                            let descriptor = FetchDescriptor<SavedArticle>(
-                                predicate: #Predicate { $0.labelId == targetLabelId }
-                            )
-                            if let articles = try? modelContext.fetch(descriptor) {
-                                for article in articles {
-                                    article.labelId = nil
-                                }
-                            }
-                            if selectedLabel?.id == label.id {
-                                setRecentsSelection()
-                            }
-                            modelContext.delete(label)
-                            saveModelContextNow()
-                        }
-                    )
-                    .tag(SidebarSelectionID.label(label.id))
-                }
-                .onMove(perform: moveLabel)
-            }
-        } header: {
-            sidebarSectionHeader("Labels") {
-                sidebarAddButton(action: onAddNewLabel, help: "New Label")
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var tagsSection: some View {
-        Section {
-            if sortedTags.isEmpty {
-                Text("No tags")
-                    .foregroundStyle(.secondary)
-                    .font(SidebarMetrics.itemFont)
-                    .padding(.vertical, SidebarMetrics.emptyStateVerticalPadding)
-                    .listRowInsets(SidebarMetrics.rowInsets)
-            } else {
-                ForEach(sortedTags) { tag in
-                    TagRowView(
-                        tag: tag,
-                        isSelected: sidebarSelection == .tag(tag.id),
-                        articleCount: tagArticleCounts[tag.id] ?? 0,
-                        onRename: {
-                            editingTag = tag
-                        },
-                        onDelete: {
-                            if selectedTag?.id == tag.id {
-                                setRecentsSelection()
-                            }
-                            modelContext.delete(tag)
-                            saveModelContextNow()
-                        }
-                    )
-                    .tag(SidebarSelectionID.tag(tag.id))
-                }
-                .onMove(perform: moveTag)
-            }
-        } header: {
-            sidebarSectionHeader("Tags") {
-                sidebarAddButton(
-                    action: { showNewTagSheet = true },
-                    help: "New Tag"
-                )
-            }
-        }
-    }
 
     // MARK: - Helper Views
-    
+
     @ViewBuilder
     private func listRow(for list: ReadingList) -> some View {
-        ListRowView(
-            list: list,
-            isSelected: sidebarSelection == .list(list.id),
-            onRename: {
-                editingList = list
-                editingName = list.name
-                showRenameAlert = true
-            },
-            onChangeIcon: {
-                iconPickerList = list
-                showIconPickerSheet = true
-            },
-            onDelete: {
-                withAnimation {
-                    if selectedList?.id == list.id {
-                        setRecentsSelection()
+        sidebarSelectableRow(
+            selection: .list(list.id),
+            isSelected: sidebarSelectionSet.contains(.list(list.id))
+        ) {
+            ListRowView(
+                list: list,
+                onRename: {
+                    editingList = list
+                    editingName = list.name
+                    showRenameAlert = true
+                },
+                onChangeIcon: {
+                    iconPickerList = list
+                    showIconPickerSheet = true
+                },
+                onDelete: {
+                    withAnimation {
+                        if selectedList?.id == list.id {
+                            setRecentsSelection()
+                        }
+                        modelContext.delete(list)
+                        saveModelContextNow()
                     }
-                    modelContext.delete(list)
-                    saveModelContextNow()
                 }
+            )
+            .draggable(list.id.uuidString) {
+                SwiftUI.Label(list.name, systemImage: list.icon)
+                    .padding(8)
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
             }
-        )
-        .tag(SidebarSelectionID.list(list.id))
-        .draggable(list.id.uuidString) {
-            SwiftUI.Label(list.name, systemImage: list.icon)
-                .padding(8)
-                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
-        }
-        .dropDestination(for: String.self) { items, location in
-            guard let idString = items.first,
-                  let uuid = UUID(uuidString: idString) else { return false }
-            
-            // Find the list being dragged
-            let descriptor = FetchDescriptor<ReadingList>(predicate: #Predicate { $0.id == uuid })
-            if let list = try? modelContext.fetch(descriptor).first {
-                // Move to root
-                list.areaId = nil
-                requestModelContextSave()
-                return true
+            .dropDestination(for: String.self) { items, _ in
+                guard let idString = items.first,
+                      let uuid = UUID(uuidString: idString) else { return false }
+
+                return moveItemToRoot(uuid)
             }
-            return false
         }
     }
-    
+
     // MARK: - Actions
 
     private func requestAreaDeletion(for requestedAreaIDs: Set<UUID>) {
@@ -1143,26 +1086,26 @@ struct ListsSidebar: View {
         saveModelContextNow()
         selectedAreaIDs.subtract(subtreeAreaIDs)
     }
-    
+
     private func moveList(from source: IndexSet, to destination: Int) {
         // When using manual sort, update sortOrder values
         var orderedLists = rootLevelLists
         orderedLists.move(fromOffsets: source, toOffset: destination)
-        
+
         // Update sortOrder for all lists
         for (index, list) in orderedLists.enumerated() {
             list.sortOrder = index
         }
-        
+
         // Switch to manual sort to preserve order
         sortOrder = .manual
         requestModelContextSave()
     }
-    
+
     private func moveLabel(from source: IndexSet, to destination: Int) {
         var updatedLabels = sortedLabels
         updatedLabels.move(fromOffsets: source, toOffset: destination)
-        
+
         // Update sort order
         for (index, label) in updatedLabels.enumerated() {
             label.sortOrder = index
@@ -1179,104 +1122,189 @@ struct ListsSidebar: View {
         }
         requestModelContextSave()
     }
-}
 
+    private func renameList(_ listID: UUID) {
+        guard let list = lists.first(where: { $0.id == listID }) else { return }
+        editingList = list
+        editingName = list.name
+        showRenameAlert = true
+    }
 
-/// Native macOS sidebar row - HIG compliant
-/// References: Finder, Notes, Craft sidebars
-private struct SidebarRootRowLabel: View {
-    @Environment(\.colorScheme) private var colorScheme
+    private func changeListIcon(_ listID: UUID) {
+        guard let list = lists.first(where: { $0.id == listID }) else { return }
+        iconPickerList = list
+        showIconPickerSheet = true
+    }
 
-    let title: String
-    let systemImage: String?
-    let isSelected: Bool
+    private func deleteList(_ listID: UUID) {
+        guard let list = lists.first(where: { $0.id == listID }) else { return }
+        if selectedList?.id == list.id {
+            setRecentsSelection()
+        }
+        modelContext.delete(list)
+        saveModelContextNow()
+    }
 
-    @State private var isHovered = false
+    private func renameArea(_ areaID: UUID) {
+        guard let area = areas.first(where: { $0.id == areaID }) else { return }
+        editingArea = area
+        editingAreaName = area.name
+        showAreaRenameAlert = true
+    }
 
-    var body: some View {
-        HStack(spacing: SidebarMetrics.rowSpacing) {
-            if let systemImage {
-                Image(systemName: systemImage)
-                    .font(SidebarMetrics.itemIconFont.weight(.semibold))
-                    .foregroundStyle(
-                        SidebarMetrics.iconColor(
-                            for: colorScheme,
-                            isHovered: isHovered
-                        )
-                    )
-                    .frame(width: SidebarMetrics.itemIconWidth, alignment: .center)
+    private func renameLabel(_ labelID: UUID) {
+        guard let label = labels.first(where: { $0.id == labelID }) else { return }
+        onEditLabel(label)
+    }
+
+    private func changeLabelColor(_ labelID: UUID, color: LabelColor) {
+        guard let label = labels.first(where: { $0.id == labelID }) else { return }
+        label.color = color
+        requestModelContextSave()
+    }
+
+    private func deleteLabel(_ labelID: UUID) {
+        guard let label = labels.first(where: { $0.id == labelID }) else { return }
+        let descriptor = FetchDescriptor<SavedArticle>(
+            predicate: #Predicate { $0.labelId == labelID }
+        )
+        if let articles = try? modelContext.fetch(descriptor) {
+            for article in articles {
+                article.labelId = nil
             }
+        }
+        if selectedLabel?.id == label.id {
+            setRecentsSelection()
+        }
+        modelContext.delete(label)
+        saveModelContextNow()
+    }
 
-            Text(title)
-                .font(SidebarMetrics.itemFont)
-                .foregroundStyle(SidebarMetrics.titleColor(for: colorScheme))
-                .lineLimit(1)
-            Spacer(minLength: 0)
+    private func renameTag(_ tagID: UUID) {
+        guard let tag = tags.first(where: { $0.id == tagID }) else { return }
+        editingTag = tag
+    }
+
+    private func deleteTag(_ tagID: UUID) {
+        guard let tag = tags.first(where: { $0.id == tagID }) else { return }
+        if selectedTag?.id == tag.id {
+            setRecentsSelection()
         }
-        .frame(maxWidth: .infinity, minHeight: SidebarMetrics.rowMinimumHitHeight, alignment: .leading)
-        .background(Color.clear)
-        .contentShape(RoundedRectangle(cornerRadius: SidebarMetrics.rowCornerRadius, style: .continuous))
-        .listRowBackground(SidebarRowSurface(isSelected: isSelected, isHovered: isHovered))
-        .onHover { hovering in
-            isHovered = hovering
+        modelContext.delete(tag)
+        saveModelContextNow()
+    }
+
+    private func setAreaExpanded(_ areaID: UUID, _ isExpanded: Bool) {
+        guard let area = areas.first(where: { $0.id == areaID }) else { return }
+        guard area.isExpanded != isExpanded else { return }
+        area.isExpanded = isExpanded
+        requestModelContextSave()
+    }
+
+    private func moveItemToRoot(_ draggedID: UUID) -> Bool {
+        let descriptor = FetchDescriptor<ReadingList>(predicate: #Predicate { $0.id == draggedID })
+        if let list = try? modelContext.fetch(descriptor).first {
+            list.areaId = nil
+            requestModelContextSave()
+            return true
         }
+
+        let areaDescriptor = FetchDescriptor<Area>(predicate: #Predicate { $0.id == draggedID })
+        guard let area = try? modelContext.fetch(areaDescriptor).first else { return false }
+        area.parentId = nil
+        requestModelContextSave()
+        return true
+    }
+
+    private func moveListToRoot(_ draggedID: UUID) -> Bool {
+        moveItemToRoot(draggedID)
+    }
+
+    private func moveSavedArticleToList(_ articleID: UUID, _ listID: UUID) -> Bool {
+        let articleDescriptor = FetchDescriptor<SavedArticle>(predicate: #Predicate { $0.id == articleID })
+        let listDescriptor = FetchDescriptor<ReadingList>(predicate: #Predicate { $0.id == listID })
+
+        guard let savedArticle = try? modelContext.fetch(articleDescriptor).first,
+              let list = try? modelContext.fetch(listDescriptor).first else {
+            return false
+        }
+
+        guard savedArticle.readingList?.id != list.id else { return false }
+
+        let newArticle = SavedArticle(
+            title: savedArticle.title,
+            description: savedArticle.articleDescription,
+            extract: savedArticle.extract,
+            thumbnailURL: savedArticle.thumbnailURL,
+            list: list
+        )
+        newArticle.isRead = savedArticle.isRead
+        newArticle.labelId = savedArticle.labelId
+        newArticle.wordCount = savedArticle.wordCount
+        list.articles.append(newArticle)
+        list.updatedAt = Date()
+
+        if let sourceList = savedArticle.readingList {
+            sourceList.articles.removeAll { $0.id == savedArticle.id }
+            sourceList.updatedAt = Date()
+        }
+        modelContext.delete(savedArticle)
+        saveModelContextNow()
+        return true
+    }
+
+    private func moveItemToArea(_ draggedID: UUID, _ targetAreaID: UUID) -> Bool {
+        let listDescriptor = FetchDescriptor<ReadingList>(predicate: #Predicate { $0.id == draggedID })
+        if let list = try? modelContext.fetch(listDescriptor).first {
+            list.areaId = targetAreaID
+            requestModelContextSave()
+            return true
+        }
+
+        let areaDescriptor = FetchDescriptor<Area>(predicate: #Predicate { $0.id == draggedID })
+        guard let draggedArea = try? modelContext.fetch(areaDescriptor).first else { return false }
+        guard draggedArea.id != targetAreaID else { return false }
+        guard !isDescendant(areaID: targetAreaID, of: draggedArea.id) else { return false }
+
+        draggedArea.parentId = targetAreaID
+        requestModelContextSave()
+        return true
+    }
+
+    private func isDescendant(areaID potentialDescendantID: UUID, of potentialAncestorID: UUID) -> Bool {
+        var currentID: UUID? = potentialDescendantID
+        while let resolvedID = currentID {
+            if resolvedID == potentialAncestorID {
+                return true
+            }
+            currentID = collectionsSnapshot.parentAreaByID[resolvedID] ?? nil
+        }
+        return false
     }
 }
-
-/// Native macOS sidebar row - HIG compliant
-/// References: Finder, Notes, Craft sidebars
 private struct ListRowView: View {
     @Environment(\.modelContext) private var modelContext
-    @Environment(\.colorScheme) private var colorScheme
 
     let list: ReadingList
-    let isSelected: Bool
     let onRename: () -> Void
     let onChangeIcon: () -> Void
     let onDelete: () -> Void
 
     @State private var isArticleDropTargeted = false
-    @State private var isHovered = false
 
     var body: some View {
-        HStack(spacing: SidebarMetrics.rowSpacing) {
-            Image(systemName: list.icon)
-                .font(SidebarMetrics.itemIconFont.weight(.semibold))
-                .foregroundStyle(
-                    SidebarMetrics.iconColor(
-                        for: colorScheme,
-                        isHovered: isHovered
-                    )
-                )
-                .frame(width: SidebarMetrics.itemIconWidth, alignment: .center)
-
-            Text(list.name)
-                .font(SidebarMetrics.itemFont)
-                .foregroundStyle(SidebarMetrics.titleColor(for: colorScheme))
+        HStack(spacing: 8) {
+            SwiftUI.Label(list.name, systemImage: list.icon)
                 .lineLimit(1)
+                .foregroundStyle(isArticleDropTargeted ? Color.accentColor : .primary)
 
             Spacer(minLength: 0)
 
             if list.articles.count > 0 {
-                SidebarCountBadge(count: list.articles.count, isSelected: isSelected)
+                SidebarCountBadge(count: list.articles.count)
             }
         }
-        .frame(maxWidth: .infinity, minHeight: SidebarMetrics.rowMinimumHitHeight, alignment: .leading)
-        .background(
-            Color.clear
-        )
-        .contentShape(RoundedRectangle(cornerRadius: SidebarMetrics.rowCornerRadius, style: .continuous))
-        .listRowInsets(SidebarMetrics.rowInsets)
-        .listRowBackground(
-            SidebarRowSurface(
-                isSelected: isSelected,
-                isHovered: isHovered,
-                isDropTarget: isArticleDropTargeted
-            )
-        )
-        .onHover { hovering in
-            isHovered = hovering
-        }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .contextMenu {
             Button {
                 onRename()
@@ -1301,7 +1329,7 @@ private struct ListRowView: View {
             isArticleDropTargeted = targeted
         }
     }
-    
+
     private func handleDrop(items: [String]) -> Bool {
         guard let idString = items.first,
               let uuid = UUID(uuidString: idString) else { return false }
@@ -1340,44 +1368,28 @@ private struct ListRowView: View {
 
 /// Label row for sidebar - displays colored circle and name
 private struct LabelRowView: View {
-    @Environment(\.colorScheme) private var colorScheme
-
     let label: Label
-    let isSelected: Bool
     let articleCount: Int
     let onPersistChange: () -> Void
     let onRename: () -> Void
     let onDelete: () -> Void
-    
-    @Environment(\.modelContext) private var modelContext
-    @State private var isHovered = false
 
     var body: some View {
-        HStack(spacing: SidebarMetrics.rowSpacing) {
+        HStack(spacing: 8) {
             Circle()
                 .fill(label.color.swiftUIColor)
                 .frame(width: 8, height: 8)
-                .frame(width: SidebarMetrics.itemIconWidth, alignment: .center)
 
             Text(label.name)
-                .font(SidebarMetrics.itemFont)
-                .foregroundStyle(SidebarMetrics.titleColor(for: colorScheme))
                 .lineLimit(1)
 
             Spacer(minLength: 0)
 
             if articleCount > 0 {
-                SidebarCountBadge(count: articleCount, isSelected: isSelected)
+                SidebarCountBadge(count: articleCount)
             }
         }
-        .frame(maxWidth: .infinity, minHeight: SidebarMetrics.rowMinimumHitHeight, alignment: .leading)
-        .background(Color.clear)
-        .contentShape(RoundedRectangle(cornerRadius: SidebarMetrics.rowCornerRadius, style: .continuous))
-        .listRowInsets(SidebarMetrics.rowInsets)
-        .listRowBackground(SidebarRowSurface(isSelected: isSelected, isHovered: isHovered))
-        .onHover { hovering in
-            isHovered = hovering
-        }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .contextMenu {
             labelContextMenu
         }
@@ -1426,46 +1438,23 @@ private struct LabelRowView: View {
 }
 
 private struct TagRowView: View {
-    @Environment(\.colorScheme) private var colorScheme
-
     let tag: Tag
-    let isSelected: Bool
     let articleCount: Int
     let onRename: () -> Void
     let onDelete: () -> Void
-    @State private var isHovered = false
 
     var body: some View {
-        HStack(spacing: SidebarMetrics.rowSpacing) {
-            Image(systemName: "tag")
-                .font(SidebarMetrics.itemIconFont)
-                .foregroundStyle(
-                    SidebarMetrics.iconColor(
-                        for: colorScheme,
-                        isHovered: isHovered
-                    )
-                )
-                .frame(width: SidebarMetrics.itemIconWidth, alignment: .center)
-
-            Text(tag.name)
-                .font(SidebarMetrics.itemFont)
-                .foregroundStyle(SidebarMetrics.titleColor(for: colorScheme))
+        HStack(spacing: 8) {
+            SwiftUI.Label(tag.name, systemImage: "tag")
                 .lineLimit(1)
 
             Spacer(minLength: 0)
 
             if articleCount > 0 {
-                SidebarCountBadge(count: articleCount, isSelected: isSelected)
+                SidebarCountBadge(count: articleCount)
             }
         }
-        .frame(maxWidth: .infinity, minHeight: SidebarMetrics.rowMinimumHitHeight, alignment: .leading)
-        .background(Color.clear)
-        .contentShape(RoundedRectangle(cornerRadius: SidebarMetrics.rowCornerRadius, style: .continuous))
-        .listRowInsets(SidebarMetrics.rowInsets)
-        .listRowBackground(SidebarRowSurface(isSelected: isSelected, isHovered: isHovered))
-        .onHover { hovering in
-            isHovered = hovering
-        }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .contextMenu {
             Button {
                 onRename()
@@ -1485,17 +1474,14 @@ private struct TagRowView: View {
 }
 
 private struct SidebarCountBadge: View {
-    @Environment(\.colorScheme) private var colorScheme
-
     let count: Int
-    var isSelected: Bool = false
 
     var body: some View {
-        Text("\(count)")
-            .font(SidebarMetrics.itemFont)
-            .foregroundStyle(SidebarMetrics.countColor(for: colorScheme))
+        Text(count.formatted())
+            .font(.caption)
+            .foregroundStyle(.secondary)
             .monospacedDigit()
-            .frame(minWidth: 22, alignment: .trailing)
+            .frame(minWidth: 18, alignment: .trailing)
     }
 }
 
@@ -1505,7 +1491,6 @@ private struct SidebarCountBadge: View {
 private struct AreaRowView<ListRow: View>: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(\.colorScheme) private var colorScheme
 
     let area: Area
     let lists: [ReadingList]
@@ -1513,7 +1498,6 @@ private struct AreaRowView<ListRow: View>: View {
     let parentAreaByID: [UUID: UUID?]
     @Binding var selectedList: ReadingList?
     @Binding var selectedAreaIDs: Set<UUID>
-    @Binding var sidebarSelection: SidebarSelectionID?
     let listRow: (ReadingList) -> ListRow
     let listsInArea: (Area) -> [ReadingList]
     let childAreasOf: (Area) -> [Area]
@@ -1521,9 +1505,9 @@ private struct AreaRowView<ListRow: View>: View {
     let onRequestDelete: (Set<UUID>) -> Void
     let onPersistChange: () -> Void
     let onCollapseHidingSelectedList: () -> Void
+    let isSelected: Bool
 
     @State private var isTargeted = false
-    @State private var isHovered = false
 
     private var deleteTargetAreaIDs: Set<UUID> {
         if selectedAreaIDs.contains(area.id) && selectedAreaIDs.count > 1 {
@@ -1534,10 +1518,6 @@ private struct AreaRowView<ListRow: View>: View {
 
     private var deleteActionLabel: String {
         deleteTargetAreaIDs.count > 1 ? "Delete Selected Folders" : "Delete Folder"
-    }
-
-    private var isSelected: Bool {
-        sidebarSelection == .area(area.id)
     }
 
     /// Total count of lists in this area and all nested areas
@@ -1587,14 +1567,14 @@ private struct AreaRowView<ListRow: View>: View {
                     parentAreaByID: parentAreaByID,
                     selectedList: $selectedList,
                     selectedAreaIDs: $selectedAreaIDs,
-                    sidebarSelection: $sidebarSelection,
                     listRow: listRow,
                     listsInArea: listsInArea,
                     childAreasOf: childAreasOf,
                     onRename: onRename,
                     onRequestDelete: onRequestDelete,
                     onPersistChange: onPersistChange,
-                    onCollapseHidingSelectedList: onCollapseHidingSelectedList
+                    onCollapseHidingSelectedList: onCollapseHidingSelectedList,
+                    isSelected: selectedAreaIDs.contains(childArea.id)
                 )
             }
 
@@ -1603,66 +1583,22 @@ private struct AreaRowView<ListRow: View>: View {
                 listRow(list)
             }
         } label: {
-            HStack(spacing: SidebarMetrics.rowSpacing) {
-                Image(systemName: area.icon)
-                    .font(SidebarMetrics.itemIconFont)
-                    .foregroundStyle(
-                        isTargeted
-                            ? Color.accentColor
-                            : SidebarMetrics.iconColor(
-                                for: colorScheme,
-                                isHovered: isHovered
-                            )
-                    )
-                    .frame(width: SidebarMetrics.itemIconWidth, alignment: .center)
-                Text(area.name)
-                    .font(SidebarMetrics.itemFont)
-                    .foregroundStyle(SidebarMetrics.titleColor(for: colorScheme))
+            HStack(spacing: 8) {
+                SwiftUI.Label(area.name, systemImage: area.icon)
+                    .foregroundStyle(isTargeted ? Color.accentColor : .primary)
 
                 Spacer()
 
                 // Total list count badge (including nested)
                 if totalListCount > 0 {
-                    SidebarCountBadge(count: totalListCount, isSelected: isSelected)
+                    SidebarCountBadge(count: totalListCount)
                 }
             }
-            .frame(maxWidth: .infinity, minHeight: SidebarMetrics.rowMinimumHitHeight, alignment: .leading)
-            .background(Color.clear)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .modifier(SidebarHoverRowModifier(isSelected: isSelected))
             .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: isTargeted)
-            .contentShape(RoundedRectangle(cornerRadius: SidebarMetrics.rowCornerRadius, style: .continuous))
         }
-        .simultaneousGesture(
-            TapGesture().onEnded {
-                if SystemBridge.isCommandPressed {
-                    if selectedAreaIDs.contains(area.id) {
-                        selectedAreaIDs.remove(area.id)
-                        if let remaining = selectedAreaIDs.sorted(by: { $0.uuidString < $1.uuidString }).first {
-                            sidebarSelection = .area(remaining)
-                        } else {
-                            sidebarSelection = nil
-                        }
-                    } else {
-                        selectedAreaIDs.insert(area.id)
-                        sidebarSelection = .area(area.id)
-                    }
-                } else {
-                    selectedAreaIDs = [area.id]
-                    sidebarSelection = .area(area.id)
-                }
-            }
-        )
         .tag(SidebarSelectionID.area(area.id))
-        .listRowInsets(SidebarMetrics.rowInsets)
-        .listRowBackground(
-            SidebarRowSurface(
-                isSelected: isSelected,
-                isHovered: isHovered,
-                isDropTarget: isTargeted
-            )
-        )
-        .onHover { hovering in
-            isHovered = hovering
-        }
         .accessibilityLabel(area.name)
         .accessibilityValue(totalListCount > 0 ? "\(totalListCount) lists" : "Empty folder")
         .accessibilityIdentifier("area-row-\(area.name)")
