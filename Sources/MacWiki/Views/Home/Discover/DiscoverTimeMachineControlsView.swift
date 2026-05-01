@@ -5,8 +5,10 @@ struct DiscoverTimeMachineControlsView: View {
     let screenModel: DiscoverScreenModel
     let discoverFeedStore: DiscoverFeedStore
     let discoverContentWidth: CGFloat
+    var isScanning = false
 
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var prefersWideTimeMachineControls: Bool {
         discoverContentWidth >= 760
@@ -19,19 +21,24 @@ struct DiscoverTimeMachineControlsView: View {
     var body: some View {
         @Bindable var screenModel = screenModel
 
-        VStack(alignment: .leading, spacing: 7) {
-            HStack(spacing: 7) {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
                 Image(systemName: "clock.arrow.trianglehead.counterclockwise.rotate.90")
                     .font(.system(size: 12, weight: .semibold))
                     .symbolRenderingMode(.hierarchical)
-                    .foregroundStyle(.primary.opacity(0.82))
+                    .foregroundStyle(.secondary)
                     .frame(width: 20, height: 20)
 
                 Text("Time Machine")
-                    .font(.system(size: 12.5, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.primary.opacity(0.92))
+                    .font(.system(size: 12.5, weight: .semibold))
+                    .foregroundStyle(.primary)
 
                 Spacer(minLength: 0)
+
+                if isScanning {
+                    scanningBadge
+                        .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .trailing)))
+                }
 
                 Text(discoverFeedStore.feed?.dateLabel ?? screenModel.discoverTimeMachineDateLabel)
                     .font(.system(size: 11, weight: .medium, design: .rounded))
@@ -89,28 +96,65 @@ struct DiscoverTimeMachineControlsView: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background {
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(.regularMaterial)
-                .overlay {
-                    LinearGradient(
-                        colors: [
-                            Color(nsColor: .systemBlue).opacity(colorScheme == .dark ? 0.12 : 0.07),
-                            Color(nsColor: .systemCyan).opacity(colorScheme == .dark ? 0.08 : 0.04),
-                            .clear
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                }
+        .background(timeMachineGlassBackground)
+        .overlay {
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(Color(nsColor: .separatorColor).opacity(colorScheme == .dark ? 0.42 : 0.34), lineWidth: 0.7)
         }
         .overlay {
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.16 : 0.09), lineWidth: 0.8)
+            if isScanning {
+                AppLoadingScanlineOverlay(lineOpacity: colorScheme == .dark ? 0.026 : 0.018)
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .blendMode(.screen)
+                    .opacity(reduceMotion ? 0.06 : 0.11)
+                    .allowsHitTesting(false)
+            }
         }
-        .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.18 : 0.07), radius: 8, y: 3)
+        .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.16 : 0.04), radius: 7, y: 2)
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.14), value: isScanning)
         .help("Temporal Lens: scrub day-by-day or jump to a specific date.")
+    }
+
+    @ViewBuilder
+    private var timeMachineGlassBackground: some View {
+        let cornerRadius: CGFloat = 14
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+
+        if #available(macOS 26, *) {
+            shape
+                .fill(.clear)
+                .glassEffect(.regular.interactive(), in: .rect(cornerRadius: cornerRadius))
+                .overlay {
+                    shape.fill(
+                        LinearGradient(
+                            colors: [
+                                Color.indigo.opacity(colorScheme == .dark ? 0.075 : 0.105),
+                                Color.accentColor.opacity(colorScheme == .dark ? 0.035 : 0.055),
+                                Color(nsColor: .windowBackgroundColor).opacity(colorScheme == .dark ? 0.018 : 0.052)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                }
+        } else {
+            shape.fill(.thinMaterial)
+        }
+    }
+
+    private var scanningBadge: some View {
+        HStack(spacing: 6) {
+            AppLoadingActivityMark(tone: .retro)
+
+            Text("SCANNING")
+                .font(.system(size: 10.5, weight: .semibold, design: .rounded))
+                .foregroundStyle(Color.accentColor)
+                .lineLimit(1)
+        }
+        .fixedSize()
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(Color.accentColor.opacity(colorScheme == .dark ? 0.18 : 0.11), in: Capsule(style: .continuous))
     }
 
     @ViewBuilder
@@ -162,7 +206,7 @@ struct DiscoverTimeMachineControlsView: View {
         }
         .buttonStyle(.borderless)
         .foregroundStyle(.primary.opacity(0.88))
-        .background(Color.primary.opacity(colorScheme == .dark ? 0.14 : 0.08), in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+        .background(Color.primary.opacity(colorScheme == .dark ? 0.12 : 0.065), in: RoundedRectangle(cornerRadius: 7, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 7, style: .continuous)
                 .strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.16 : 0.10), lineWidth: 0.6)
@@ -221,7 +265,7 @@ struct DiscoverTimeMachineControlsView: View {
         }
         .buttonStyle(.borderless)
         .foregroundStyle(.primary.opacity(discoverFeedStore.isLoading ? 0.38 : 0.86))
-        .background(Color.primary.opacity(colorScheme == .dark ? 0.14 : 0.08), in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+        .background(Color.primary.opacity(colorScheme == .dark ? 0.12 : 0.065), in: RoundedRectangle(cornerRadius: 7, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 7, style: .continuous)
                 .strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.16 : 0.10), lineWidth: 0.6)
@@ -260,7 +304,7 @@ struct DiscoverTimeMachineControlsView: View {
         }
         .buttonStyle(.borderless)
         .foregroundStyle(.primary.opacity(0.86))
-        .background(Color.primary.opacity(colorScheme == .dark ? 0.14 : 0.08), in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+        .background(Color.primary.opacity(colorScheme == .dark ? 0.12 : 0.065), in: RoundedRectangle(cornerRadius: 7, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 7, style: .continuous)
                 .strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.16 : 0.10), lineWidth: 0.6)
@@ -281,7 +325,7 @@ struct DiscoverTimeMachineControlsView: View {
         .buttonStyle(.borderless)
         .disabled(disabled)
         .foregroundStyle(.primary.opacity(disabled ? 0.36 : 0.86))
-        .background(Color.primary.opacity(colorScheme == .dark ? 0.14 : 0.08), in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+        .background(Color.primary.opacity(colorScheme == .dark ? 0.12 : 0.065), in: RoundedRectangle(cornerRadius: 7, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 7, style: .continuous)
                 .strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.16 : 0.10), lineWidth: 0.6)

@@ -13,6 +13,7 @@ struct InspectorColumnView: View {
             currentArticleTitle: appState.currentArticle?.title
         )
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .ignoresSafeArea(.container, edges: .top)
         .zIndex(30)
     }
 }

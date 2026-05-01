@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 
 @testable import MacWiki
@@ -46,5 +47,25 @@ struct WebViewMessageRouterTests {
         }
 
         #expect(text == "Important passage")
+    }
+
+    @Test func parsesHighlightResultPayload() {
+        let failedId = UUID().uuidString
+        let body: [String: Any] = [
+            "total": 3,
+            "success": 2,
+            "failedIds": [failedId]
+        ]
+
+        let event = WebViewMessageRouter.route(name: "highlightResult", body: body)
+
+        guard case .highlightResult(let payload)? = event else {
+            Issue.record("Expected highlightResult payload")
+            return
+        }
+
+        #expect(payload["total"] as? Int == 3)
+        #expect(payload["success"] as? Int == 2)
+        #expect(payload["failedIds"] as? [String] == [failedId])
     }
 }

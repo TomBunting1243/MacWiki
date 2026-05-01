@@ -12,6 +12,25 @@ VISIBILITY="public"
 SKIP_PREFLIGHT=0
 ASSUME_YES=0
 DRY_RUN=0
+SIGN_IDENTITY=""
+NOTARY_PROFILE=""
+
+require_git_repo() {
+  if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    echo "release_beta.sh must be run inside an existing git repository."
+    exit 1
+  fi
+}
+
+require_clean_git_tree() {
+  local status_output
+  status_output="$(git status --porcelain --untracked-files=all)"
+  if [[ -n "$status_output" ]]; then
+    echo "Public beta releases require a clean git tree:"
+    echo "$status_output"
+    exit 1
+  fi
+}
 
 usage() {
   cat <<'EOF'
@@ -25,6 +44,9 @@ Options:
   --build <number>        Build number for packaged artifact (example: 1)
   --repo <owner/name>     GitHub repository slug (default: tombunting/MacWiki)
   --title <text>          GitHub release title (default: "MacWiki <version>")
+  --identity <name>       Developer ID signing identity used for packaging
+  --notary-profile <name>
+                          `notarytool` keychain profile used for notarization
   --private               Create first-time repository as private
   --public                Create first-time repository as public (default)
   --skip-preflight        Skip preflight (not recommended)
@@ -39,22 +61,6 @@ run_cmd() {
     echo "[dry-run] $*"
   else
     "$@"
-  fi
-}
-
-stage_and_maybe_commit() {
-  local commit_message="$1"
-  run_cmd git add .
-
-  if [[ "$DRY_RUN" -eq 1 ]]; then
-    echo "[dry-run] git commit -m \"$commit_message\"  # if staged changes exist"
-    return
-  fi
-
-  if git diff --cached --quiet; then
-    echo "No staged changes to commit."
-  else
-    git commit -m "$commit_message"
   fi
 }
 
@@ -122,6 +128,14 @@ while [[ $# -gt 0 ]]; do
       RELEASE_TITLE="${2:-}"
       shift 2
       ;;
+    --identity)
+      SIGN_IDENTITY="${2:-}"
+      shift 2
+      ;;
+    --notary-profile)
+      NOTARY_PROFILE="${2:-}"
+      shift 2
+      ;;
     --private)
       VISIBILITY="private"
       shift
@@ -154,6 +168,14 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+require_git_repo
+CURRENT_BRANCH="$(git branch --show-current)"
+if [[ -z "$CURRENT_BRANCH" ]]; then
+  echo "Release flow requires a checked-out branch, not detached HEAD."
+  exit 1
+fi
+require_clean_git_tree
+
 if ! command -v gh >/dev/null 2>&1; then
   if [[ "$DRY_RUN" -eq 1 ]]; then
     echo "Warning: GitHub CLI (gh) not found. Continuing because --dry-run is enabled."
@@ -178,6 +200,11 @@ if [[ ! "$BUILD_NUMBER" =~ ^[0-9]+$ ]]; then
   exit 1
 fi
 
+if [[ -z "$SIGN_IDENTITY" || -z "$NOTARY_PROFILE" ]]; then
+  echo "Public beta release requires both --identity and --notary-profile."
+  exit 1
+fi
+
 if [[ -z "$RELEASE_TITLE" ]]; then
   RELEASE_TITLE="MacWiki $VERSION"
 fi
@@ -190,7 +217,10 @@ echo "  Version tag: $VERSION"
 echo "  Package version: $PACKAGE_VERSION"
 echo "  Build: $BUILD_NUMBER"
 echo "  Repo: $REPO_SLUG"
+echo "  Branch: $CURRENT_BRANCH"
 echo "  Visibility (first create): $VISIBILITY"
+echo "  Signing identity: $SIGN_IDENTITY"
+echo "  Notary profile: $NOTARY_PROFILE"
 echo "  Preflight: $([[ "$SKIP_PREFLIGHT" -eq 1 ]] && echo "skip" || echo "run")"
 echo "  Dry run: $([[ "$DRY_RUN" -eq 1 ]] && echo "yes" || echo "no")"
 echo
@@ -199,13 +229,22 @@ confirm_or_exit "Have you completed manual QA for this beta?"
 confirm_or_exit "Proceed with automated release steps?"
 
 if [[ "$SKIP_PREFLIGHT" -eq 0 ]]; then
-  run_cmd ./scripts/preflight_beta_release.sh --version "$PACKAGE_VERSION" --build "$BUILD_NUMBER"
+  run_cmd ./scripts/preflight_beta_release.sh \
+    --version "$PACKAGE_VERSION" \
+    --build "$BUILD_NUMBER" \
+    --identity "$SIGN_IDENTITY" \
+    --notary-profile "$NOTARY_PROFILE"
 fi
 
 ZIP_PATH="$(ls -td "dist/MacWiki-${PACKAGE_VERSION}-build${BUILD_NUMBER}-"*.zip 2>/dev/null | head -1 || true)"
 if [[ -z "$ZIP_PATH" ]]; then
   echo "No packaged zip found for $PACKAGE_VERSION build $BUILD_NUMBER in dist/. Running packaging now."
-  run_cmd ./scripts/package_beta_app.sh --version "$PACKAGE_VERSION" --build "$BUILD_NUMBER" --skip-build
+  run_cmd ./scripts/package_beta_app.sh \
+    --version "$PACKAGE_VERSION" \
+    --build "$BUILD_NUMBER" \
+    --skip-build \
+    --identity "$SIGN_IDENTITY" \
+    --notary-profile "$NOTARY_PROFILE"
   ZIP_PATH="$(ls -td "dist/MacWiki-${PACKAGE_VERSION}-build${BUILD_NUMBER}-"*.zip 2>/dev/null | head -1 || true)"
 fi
 if [[ -z "$ZIP_PATH" ]]; then
@@ -213,38 +252,16 @@ if [[ -z "$ZIP_PATH" ]]; then
   exit 1
 fi
 
-IN_GIT_REPO=0
-if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  IN_GIT_REPO=1
-  echo "Git repository detected."
-fi
-
-if [[ "$IN_GIT_REPO" -eq 0 ]]; then
-  echo "Initializing git repository..."
-  run_cmd git init -b main
-  if [[ "$DRY_RUN" -eq 1 ]]; then
-    IN_GIT_REPO=1
-  fi
-fi
-
 REMOTE_EXISTS=0
-if [[ "$DRY_RUN" -eq 1 && "$IN_GIT_REPO" -eq 1 ]]; then
-  # In dry-run mode, we cannot rely on simulated git init for remote checks.
-  if git rev-parse --is-inside-work-tree >/dev/null 2>&1 && git remote get-url origin >/dev/null 2>&1; then
-    REMOTE_EXISTS=1
-  fi
-elif git remote get-url origin >/dev/null 2>&1; then
+if git remote get-url origin >/dev/null 2>&1; then
   REMOTE_EXISTS=1
 fi
 
 if [[ "$REMOTE_EXISTS" -eq 1 ]]; then
   echo "Git remote origin already configured."
-  stage_and_maybe_commit "Release: $VERSION"
-  run_cmd git push -u origin main
+  run_cmd git push -u origin "$CURRENT_BRANCH"
 else
-  echo "Creating GitHub repository and pushing main..."
-  stage_and_maybe_commit "Release: $VERSION"
-
+  echo "Creating GitHub repository and pushing $CURRENT_BRANCH..."
   if [[ "$VISIBILITY" == "private" ]]; then
     run_cmd gh repo create "$REPO_SLUG" --private --source=. --remote=origin --push
   else

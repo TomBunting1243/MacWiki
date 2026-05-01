@@ -28,7 +28,6 @@ struct ContentView: View {
     // Tag management (Shared)
     @State private var showNewTagSheet = false
     @State private var articleForNewTag: Article?
-    @AppStorage(AppStorageKey.Search.presentationMode) private var searchPresentationMode: SearchPresentationMode = .overlay
     @AppStorage(ExperimentFlag.wikiHopPOCEnabled.key) private var wikiHopPOCEnabled = false
     @AppStorage(AppStorageKey.Features.wikiHopPostV1Enabled) private var wikiHopPostV1Enabled = false
     @State private var suppressInitialImplicitAnimations = true
@@ -40,7 +39,6 @@ struct ContentView: View {
 
     private enum PanelMotion {
         static let sidebarToggle = ColumnMotion.sidebarVisibility
-        static let searchOverlayToggle = Animation.spring(response: 0.24, dampingFraction: 0.88)
         static let wikiHopSummaryFade = Animation.easeInOut(duration: 0.3)
     }
 
@@ -57,9 +55,7 @@ struct ContentView: View {
             workspaceSharedBackground
             mainWindowContent
             wikiHopOverlay
-            searchOverlay
         }
-        .animation(reduceMotion ? nil : PanelMotion.searchOverlayToggle, value: appState.showSearch)
         .contentSheets(
             editingLabel: $editingLabel, 
             showNewLabelSheet: $showNewLabelSheet, 
@@ -77,9 +73,6 @@ struct ContentView: View {
         }
         .onChange(of: appState.showSearch) { _, isShowingSearch in
             guard isShowingSearch else { return }
-            revealSidebarForEmbeddedSearchIfNeeded()
-        }
-        .onChange(of: searchPresentationMode) { _, _ in
             revealSidebarForEmbeddedSearchIfNeeded()
         }
         .onChange(of: wikiHopPOCEnabled) { _, _ in
@@ -144,37 +137,6 @@ struct ContentView: View {
     }
     
     @ViewBuilder
-    private var searchOverlay: some View {
-        if appState.showSearch && searchPresentationMode == .overlay {
-            GeometryReader { proxy in
-                let containerSize = proxy.size
-                let clampedWidth = min(QuickSearchView.idealSize.width, containerSize.width * 0.82)
-                let clampedHeight = min(QuickSearchView.idealSize.height, containerSize.height * 0.78)
-                let modalSize = CGSize(width: clampedWidth, height: clampedHeight)
-                let topInset = max(proxy.safeAreaInsets.top + 18, 28)
-
-                ZStack(alignment: .top) {
-                    Color.black.opacity(0.08)
-                        .ignoresSafeArea()
-                        .onTapGesture {
-                            performAnimation(PanelMotion.searchOverlayToggle) {
-                                appState.showSearch = false
-                            }
-                        }
-
-                    VStack(spacing: 0) {
-                        QuickSearchView(modalSize: modalSize)
-                            .padding(.top, topInset)
-                        Spacer(minLength: 0)
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                }
-                .transition(AppLoadingMotion.overlayTransition(reduceMotion: reduceMotion, anchor: .top))
-            }
-        }
-    }
-
-    @ViewBuilder
     private var wikiHopOverlay: some View {
         if let session = appState.wikiHopSession {
             if session.status == .active {
@@ -219,7 +181,6 @@ struct ContentView: View {
 
     private func revealSidebarForEmbeddedSearchIfNeeded() {
         guard appState.showSearch else { return }
-        guard searchPresentationMode == .sidebar else { return }
         guard !appState.listsSidebarVisible || !appState.directoryColumnVisible else { return }
         guard !appState.isWikiHopNavigationLocked else { return }
 

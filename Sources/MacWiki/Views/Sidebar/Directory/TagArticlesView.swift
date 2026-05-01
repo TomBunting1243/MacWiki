@@ -157,6 +157,7 @@ struct TagArticlesView: View {
                     let isRead = effectiveReadState(for: article.title)
                     let progress = readingProgress(for: article.title)
                     let tags = tagsForArticle(title: article.title)
+                        .filter { $0.id != tag.id }
 
                     if let saved = savedArticle(for: article.title) {
                         SavedArticleRow(
@@ -196,6 +197,7 @@ struct TagArticlesView: View {
                             onTagClick: { tag in
                                 localTagFilter = (localTagFilter?.id == tag.id) ? nil : tag
                             },
+                            showsListMembership: true,
                             onNewLabel: { draft in
                                 onNewLabelWithArticle(draft)
                             },

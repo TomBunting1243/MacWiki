@@ -22,11 +22,11 @@ struct MetadataView: View {
                     VStack(alignment: .leading, spacing: 0) {
                         VStack(alignment: .leading, spacing: 4) {
                             Text(item.label)
-                                .font(.caption2.weight(.semibold))
+                                .font(MacWikiTypography.metadataLabel)
                                 .foregroundStyle(.secondary)
 
                             metadataValueText(item.value)
-                                .font(.footnote)
+                                .font(MacWikiTypography.metadataValue)
                                 .foregroundStyle(.primary)
                                 .multilineTextAlignment(.leading)
                                 .fixedSize(horizontal: false, vertical: true)

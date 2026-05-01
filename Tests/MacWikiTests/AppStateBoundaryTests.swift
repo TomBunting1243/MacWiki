@@ -6,6 +6,46 @@ import Testing
 
 @MainActor
 struct AppStateBoundaryTests {
+    @Test func listContentsTogglePreservesListsSidebarVisibility() {
+        let appState = AppState(loadPersistedState: false)
+        appState.navigationSplitViewVisibility = .all
+        appState.listContentsColumnVisible = true
+
+        appState.toggleDirectoryColumnVisibility()
+
+        #expect(appState.listsSidebarVisible == true)
+        #expect(appState.directoryColumnVisible == false)
+        #expect(appState.listContentsColumnVisible == false)
+        #expect(appState.navigationSplitViewVisibility == .all)
+
+        appState.toggleDirectoryColumnVisibility()
+
+        #expect(appState.listsSidebarVisible == true)
+        #expect(appState.directoryColumnVisible == true)
+        #expect(appState.listContentsColumnVisible == true)
+        #expect(appState.navigationSplitViewVisibility == .all)
+    }
+
+    @Test func navigationColumnsToggleHidesAndRestoresListsAndDirectoryColumns() {
+        let appState = AppState(loadPersistedState: false)
+        appState.navigationSplitViewVisibility = .all
+        appState.listContentsColumnVisible = true
+
+        appState.toggleNavigationColumnsVisibility()
+
+        #expect(appState.listsSidebarVisible == false)
+        #expect(appState.directoryColumnVisible == false)
+        #expect(appState.listContentsColumnVisible == false)
+        #expect(appState.navigationSplitViewVisibility == .detailOnly)
+
+        appState.toggleNavigationColumnsVisibility()
+
+        #expect(appState.listsSidebarVisible == true)
+        #expect(appState.directoryColumnVisible == true)
+        #expect(appState.listContentsColumnVisible == true)
+        #expect(appState.navigationSplitViewVisibility == .all)
+    }
+
     @Test func dismissFindOnPageInvalidatesQueryResultsAndQueuesLegacyClearRequest() {
         let appState = AppState(loadPersistedState: false)
         let tabID = UUID()
@@ -142,5 +182,34 @@ struct AppStateBoundaryTests {
         #expect(defaults.bool(forKey: ExperimentFlag.wikiHopPOCEnabled.key) == false)
         #expect(appState.wikiHopSession == nil)
         #expect(defaults.string(forKey: DiscoverStartMode.storageKey) == DiscoverStartMode.discoverFeed.rawValue)
+    }
+
+    @Test func appStateReadStateUpdatesRecentsAndQueuesTabSessionSave() {
+        let appState = AppState(loadPersistedState: false)
+        appState.recentArticles = [
+            Article(id: "ada", title: "Ada Lovelace"),
+            Article(id: "swift", title: "Swift")
+        ]
+        appState.openTabs = [
+            ArticleTab(
+                content: .history(
+                    items: [
+                        HistoryItem(article: Article(id: "ada-tab", title: "Ada_Lovelace"))
+                    ],
+                    currentIndex: 0
+                )
+            )
+        ]
+
+        let saveGeneration = appState.tabSessionStore.saveRequestGeneration
+        appState.updateReadState(forTitle: "Ada Lovelace", isRead: true)
+
+        #expect(appState.recentArticles[0].isRead == true)
+        #expect(appState.recentArticles[1].isRead == false)
+        #expect(appState.openTabs[0].history[0].article.isRead == true)
+        #expect(appState.tabSessionStore.saveRequestGeneration == saveGeneration + 1)
+        appState.saveTask?.cancel()
+        appState.saveTask = nil
+        appState.tabSessionStore.cancelPendingSaveForTesting()
     }
 }

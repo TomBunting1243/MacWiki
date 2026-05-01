@@ -14,4 +14,20 @@ enum SearchResultActions {
             modelContext: modelContext
         )
     }
+
+    static func saveAllToList(
+        _ results: [WikipediaService.SearchResult],
+        list: ReadingList,
+        modelContext: ModelContext
+    ) {
+        guard !results.isEmpty else { return }
+
+        for result in results {
+            ArticleLibraryActions.saveSearchResultToList(
+                result,
+                list: list,
+                modelContext: modelContext
+            )
+        }
+    }
 }

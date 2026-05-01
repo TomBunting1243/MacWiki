@@ -50,7 +50,7 @@ struct ReaderAppearance: Equatable {
     static let minimumReadableColumnWidth: Double = 360
 
     static let `default` = ReaderAppearance(
-        fontPreset: .system,
+        fontPreset: .newYork,
         fontSize: 17,
         lineHeight: 1.65,
         paragraphSpacing: 16,

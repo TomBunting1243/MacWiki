@@ -22,6 +22,12 @@ extension WebView.Coordinator {
                 request: request
             ))
             menu.addItem(linkMenuItem(
+                title: "Open in New Window",
+                systemImage: "macwindow.badge.plus",
+                action: .openInNewWindow,
+                request: request
+            ))
+            menu.addItem(linkMenuItem(
                 title: "Open in Background Tab",
                 systemImage: "square.on.square",
                 action: .openInNewBackgroundTab,
@@ -109,6 +115,8 @@ extension WebView.Coordinator {
                 self.openLinkFromContextMenu(payload.url, inNewTab: true)
             case .openInNewBackgroundTab:
                 self.openLinkFromContextMenu(payload.url, inNewTab: true, activateNewTab: false)
+            case .openInNewWindow:
+                self.openLinkFromContextMenuInNewWindow(payload.url)
             case .copyTitle:
                 if let title = payload.articleTitle {
                     _ = SystemBridge.copyText(title)
@@ -120,6 +128,19 @@ extension WebView.Coordinator {
                       let readingListID = payload.readingListID else { return }
                 self.saveLinkedArticle(title: title, to: readingListID)
             }
+        }
+    }
+
+    func openLinkFromContextMenuInNewWindow(_ url: URL) {
+        dismissLinkHoverPreview(immediate: true)
+        if let target = wikipediaLinkTarget(from: url) {
+            let article = Article(id: target.id, title: target.displayTitle)
+            onOpenArticleInNewWindow?(article)
+            return
+        }
+
+        if url.scheme != nil {
+            _ = SystemBridge.openURLExternally(url)
         }
     }
 

@@ -7,7 +7,11 @@ struct ReferenceExportBarView: View {
     let allSections: [ArticleReferenceSection]
     let onClearSelection: () -> Void
 
+    @Environment(\.colorScheme) private var colorScheme
+
     var body: some View {
+        let shape = RoundedRectangle(cornerRadius: 16, style: .continuous)
+
         HStack(spacing: 10) {
             Image(systemName: "books.vertical")
                 .font(.system(size: 11, weight: .semibold))
@@ -38,27 +42,33 @@ struct ReferenceExportBarView: View {
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
         .background {
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(.regularMaterial)
+            shape
+                .fill(.ultraThinMaterial)
                 .overlay {
-                    LinearGradient(
-                        colors: [
-                            Color.white.opacity(0.18),
-                            Color.white.opacity(0.02),
-                            Color.clear
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                    .blendMode(.screen)
+                    shape
+                        .fill(Color(nsColor: .windowBackgroundColor).opacity(colorScheme == .dark ? 0.04 : 0.025))
+                }
+                .overlay {
+                    shape
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color.white.opacity(0.10),
+                                    Color.white.opacity(0.015),
+                                    Color.clear
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .blendMode(.screen)
                 }
         }
         .overlay {
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(Color.white.opacity(0.12), lineWidth: 0.8)
+            shape
+                .strokeBorder(Color.white.opacity(0.08), lineWidth: 0.7)
         }
-        .shadow(color: .black.opacity(0.18), radius: 14, y: 6)
-        .shadow(color: .black.opacity(0.08), radius: 4, y: 2)
+        .shadow(color: .black.opacity(0.10), radius: 10, y: 4)
+        .shadow(color: .black.opacity(0.05), radius: 3, y: 1)
     }
 }

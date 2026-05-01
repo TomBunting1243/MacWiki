@@ -10,7 +10,7 @@ struct HighlightToolbar: View {
 
     @Environment(AppState.self) private var appState
     @Environment(\.modelContext) private var modelContext
-    @AppStorage(AppStorageKey.Chrome.tabBarLiquidGlass) private var tabBarLiquidGlass = true
+    @AppStorage(AppStorageKey.Chrome.liquidGlassChrome) private var liquidGlassChrome = true
     @AppStorage(MacWikiGlassRuntime.forceLegacyFallbackKey) private var forceLegacyGlassFallback = false
     @State private var selectedColor: HighlightColor = .yellow
     @State private var isHoveringColor: HighlightColor?
@@ -31,23 +31,27 @@ struct HighlightToolbar: View {
     }
 
     private var usesNativeGlass: Bool {
-        tabBarLiquidGlass &&
-            MacWikiGlassRuntime.usesNativeGlass(forceLegacyFallback: forceLegacyGlassFallback)
+        MacWikiGlassRuntime.usesNativeGlass(
+            isEnabled: liquidGlassChrome,
+            forceLegacyFallback: forceLegacyGlassFallback
+        )
     }
 
     var body: some View {
-        colorPickerView
-            .padding(.horizontal, 10)
-            .padding(.vertical, 8)
-            .background(toolbarBackground)
-            .overlay {
-                RoundedRectangle(cornerRadius: Metrics.cornerRadius, style: .continuous)
-                    .strokeBorder(
-                        Color.primary.opacity(colorScheme == .dark ? 0.075 : 0.046),
-                        lineWidth: 0.5
-                    )
-            }
-            .shadow(color: .black.opacity(colorScheme == .dark ? 0.16 : 0.06), radius: 10, x: 0, y: 4)
+        MacWikiGlassGroup(spacing: 8) {
+            colorPickerView
+                .padding(.horizontal, 10)
+                .padding(.vertical, 8)
+                .background(toolbarBackground)
+                .overlay {
+                    RoundedRectangle(cornerRadius: Metrics.cornerRadius, style: .continuous)
+                        .strokeBorder(
+                            Color.primary.opacity(colorScheme == .dark ? 0.075 : 0.046),
+                            lineWidth: 0.5
+                        )
+                }
+        }
+        .shadow(color: .black.opacity(colorScheme == .dark ? 0.16 : 0.06), radius: 10, x: 0, y: 4)
     }
 
     private var colorPickerView: some View {
@@ -69,6 +73,13 @@ struct HighlightToolbar: View {
                             Circle()
                                 .fill(color.swiftUIColor)
                                 .frame(width: Metrics.colorSwatchSize, height: Metrics.colorSwatchSize)
+                                .scaleEffect(isHoveringColor == color ? 1.08 : 1)
+                                .shadow(
+                                    color: color.swiftUIColor.opacity(isHoveringColor == color ? 0.34 : 0),
+                                    radius: 4,
+                                    x: 0,
+                                    y: 1
+                                )
 
                             Circle()
                                 .strokeBorder(Color.white.opacity(0.9), lineWidth: selectedColor == color ? 1.25 : 0)
@@ -109,7 +120,7 @@ struct HighlightToolbar: View {
         HStack(spacing: 2) {
             toolbarActionButton(
                 action: .addNote,
-                systemImage: "note.text",
+                systemImage: "pencil",
                 helpText: "Add note"
             ) {
                 createHighlight(color: selectedColor, openNoteEditor: true)

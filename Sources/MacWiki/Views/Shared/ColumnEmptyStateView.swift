@@ -45,12 +45,12 @@ struct ColumnEmptyStateView: View {
 
             Text(title)
                 .font(style == .quiet ? .headline : .system(size: 17, weight: .semibold))
-                .foregroundStyle(style == .quiet ? .secondary : .primary)
+                .foregroundStyle(.primary)
                 .multilineTextAlignment(.center)
 
             Text(description)
-                .font(style == .quiet ? .caption : .system(size: 14, weight: .medium))
-                .foregroundStyle(style == .quiet ? .tertiary : .secondary)
+                .font(style == .quiet ? MacWikiTypography.settingsHelp : MacWikiTypography.emptyStateDescription)
+                .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
         }

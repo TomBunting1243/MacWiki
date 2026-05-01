@@ -21,6 +21,8 @@ AGENTS.md
 CLAUDE.md
 GEMINI.md
 ANTIGRAVITY.md
+MODEL_HANDOVER_*.md
+macwiki-sidebar-audit.png
 
 # App runtime cache and profiling artifacts
 MacWikiURLCache/

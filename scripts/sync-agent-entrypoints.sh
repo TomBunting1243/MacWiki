@@ -32,8 +32,8 @@ If this file conflicts with \`.agent/AGENT_RULES.md\`, canonical rules win.
 ## Context Policy
 
 - Default to narrow startup: inspect the relevant code first.
-- Read \`Projects/MacWiki/MacWiki.md\` and the latest development log only for resume work, ambiguous feature work, or project-state questions.
-- Use Obsidian CLI first with \`vault="Jack"\`. If the CLI bridge is disabled, fall back to direct vault file reads/patches.
+- Read Jack \`Projects/MacWiki/MacWiki.md\` and Project Indy \`Projects/MacWiki/MacWiki Ops.md\` for resume work, ambiguous feature work, or project-state questions.
+- Use Obsidian CLI first with \`vault="Jack"\` for product docs and \`vault="Project Indy"\` for operational/session docs. If the CLI bridge is disabled, fall back to direct vault file reads/patches.
 
 ## Additional Workflows
 

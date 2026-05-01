@@ -107,24 +107,23 @@ struct DiscoverNewsStoryCard: View {
                 .scrollIndicators(.hidden)
             }
         }
-        .padding(11)
+        .padding(12)
         .background(
             Group {
                 if showsSurface {
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(.regularMaterial)
+                        .fill(.thinMaterial)
                 } else {
                     RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .fill(Color.primary.opacity(isHovered ? 0.05 : 0.028))
+                        .fill(Color.primary.opacity(isHovered ? 0.04 : 0.018))
                 }
             }
         )
         .overlay {
             RoundedRectangle(cornerRadius: showsSurface ? 14 : 16, style: .continuous)
-                .strokeBorder(Color.primary.opacity(isHovered ? 0.16 : (showsSurface ? 0.08 : 0.05)), lineWidth: 0.8)
+                .strokeBorder(Color(nsColor: .separatorColor).opacity(isHovered ? 0.46 : 0.32), lineWidth: 0.7)
         }
-        .scaleEffect(reduceMotion ? 1 : (isHovered ? 1.006 : 1))
-        .animation(reduceMotion ? nil : .easeOut(duration: 0.14), value: isHovered)
+        .discoverHoverEffect(.card, isActive: isHovered, reduceMotion: reduceMotion)
         .onHover { isHovered = $0 }
         .contentShape(RoundedRectangle(cornerRadius: showsSurface ? 14 : 16, style: .continuous))
     }
@@ -147,10 +146,7 @@ struct DiscoverStoryLinkChip: View {
                 .lineLimit(1)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
-                .background(
-                    Color.accentColor.opacity(isHovered ? 0.19 : 0.12),
-                    in: Capsule()
-                )
+                .background(Color.accentColor.opacity(isHovered ? 0.17 : 0.10), in: Capsule())
                 .overlay {
                     Capsule()
                         .strokeBorder(
@@ -160,8 +156,7 @@ struct DiscoverStoryLinkChip: View {
                 }
         }
         .buttonStyle(DiscoverInteractivePressStyle())
-        .scaleEffect(reduceMotion ? 1 : (isHovered ? 1.018 : 1))
-        .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: isHovered)
+        .discoverHoverEffect(.chip, isActive: isHovered, reduceMotion: reduceMotion)
         .onHover { isHovered = $0 }
         .contextMenu {
             ArticleQuickActionsMenuContent(
@@ -209,7 +204,7 @@ struct DiscoverOnThisDayFeatureCard: View {
             VStack(alignment: .leading, spacing: 10) {
                 HStack(alignment: .top, spacing: 12) {
                     Text(event.year)
-                        .font(.system(size: 28, weight: .bold, design: .serif))
+                        .font(.system(size: 28, weight: .semibold, design: .rounded))
                         .foregroundStyle(.primary)
                         .lineLimit(1)
 
@@ -227,35 +222,23 @@ struct DiscoverOnThisDayFeatureCard: View {
                 }
 
                 Text(event.text)
-                    .font(.system(size: 15, weight: .medium, design: .serif))
+                    .font(.system(size: 15, weight: .medium))
                     .foregroundStyle(.primary)
                     .lineLimit(4)
                     .multilineTextAlignment(.leading)
             }
             .padding(14)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                LinearGradient(
-                    colors: [
-                        accent.opacity(isHovered ? 0.12 : 0.09),
-                        Color.primary.opacity(0.025),
-                        Color.white.opacity(0.10)
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                ),
-                in: RoundedRectangle(cornerRadius: 18, style: .continuous)
-            )
+            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
             .overlay {
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .strokeBorder(accent.opacity(isHovered ? 0.22 : 0.12), lineWidth: 0.9)
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .strokeBorder(Color(nsColor: .separatorColor).opacity(isHovered ? 0.46 : 0.32), lineWidth: 0.7)
             }
         }
         .buttonStyle(DiscoverInteractivePressStyle(pressedScale: 0.992, pressedOpacity: 0.95))
         .disabled(event.article == nil)
-        .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-        .scaleEffect(reduceMotion ? 1 : (isHovered ? 1.006 : 1))
-        .animation(reduceMotion ? nil : .easeOut(duration: 0.14), value: isHovered)
+        .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .discoverHoverEffect(.card, isActive: isHovered, reduceMotion: reduceMotion)
         .onHover { isHovered = $0 }
     }
 }
@@ -301,20 +284,19 @@ struct DiscoverOnThisDayRow: View {
             Group {
                 if showsSurface {
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(.regularMaterial)
+                        .fill(.thinMaterial)
                 } else {
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(Color.primary.opacity(isHovered ? 0.048 : 0.026))
+                        .fill(Color.primary.opacity(isHovered ? 0.04 : 0.018))
                 }
             }
         )
         .overlay {
             RoundedRectangle(cornerRadius: showsSurface ? 12 : 14, style: .continuous)
-                .strokeBorder(Color.primary.opacity(isHovered ? 0.15 : (showsSurface ? 0.08 : 0.05)), lineWidth: 0.8)
+                .strokeBorder(Color(nsColor: .separatorColor).opacity(isHovered ? 0.44 : 0.30), lineWidth: 0.7)
         }
         .contentShape(RoundedRectangle(cornerRadius: showsSurface ? 12 : 14, style: .continuous))
-        .scaleEffect(reduceMotion ? 1 : (isHovered ? 1.004 : 1))
-        .animation(reduceMotion ? nil : .easeOut(duration: 0.13), value: isHovered)
+        .discoverHoverEffect(.row, isActive: isHovered, reduceMotion: reduceMotion)
         .onHover { isHovered = $0 }
         .contextMenu {
             if let article = event.article {
@@ -379,20 +361,19 @@ struct DiscoverDidYouKnowRow: View {
             Group {
                 if showsSurface {
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(.regularMaterial)
+                        .fill(.thinMaterial)
                 } else {
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(Color.primary.opacity(isHovered ? 0.048 : 0.026))
+                        .fill(Color.primary.opacity(isHovered ? 0.04 : 0.018))
                 }
             }
         )
         .overlay {
             RoundedRectangle(cornerRadius: showsSurface ? 12 : 14, style: .continuous)
-                .strokeBorder(Color.primary.opacity(isHovered ? 0.15 : (showsSurface ? 0.08 : 0.05)), lineWidth: 0.8)
+                .strokeBorder(Color(nsColor: .separatorColor).opacity(isHovered ? 0.44 : 0.30), lineWidth: 0.7)
         }
         .contentShape(RoundedRectangle(cornerRadius: showsSurface ? 12 : 14, style: .continuous))
-        .scaleEffect(reduceMotion ? 1 : (isHovered ? 1.004 : 1))
-        .animation(reduceMotion ? nil : .easeOut(duration: 0.13), value: isHovered)
+        .discoverHoverEffect(.row, isActive: isHovered, reduceMotion: reduceMotion)
         .onHover { isHovered = $0 }
         .contextMenu {
             if let article = fact.article {

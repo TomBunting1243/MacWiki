@@ -33,7 +33,7 @@ struct TagChipView: View {
                     .contentTransition(.symbolEffect(.replace.downUp))
             }
             Text(title)
-                .font(.caption2.weight(.semibold))
+                .font(MacWikiTypography.metadataLabel)
         }
         .foregroundStyle(chipColor)
         .lineLimit(1)

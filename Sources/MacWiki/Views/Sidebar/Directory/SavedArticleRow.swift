@@ -23,6 +23,9 @@ struct SavedArticleRow: View {
     var selectedTagId: UUID? = nil
     var onTagClick: ((Tag) -> Void)? = nil
     var isSelected: Bool = false
+    var showsLabelMetadata: Bool = true
+    var alwaysShowsLabelMetadata: Bool = false
+    var showsListMembership: Bool = false
     var onOpenArticle: ((Article) -> Void)? = nil
     let onNewLabel: (SavedArticle) -> Void
     var onNewTag: ((Article) -> Void)? = nil
@@ -31,6 +34,19 @@ struct SavedArticleRow: View {
 
     private var currentLabel: Label? {
         allLabels.first { $0.id == savedArticle.labelId }
+    }
+
+    private var dragPayload: SavedArticleDragPayload {
+        SavedArticleDragPayload(
+            savedArticleID: savedArticle.id,
+            sourceListID: savedArticle.readingList?.id,
+            title: savedArticle.title,
+            articleDescription: savedArticle.articleDescription,
+            extract: savedArticle.extract,
+            thumbnailURL: savedArticle.thumbnailURL,
+            isRead: isRead,
+            wordCount: savedArticle.wordCount
+        )
     }
 
     var body: some View {
@@ -72,8 +88,10 @@ struct SavedArticleRow: View {
                 extract: resolvedExtract,
                 allowsEstimatedWordCount: false,
                 isHovered: isHovered,
-                label: label,
+                label: showsLabelMetadata ? (alwaysShowsLabelMetadata ? currentLabel : label) : nil,
                 onLabelClick: onLabelClick,
+                listName: showsListMembership ? list?.name : nil,
+                listIconName: showsListMembership ? list?.icon : nil,
                 tags: tags,
                 selectedTagId: selectedTagId,
                 onTagClick: onTagClick
@@ -81,6 +99,7 @@ struct SavedArticleRow: View {
         }
         .contextMenu {
             ArticleContextMenuContent(
+                articleID: article.id,
                 title: savedArticle.title,
                 description: resolvedDescription,
                 extract: resolvedExtract,
@@ -137,7 +156,7 @@ struct SavedArticleRow: View {
                 referenceDate: Date()
             )
         }
-        .draggable(savedArticle.id.uuidString) {
+        .draggable(dragPayload) {
             SwiftUI.Label(savedArticle.title, systemImage: "doc.text")
                 .padding(8)
                 .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))

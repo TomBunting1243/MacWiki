@@ -4,7 +4,7 @@ import SwiftData
 struct HighlightListView: View {
     @Environment(AppState.self) private var appState
     @Environment(\.modelContext) private var modelContext
-    @Query(sort: \Tag.sortOrder) private var allTags: [Tag]
+    @Environment(\.colorScheme) private var colorScheme
 
     let highlights: [Highlight]
     @State private var showStaleHighlights = true
@@ -36,29 +36,25 @@ struct HighlightListView: View {
     }
 
     private var visibleHighlights: [Highlight] {
-        var filtered = highlights.filter { highlight in
-            if highlight.isArchived {
-                return showArchivedHighlights
-            }
-            if !showStaleHighlights && highlight.isStale {
-                return false
-            }
-            return true
-        }
-        if let tagId = appState.highlightTagFilterId {
-            filtered = filtered.filter { highlight in
-                highlight.tags.contains { $0.id == tagId }
-            }
-        }
-        return filtered
+        HighlightDisplayFilter.visibleHighlights(
+            from: highlights,
+            showStaleHighlights: showStaleHighlights,
+            showArchivedHighlights: showArchivedHighlights
+        )
+    }
+
+    private enum Metrics {
+        static let topChromeReservation: CGFloat = 58
+        static let horizontalPadding: CGFloat = 16
+        static let topPadding: CGFloat = 8
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            header
-
+        ZStack(alignment: .top) {
             if visibleHighlights.isEmpty {
                 emptyState
+                    .padding(.top, Metrics.topChromeReservation)
+                    .padding(.horizontal, Metrics.horizontalPadding)
             } else {
                 ScrollViewReader { proxy in
                     ScrollView {
@@ -66,25 +62,18 @@ struct HighlightListView: View {
                             ForEach(visibleHighlights, id: \.id) { highlight in
                                 HighlightRowView(
                                     highlight: highlight,
-                                    allTags: allTags,
                                     onDelete: {
                                         withAnimation(.easeOut(duration: 0.2)) {
                                             deleteHighlight(highlight)
-                                        }
-                                    },
-                                    onTagSelected: { tag in
-                                        if appState.highlightTagFilterId == tag.id {
-                                            appState.highlightTagFilterId = nil
-                                        } else {
-                                            appState.highlightTagFilterId = tag.id
                                         }
                                     }
                                 )
                                 .id(highlight.id)
                             }
                         }
+                        .padding(.top, Metrics.topChromeReservation)
+                        .padding(.horizontal, Metrics.horizontalPadding)
                         .padding(.bottom, 12)
-                        .padding(.bottom, showsRehydrateBar ? 86 : 0)
                     }
                     .onChange(of: appState.selectedHighlightId) { _, newValue in
                         guard let newValue,
@@ -97,11 +86,15 @@ struct HighlightListView: View {
                     }
                 }
             }
+
+            header
+                .padding(.horizontal, Metrics.horizontalPadding)
+                .padding(.top, Metrics.topPadding)
+                .zIndex(1)
         }
-        .padding(.horizontal)
-        .padding(.top, 8)
         .padding(.bottom, 12)
-        .overlay(alignment: .bottom) {
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
             if showsRehydrateBar {
                 HighlightRehydrateBarView(
                     staleCount: staleHighlightCount,
@@ -135,107 +128,98 @@ struct HighlightListView: View {
     }
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 10) {
-                Image(systemName: "highlighter")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(.secondary)
+        HStack(spacing: 10) {
+            Image(systemName: "highlighter")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.secondary)
 
-                Text("Highlights")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
+            Text("Highlights")
+                .font(MacWikiTypography.inspectorSectionLabel)
+                .foregroundStyle(.primary)
+                .lineLimit(1)
 
-                Text("\(visibleHighlights.count)")
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(Color.accentColor, in: Capsule())
+            Text("\(visibleHighlights.count)")
+                .font(MacWikiTypography.compactRowMetadata)
+                .foregroundStyle(.white)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(Color.accentColor, in: Capsule())
 
-                Spacer()
+            Spacer(minLength: 6)
 
-                if !staleHighlights.isEmpty {
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.15)) {
-                            showStaleHighlights.toggle()
-                        }
-                    } label: {
-                        HStack(spacing: 4) {
-                            Image(systemName: "exclamationmark.triangle.fill")
-                                .font(.system(size: 9, weight: .semibold))
-                            Text("\(staleHighlights.count)")
-                                .font(.caption.weight(.medium))
-                            Text("Stale")
-                                .font(.caption.weight(.medium))
-                        }
-                        .foregroundStyle(showStaleHighlights ? .orange : .secondary)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(
-                            showStaleHighlights
-                                ? Color.orange.opacity(0.18)
-                                : Color.gray.opacity(0.12),
-                            in: Capsule()
-                        )
-                        .overlay {
-                            Capsule()
-                                .strokeBorder(
-                                    showStaleHighlights ? Color.orange.opacity(0.4) : Color.clear,
-                                    lineWidth: 0.8
-                                )
-                        }
+            if !staleHighlights.isEmpty {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.15)) {
+                        showStaleHighlights.toggle()
                     }
-                    .buttonStyle(.plain)
-                    .help(showStaleHighlights ? "Hide stale highlights" : "Show stale highlights")
-                }
-
-                if archivedHighlightCount > 0 {
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.15)) {
-                            showArchivedHighlights.toggle()
-                        }
-                    } label: {
-                        HStack(spacing: 4) {
-                            Image(systemName: "archivebox")
-                                .font(.system(size: 9, weight: .semibold))
-                            Text("\(archivedHighlightCount)")
-                                .font(.caption.weight(.medium))
-                            Text("Archived")
-                                .font(.caption.weight(.medium))
-                        }
-                        .foregroundStyle(showArchivedHighlights ? .secondary : .tertiary)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(
-                            showArchivedHighlights
-                                ? Color.gray.opacity(0.12)
-                                : Color.gray.opacity(0.08),
-                            in: Capsule()
-                        )
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.system(size: 9, weight: .semibold))
+                        Text("\(staleHighlights.count)")
+                            .font(MacWikiTypography.compactRowMetadata)
+                        Text("Stale")
+                            .font(MacWikiTypography.compactRowMetadata)
                     }
-                    .buttonStyle(.plain)
-                    .help(showArchivedHighlights ? "Hide archived highlights" : "Show archived highlights")
+                    .foregroundStyle(showStaleHighlights ? .orange : .secondary)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(
+                        showStaleHighlights
+                            ? Color.orange.opacity(0.18)
+                            : Color.gray.opacity(0.12),
+                        in: Capsule()
+                    )
+                    .overlay {
+                        Capsule()
+                            .strokeBorder(
+                                showStaleHighlights ? Color.orange.opacity(0.4) : Color.clear,
+                                lineWidth: 0.8
+                            )
+                    }
                 }
+                .buttonStyle(.plain)
+                .help(showStaleHighlights ? "Hide stale highlights" : "Show stale highlights")
             }
 
-            if let tagId = appState.highlightTagFilterId,
-               let tag = allTags.first(where: { $0.id == tagId }) {
-                HStack(spacing: 6) {
-                    TagChipView(title: tag.name, isSelected: true) {
-                        appState.highlightTagFilterId = nil
+            if archivedHighlightCount > 0 {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.15)) {
+                        showArchivedHighlights.toggle()
                     }
-
-                    Button {
-                        appState.highlightTagFilterId = nil
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 12))
-                            .foregroundStyle(.tertiary)
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "archivebox")
+                            .font(.system(size: 9, weight: .semibold))
+                        Text("\(archivedHighlightCount)")
+                            .font(MacWikiTypography.compactRowMetadata)
+                        Text("Archived")
+                            .font(MacWikiTypography.compactRowMetadata)
                     }
-                    .buttonStyle(.plain)
+                    .foregroundStyle(showArchivedHighlights ? .secondary : .tertiary)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(
+                        showArchivedHighlights
+                            ? Color.gray.opacity(0.12)
+                            : Color.gray.opacity(0.08),
+                        in: Capsule()
+                    )
                 }
+                .buttonStyle(.plain)
+                .help(showArchivedHighlights ? "Hide archived highlights" : "Show archived highlights")
             }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background {
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(.ultraThinMaterial)
+                .opacity(colorScheme == .dark ? 0.68 : 0.54)
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.06 : 0.035), lineWidth: 0.5)
         }
     }
 
@@ -251,8 +235,8 @@ struct HighlightListView: View {
 
         return VStack(spacing: 6) {
             Text(title)
-                .font(.caption)
-                .foregroundStyle(.tertiary)
+                .font(MacWikiTypography.settingsHelp)
+                .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 16)

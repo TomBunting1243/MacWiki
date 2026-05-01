@@ -315,7 +315,7 @@ struct OptionClickSaveSheet: View {
                 } label: {
                     HStack(spacing: 8) {
                         Text(selectedTag?.name ?? "None")
-                            .font(.subheadline.weight(.medium))
+                            .font(MacWikiTypography.controlValue)
                             .foregroundStyle(selectedTag == nil ? .secondary : .primary)
 
                         Spacer(minLength: 0)
@@ -366,7 +366,7 @@ struct OptionClickSaveSheet: View {
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(selectedTagID == id ? Color.accentColor : Color.secondary)
                 Text(name)
-                    .font(.subheadline.weight(.medium))
+                    .font(MacWikiTypography.controlValue)
                     .foregroundStyle(.primary)
                 Spacer(minLength: 0)
             }
@@ -387,7 +387,7 @@ struct OptionClickSaveSheet: View {
                     .frame(width: Metrics.fieldLabelWidth, height: 1)
             } else {
                 Text(title)
-                    .font(.subheadline.weight(.medium))
+                    .font(MacWikiTypography.controlValue)
                     .foregroundStyle(.secondary)
                     .frame(width: Metrics.fieldLabelWidth, alignment: .leading)
             }
@@ -416,7 +416,7 @@ struct OptionClickSaveSheet: View {
                 .frame(width: 10, height: 10)
 
             Text(hasValue ? valueText : fallbackText)
-                .font(.caption.weight(.semibold))
+                .font(MacWikiTypography.controlValue)
                 .foregroundStyle(hasValue ? .primary : .secondary)
                 .lineLimit(1)
 
@@ -454,7 +454,7 @@ struct OptionClickSaveSheet: View {
                 .foregroundStyle(.secondary)
 
             Text(destinationSummaryText)
-                .font(.footnote.weight(.medium))
+                .font(MacWikiTypography.settingsHelp)
                 .foregroundStyle(.secondary)
                 .lineLimit(2)
 

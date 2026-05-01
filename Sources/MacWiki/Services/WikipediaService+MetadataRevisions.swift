@@ -128,6 +128,13 @@ extension WikipediaService {
         ]
     }
 
+    func hasUnknownRevisionMetadata(_ metadata: [MetadataItem]) -> Bool {
+        let revisionLabels = Set(["Last edited", "First created"])
+        let revisionItems = metadata.filter { revisionLabels.contains($0.label) }
+        guard revisionItems.count == revisionLabels.count else { return true }
+        return revisionItems.contains { $0.value == "Unknown" }
+    }
+
     func formatWordCount(_ count: Int) -> String {
         let countString = NumberFormatter.localizedString(from: NSNumber(value: count), number: .decimal)
         return count == 1 ? "\(countString) word" : "\(countString) words"

@@ -87,9 +87,10 @@ struct ArticleListItem<Content: View>: View {
                             progress: progress,
                             isRead: isRead,
                             tint: indicatorTint,
-                            trackColor: indicatorTrack
+                            trackColor: indicatorTrack,
+                            size: 10,
+                            lineWidth: 1.1
                         )
-                        .frame(width: 8, height: 8)
                     }
                     .buttonStyle(.plain)
                     .help(isRead ? "Mark as unread" : "Mark as read")
@@ -100,9 +101,10 @@ struct ArticleListItem<Content: View>: View {
                         progress: progress,
                         isRead: isRead,
                         tint: indicatorTint,
-                        trackColor: indicatorTrack
+                        trackColor: indicatorTrack,
+                        size: 10,
+                        lineWidth: 1.1
                     )
-                    .frame(width: 8, height: 8)
                     .padding(.top, 10)
                     .padding(.leading, 4)
                 }
@@ -112,6 +114,7 @@ struct ArticleListItem<Content: View>: View {
             }
             .padding(.horizontal, 8)
             .padding(.vertical, 8)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .opacity(isRead ? 0.76 : 1.0)
             .background {
                 RoundedRectangle(cornerRadius: rowCornerRadius, style: .continuous)
@@ -143,6 +146,8 @@ struct ArticleRow: View {
     var isHovered: Bool = false
     var label: Label? = nil
     var onLabelClick: ((Label) -> Void)? = nil
+    var listName: String? = nil
+    var listIconName: String? = nil
     var tags: [Tag] = []
     var selectedTagId: UUID? = nil
     var onTagClick: ((Tag) -> Void)? = nil
@@ -157,19 +162,19 @@ struct ArticleRow: View {
     }
 
     private var hasFooterMetadata: Bool {
-        wordCountText != nil || label != nil
+        wordCountText != nil || label != nil || listName != nil
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
             Text(article.title)
-                .font(.body.weight(.semibold))
+                .font(MacWikiTypography.articleListTitle)
                 .foregroundStyle(.primary)
                 .lineLimit(2)
 
             HStack(spacing: 6) {
                 Text(article.description ?? " ")
-                    .font(.subheadline)
+                    .font(MacWikiTypography.articleListSubtitle)
                     .foregroundStyle(article.description != nil ? AnyShapeStyle(Color(nsColor: .secondaryLabelColor)) : AnyShapeStyle(.clear))
                     .lineLimit(subheadLineLimit)
 
@@ -177,32 +182,31 @@ struct ArticleRow: View {
             }
 
             Text(extract ?? " \n ")
-                .font(.subheadline)
-                .foregroundStyle(extract != nil ? AnyShapeStyle(Color(nsColor: .tertiaryLabelColor)) : AnyShapeStyle(.clear))
+                .font(MacWikiTypography.articleListExcerpt)
+                .foregroundStyle(extract != nil ? AnyShapeStyle(Color(nsColor: .secondaryLabelColor)) : AnyShapeStyle(.clear))
                 .lineLimit(2)
 
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 8) {
                     Text(wordCountText ?? " ")
-                        .font(.caption)
-                        .foregroundStyle(wordCountText == nil ? AnyShapeStyle(.clear) : AnyShapeStyle(Color(nsColor: .tertiaryLabelColor)))
+                        .font(MacWikiTypography.articleListMetadata)
+                        .foregroundStyle(wordCountText == nil ? AnyShapeStyle(.clear) : AnyShapeStyle(.secondary))
 
                     if let label {
                         Button {
                             onLabelClick?(label)
                         } label: {
-                            Text(label.name)
-                                .font(.system(size: 9, weight: .medium))
-                                .foregroundStyle(label.color.swiftUIColor)
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .background(label.color.swiftUIColor.opacity(0.08), in: Capsule())
-                                .overlay(
-                                    Capsule()
-                                        .stroke(label.color.swiftUIColor.opacity(0.18), lineWidth: 0.5)
-                                )
+                            ArticleMetadataChip(title: label.name, tint: label.color.swiftUIColor)
                         }
                         .buttonStyle(.plain)
+                    }
+
+                    if let listName {
+                        ArticleMetadataChip(
+                            title: listName,
+                            systemImage: listIconName ?? "folder",
+                            tint: .secondary
+                        )
                     }
                 }
                 .frame(minHeight: 12, alignment: .leading)
@@ -236,6 +240,8 @@ struct ArticleRowWithFetch: View {
     var isHovered: Bool = false
     var label: Label? = nil
     var onLabelClick: ((Label) -> Void)? = nil
+    var listName: String? = nil
+    var listIconName: String? = nil
     var tags: [Tag] = []
     var selectedTagId: UUID? = nil
     var trendPulse: WikipediaService.TrendPulse? = nil
@@ -270,12 +276,12 @@ struct ArticleRowWithFetch: View {
     private var displayedExtract: String { resolvedExtract ?? " \n " }
     private var hasDescription: Bool { resolvedDescription != nil }
     private var hasExtract: Bool { resolvedExtract != nil }
-    private var hasFooterMetadata: Bool { wordCountText != nil || label != nil }
+    private var hasFooterMetadata: Bool { wordCountText != nil || label != nil || listName != nil }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(article.title)
-                .font(.body.weight(.semibold))
+                .font(MacWikiTypography.articleListTitle)
                 .foregroundStyle(.primary)
                 .lineLimit(2)
 
@@ -292,7 +298,7 @@ struct ArticleRowWithFetch: View {
 
             HStack(spacing: 6) {
                 Text(displayedDescription)
-                    .font(.subheadline)
+                    .font(MacWikiTypography.articleListSubtitle)
                     .foregroundStyle(hasDescription ? AnyShapeStyle(Color(nsColor: .secondaryLabelColor)) : AnyShapeStyle(.clear))
                     .lineLimit(subheadLineLimit)
 
@@ -300,32 +306,31 @@ struct ArticleRowWithFetch: View {
             }
 
             Text(displayedExtract)
-                .font(.subheadline)
-                .foregroundStyle(hasExtract ? AnyShapeStyle(Color(nsColor: .tertiaryLabelColor)) : AnyShapeStyle(.clear))
+                .font(MacWikiTypography.articleListExcerpt)
+                .foregroundStyle(hasExtract ? AnyShapeStyle(Color(nsColor: .secondaryLabelColor)) : AnyShapeStyle(.clear))
                 .lineLimit(2)
 
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 8) {
                     Text(wordCountText ?? " ")
-                        .font(.caption)
-                        .foregroundStyle(wordCountText == nil ? AnyShapeStyle(.clear) : AnyShapeStyle(Color(nsColor: .tertiaryLabelColor)))
+                        .font(MacWikiTypography.articleListMetadata)
+                        .foregroundStyle(wordCountText == nil ? AnyShapeStyle(.clear) : AnyShapeStyle(.secondary))
 
                     if let label {
                         Button {
                             onLabelClick?(label)
                         } label: {
-                            Text(label.name)
-                                .font(.system(size: 9, weight: .medium))
-                                .foregroundStyle(label.color.swiftUIColor)
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .background(label.color.swiftUIColor.opacity(0.08), in: Capsule())
-                                .overlay(
-                                    Capsule()
-                                        .stroke(label.color.swiftUIColor.opacity(0.18), lineWidth: 0.5)
-                                )
+                            ArticleMetadataChip(title: label.name, tint: label.color.swiftUIColor)
                         }
                         .buttonStyle(.plain)
+                    }
+
+                    if let listName {
+                        ArticleMetadataChip(
+                            title: listName,
+                            systemImage: listIconName ?? "folder",
+                            tint: .secondary
+                        )
                     }
                 }
                 .frame(minHeight: 12, alignment: .leading)
@@ -350,5 +355,33 @@ struct ArticleRowWithFetch: View {
         }
         .padding(.vertical, 5)
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+private struct ArticleMetadataChip: View {
+    let title: String
+    var systemImage: String?
+    var tint: Color
+
+    var body: some View {
+        HStack(spacing: 4) {
+            if let systemImage {
+                Image(systemName: systemImage)
+                    .font(.system(size: 9, weight: .semibold))
+            }
+
+            Text(title)
+                .font(MacWikiTypography.metadataLabel)
+        }
+        .foregroundStyle(tint)
+        .lineLimit(1)
+        .fixedSize(horizontal: true, vertical: false)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(tint.opacity(0.08), in: Capsule())
+        .overlay {
+            Capsule()
+                .stroke(tint.opacity(0.18), lineWidth: 0.8)
+        }
     }
 }

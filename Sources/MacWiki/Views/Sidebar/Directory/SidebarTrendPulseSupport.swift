@@ -71,7 +71,7 @@ struct SidebarTrendPulseChip: View {
     }
 }
 
-enum ViewsPopoverTimeRange: Int, CaseIterable, Identifiable {
+enum ViewsPopoverTimeRange: Int, CaseIterable, Identifiable, Sendable {
     case week = 7
     case month = 30
     case quarter = 90
@@ -92,8 +92,19 @@ enum ViewsPopoverTimeRange: Int, CaseIterable, Identifiable {
         }
     }
 
-    func requestedDays(relativeTo referenceDate: Date) -> Int {
-        let calendar = Calendar.current
+    var historyMode: DiscoverPageViewsHistoryMode {
+        switch self {
+        case .max:
+            return .continuousToPresent
+        case .week, .month, .quarter, .year, .fiveYears:
+            return .selectedDateRelative
+        }
+    }
+
+    func requestedDays(
+        relativeTo referenceDate: Date,
+        calendar: Calendar = .current
+    ) -> Int {
         let endDate = calendar.startOfDay(for: referenceDate)
 
         let resolvedStartDate: Date

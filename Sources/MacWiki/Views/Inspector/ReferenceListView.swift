@@ -7,23 +7,34 @@ struct ReferenceListView: View {
     let sections: [ArticleReferenceSection]
 
     @State private var selectedReferenceIds: Set<String> = []
+    @State private var suppressNextReferenceScroll = false
+
+    private var visibleSections: [ArticleReferenceSection] {
+        ReferenceListHelpers.visibleSections(from: sections)
+    }
 
     private var totalCount: Int {
-        sections.reduce(0) { $0 + $1.items.count }
+        visibleSections.reduce(0) { $0 + $1.items.count }
     }
 
     private var selectionCount: Int {
         selectedReferenceIds.count
     }
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            header
+    private enum Metrics {
+        static let topChromeReservation: CGFloat = 58
+        static let bottomChromeReservation: CGFloat = 92
+        static let horizontalPadding: CGFloat = 16
+        static let topPadding: CGFloat = 8
+        static let bottomPadding: CGFloat = 14
+    }
 
+    var body: some View {
+        ZStack(alignment: .top) {
             ScrollViewReader { proxy in
                 ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 16) {
-                        ForEach(sections) { section in
+                    VStack(alignment: .leading, spacing: 16) {
+                        ForEach(visibleSections) { section in
                             if !section.items.isEmpty {
                                 ReferenceSectionHeaderView(title: section.title)
 
@@ -33,7 +44,7 @@ struct ReferenceListView: View {
                                         displayLabel: ReferenceListHelpers.displayLabel(for: item, index: index),
                                         isSelected: selectedReferenceIds.contains(item.id),
                                         isFocused: appState.selectedReferenceId == item.id,
-                                        hasLink: !item.links.isEmpty,
+                                        hasOpenTarget: ReferenceListHelpers.canOpen(item),
                                         onToggleSelection: {
                                             toggleSelection(for: item.id)
                                         },
@@ -53,49 +64,62 @@ struct ReferenceListView: View {
                                             )
                                         },
                                         onFocus: {
+                                            suppressNextReferenceScroll = appState.selectedReferenceId != item.id
                                             appState.selectedReferenceId = item.id
                                         }
                                     )
+                                    .id(item.id)
                                 }
                             }
                         }
                     }
-                    .padding(.bottom, 86)
+                    .padding(.top, Metrics.topChromeReservation)
+                    .padding(.horizontal, Metrics.horizontalPadding)
+                    .padding(.bottom, visibleSections.isEmpty ? 12 : Metrics.bottomChromeReservation)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .scrollIndicators(.hidden)
+                .scrollIndicators(.visible)
                 .onChange(of: appState.selectedReferenceId) { _, newValue in
                     guard let newValue else { return }
+                    if suppressNextReferenceScroll {
+                        suppressNextReferenceScroll = false
+                        return
+                    }
                     withAnimation(.easeOut(duration: 0.2)) {
                         proxy.scrollTo(newValue, anchor: .center)
                     }
                 }
             }
+
+            header
+                .padding(.horizontal, Metrics.horizontalPadding)
+                .padding(.top, Metrics.topPadding)
+                .zIndex(1)
         }
-        .padding(.horizontal)
-        .padding(.top, 8)
         .padding(.bottom, 12)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .overlay(alignment: .bottom) {
-            if !sections.isEmpty {
+            if !visibleSections.isEmpty {
                 ReferenceExportBarView(
                     totalCount: totalCount,
                     selectionCount: selectionCount,
                     selectedSections: ReferenceListHelpers.filteredSections(
-                        sections: sections,
+                        sections: visibleSections,
                         selection: selectedReferenceIds
                     ),
-                    allSections: sections,
+                    allSections: visibleSections,
                     onClearSelection: {
                         selectedReferenceIds.removeAll()
                     }
                 )
-                .padding(.horizontal, 16)
-                .padding(.bottom, 14)
+                .padding(.horizontal, Metrics.horizontalPadding)
+                .padding(.bottom, Metrics.bottomPadding)
                 .transition(.opacity.combined(with: .move(edge: .bottom)))
             }
         }
-        .animation(.easeOut(duration: 0.2), value: sections.isEmpty)
+        .animation(.easeOut(duration: 0.2), value: visibleSections.isEmpty)
         .onChange(of: sections) { _, newValue in
-            reconcileSelection(with: newValue)
+            reconcileSelection(with: ReferenceListHelpers.visibleSections(from: newValue))
         }
         .onChange(of: appState.currentArticle?.title) { _, _ in
             selectedReferenceIds.removeAll()
@@ -103,35 +127,44 @@ struct ReferenceListView: View {
     }
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 10) {
-                Image(systemName: "books.vertical")
-                    .font(.system(size: 12, weight: .medium))
+        HStack(spacing: 10) {
+            Image(systemName: "books.vertical")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.secondary)
+
+            Text("References")
+                .font(MacWikiTypography.inspectorSectionLabel)
+                .foregroundStyle(.primary)
+                .lineLimit(1)
+
+            Text("\(totalCount)")
+                .font(MacWikiTypography.compactRowMetadata)
+                .foregroundStyle(.white)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(Color.accentColor, in: Capsule())
+
+            if selectionCount > 0 {
+                Text("Selected \(selectionCount)")
+                    .font(MacWikiTypography.compactRowMetadata)
                     .foregroundStyle(.secondary)
-
-                Text("References")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-
-                Text("\(totalCount)")
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(Color.accentColor, in: Capsule())
-
-                if selectionCount > 0 {
-                    Text("Selected \(selectionCount)")
-                        .font(.caption.weight(.medium))
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(Color.gray.opacity(0.12), in: Capsule())
-                }
-
-                Spacer()
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(Color.gray.opacity(0.12), in: Capsule())
             }
+
+            Spacer(minLength: 6)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background {
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(.ultraThinMaterial)
+                .opacity(0.58)
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.04), lineWidth: 0.5)
         }
     }
 }

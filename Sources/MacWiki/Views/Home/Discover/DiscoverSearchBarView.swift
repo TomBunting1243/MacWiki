@@ -9,18 +9,19 @@ struct DiscoverSearchBarView: View {
     let onClearSearch: () -> Void
 
     @FocusState.Binding var isSearchFocused: Bool
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         @Bindable var searchCoordinator = searchCoordinator
 
         HStack(spacing: 10) {
             Image(systemName: "magnifyingglass")
-                .font(.system(size: 15, weight: .semibold))
+                .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(.secondary)
 
             TextField("Search Wikipedia", text: $searchCoordinator.searchText)
                 .textFieldStyle(.plain)
-                .font(.system(size: 16, weight: .medium))
+                .font(.system(size: 15, weight: .medium))
                 .focused($isSearchFocused)
                 .onSubmit(onOpenFirstResult)
 
@@ -50,13 +51,31 @@ struct DiscoverSearchBarView: View {
                 .buttonStyle(DiscoverInteractivePressStyle())
             }
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 11)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .padding(.horizontal, 13)
+        .padding(.vertical, 9)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(searchGlassBackground)
         .overlay {
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.8)
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(Color(nsColor: .separatorColor).opacity(0.38), lineWidth: 0.7)
         }
-        .shadow(color: Color.black.opacity(0.05), radius: 8, y: 4)
+        .shadow(color: Color.black.opacity(0.035), radius: 6, y: 2)
+    }
+
+    @ViewBuilder
+    private var searchGlassBackground: some View {
+        let cornerRadius: CGFloat = 12
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+
+        if #available(macOS 26, *) {
+            shape
+                .fill(.clear)
+                .glassEffect(.regular.interactive(), in: .rect(cornerRadius: cornerRadius))
+                .overlay {
+                    shape.fill(Color(nsColor: .windowBackgroundColor).opacity(colorScheme == .dark ? 0.018 : 0.055))
+                }
+        } else {
+            shape.fill(.thinMaterial)
+        }
     }
 }

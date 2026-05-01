@@ -3,7 +3,7 @@ import SwiftUI
 struct FindOnPageBarView: View {
     @Environment(AppState.self) private var appState
     @Environment(\.colorScheme) private var colorScheme
-    @AppStorage(AppStorageKey.Chrome.tabBarLiquidGlass) private var tabBarLiquidGlass = true
+    @AppStorage(AppStorageKey.Chrome.liquidGlassChrome) private var liquidGlassChrome = true
     @AppStorage(MacWikiGlassRuntime.forceLegacyFallbackKey) private var forceLegacyGlassFallback = false
     let tabID: UUID
     let availableWidth: CGFloat
@@ -71,8 +71,10 @@ struct FindOnPageBarView: View {
     }
 
     private var usesNativeGlass: Bool {
-        tabBarLiquidGlass &&
-            MacWikiGlassRuntime.usesNativeGlass(forceLegacyFallback: forceLegacyGlassFallback)
+        MacWikiGlassRuntime.usesNativeGlass(
+            isEnabled: liquidGlassChrome,
+            forceLegacyFallback: forceLegacyGlassFallback
+        )
     }
 
     @ViewBuilder
@@ -97,18 +99,20 @@ struct FindOnPageBarView: View {
     var body: some View {
         @Bindable var appState = appState
 
-        HStack(spacing: 8) {
-            searchFieldGroup
+        MacWikiGlassGroup(spacing: 8) {
+            HStack(spacing: 8) {
+                searchFieldGroup
 
-            if !isCompactLayout {
-                statusChip
+                if !isCompactLayout {
+                    statusChip
+                }
+
+                actionGroup
             }
-
-            actionGroup
+            .padding(.horizontal, Metrics.horizontalPadding)
+            .padding(.vertical, Metrics.verticalPadding)
+            .background(findBarBackground)
         }
-        .padding(.horizontal, Metrics.horizontalPadding)
-        .padding(.vertical, Metrics.verticalPadding)
-        .background(findBarBackground)
         .shadow(color: .black.opacity(colorScheme == .dark ? 0.16 : 0.06), radius: 10, x: 0, y: 4)
         .frame(maxWidth: max(0, availableWidth), alignment: .trailing)
         .onAppear {

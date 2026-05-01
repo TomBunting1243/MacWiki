@@ -137,13 +137,14 @@ extension WikipediaService {
     /// Enrich baseline article metadata with revision dates + infobox fields.
     func fetchArticleMetadata(_ title: String, html: String, wordCount: Int) async -> HydratedMetadata {
         let normalizedTitle = normalizedArticleTitle(title)
-        if let cached = cachedFullArticle(for: normalizedTitle) {
+        if let cached = cachedFullArticle(for: normalizedTitle),
+           !hasUnknownRevisionMetadata(cached.metadata) {
             return HydratedMetadata(items: cached.metadata, wordCount: cached.wordCount)
         }
 
         async let revisionMetadata = fetchRevisionMetadataWithTimeout(
             title,
-            timeout: .milliseconds(180)
+            timeout: .milliseconds(1_200)
         )
         async let resolvedWordCount = resolveHydratedWordCount(for: title, fallback: wordCount)
         let infoboxMetadata = InfoboxParser.extractMetadata(

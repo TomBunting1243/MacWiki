@@ -14,9 +14,9 @@ struct DiscoverVisualContextStrip: View {
     var body: some View {
         let content = VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
-                Text("PLACEHOLDER")
+                Text(DiscoverEditionCopy.visualContextTitle)
                     .font(.system(size: 13.5, weight: .semibold, design: .rounded))
-                Text("PLACEHOLDER")
+                Text(DiscoverEditionCopy.visualContextSubtitle)
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(.secondary)
             }
@@ -39,10 +39,10 @@ struct DiscoverVisualContextStrip: View {
         if showsSurface {
             content
                 .padding(12)
-                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                 .overlay {
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .strokeBorder(Color.primary.opacity(0.06), lineWidth: 0.8)
+                        .strokeBorder(Color(nsColor: .separatorColor).opacity(0.32), lineWidth: 0.7)
                 }
         } else {
             content
@@ -122,13 +122,12 @@ struct DiscoverVisualContextCard: View {
         }
         .buttonStyle(DiscoverInteractivePressStyle())
         .disabled(image.filePageURL == nil)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(Color.primary.opacity(isHovered ? 0.13 : 0.05), lineWidth: 0.8)
+                .strokeBorder(Color(nsColor: .separatorColor).opacity(isHovered ? 0.42 : 0.30), lineWidth: 0.7)
         }
-        .scaleEffect(reduceMotion ? 1 : (isHovered ? 1.01 : 1))
-        .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: isHovered)
+        .discoverHoverEffect(.card, isActive: isHovered, reduceMotion: reduceMotion)
         .onHover { isHovered = $0 }
     }
 }
@@ -171,6 +170,7 @@ struct DiscoverThumbnailSlot: View {
             }
         }
         .frame(width: size, height: size)
+        .clipped()
         .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
     }
 
@@ -269,13 +269,13 @@ struct DiscoverFeaturedImageCard: View {
             }
         }
         .padding(prefersHorizontalLayout ? 16 : 12)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(Color.primary.opacity(isHovered ? 0.14 : 0.08), lineWidth: 0.8)
+                .strokeBorder(Color(nsColor: .separatorColor).opacity(isHovered ? 0.46 : 0.34), lineWidth: 0.7)
         }
-        .scaleEffect(reduceMotion ? 1 : (isHovered ? 1.004 : 1))
-        .animation(reduceMotion ? nil : .easeOut(duration: 0.14), value: isHovered)
+        .discoverHoverEffect(.card, isActive: isHovered, reduceMotion: reduceMotion)
         .onHover { isHovered = $0 }
         .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .contextMenu {
@@ -297,13 +297,15 @@ struct DiscoverFeaturedImageCard: View {
 
     @ViewBuilder
     private var imagePanel: some View {
+        let panelHeight: CGFloat = prefersHorizontalLayout ? 352 : 280
+
         Group {
             if let displayImageURL {
                 CachedThumbnailImage(
                     url: displayImageURL,
                     targetSize: prefersHorizontalLayout
-                        ? CGSize(width: 480, height: 352)
-                        : CGSize(width: 300, height: 280),
+                        ? CGSize(width: 620, height: panelHeight)
+                        : CGSize(width: 980, height: panelHeight),
                     animatesNetworkSuccess: !reduceMotion
                 ) { loadedImage in
                     ZStack {
@@ -311,13 +313,13 @@ struct DiscoverFeaturedImageCard: View {
                             .fill(Color.primary.opacity(0.04))
                         loadedImage
                             .resizable()
-                            .aspectRatio(contentMode: .fit)
+                            .scaledToFit()
                             .padding(prefersHorizontalLayout ? 12 : 8)
                     }
                 } placeholder: {
                     AppLoadingThumbnailPlaceholder(
-                        width: prefersHorizontalLayout ? 480 : 300,
-                        height: prefersHorizontalLayout ? 352 : 180,
+                        width: prefersHorizontalLayout ? 620 : 980,
+                        height: panelHeight,
                         cornerRadius: 12,
                         tone: .accent
                     )
@@ -334,16 +336,18 @@ struct DiscoverFeaturedImageCard: View {
                 Rectangle().fill(.quaternary)
             }
         }
+        .frame(maxWidth: .infinity)
+        .frame(height: panelHeight)
+        .clipped()
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 
     private var detailsPanel: some View {
         VStack(alignment: .leading, spacing: prefersHorizontalLayout ? 10 : 6) {
             if prefersHorizontalLayout {
-                Text("PLACEHOLDER")
+                Text(DiscoverEditionCopy.commonsSpotlight)
                     .font(.system(size: 10.5, weight: .semibold, design: .rounded))
                     .textCase(.uppercase)
-                    .tracking(0.9)
                     .foregroundStyle(.tertiary)
             }
 

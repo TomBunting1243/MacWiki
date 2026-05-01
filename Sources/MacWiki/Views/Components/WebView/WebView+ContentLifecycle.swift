@@ -16,6 +16,7 @@ extension WebView.Coordinator {
         syncRestoreTelemetryMode(on: webView, force: true)
         self.webView = webView
         openTimer?.wrappedValue.markWebViewDidFinish()
+        syncLinkPreviewImmediateModifier(on: webView, force: true)
         syncNativeHighlightMenuMode(on: webView, force: true)
         let restoreSessionID = beginRestoreSession()
         let scrollY = scrollPosition.wrappedValue
@@ -167,6 +168,19 @@ extension WebView.Coordinator {
             self?.lastAppliedReaderTopInset = self?.readerTopInset ?? -1
             completion?(true)
         }
+    }
+
+    func syncLinkPreviewImmediateModifier(on webView: WKWebView, force: Bool = false) {
+        guard force || lastAppliedLinkPreviewImmediateModifier != linkPreviewImmediateModifier else { return }
+        lastAppliedLinkPreviewImmediateModifier = linkPreviewImmediateModifier
+        let modifierLiteral = WebView.javaScriptStringLiteral(linkPreviewImmediateModifier.javaScriptValue)
+        let script = """
+        window._macwikiLinkPreviewImmediateModifier = \(modifierLiteral);
+        if (window.setLinkPreviewImmediateModifier) {
+            window.setLinkPreviewImmediateModifier(\(modifierLiteral));
+        }
+        """
+        webView.evaluateJavaScript(script)
     }
 
     func syncNativeHighlightMenuMode(on webView: WKWebView, force: Bool = false) {

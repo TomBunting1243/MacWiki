@@ -109,6 +109,10 @@ final class TabSessionStore {
     private let persistenceQueue = DispatchQueue(label: "MacWiki.TabSession.Persistence", qos: .utility)
     @ObservationIgnored
     private let persistenceQueueKey = DispatchSpecificKey<Void>()
+#if DEBUG
+    @ObservationIgnored
+    private(set) var saveRequestGeneration = 0
+#endif
 
     var openTabs: [ArticleTab] = []
     var activeTabId: UUID?
@@ -290,7 +294,70 @@ final class TabSessionStore {
         requestSave()
     }
 
+    @discardableResult
+    func updateArticleMetadata(ids: Set<String>, description: String?, extract: String?, wordCount: Int?) -> Bool {
+        guard !ids.isEmpty else { return false }
+
+        var tabs = openTabs
+        var didChange = false
+
+        for tabIndex in tabs.indices {
+            for historyIndex in tabs[tabIndex].history.indices {
+                let article = tabs[tabIndex].history[historyIndex].article
+                guard ids.contains(article.id) else { continue }
+
+                tabs[tabIndex].updateHistoryItem(at: historyIndex) { item in
+                    if let description, item.article.description != description {
+                        item.article.description = description
+                        didChange = true
+                    }
+                    if let extract, item.article.extract != extract {
+                        item.article.extract = extract
+                        didChange = true
+                    }
+                    if let wordCount, item.article.wordCount != wordCount {
+                        item.article.wordCount = wordCount
+                        didChange = true
+                    }
+                }
+            }
+        }
+
+        guard didChange else { return false }
+        openTabs = tabs
+        requestSave()
+        return true
+    }
+
+    @discardableResult
+    func updateReadState(forTitle title: String, isRead: Bool) -> Bool {
+        let normalized = ReadStateSync.normalizedTitle(title)
+        var tabs = openTabs
+        var didChange = false
+
+        for tabIndex in tabs.indices {
+            for historyIndex in tabs[tabIndex].history.indices {
+                let candidate = ReadStateSync.normalizedTitle(tabs[tabIndex].history[historyIndex].article.title)
+                guard candidate == normalized else { continue }
+
+                tabs[tabIndex].updateHistoryItem(at: historyIndex) { item in
+                    guard item.article.isRead != isRead else { return }
+                    item.article.isRead = isRead
+                    didChange = true
+                }
+            }
+        }
+
+        guard didChange else { return false }
+        openTabs = tabs
+        requestSave()
+        return true
+    }
+
     func requestSave() {
+#if DEBUG
+        saveRequestGeneration += 1
+#endif
         saveTask?.cancel()
         saveTask = Task { [weak self] in
             try? await Task.sleep(for: .milliseconds(650))
@@ -303,6 +370,13 @@ final class TabSessionStore {
         saveTask?.cancel()
         performSave(sync: true)
     }
+
+#if DEBUG
+    func cancelPendingSaveForTesting() {
+        saveTask?.cancel()
+        saveTask = nil
+    }
+#endif
 
     func resetForFactoryDefaults() {
         saveTask?.cancel()

@@ -4,7 +4,7 @@ struct WikiHopOverlay: View {
     let session: WikiHopSession
     @Environment(AppState.self) private var appState
     @Environment(\.colorScheme) private var colorScheme
-    @AppStorage(AppStorageKey.Chrome.tabBarLiquidGlass) private var tabBarLiquidGlass = true
+    @AppStorage(AppStorageKey.Chrome.liquidGlassChrome) private var liquidGlassChrome = true
     @AppStorage(MacWikiGlassRuntime.forceLegacyFallbackKey) private var forceLegacyGlassFallback = false
     
     // Timer state
@@ -17,24 +17,28 @@ struct WikiHopOverlay: View {
     }
 
     private var usesNativeGlass: Bool {
-        tabBarLiquidGlass &&
-            MacWikiGlassRuntime.usesNativeGlass(forceLegacyFallback: forceLegacyGlassFallback)
+        MacWikiGlassRuntime.usesNativeGlass(
+            isEnabled: liquidGlassChrome,
+            forceLegacyFallback: forceLegacyGlassFallback
+        )
     }
 
     var body: some View {
-        HStack(spacing: 12) {
-            targetGroup
+        MacWikiGlassGroup(spacing: 12) {
+            HStack(spacing: 12) {
+                targetGroup
 
-            statsGroup
+                statsGroup
 
-            giveUpButton
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-        .background(overlayBackground)
-        .overlay {
-            Capsule(style: .continuous)
-                .strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.075 : 0.046), lineWidth: 0.5)
+                giveUpButton
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(overlayBackground)
+            .overlay {
+                Capsule(style: .continuous)
+                    .strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.075 : 0.046), lineWidth: 0.5)
+            }
         }
         .shadow(color: .black.opacity(colorScheme == .dark ? 0.16 : 0.06), radius: 10, y: 4)
         .frame(width: 420)

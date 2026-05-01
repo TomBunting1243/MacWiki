@@ -16,6 +16,8 @@ final class AppState {
     let tabSessionStore: TabSessionStore
 
     @ObservationIgnored
+    let webViewPoolOwnerID = UUID()
+    @ObservationIgnored
     var lastOpenArticleSignature: String?
     @ObservationIgnored
     var lastOpenArticleTimestamp: TimeInterval = 0
@@ -49,6 +51,13 @@ final class AppState {
     /// Shared visibility model for the three-column SwiftUI shell.
     var navigationSplitViewVisibility: NavigationSplitViewVisibility = .all
 
+    /// SwiftUI's three-column visibility enum cannot represent sidebar + detail
+    /// without the middle content column, so MacWiki tracks that state directly.
+    var listContentsColumnVisible: Bool = true
+
+    @ObservationIgnored
+    var navigationSplitViewVisibilityBeforeReaderOnly: NavigationSplitViewVisibility = .all
+
     /// Compatibility shim while remaining call sites migrate to the split view visibility model.
     var listsSidebarVisible: Bool {
         get {
@@ -72,6 +81,8 @@ final class AppState {
     /// Compatibility shim while remaining call sites migrate to the split view visibility model.
     var directoryColumnVisible: Bool {
         get {
+            guard listContentsColumnVisible else { return false }
+
             switch navigationSplitViewVisibility {
             case .detailOnly:
                 return false
@@ -114,7 +125,7 @@ final class AppState {
     /// Section currently nearest to viewport top in the reader
     var currentVisibleTableOfContentsSectionId: String?
     
-    /// Whether the search UI is shown (floating overlay or sidebar, based on settings)
+    /// Whether the embedded List Contents search surface is shown.
     var showSearch: Bool = false
 
     // MARK: - Find on Page (Reader)

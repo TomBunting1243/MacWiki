@@ -23,7 +23,6 @@ enum LinkHoverPreviewLayoutMetrics {
     static let headerHorizontalInset: CGFloat = 16
     static let headerTopInset: CGFloat = 14
     static let headerBottomInset: CGFloat = 13
-    static let headerVerticalSpacing: CGFloat = 8
     static let bodyHorizontalInset: CGFloat = 16
     static let bodyTopInset: CGFloat = 14
     static let bodyBottomInset: CGFloat = 16
@@ -33,7 +32,6 @@ enum LinkHoverPreviewLayoutMetrics {
     static let descriptionLineLimit = 3
     static let actionRailEstimatedWidth: CGFloat = 96
     static let titleActionsGap: CGFloat = 20
-    static let sourceRowEstimatedHeight: CGFloat = 21
     static let separatorHeight: CGFloat = 0.5
 
     static func preferredPaneHeight(
@@ -75,8 +73,6 @@ enum LinkHoverPreviewLayoutMetrics {
         )
 
         return headerTopInset +
-            sourceRowEstimatedHeight +
-            headerVerticalSpacing +
             titleHeight +
             headerBottomInset +
             separatorHeight
@@ -173,42 +169,46 @@ enum LinkHoverPreviewLayoutMetrics {
 
 struct LinkHoverPreviewPane: View {
     @Environment(\.colorScheme) private var colorScheme
-    @AppStorage(AppStorageKey.Chrome.tabBarLiquidGlass) private var tabBarLiquidGlass = true
+    @AppStorage(AppStorageKey.Chrome.liquidGlassChrome) private var liquidGlassChrome = true
     @AppStorage(MacWikiGlassRuntime.forceLegacyFallbackKey) private var forceLegacyGlassFallback = false
 
     let title: String
-    let url: URL
+    let fallbackURL: URL
     let onOpen: () -> Void
     let onOpenInNewTab: () -> Void
+    let onOpenInNewWindow: () -> Void
     let onSave: () -> Void
     var previewSize: CGSize = CGSize(width: LinkHoverPreviewMetrics.width, height: LinkHoverPreviewMetrics.height)
     var onPreferredHeightChange: (CGFloat) -> Void = { _ in }
-    var onHoverStateChange: (Bool) -> Void = { _ in }
 
     private var isDarkMode: Bool {
         colorScheme == .dark
     }
 
     private var usesNativeGlass: Bool {
-        tabBarLiquidGlass &&
-            MacWikiGlassRuntime.usesNativeGlass(forceLegacyFallback: forceLegacyGlassFallback)
+        MacWikiGlassRuntime.usesNativeGlass(
+            isEnabled: liquidGlassChrome,
+            forceLegacyFallback: forceLegacyGlassFallback
+        )
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            header
-            LinkHoverArticleSummaryPreview(
-                articleTitle: title,
-                fallbackURL: url,
-                previewWidth: previewSize.width,
-                onPreferredHeightChange: onPreferredHeightChange
-            )
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        MacWikiGlassGroup(spacing: 8) {
+            VStack(spacing: 0) {
+                header
+                LinkHoverArticleSummaryPreview(
+                    articleTitle: title,
+                    fallbackURL: fallbackURL,
+                    previewWidth: previewSize.width,
+                    onPreferredHeightChange: onPreferredHeightChange
+                )
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(glassPlane)
+            .clipShape(RoundedRectangle(cornerRadius: LinkHoverGlassMetrics.cornerRadius, style: .continuous))
+            .overlay(glassBorder)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(glassPlane)
-        .clipShape(RoundedRectangle(cornerRadius: LinkHoverGlassMetrics.cornerRadius, style: .continuous))
-        .overlay(glassBorder)
         .shadow(
             color: .black.opacity(isDarkMode ? 0.18 : 0.08),
             radius: 14,
@@ -218,21 +218,16 @@ struct LinkHoverPreviewPane: View {
         .frame(width: previewSize.width, height: previewSize.height)
         .background(Color.clear)
         .contentShape(RoundedRectangle(cornerRadius: LinkHoverGlassMetrics.cornerRadius, style: .continuous))
-        .onHover(perform: onHoverStateChange)
     }
 
     private var header: some View {
         HStack(alignment: .top, spacing: 12) {
-            VStack(alignment: .leading, spacing: 8) {
-                sourceRow
-
-                Text(title)
-                    .font(.title3.weight(.semibold))
-                    .lineLimit(3)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .foregroundStyle(.primary)
-                    .layoutPriority(1)
-            }
+            Text(title)
+                .font(.title3.weight(.semibold))
+                .lineLimit(3)
+                .fixedSize(horizontal: false, vertical: true)
+                .foregroundStyle(.primary)
+                .layoutPriority(1)
 
             Spacer(minLength: 8)
 
@@ -247,6 +242,12 @@ struct LinkHoverPreviewPane: View {
                     systemImage: "plus.square.on.square",
                     helpText: "Open in New Tab",
                     action: onOpenInNewTab
+                )
+
+                LinkHoverActionIcon(
+                    systemImage: "macwindow.badge.plus",
+                    helpText: "Open in New Window",
+                    action: onOpenInNewWindow
                 )
 
                 LinkHoverActionIcon(
@@ -269,50 +270,17 @@ struct LinkHoverPreviewPane: View {
         }
     }
 
-    private var sourceRow: some View {
-        HStack(spacing: 8) {
-            HStack(spacing: 5) {
-                Image(systemName: "globe")
-                    .font(.system(size: 10, weight: .semibold))
-
-                Text("Wikipedia")
-                    .font(.caption.weight(.semibold))
-            }
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(sourceBadgeBackground)
-
-            Text(displayHost)
-                .font(.caption)
-                .foregroundStyle(.tertiary)
-                .lineLimit(1)
-        }
-    }
-
     @ViewBuilder
     private var glassPlane: some View {
         let shape = RoundedRectangle(cornerRadius: LinkHoverGlassMetrics.cornerRadius, style: .continuous)
-        if #available(macOS 26, *), usesNativeGlass {
-            shape
-                .fill(.clear)
-                .glassEffect(.regular, in: .rect(cornerRadius: LinkHoverGlassMetrics.cornerRadius))
-                .overlay {
-                    shape.fill(
-                        Color(nsColor: .windowBackgroundColor)
-                            .opacity(isDarkMode ? 0.018 : 0.012)
-                    )
-                }
-        } else {
-            shape
-                .fill(.thinMaterial)
-                .overlay {
-                    shape.fill(
-                        Color(nsColor: .windowBackgroundColor)
-                            .opacity(isDarkMode ? 0.085 : 0.052)
-                    )
-                }
-        }
+        shape
+            .fill(.thinMaterial)
+            .overlay {
+                shape.fill(
+                    Color(nsColor: .windowBackgroundColor)
+                        .opacity(isDarkMode ? 0.11 : 0.074)
+                )
+            }
     }
 
     private var glassBorder: some View {
@@ -333,23 +301,6 @@ struct LinkHoverPreviewPane: View {
                         lineWidth: 0.45
                     )
             }
-    }
-
-    private var sourceBadgeBackground: some View {
-        Capsule(style: .continuous)
-            .fill(Color(nsColor: .windowBackgroundColor).opacity(isDarkMode ? 0.12 : 0.06))
-            .overlay {
-                Capsule(style: .continuous)
-                    .strokeBorder(
-                        Color.primary.opacity(isDarkMode ? 0.055 : 0.032),
-                        lineWidth: 0.45
-                    )
-            }
-    }
-
-    private var displayHost: String {
-        let host = url.host(percentEncoded: false) ?? url.host() ?? "en.wikipedia.org"
-        return host.replacingOccurrences(of: "www.", with: "")
     }
 }
 

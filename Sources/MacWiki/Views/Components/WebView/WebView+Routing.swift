@@ -1,6 +1,10 @@
 import Foundation
 import WebKit
 
+private enum LinkHoverPreviewRoutingMetrics {
+    static let dismissGraceDelay: TimeInterval = 0.38
+}
+
 extension WebView.Coordinator {
     // MARK: - WKScriptMessageHandler
 
@@ -64,22 +68,7 @@ extension WebView.Coordinator {
             appState?.inspectorVisible = true
 
         case .highlightResult(let data):
-            if let failedIds = data["failedIds"] as? [String] {
-                let failedSet = Set(failedIds.compactMap { UUID(uuidString: $0) })
-                var didChange = false
-
-                for highlight in highlights {
-                    let shouldBeStale = failedSet.contains(highlight.id)
-                    if highlight.isStale != shouldBeStale {
-                        highlight.isStale = shouldBeStale
-                        didChange = true
-                    }
-                }
-
-                if didChange {
-                    try? modelContext?.save()
-                }
-            }
+            applyHighlightRehydrateResult(data)
 
         case .highlightRightClicked(let data):
             handleHighlightContextRequest(data)
@@ -89,6 +78,44 @@ extension WebView.Coordinator {
             appState?.inspectorMode = .references
             appState?.inspectorVisible = true
         }
+    }
+
+    func applyHighlightRehydrateResult(_ data: [String: Any]) {
+        guard let failedIds = data["failedIds"] as? [String] else { return }
+        let failedSet = Set(failedIds.compactMap { UUID(uuidString: $0) })
+        var didChange = false
+
+        for highlight in highlights {
+            let shouldBeStale = failedSet.contains(highlight.id)
+            if highlight.isStale != shouldBeStale {
+                highlight.isStale = shouldBeStale
+                didChange = true
+            }
+        }
+
+        if didChange {
+            try? modelContext?.save()
+        }
+    }
+
+    func completePendingHighlightRehydrate(
+        _ pending: AppState.HighlightRehydrateRequest,
+        success: Bool,
+        timestamp: Date = Date()
+    ) {
+        appState?.isHighlightRehydrateInProgress = false
+        appState?.pendingHighlightRehydrate = nil
+        appState?.lastHighlightRehydrateResult = AppState.HighlightRehydrateResult(
+            id: pending.id,
+            success: success,
+            timestamp: timestamp
+        )
+
+        guard success else { return }
+        guard let target = highlights.first(where: { $0.id == pending.id }) else { return }
+        target.isStale = false
+        target.updatedAt = timestamp
+        try? modelContext?.save()
     }
 
     func handleTextSelection(_ data: [String: Any]) {
@@ -356,7 +383,25 @@ extension WebView.Coordinator {
         guard let target = wikipediaLinkTarget(from: url) else { return false }
         let resolvedTitle = (previewTitle?.trimmingCharacters(in: .whitespacesAndNewlines))
             .flatMap { $0.isEmpty ? nil : $0 } ?? target.displayTitle
+        guard !isMediaOnlyHoverPreviewTarget(title: target.displayTitle, url: url) else { return false }
+        guard !isMediaOnlyHoverPreviewTarget(title: resolvedTitle, url: url) else { return false }
         return normalizedArticleKey(resolvedTitle) != normalizedArticleKey(articleTitle)
+    }
+
+    func isMediaOnlyHoverPreviewTarget(title: String, url: URL) -> Bool {
+        let loweredTitle = normalizedArticleKey(title)
+        if loweredTitle.hasPrefix("file:") ||
+            loweredTitle.hasPrefix("image:") ||
+            loweredTitle.hasPrefix("media:") {
+            return true
+        }
+
+        let loweredExtension = url.pathExtension.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return [
+            "apng", "avif", "bmp", "flac", "gif", "heic", "heif", "jpeg", "jpg",
+            "mov", "mp3", "mp4", "ogg", "ogv", "png", "svg", "tif", "tiff",
+            "wav", "webm", "webp"
+        ].contains(loweredExtension)
     }
 
     func presentLinkHoverPreview(for request: WebViewLinkHoverRequest) {
@@ -425,7 +470,10 @@ extension WebView.Coordinator {
 
         let workItem = DispatchWorkItem(block: closeAction)
         pendingLinkHoverHideWorkItem = workItem
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.22, execute: workItem)
+        DispatchQueue.main.asyncAfter(
+            deadline: .now() + LinkHoverPreviewRoutingMetrics.dismissGraceDelay,
+            execute: workItem
+        )
     }
 
     func publishLinkHoverPreview(_ request: WebViewLinkHoverRequest?) {

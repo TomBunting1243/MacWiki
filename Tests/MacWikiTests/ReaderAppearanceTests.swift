@@ -4,6 +4,13 @@ import Testing
 @testable import MacWiki
 
 struct ReaderAppearanceTests {
+    @Test func defaultReaderTypographyMatchesProductPreference() {
+        let appearance = ReaderAppearance.default
+
+        #expect(appearance.fontPreset == .newYork)
+        #expect(approximatelyEqual(appearance.fontSize, 17))
+    }
+
     @Test func webPayloadContainsAllTypographyKeys() {
         let payload = ReaderAppearance.default.webPayload
         let expectedKeys = Set([

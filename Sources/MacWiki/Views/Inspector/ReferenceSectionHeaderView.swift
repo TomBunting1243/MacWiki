@@ -5,7 +5,7 @@ struct ReferenceSectionHeaderView: View {
 
     var body: some View {
         Text(title.uppercased())
-            .font(.caption.weight(.semibold))
+            .font(MacWikiTypography.metadataLabel)
             .foregroundStyle(.secondary)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.top, 6)

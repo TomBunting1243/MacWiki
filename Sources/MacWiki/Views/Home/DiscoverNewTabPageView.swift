@@ -30,6 +30,18 @@ struct DiscoverNewTabPageView: View {
         screenModel.discoverFeedStore
     }
 
+    private var discoverPageMaxWidth: CGFloat {
+        if discoverContentWidth >= 1540 { return 1320 }
+        if discoverContentWidth >= 1240 { return 1160 }
+        return 980
+    }
+
+    private var discoverHorizontalPadding: CGFloat {
+        if discoverContentWidth < 720 { return 18 }
+        if discoverContentWidth >= 1540 { return 42 }
+        return 28
+    }
+
     private var shouldQueueTimeTravelSkeleton: Bool {
         screenModel.shouldQueueTimeTravelSkeleton
     }
@@ -72,7 +84,7 @@ struct DiscoverNewTabPageView: View {
 
     private var discoverFeedContent: some View {
         ScrollView {
-            LazyVStack(alignment: .leading, spacing: discoverContentWidth < 820 ? 18 : 22) {
+            LazyVStack(alignment: .leading, spacing: discoverContentWidth < 820 ? 16 : 20) {
                 DiscoverSearchBarView(
                     searchCoordinator: searchCoordinator,
                     discoverFeedStore: discoverFeedStore,
@@ -102,15 +114,10 @@ struct DiscoverNewTabPageView: View {
                         onOpen: open
                     )
                 } else {
-                    DiscoverTimeMachineControlsView(
+                    DiscoverTimeMachineStageView(
                         screenModel: screenModel,
                         discoverFeedStore: discoverFeedStore,
-                        discoverContentWidth: discoverContentWidth
-                    )
-                    DiscoverFeedSurface(
-                        discoverFeedStore: discoverFeedStore,
-                        referenceDate: discoverReferenceDate,
-                        availableWidth: discoverContentWidth,
+                        discoverContentWidth: discoverContentWidth,
                         isSearchFieldFocused: isSearchFocused,
                         refreshGeneration: screenModel.discoverRefreshGeneration,
                         allLists: allLists,
@@ -123,9 +130,10 @@ struct DiscoverNewTabPageView: View {
                     )
                 }
             }
-            .frame(maxWidth: 1040, alignment: .leading)
-            .padding(.horizontal, 28)
-            .padding(.top, 28)
+            .frame(maxWidth: discoverPageMaxWidth, alignment: .leading)
+            .frame(maxWidth: .infinity, alignment: .center)
+            .padding(.horizontal, discoverHorizontalPadding)
+            .padding(.top, 24)
             .padding(.bottom, 48)
             .background {
                 GeometryReader { proxy in
@@ -139,7 +147,7 @@ struct DiscoverNewTabPageView: View {
                 }
             }
         }
-        .background(discoverBackground.ignoresSafeArea())
+        .background(DiscoverEditionBackground().ignoresSafeArea())
         .onAppear {
             refreshArticleLookupSnapshot()
             if reduceMotion {
@@ -181,46 +189,6 @@ struct DiscoverNewTabPageView: View {
 
     private func updateTimeTravelSkeletonVisibility() {
         screenModel.updateTimeTravelSkeletonVisibility(reduceMotion: reduceMotion)
-    }
-
-    private var discoverBackground: some View {
-        ZStack {
-            LinearGradient(
-                colors: [
-                    Color(nsColor: .windowBackgroundColor),
-                    Color(nsColor: .controlBackgroundColor).opacity(0.74)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-
-            Circle()
-                .fill(
-                    RadialGradient(
-                        colors: [Color.accentColor.opacity(0.12), Color.accentColor.opacity(0)],
-                        center: .center,
-                        startRadius: 20,
-                        endRadius: 260
-                    )
-                )
-                .offset(x: 250, y: -260)
-
-            Circle()
-                .fill(
-                    RadialGradient(
-                        colors: [Color.blue.opacity(0.08), Color.blue.opacity(0)],
-                        center: .center,
-                        startRadius: 10,
-                        endRadius: 220
-                    )
-                )
-                .offset(x: -320, y: 180)
-
-            RoundedRectangle(cornerRadius: 320, style: .continuous)
-                .stroke(Color.primary.opacity(0.03), lineWidth: 1)
-                .scaleEffect(1.2)
-                .offset(y: 180)
-        }
     }
 
     private func open(_ result: WikipediaService.SearchResult, inNewTab: Bool) {

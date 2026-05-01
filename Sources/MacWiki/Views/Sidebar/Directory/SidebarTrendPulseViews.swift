@@ -4,6 +4,7 @@ struct TrendPulsePopoverView: View {
     let title: String
     let pulse: WikipediaService.TrendPulse
     @Binding var selectedRange: ViewsPopoverTimeRange
+    let presentationContext: DiscoverPageViewsPresentationContext
     @State private var selectedIndex: Int?
     @State private var peakDays: [WikipediaService.PeakPageviewDay] = []
     @State private var isLoadingPeakDays = false
@@ -30,8 +31,10 @@ struct TrendPulsePopoverView: View {
         downsampledTrendPoints(fullPoints, maxPoints: 220)
     }
     private var selectedPoint: TrendPoint? {
-        guard let selectedIndex else { return fullPoints.last }
-        return fullPoints.first(where: { $0.id == selectedIndex }) ?? fullPoints.last
+        if let selectedIndex {
+            return fullPoints.first(where: { $0.id == selectedIndex }) ?? selectionAnchorPoint
+        }
+        return selectionAnchorPoint
     }
     private var latestViewsCompact: String {
         abbreviatedViewCount(pulse.latestViews)
@@ -118,12 +121,17 @@ struct TrendPulsePopoverView: View {
     private var recentPoints: [TrendPoint] {
         Array(fullPoints.suffix(5).reversed())
     }
+
+    private var selectionAnchorPoint: TrendPoint? {
+        nearestPoint(to: presentationContext.selectionAnchorDate) ?? fullPoints.last
+    }
+
     private var peakDaysTaskKey: String {
         let normalizedTitle = title
             .lowercased()
             .replacingOccurrences(of: "_", with: " ")
             .trimmingCharacters(in: .whitespacesAndNewlines)
-        let endStamp = Int(pulse.windowEnd.timeIntervalSinceReferenceDate)
+        let endStamp = Int(presentationContext.allTimeHighDaysEndDate.timeIntervalSinceReferenceDate)
         return "\(normalizedTitle)|\(endStamp)"
     }
 
@@ -132,8 +140,8 @@ struct TrendPulsePopoverView: View {
         return fullPoints.first(where: { calendar.isDate($0.date, inSameDayAs: date) })?.id
     }
 
-    private func resetSelectionToLatest() {
-        selectedIndex = fullPoints.last?.id
+    private func resetSelectionToAnchor() {
+        selectedIndex = selectionAnchorPoint?.id
     }
 
     var body: some View {
@@ -265,7 +273,7 @@ struct TrendPulsePopoverView: View {
                                 case .active(let location):
                                     updateSelection(location: location, proxy: proxy, geometry: geometry)
                                 case .ended:
-                                    selectedIndex = fullPoints.last?.id
+                                    resetSelectionToAnchor()
                                 }
                             }
                             .gesture(
@@ -300,7 +308,7 @@ struct TrendPulsePopoverView: View {
             Divider().opacity(0.55)
 
             VStack(alignment: .leading, spacing: 6) {
-                Text("Recent Days")
+                Text(presentationContext.recencySectionTitle)
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(.secondary)
 
@@ -333,7 +341,7 @@ struct TrendPulsePopoverView: View {
                             selectedIndex = point.id
                         } else if hoveredRecentPointID == point.id {
                             hoveredRecentPointID = nil
-                            resetSelectionToLatest()
+                            resetSelectionToAnchor()
                         }
                     }
                 }
@@ -388,7 +396,7 @@ struct TrendPulsePopoverView: View {
                                 }
                             } else if hoveredPeakDayID == peak.id {
                                 hoveredPeakDayID = nil
-                                resetSelectionToLatest()
+                                resetSelectionToAnchor()
                             }
                         }
                     }
@@ -399,6 +407,12 @@ struct TrendPulsePopoverView: View {
         .frame(width: Layout.popoverWidth)
         .task(id: peakDaysTaskKey) {
             await loadPeakDays()
+        }
+        .onChange(of: selectedRange) { _, _ in
+            selectedIndex = nil
+        }
+        .onChange(of: pulse) { _, _ in
+            selectedIndex = nil
         }
     }
 
@@ -479,7 +493,7 @@ struct TrendPulsePopoverView: View {
         do {
             let result = try await WikipediaService.shared.fetchPeakPageviewDays(
                 for: title,
-                endingAt: pulse.windowEnd,
+                endingAt: presentationContext.allTimeHighDaysEndDate,
                 top: 5
             )
             guard !Task.isCancelled else { return }
@@ -487,6 +501,12 @@ struct TrendPulsePopoverView: View {
         } catch {
             guard !Task.isCancelled else { return }
             peakDays = []
+        }
+    }
+
+    private func nearestPoint(to targetDate: Date) -> TrendPoint? {
+        fullPoints.min { lhs, rhs in
+            abs(lhs.date.timeIntervalSince(targetDate)) < abs(rhs.date.timeIntervalSince(targetDate))
         }
     }
 }

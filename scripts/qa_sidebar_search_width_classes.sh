@@ -20,7 +20,6 @@ WINDOW_HEIGHT="${WINDOW_HEIGHT:-980}"
 WINDOW_POS_X="${WINDOW_POS_X:-90}"
 WINDOW_POS_Y="${WINDOW_POS_Y:-70}"
 SEARCH_QUERY="${SEARCH_QUERY:-Albert Einstein}"
-SEARCH_PRESENTATION_MODE="${SEARCH_PRESENTATION_MODE:-List Contents Sidebar}"
 LISTS_SIDEBAR_WIDTH="${LISTS_SIDEBAR_WIDTH:-180}"
 RESTART_APP="${RESTART_APP:-1}"
 STRICT_OCR="${STRICT_OCR:-0}"
@@ -101,8 +100,8 @@ run_osascript_with_timeout() {
 }
 
 prepare_deterministic_defaults() {
-  defaults write "$APP_BUNDLE_ID" searchPresentationMode -string "$SEARCH_PRESENTATION_MODE" >/dev/null 2>&1 || true
-  defaults write "$APP_BUNDLE_ID" listsSidebarWidth -float "$LISTS_SIDEBAR_WIDTH" >/dev/null 2>&1 || true
+  defaults delete "$APP_BUNDLE_ID" searchPresentationMode >/dev/null 2>&1 || true
+  defaults write "$APP_BUNDLE_ID" mainWindow.sidebarWidth -float "$LISTS_SIDEBAR_WIDTH" >/dev/null 2>&1 || true
 }
 
 set_launch_sidebar_search_defaults() {
@@ -344,15 +343,20 @@ on contentWindowIndex(appName)
     return 0
 end contentWindowIndex
 
-on firstTextFieldIn(elementRef)
+on sidebarSearchFieldIn(elementRef)
     set allElements to entire contents of elementRef
+    repeat with e in allElements
+        try
+            if (value of attribute "AXIdentifier" of e) is "sidebar-search-field" then return e
+        end try
+    end repeat
     repeat with e in allElements
         try
             if class of e is text field then return e
         end try
     end repeat
     return missing value
-end firstTextFieldIn
+end sidebarSearchFieldIn
 
 on run argv
     set appName to item 1 of argv
@@ -364,7 +368,7 @@ on run argv
     tell application appName to activate
     tell application "System Events"
         tell process appName
-            set targetField to my firstTextFieldIn(splitter group 1 of group 1 of window windowIndex)
+            set targetField to my sidebarSearchFieldIn(splitter group 1 of group 1 of window windowIndex)
             if targetField is missing value then error "missing search field"
             set value of targetField to queryText
         end tell
@@ -456,7 +460,7 @@ echo "Search query: $SEARCH_QUERY"
   echo "- Captured: $(date)"
   echo "- Output directory: \`$OUTPUT_DIR\`"
   echo "- App binary: \`$APP_BIN\`"
-  echo "- Search presentation mode: \`$SEARCH_PRESENTATION_MODE\`"
+  echo "- Sidebar width seed: \`${LISTS_SIDEBAR_WIDTH}px\`"
   echo "- Width presets: \`$WIDTH_PRESETS_CSV\`"
   echo "- Search query: \`$SEARCH_QUERY\`"
   echo "- Strict OCR checks: \`$STRICT_OCR\`"

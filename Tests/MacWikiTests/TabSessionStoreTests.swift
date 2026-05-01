@@ -121,4 +121,55 @@ struct TabSessionStoreTests {
         #expect(restored.openTabs[1].isPlaceholder == true)
         #expect(restored.recentlyClosedTabs.first?.history.map(\.article.title) == ["A", "B"])
     }
+
+    @Test func readStateMutationQueuesTabSessionSave() {
+        let store = TabSessionStore(loadPersistedState: false)
+        let tab = ArticleTab(
+            content: .history(
+                items: [
+                    HistoryItem(article: Article(id: "ada", title: "Ada Lovelace")),
+                    HistoryItem(article: Article(id: "swift", title: "Swift"))
+                ],
+                currentIndex: 0
+            )
+        )
+        store.openTabs = [tab]
+        let saveGeneration = store.saveRequestGeneration
+
+        let didChange = store.updateReadState(forTitle: "Ada_Lovelace", isRead: true)
+
+        #expect(didChange == true)
+        #expect(store.openTabs[0].history[0].article.isRead == true)
+        #expect(store.openTabs[0].history[1].article.isRead == false)
+        #expect(store.saveRequestGeneration == saveGeneration + 1)
+        store.cancelPendingSaveForTesting()
+    }
+
+    @Test func articleMetadataMutationQueuesTabSessionSave() {
+        let store = TabSessionStore(loadPersistedState: false)
+        let tab = ArticleTab(
+            content: .history(
+                items: [
+                    HistoryItem(article: Article(id: "swift", title: "Swift"))
+                ],
+                currentIndex: 0
+            )
+        )
+        store.openTabs = [tab]
+        let saveGeneration = store.saveRequestGeneration
+
+        let didChange = store.updateArticleMetadata(
+            ids: ["swift"],
+            description: "A programming language",
+            extract: "Swift is a programming language.",
+            wordCount: 42
+        )
+
+        #expect(didChange == true)
+        #expect(store.openTabs[0].history[0].article.description == "A programming language")
+        #expect(store.openTabs[0].history[0].article.extract == "Swift is a programming language.")
+        #expect(store.openTabs[0].history[0].article.wordCount == 42)
+        #expect(store.saveRequestGeneration == saveGeneration + 1)
+        store.cancelPendingSaveForTesting()
+    }
 }

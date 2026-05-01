@@ -9,6 +9,8 @@ struct DiscoverFeedSections: View {
     let allLists: [ReadingList]
     let allLabels: [Label]
     let allTags: [Tag]
+    let showsTimeTravelSkeleton: Bool
+    let timeMachineTargetDate: Date
     let onOpen: (WikipediaService.SearchResult, Bool) -> Void
     @Environment(\.openURL) private var openURL
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -24,6 +26,9 @@ struct DiscoverFeedSections: View {
     @State private var focusedCollectionLane: DiscoverCollectionLane = .mostRead
     @State private var focusedMostReadRowIndex = 0
     @State private var focusedLongestRowIndex = 0
+    @State private var isTodayMostReadExpanded = true
+    @State private var isMostReadCollectionExpanded = false
+    @State private var isLongestReadsCollectionExpanded = false
 
     private var isUltraCompactLayout: Bool {
         availableWidth < 720
@@ -46,6 +51,8 @@ struct DiscoverFeedSections: View {
         if isUltraCompactLayout { return 172 }
         if isVeryCompactLayout { return 190 }
         if isCompactLayout { return 214 }
+        if availableWidth >= 1320 { return 320 }
+        if availableWidth >= 1120 { return 286 }
         return 252
     }
 
@@ -61,69 +68,12 @@ struct DiscoverFeedSections: View {
         return 4
     }
 
-    private var usesOpeningModuleSplit: Bool {
-        availableWidth >= 760 && !feed.newsStories.isEmpty
-    }
-
-    private var openingModuleColumns: [GridItem] {
-        [
-            GridItem(.flexible(minimum: 280), spacing: 14),
-            GridItem(.flexible(minimum: 280), spacing: 14)
-        ]
-    }
-
-    private var usesCollectionsExplorationSplit: Bool {
-        availableWidth >= 1040
-    }
-
-    private var collectionsExplorationRailWidth: CGFloat {
-        min(max(availableWidth * 0.34, 318), 372)
-    }
-
-    private var usesMediaSpotlightSplit: Bool {
-        availableWidth >= 980 && feed.featuredImage != nil && !remainingNewsItems.isEmpty
-    }
-
-    private var mediaSpotlightRailWidth: CGFloat {
-        min(max(availableWidth * 0.31, 292), 344)
-    }
-
     private var inTheNewsRailLimit: Int {
-        usesMediaSpotlightSplit ? 4 : (isCompactLayout ? 8 : 12)
-    }
-
-    private var usesTimeCapsuleSpread: Bool {
-        availableWidth >= 940 && !primaryTimelineEvents.isEmpty && !feed.didYouKnow.isEmpty
-    }
-
-    private var timeCapsuleRailWidth: CGFloat {
-        min(max(availableWidth * 0.33, 292), 356)
+        isCompactLayout ? 8 : 12
     }
 
     private var hasTimeCapsuleDetails: Bool {
         !primaryTimelineEvents.isEmpty || !feed.didYouKnow.isEmpty
-    }
-
-    private var usesTemporalExplorationSpread: Bool {
-        availableWidth >= 1120 && hasTimeCapsuleDetails && hasTimeMachineDetails
-    }
-
-    private var temporalExplorationRailWidth: CGFloat {
-        min(max(availableWidth * 0.39, 352), 424)
-    }
-
-    private var usesTimeMachineTwinColumns: Bool {
-        availableWidth >= 900 && !feed.onThisDayBirths.isEmpty && !feed.onThisDayDeaths.isEmpty
-    }
-
-    private var playlistColumns: [GridItem] {
-        if availableWidth < 900 {
-            return [GridItem(.flexible(minimum: 280), spacing: 0)]
-        }
-        return [
-            GridItem(.flexible(minimum: 300), spacing: 12),
-            GridItem(.flexible(minimum: 300), spacing: 12)
-        ]
     }
 
     private var newsBriefingLimit: Int {
@@ -135,11 +85,13 @@ struct DiscoverFeedSections: View {
 
     private var allTimeMostReadLimit: Int {
         if isUltraCompactLayout { return 10 }
+        if availableWidth >= 1200 { return 22 }
         return isVeryCompactLayout ? 14 : 18
     }
 
     private var playlistRowLimit: Int {
         if isUltraCompactLayout { return 6 }
+        if availableWidth >= 1200 { return 12 }
         return isVeryCompactLayout ? 8 : 10
     }
 
@@ -150,6 +102,7 @@ struct DiscoverFeedSections: View {
     private var todayMostReadLimit: Int {
         if isUltraCompactLayout { return 8 }
         if isVeryCompactLayout { return 10 }
+        if availableWidth >= 1200 { return 14 }
         return 12
     }
 
@@ -177,6 +130,15 @@ struct DiscoverFeedSections: View {
         Array(rankedMostReadItems.prefix(playlistRowLimit))
     }
 
+    private var trendPulseItems: [WikipediaService.SearchResult] {
+        var items: [WikipediaService.SearchResult] = []
+        if let featuredArticle = feed.featuredArticle {
+            items.append(featuredArticle)
+        }
+        items.append(contentsOf: playlistMostReadItems)
+        return items
+    }
+
     private var allTimeMostReadLoadKey: String {
         "\(allTimeMostReadLoadLimit)"
     }
@@ -194,7 +156,7 @@ struct DiscoverFeedSections: View {
 
     private var trendPulseLoadKey: Int {
         titleFingerprint(
-            playlistMostReadItems.map(\.title),
+            trendPulseItems.map(\.title),
             seeds: [AnyHashable(feed.dateKey), AnyHashable("playlist-most-read-pulse")]
         )
     }
@@ -220,6 +182,13 @@ struct DiscoverFeedSections: View {
         trendReferenceDate
     }
 
+    private var timeMachineDisplayDateLabel: String {
+        if showsTimeTravelSkeleton {
+            return Self.timeMachineTargetDateFormatter.string(from: timeMachineTargetDate)
+        }
+        return feed.dateLabel
+    }
+
     private func titleFingerprint<S: Sequence>(
         _ titles: S,
         seeds: [AnyHashable] = []
@@ -235,27 +204,39 @@ struct DiscoverFeedSections: View {
     }
 
     private var todayMostReadSubtitle: String {
-        "PLACEHOLDER"
+        DiscoverEditionCopy.todayMostReadColumnSubtitle
     }
 
     private var playlistMostReadSubtitle: String {
-        "PLACEHOLDER"
+        DiscoverEditionCopy.allTimeMostReadSubtitle
     }
 
     private var playlistLongestSubtitle: String {
-        "PLACEHOLDER"
+        DiscoverEditionCopy.longestReadsSubtitle
     }
 
     private var mostReadCollectionMeta: String {
-        "PLACEHOLDER"
+        allTimeMostReadStore.isLoading ? "Updating ranking" : "\(allTimeMostReadEntries.count) ranked"
     }
 
     private var longestCollectionMeta: String {
-        "PLACEHOLDER"
+        wordCountStore.isLoading ? "Measuring length" : "\(keyboardLongestResults.count) candidates"
     }
 
     private var todayMostReadMeta: String {
-        "PLACEHOLDER"
+        todayMostReadStore.isLoading ? "Refreshing" : "\(todayMostReadItems.count) articles today"
+    }
+
+    private var todayMostReadPreviewTitles: [String] {
+        Array(todayMostReadItems.prefix(3).map(\.title))
+    }
+
+    private var mostReadPreviewTitles: [String] {
+        Array(playlistMostReadItems.prefix(3).map(\.title))
+    }
+
+    private var longestReadsPreviewTitles: [String] {
+        Array(keyboardLongestResults.prefix(3).map(\.title))
     }
 
     private var remainingNewsItems: [WikipediaService.SearchResult] {
@@ -279,6 +260,10 @@ struct DiscoverFeedSections: View {
 
     private var hasTimeMachineDetails: Bool {
         return !feed.onThisDayBirths.isEmpty || !feed.onThisDayDeaths.isEmpty || !feed.holidays.isEmpty
+    }
+
+    private var hasTimeMachineSurface: Bool {
+        showsTimeTravelSkeleton || hasTimeMachineDetails
     }
 
     private var longestReadCandidates: [WikipediaService.SearchResult] {
@@ -325,15 +310,15 @@ struct DiscoverFeedSections: View {
         return longestFallbackItems
     }
 
+    private var collectionsKeyboardContext: DiscoverCollectionsKeyboardContext {
+        DiscoverCollectionsKeyboardContext(
+            mostReadCount: keyboardMostReadResults.count,
+            longestCount: keyboardLongestResults.count
+        )
+    }
+
     private var visibleKeyboardLanes: [DiscoverCollectionLane] {
-        var lanes: [DiscoverCollectionLane] = []
-        if !keyboardMostReadResults.isEmpty {
-            lanes.append(.mostRead)
-        }
-        if !keyboardLongestResults.isEmpty {
-            lanes.append(.longest)
-        }
-        return lanes
+        collectionsKeyboardContext.visibleLanes
     }
 
     private var collectionsFocusDataKey: Int {
@@ -354,7 +339,8 @@ struct DiscoverFeedSections: View {
     }
 
     private var canOpenFocusedCollectionItem: Bool {
-        guard isCollectionsKeyboardFocusActive else { return false }
+        guard !showsTimeTravelSkeleton else { return false }
+        guard currentCollectionsKeyboardState().isActive else { return false }
         return focusedCollectionResult != nil
     }
 
@@ -407,131 +393,129 @@ struct DiscoverFeedSections: View {
     }
 
     private var focusedCollectionResult: WikipediaService.SearchResult? {
-        switch focusedCollectionLane {
+        guard let selection = DiscoverCollectionsKeyboardCoordinator.focusedSelection(
+            in: currentCollectionsKeyboardState(),
+            context: collectionsKeyboardContext
+        ) else {
+            return nil
+        }
+
+        switch selection.lane {
         case .mostRead:
-            guard keyboardMostReadResults.indices.contains(focusedMostReadRowIndex) else { return nil }
-            return keyboardMostReadResults[focusedMostReadRowIndex]
+            guard keyboardMostReadResults.indices.contains(selection.index) else { return nil }
+            return keyboardMostReadResults[selection.index]
         case .longest:
-            guard keyboardLongestResults.indices.contains(focusedLongestRowIndex) else { return nil }
-            return keyboardLongestResults[focusedLongestRowIndex]
-        }
-    }
-
-    private func rowCount(for lane: DiscoverCollectionLane) -> Int {
-        switch lane {
-        case .mostRead: return keyboardMostReadResults.count
-        case .longest: return keyboardLongestResults.count
-        }
-    }
-
-    private func focusedRowIndex(for lane: DiscoverCollectionLane) -> Int {
-        switch lane {
-        case .mostRead: return focusedMostReadRowIndex
-        case .longest: return focusedLongestRowIndex
-        }
-    }
-
-    private func setFocusedRowIndex(_ index: Int, for lane: DiscoverCollectionLane) {
-        let upperBound = max(rowCount(for: lane) - 1, 0)
-        let clamped = min(max(index, 0), upperBound)
-        switch lane {
-        case .mostRead:
-            focusedMostReadRowIndex = clamped
-        case .longest:
-            focusedLongestRowIndex = clamped
+            guard keyboardLongestResults.indices.contains(selection.index) else { return nil }
+            return keyboardLongestResults[selection.index]
         }
     }
 
     private func isFocusedCollectionRow(lane: DiscoverCollectionLane, index: Int) -> Bool {
-        guard isCollectionsKeyboardFocusActive else { return false }
-        guard focusedCollectionLane == lane else { return false }
-        return focusedRowIndex(for: lane) == index
+        DiscoverCollectionsKeyboardCoordinator.isFocusedRow(
+            lane: lane,
+            index: index,
+            state: currentCollectionsKeyboardState(),
+            context: collectionsKeyboardContext
+        )
     }
 
     private func markCollectionsFocus(lane: DiscoverCollectionLane, index: Int) {
-        focusedCollectionLane = lane
-        setFocusedRowIndex(index, for: lane)
-        isCollectionsKeyboardFocusActive = true
+        setCollectionExpansion(lane, isExpanded: true)
+        applyCollectionsKeyboardState(
+            DiscoverCollectionsKeyboardCoordinator.markedFocus(
+                lane: lane,
+                index: index,
+                state: currentCollectionsKeyboardState(),
+                context: collectionsKeyboardContext
+            )
+        )
+    }
+
+    private func collectionExpansionBinding(for lane: DiscoverCollectionLane) -> Binding<Bool> {
+        Binding(
+            get: {
+                switch lane {
+                case .mostRead:
+                    return isMostReadCollectionExpanded
+                case .longest:
+                    return isLongestReadsCollectionExpanded
+                }
+            },
+            set: { isExpanded in
+                setCollectionExpansion(lane, isExpanded: isExpanded)
+            }
+        )
+    }
+
+    private func setCollectionExpansion(_ lane: DiscoverCollectionLane, isExpanded: Bool) {
+        switch lane {
+        case .mostRead:
+            isMostReadCollectionExpanded = isExpanded
+        case .longest:
+            isLongestReadsCollectionExpanded = isExpanded
+        }
+
+        if !isExpanded && isCollectionsKeyboardFocusActive && focusedCollectionLane == lane {
+            applyCollectionsKeyboardState(
+                DiscoverCollectionsKeyboardCoordinator.deactivated(currentCollectionsKeyboardState())
+            )
+        }
     }
 
     private func normalizeCollectionsKeyboardFocus() {
-        let lanes = visibleKeyboardLanes
-        guard !lanes.isEmpty else {
-            isCollectionsKeyboardFocusActive = false
-            focusedMostReadRowIndex = 0
-            focusedLongestRowIndex = 0
-            return
-        }
-
-        if !lanes.contains(focusedCollectionLane) {
-            focusedCollectionLane = lanes.contains(.mostRead) ? .mostRead : lanes[0]
-        }
-
-        setFocusedRowIndex(focusedMostReadRowIndex, for: .mostRead)
-        setFocusedRowIndex(focusedLongestRowIndex, for: .longest)
-    }
-
-    private func shiftCollectionsFocusLane(_ direction: MoveCommandDirection) {
-        let lanes = visibleKeyboardLanes
-        guard lanes.count > 1 else { return }
-        guard let laneIndex = lanes.firstIndex(of: focusedCollectionLane) else {
-            focusedCollectionLane = lanes[0]
-            setFocusedRowIndex(0, for: lanes[0])
-            return
-        }
-
-        let targetLaneIndex: Int
-        if direction == .left {
-            targetLaneIndex = max(laneIndex - 1, 0)
-        } else if direction == .right {
-            targetLaneIndex = min(laneIndex + 1, lanes.count - 1)
-        } else {
-            return
-        }
-
-        guard targetLaneIndex != laneIndex else { return }
-        let targetLane = lanes[targetLaneIndex]
-        let sourceIndex = focusedRowIndex(for: focusedCollectionLane)
-        focusedCollectionLane = targetLane
-        setFocusedRowIndex(sourceIndex, for: targetLane)
+        applyCollectionsKeyboardState(
+            DiscoverCollectionsKeyboardCoordinator.normalized(
+                currentCollectionsKeyboardState(),
+                context: collectionsKeyboardContext
+            )
+        )
     }
 
     private func moveCollectionsFocus(_ direction: MoveCommandDirection) {
-        guard !isSearchFieldFocused else { return }
-        normalizeCollectionsKeyboardFocus()
-        guard !visibleKeyboardLanes.isEmpty else { return }
-
-        if !isCollectionsKeyboardFocusActive {
-            isCollectionsKeyboardFocusActive = true
-            if !visibleKeyboardLanes.contains(focusedCollectionLane) {
-                focusedCollectionLane = visibleKeyboardLanes.contains(.mostRead) ? .mostRead : visibleKeyboardLanes[0]
-            }
-            if direction == .up {
-                setFocusedRowIndex(max(rowCount(for: focusedCollectionLane) - 1, 0), for: focusedCollectionLane)
-            } else if direction == .left || direction == .right {
-                shiftCollectionsFocusLane(direction)
-            }
+        guard !showsTimeTravelSkeleton else {
+            applyCollectionsKeyboardState(
+                DiscoverCollectionsKeyboardCoordinator.deactivated(currentCollectionsKeyboardState())
+            )
             return
         }
-
-        switch direction {
-        case .up:
-            let nextIndex = max(focusedRowIndex(for: focusedCollectionLane) - 1, 0)
-            setFocusedRowIndex(nextIndex, for: focusedCollectionLane)
-        case .down:
-            let maxIndex = max(rowCount(for: focusedCollectionLane) - 1, 0)
-            let nextIndex = min(focusedRowIndex(for: focusedCollectionLane) + 1, maxIndex)
-            setFocusedRowIndex(nextIndex, for: focusedCollectionLane)
-        case .left, .right:
-            shiftCollectionsFocusLane(direction)
-        default:
-            break
-        }
+        applyCollectionsKeyboardState(
+            DiscoverCollectionsKeyboardCoordinator.moved(
+                currentCollectionsKeyboardState(),
+                direction: direction,
+                isSearchFieldFocused: isSearchFieldFocused,
+                context: collectionsKeyboardContext
+            )
+        )
     }
 
     private func openFocusedCollectionItem(inNewTab: Bool) {
         guard let result = focusedCollectionResult else { return }
         onOpen(result, inNewTab)
+    }
+
+    private func currentCollectionsKeyboardState() -> DiscoverCollectionsKeyboardState {
+        DiscoverCollectionsKeyboardState(
+            isActive: isCollectionsKeyboardFocusActive,
+            focusedLane: focusedCollectionLane,
+            focusedMostReadRowIndex: focusedMostReadRowIndex,
+            focusedLongestRowIndex: focusedLongestRowIndex
+        )
+    }
+
+    private func applyCollectionsKeyboardState(_ state: DiscoverCollectionsKeyboardState) {
+        isCollectionsKeyboardFocusActive = state.isActive
+        focusedCollectionLane = state.focusedLane
+        focusedMostReadRowIndex = state.focusedMostReadRowIndex
+        focusedLongestRowIndex = state.focusedLongestRowIndex
+
+        if state.isActive {
+            switch state.focusedLane {
+            case .mostRead:
+                isMostReadCollectionExpanded = true
+            case .longest:
+                isLongestReadsCollectionExpanded = true
+            }
+        }
     }
 
     @ViewBuilder
@@ -557,51 +541,50 @@ struct DiscoverFeedSections: View {
 
     @ViewBuilder
     private var mostReadCollectionModule: some View {
-        DiscoverEditorialPanel(accent: .accentColor, tone: .atlas) {
-            DiscoverPlaylistColumn(
-                title: "Most Read",
-                subtitle: playlistMostReadSubtitle,
-                meta: mostReadCollectionMeta,
-                systemImage: "chart.line.uptrend.xyaxis",
-                tint: .accentColor,
-                showsLoading: trendPulseStore.isLoading,
-                isKeyboardFocused: isCollectionsKeyboardFocusActive && focusedCollectionLane == .mostRead,
-                showsSurface: false
-            ) {
-                if playlistMostReadItems.isEmpty {
-                    DiscoverPlaylistPlaceholder(
-                        text: allTimeMostReadStore.isLoading
-                            ? "Loading all-time most read…"
-                            : "All-time Most Read is unavailable right now."
+        DiscoverExpandableCollectionCard(
+            title: "Most Read",
+            subtitle: playlistMostReadSubtitle,
+            meta: mostReadCollectionMeta,
+            systemImage: "chart.line.uptrend.xyaxis",
+            tint: .accentColor,
+            showsLoading: trendPulseStore.isLoading,
+            isKeyboardFocused: isCollectionsKeyboardFocusActive && focusedCollectionLane == .mostRead,
+            isExpanded: collectionExpansionBinding(for: .mostRead),
+            collapsedPreviewTitles: mostReadPreviewTitles
+        ) {
+            if playlistMostReadItems.isEmpty {
+                DiscoverPlaylistPlaceholder(
+                    text: allTimeMostReadStore.isLoading
+                        ? "Loading all-time most read..."
+                        : "All-time Most Read is unavailable right now."
+                )
+            } else {
+                ForEach(Array(playlistMostReadItems.enumerated()), id: \.element.id) { index, result in
+                    let rowKey = pageViewsRowKey(section: "collection-most-read", result: result, index: index)
+                    let trendPulse = trendPulseStore.pulse(for: result.title)
+                    DiscoverPlaylistArticleRow(
+                        result: result,
+                        rank: index + 1,
+                        primaryStat: mostReadPrimaryStat(for: result),
+                        secondaryStat: mostReadSecondaryStat(for: result),
+                        statTint: mostReadStatTint(for: result),
+                        isKeyboardFocused: isFocusedCollectionRow(lane: .mostRead, index: index),
+                        onFocus: {
+                            markCollectionsFocus(lane: .mostRead, index: index)
+                        },
+                        onOpen: onOpen
                     )
-                } else {
-                    ForEach(Array(playlistMostReadItems.enumerated()), id: \.element.id) { index, result in
-                        let rowKey = pageViewsRowKey(section: "collection-most-read", result: result, index: index)
-                        let trendPulse = trendPulseStore.pulse(for: result.title)
-                        DiscoverPlaylistArticleRow(
-                            result: result,
-                            rank: index + 1,
-                            primaryStat: mostReadPrimaryStat(for: result),
-                            secondaryStat: mostReadSecondaryStat(for: result),
-                            statTint: mostReadStatTint(for: result),
-                            isKeyboardFocused: isFocusedCollectionRow(lane: .mostRead, index: index),
-                            onFocus: {
-                                markCollectionsFocus(lane: .mostRead, index: index)
-                            },
-                            onOpen: onOpen
-                        )
-                        .contextMenu {
-                            discoverContextMenu(for: result) {
-                                presentPageViewsPopover(
-                                    for: result,
-                                    rowKey: rowKey,
-                                    initialPulse: trendPulse
-                                )
-                            }
+                    .contextMenu {
+                        discoverContextMenu(for: result) {
+                            presentPageViewsPopover(
+                                for: result,
+                                rowKey: rowKey,
+                                initialPulse: trendPulse
+                            )
                         }
-                        .popover(isPresented: pageViewsPopoverBinding(for: rowKey), arrowEdge: .trailing) {
-                            pageViewsPopover(for: rowKey)
-                        }
+                    }
+                    .popover(isPresented: pageViewsPopoverBinding(for: rowKey), arrowEdge: .trailing) {
+                        pageViewsPopover(for: rowKey)
                     }
                 }
             }
@@ -610,58 +593,33 @@ struct DiscoverFeedSections: View {
 
     @ViewBuilder
     private var longestReadsCollectionModule: some View {
-        DiscoverEditorialPanel(accent: Color.orange.opacity(0.9), tone: .notebook) {
-            DiscoverPlaylistColumn(
-                title: "Longest Reads",
-                subtitle: playlistLongestSubtitle,
-                meta: longestCollectionMeta,
-                systemImage: "text.alignleft",
-                tint: Color.orange.opacity(0.9),
-                showsLoading: wordCountStore.isLoading,
-                isKeyboardFocused: isCollectionsKeyboardFocusActive && focusedCollectionLane == .longest,
-                showsSurface: false
-            ) {
-                if longestReadItems.isEmpty {
-                    if longestFallbackItems.isEmpty {
-                        DiscoverPlaylistPlaceholder(
-                            text: wordCountStore.isLoading
-                                ? "Finding long reads…"
-                                : "No all-time long-read candidates are available yet."
-                        )
-                    } else {
-                        ForEach(Array(longestFallbackItems.enumerated()), id: \.element.id) { index, result in
-                            let rowKey = pageViewsRowKey(section: "collection-longest-fallback", result: result, index: index)
-                            DiscoverPlaylistArticleRow(
-                                result: result,
-                                rank: index + 1,
-                                primaryStat: wordCountStore.isLoading ? "Loading words…" : "Word count unavailable",
-                                secondaryStat: wordCountStore.isLoading ? nil : "Open to inspect",
-                                statTint: .secondary,
-                                isKeyboardFocused: isFocusedCollectionRow(lane: .longest, index: index),
-                                onFocus: {
-                                    markCollectionsFocus(lane: .longest, index: index)
-                                },
-                                onOpen: onOpen
-                            )
-                            .contextMenu {
-                                discoverContextMenu(for: result) {
-                                    presentPageViewsPopover(for: result, rowKey: rowKey)
-                                }
-                            }
-                            .popover(isPresented: pageViewsPopoverBinding(for: rowKey), arrowEdge: .trailing) {
-                                pageViewsPopover(for: rowKey)
-                            }
-                        }
-                    }
+        DiscoverExpandableCollectionCard(
+            title: "Longest Reads",
+            subtitle: playlistLongestSubtitle,
+            meta: longestCollectionMeta,
+            systemImage: "text.alignleft",
+            tint: Color.orange.opacity(0.92),
+            showsLoading: wordCountStore.isLoading,
+            isKeyboardFocused: isCollectionsKeyboardFocusActive && focusedCollectionLane == .longest,
+            isExpanded: collectionExpansionBinding(for: .longest),
+            collapsedPreviewTitles: longestReadsPreviewTitles
+        ) {
+            if longestReadItems.isEmpty {
+                if longestFallbackItems.isEmpty {
+                    DiscoverPlaylistPlaceholder(
+                        text: wordCountStore.isLoading
+                            ? "Finding long reads..."
+                            : "No all-time long-read candidates are available yet."
+                    )
                 } else {
-                    ForEach(Array(longestReadItems.enumerated()), id: \.element.id) { index, entry in
-                        let rowKey = pageViewsRowKey(section: "collection-longest", result: entry.result, index: index)
+                    ForEach(Array(longestFallbackItems.enumerated()), id: \.element.id) { index, result in
+                        let rowKey = pageViewsRowKey(section: "collection-longest-fallback", result: result, index: index)
                         DiscoverPlaylistArticleRow(
-                            result: entry.result,
+                            result: result,
                             rank: index + 1,
-                            primaryStat: formattedWordCount(entry.wordCount),
-                            secondaryStat: estimatedReadingTimeText(for: entry.wordCount),
-                            statTint: Color.orange.opacity(0.92),
+                            primaryStat: wordCountStore.isLoading ? "Loading words..." : "Word count unavailable",
+                            secondaryStat: wordCountStore.isLoading ? nil : "Open to inspect",
+                            statTint: .secondary,
                             isKeyboardFocused: isFocusedCollectionRow(lane: .longest, index: index),
                             onFocus: {
                                 markCollectionsFocus(lane: .longest, index: index)
@@ -669,13 +627,37 @@ struct DiscoverFeedSections: View {
                             onOpen: onOpen
                         )
                         .contextMenu {
-                            discoverContextMenu(for: entry.result) {
-                                presentPageViewsPopover(for: entry.result, rowKey: rowKey)
+                            discoverContextMenu(for: result) {
+                                presentPageViewsPopover(for: result, rowKey: rowKey)
                             }
                         }
                         .popover(isPresented: pageViewsPopoverBinding(for: rowKey), arrowEdge: .trailing) {
                             pageViewsPopover(for: rowKey)
                         }
+                    }
+                }
+            } else {
+                ForEach(Array(longestReadItems.enumerated()), id: \.element.id) { index, entry in
+                    let rowKey = pageViewsRowKey(section: "collection-longest", result: entry.result, index: index)
+                    DiscoverPlaylistArticleRow(
+                        result: entry.result,
+                        rank: index + 1,
+                        primaryStat: formattedWordCount(entry.wordCount),
+                        secondaryStat: estimatedReadingTimeText(for: entry.wordCount),
+                        statTint: Color.orange.opacity(0.92),
+                        isKeyboardFocused: isFocusedCollectionRow(lane: .longest, index: index),
+                        onFocus: {
+                            markCollectionsFocus(lane: .longest, index: index)
+                        },
+                        onOpen: onOpen
+                    )
+                    .contextMenu {
+                        discoverContextMenu(for: entry.result) {
+                            presentPageViewsPopover(for: entry.result, rowKey: rowKey)
+                        }
+                    }
+                    .popover(isPresented: pageViewsPopoverBinding(for: rowKey), arrowEdge: .trailing) {
+                        pageViewsPopover(for: rowKey)
                     }
                 }
             }
@@ -684,55 +666,48 @@ struct DiscoverFeedSections: View {
 
     @ViewBuilder
     private var todayMostReadSection: some View {
-        DiscoverEditorialPanel(accent: Color.blue.opacity(0.9), tone: .feature) {
-            VStack(alignment: .leading, spacing: 12) {
-                DiscoverSectionHeader(
-                    title: "Today’s Most Read",
-                    subtitle: "PLACEHOLDER"
+        DiscoverExpandableCollectionCard(
+            title: "Today’s Most Read",
+            subtitle: todayMostReadSubtitle,
+            meta: todayMostReadMeta,
+            systemImage: "sun.max.fill",
+            tint: Color.blue.opacity(0.92),
+            showsLoading: todayMostReadStore.isLoading || todayTrendPulseStore.isLoading,
+            isKeyboardFocused: false,
+            isExpanded: $isTodayMostReadExpanded,
+            collapsedPreviewTitles: todayMostReadPreviewTitles
+        ) {
+            if todayMostReadItems.isEmpty {
+                DiscoverPlaylistPlaceholder(
+                    text: todayMostReadStore.isLoading
+                        ? "Loading today's most read..."
+                        : "Today's Most Read is unavailable right now."
                 )
-                DiscoverPlaylistColumn(
-                    title: "Today",
-                    subtitle: todayMostReadSubtitle,
-                    meta: todayMostReadMeta,
-                    systemImage: "sun.max.fill",
-                    tint: Color.blue.opacity(0.9),
-                    showsLoading: todayMostReadStore.isLoading || todayTrendPulseStore.isLoading,
-                    isKeyboardFocused: false,
-                    showsSurface: false
-                ) {
-                    if todayMostReadItems.isEmpty {
-                        DiscoverPlaylistPlaceholder(
-                            text: todayMostReadStore.isLoading
-                                ? "Loading today’s most read…"
-                                : "Today’s Most Read is unavailable right now."
-                        )
-                    } else {
-                        ForEach(Array(todayMostReadItems.enumerated()), id: \.element.id) { index, result in
-                            let rowKey = pageViewsRowKey(section: "today-most-read", result: result, index: index)
-                            let trendPulse = todayMostReadPulse(for: result)
-                            DiscoverPlaylistArticleRow(
-                                result: result,
-                                rank: index + 1,
-                                primaryStat: todayMostReadPrimaryStat(for: result),
-                                secondaryStat: todayMostReadSecondaryStat(for: result),
-                                statTint: todayMostReadStatTint(for: result),
-                                isKeyboardFocused: false,
-                                onFocus: nil,
-                                onOpen: onOpen
+            } else {
+                ForEach(Array(todayMostReadItems.enumerated()), id: \.element.id) { index, result in
+                    let rowKey = pageViewsRowKey(section: "today-most-read", result: result, index: index)
+                    let trendPulse = todayMostReadPulse(for: result)
+                    DiscoverPlaylistArticleRow(
+                        result: result,
+                        rank: index + 1,
+                        primaryStat: todayMostReadPrimaryStat(for: result),
+                        secondaryStat: todayMostReadSecondaryStat(for: result),
+                        statTint: todayMostReadStatTint(for: result),
+                        isKeyboardFocused: false,
+                        onFocus: nil,
+                        onOpen: onOpen
+                    )
+                    .contextMenu {
+                        discoverContextMenu(for: result) {
+                            presentPageViewsPopover(
+                                for: result,
+                                rowKey: rowKey,
+                                initialPulse: trendPulse
                             )
-                            .contextMenu {
-                                discoverContextMenu(for: result) {
-                                    presentPageViewsPopover(
-                                        for: result,
-                                        rowKey: rowKey,
-                                        initialPulse: trendPulse
-                                    )
-                                }
-                            }
-                            .popover(isPresented: pageViewsPopoverBinding(for: rowKey), arrowEdge: .trailing) {
-                                pageViewsPopover(for: rowKey)
-                            }
                         }
+                    }
+                    .popover(isPresented: pageViewsPopoverBinding(for: rowKey), arrowEdge: .trailing) {
+                        pageViewsPopover(for: rowKey)
                     }
                 }
             }
@@ -746,7 +721,7 @@ struct DiscoverFeedSections: View {
                 VStack(alignment: .leading, spacing: 12) {
                     DiscoverSectionHeader(
                         title: "News Briefing",
-                        subtitle: "PLACEHOLDER"
+                        subtitle: DiscoverEditionCopy.newsBriefingSubtitle
                     )
                     VStack(spacing: 10) {
                         ForEach(feed.newsStories.prefix(newsBriefingLimit)) { story in
@@ -776,7 +751,7 @@ struct DiscoverFeedSections: View {
         VStack(alignment: .leading, spacing: isCompactLayout ? 14 : 16) {
             DiscoverSectionHeader(
                 title: "Collections",
-                subtitle: "PLACEHOLDER"
+                subtitle: DiscoverEditionCopy.collectionsSubtitle
             )
 
             VStack(alignment: .leading, spacing: 16) {
@@ -788,21 +763,39 @@ struct DiscoverFeedSections: View {
 
     @ViewBuilder
     private var mediaSpotlightSection: some View {
-        if let featuredImage = feed.featuredImage {
-            VStack(alignment: .leading, spacing: 16) {
-                DiscoverEditorialPanel(accent: Color.indigo.opacity(0.82), tone: .feature) {
-                    VStack(alignment: .leading, spacing: 12) {
-                        DiscoverSectionHeader(title: "Image of the Day", subtitle: "PLACEHOLDER")
-                        DiscoverFeaturedImageCard(image: featuredImage)
-                    }
+        if feed.featuredImage != nil || !remainingNewsItems.isEmpty {
+            VStack(alignment: .leading, spacing: isCompactLayout ? 14 : 16) {
+                DiscoverSectionHeader(title: "Media & Current Events", subtitle: DiscoverEditionCopy.mediaSubtitle)
+
+                VStack(alignment: .leading, spacing: 16) {
+                    mediaSpotlightImageModule
+                    inTheNewsModule
                 }
             }
         }
+    }
 
+    @ViewBuilder
+    private var mediaSpotlightImageModule: some View {
+        if let featuredImage = feed.featuredImage {
+            DiscoverEditorialPanel(accent: Color.indigo.opacity(0.82), tone: .feature) {
+                VStack(alignment: .leading, spacing: 12) {
+                    DiscoverSectionHeader(title: "Image of the Day", subtitle: DiscoverEditionCopy.imageOfTheDaySubtitle)
+                    DiscoverFeaturedImageCard(
+                        image: featuredImage,
+                        prefersHorizontalLayout: false
+                    )
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var inTheNewsModule: some View {
         if !remainingNewsItems.isEmpty {
             DiscoverEditorialPanel(accent: Color.red.opacity(0.78), tone: .notebook) {
                 VStack(alignment: .leading, spacing: 12) {
-                    DiscoverSectionHeader(title: "In the News", subtitle: "PLACEHOLDER")
+                    DiscoverSectionHeader(title: "In the News", subtitle: DiscoverEditionCopy.inTheNewsSubtitle)
                     VStack(spacing: 10) {
                         ForEach(remainingNewsItems.prefix(inTheNewsRailLimit)) { result in
                             let rowKey = pageViewsRowKey(section: "in-news", result: result)
@@ -889,7 +882,7 @@ struct DiscoverFeedSections: View {
                 contentPadding: isCompactLayout ? 14 : 18
             ) {
                 VStack(alignment: .leading, spacing: isCompactLayout ? 14 : 18) {
-                    DiscoverSectionHeader(title: "Time Capsule", subtitle: "PLACEHOLDER")
+                    DiscoverSectionHeader(title: "Time Capsule", subtitle: DiscoverEditionCopy.timeCapsuleSubtitle)
                     timeCapsuleHistoryModule
                     timeCapsuleDidYouKnowModule
                 }
@@ -971,7 +964,7 @@ struct DiscoverFeedSections: View {
 
     @ViewBuilder
     private var timeMachineStage: some View {
-        if hasTimeMachineDetails {
+        if hasTimeMachineSurface {
             DiscoverEditorialPanel(
                 accent: Color.indigo.opacity(0.84),
                 tone: .timewarp,
@@ -979,12 +972,21 @@ struct DiscoverFeedSections: View {
             ) {
                 VStack(alignment: .leading, spacing: isCompactLayout ? 14 : 18) {
                     HStack(alignment: .firstTextBaseline, spacing: 12) {
-                        DiscoverSectionHeader(title: "Time Machine", subtitle: "PLACEHOLDER")
+                        DiscoverSectionHeader(title: "Time Machine", subtitle: DiscoverEditionCopy.timeMachineSubtitle)
 
                         Spacer(minLength: 0)
 
-                        if !feed.dateLabel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                            Text(feed.dateLabel)
+                        if showsTimeTravelSkeleton {
+                            AppLoadingInlineLabel(
+                                text: "Scanning",
+                                tone: .retro,
+                                font: .caption.weight(.semibold)
+                            )
+                            .fixedSize()
+                        }
+
+                        if !timeMachineDisplayDateLabel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                            Text(timeMachineDisplayDateLabel)
                                 .font(.system(size: 11, weight: .semibold, design: .rounded))
                                 .foregroundStyle(.secondary)
                                 .lineLimit(1)
@@ -994,12 +996,16 @@ struct DiscoverFeedSections: View {
                         }
                     }
 
-                    if !feed.onThisDayBirths.isEmpty || !feed.onThisDayDeaths.isEmpty {
-                        timeMachineBirthsModule
-                        timeMachineDeathsModule
-                    }
+                    if showsTimeTravelSkeleton {
+                        DiscoverTimeMachineLoadingContent(isCompactLayout: isCompactLayout)
+                    } else {
+                        if !feed.onThisDayBirths.isEmpty || !feed.onThisDayDeaths.isEmpty {
+                            timeMachineBirthsModule
+                            timeMachineDeathsModule
+                        }
 
-                    timeMachineHolidaysModule
+                        timeMachineHolidaysModule
+                    }
                 }
             }
         }
@@ -1013,46 +1019,73 @@ struct DiscoverFeedSections: View {
         }
     }
 
+    @ViewBuilder
+    private var leadEditionStage: some View {
+        VStack(alignment: .leading, spacing: isCompactLayout ? 14 : 18) {
+            DiscoverMasthead(
+                dateLabel: feed.dateLabel,
+                isCompactLayout: isCompactLayout
+            )
+
+            if let featured = feed.featuredArticle {
+                VStack(alignment: .leading, spacing: 16) {
+                    featuredStoryModule(featured)
+                    openingEditorialSpread
+                }
+            } else {
+                openingEditorialSpread
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func featuredStoryModule(_ featured: WikipediaService.SearchResult) -> some View {
+        let featuredRowKey = pageViewsRowKey(section: "featured", result: featured)
+        let featuredPulse = mostReadPulse(for: featured)
+        DiscoverFeatureModule(
+            result: featured,
+            teaserText: featuredTeaserText,
+            isTeaserLoading: isFeaturedTeaserLoading,
+            trendPulse: featuredPulse,
+            isTrendPulseLoading: trendPulseStore.isLoading && featuredPulse == nil,
+            visualContextImages: visualContextStore.images,
+            isVisualContextLoading: visualContextStore.isLoading && visualContextStore.images.isEmpty,
+            heroImageHeight: heroImageHeight,
+            titleLineLimit: leadStoryTitleLineLimit,
+            descriptionLineLimit: leadStoryDescriptionLineLimit,
+            isCompactLayout: isCompactLayout,
+            onOpen: onOpen,
+            onOpenURL: { url in
+                openURL(url)
+            },
+            onTrendTapped: { pulse in
+                presentPageViewsPopover(
+                    for: featured,
+                    rowKey: featuredRowKey,
+                    initialPulse: pulse
+                )
+            }
+        )
+        .contextMenu {
+            discoverContextMenu(for: featured) {
+                presentPageViewsPopover(for: featured, rowKey: featuredRowKey)
+            }
+        }
+        .popover(isPresented: pageViewsPopoverBinding(for: featuredRowKey), arrowEdge: .trailing) {
+            pageViewsPopover(for: featuredRowKey)
+        }
+    }
+
     var body: some View {
         LazyVStack(alignment: .leading, spacing: sectionSpacing) {
-            if let featured = feed.featuredArticle {
-                DiscoverMasthead(
-                    dateLabel: feed.dateLabel,
-                    isCompactLayout: isCompactLayout
-                )
-                let featuredRowKey = pageViewsRowKey(section: "featured", result: featured)
-                DiscoverFeatureModule(
-                    result: featured,
-                    teaserText: featuredTeaserText,
-                    isTeaserLoading: isFeaturedTeaserLoading,
-                    visualContextImages: visualContextStore.images,
-                    isVisualContextLoading: visualContextStore.isLoading && visualContextStore.images.isEmpty,
-                    heroImageHeight: heroImageHeight,
-                    titleLineLimit: leadStoryTitleLineLimit,
-                    descriptionLineLimit: leadStoryDescriptionLineLimit,
-                    isCompactLayout: isCompactLayout,
-                    onOpen: onOpen,
-                    onOpenURL: { url in
-                        openURL(url)
-                    }
-                )
-                .contextMenu {
-                    discoverContextMenu(for: featured) {
-                        presentPageViewsPopover(for: featured, rowKey: featuredRowKey)
-                    }
-                }
-                .popover(isPresented: pageViewsPopoverBinding(for: featuredRowKey), arrowEdge: .trailing) {
-                    pageViewsPopover(for: featuredRowKey)
-                }
+            if showsTimeTravelSkeleton {
+                timeMachineStage
+            } else {
+                leadEditionStage
+                collectionsStage
+                mediaSpotlightSection
+                temporalExplorationStage
             }
-
-            openingEditorialSpread
-
-            collectionsStage
-
-            mediaSpotlightSection
-
-            temporalExplorationStage
         }
         .background {
             collectionsKeyboardShortcutHost
@@ -1068,14 +1101,18 @@ struct DiscoverFeedSections: View {
         }
         .onChange(of: isSearchFieldFocused) { _, focused in
             if focused {
-                isCollectionsKeyboardFocusActive = false
+                applyCollectionsKeyboardState(
+                    DiscoverCollectionsKeyboardCoordinator.deactivated(currentCollectionsKeyboardState())
+                )
             }
         }
         .onMoveCommand { direction in
             moveCollectionsFocus(direction)
         }
         .onExitCommand {
-            isCollectionsKeyboardFocusActive = false
+            applyCollectionsKeyboardState(
+                DiscoverCollectionsKeyboardCoordinator.deactivated(currentCollectionsKeyboardState())
+            )
         }
         .task(id: todayMostReadLoadKey) {
             todayMostReadStore.queueLoad(forceRefresh: refreshGeneration > 0)
@@ -1091,7 +1128,7 @@ struct DiscoverFeedSections: View {
         }
         .task(id: trendPulseLoadKey) {
             trendPulseStore.queueLoad(
-                results: playlistMostReadItems,
+                results: trendPulseItems,
                 referenceDate: mostReadPulseReferenceDate
             )
         }
@@ -1220,6 +1257,13 @@ struct DiscoverFeedSections: View {
         return formatter
     }()
 
+    private static let timeMachineTargetDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale.autoupdatingCurrent
+        formatter.setLocalizedDateFormatFromTemplate("EEE, MMM d")
+        return formatter
+    }()
+
     @ViewBuilder
     private func discoverContextMenu(
         for result: WikipediaService.SearchResult,
@@ -1247,17 +1291,16 @@ struct DiscoverMasthead: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .firstTextBaseline, spacing: 12) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Today’s Edition")
-                        .font(.system(size: 10.5, weight: .semibold, design: .rounded))
+                        .font(.system(size: 11, weight: .semibold, design: .rounded))
                         .textCase(.uppercase)
-                        .tracking(1.0)
                         .foregroundStyle(.tertiary)
 
                     Text("Discover")
-                        .font(.system(size: isCompactLayout ? 31 : 38, weight: .semibold, design: .serif))
+                        .font(.system(size: isCompactLayout ? 30 : 36, weight: .semibold))
                         .foregroundStyle(.primary)
                 }
 
@@ -1265,11 +1308,15 @@ struct DiscoverMasthead: View {
 
                 if !trimmedDateLabel.isEmpty {
                     Text(trimmedDateLabel)
-                        .font(.system(size: 11.5, weight: .semibold, design: .rounded))
+                        .font(.system(size: 11.5, weight: .medium, design: .rounded))
                         .foregroundStyle(.secondary)
                         .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                        .background(Color.primary.opacity(0.045), in: Capsule())
+                        .padding(.vertical, 5)
+                        .background(.thinMaterial, in: Capsule())
+                        .overlay {
+                            Capsule()
+                                .strokeBorder(Color(nsColor: .separatorColor).opacity(0.35), lineWidth: 0.6)
+                        }
                         .multilineTextAlignment(.trailing)
                 }
             }
@@ -1277,7 +1324,6 @@ struct DiscoverMasthead: View {
             Rectangle()
                 .fill(Color.primary.opacity(0.08))
                 .frame(height: 1)
-                .padding(.top, 2)
         }
     }
 }
@@ -1295,16 +1341,16 @@ struct DiscoverSectionHeader: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: showsSubtitle ? 4 : 0) {
+        VStack(alignment: .leading, spacing: showsSubtitle ? 3 : 0) {
             if showsSubtitle {
                 Text(normalizedSubtitle)
                     .font(DiscoverTypography.sectionSubtitle)
                     .textCase(.uppercase)
-                    .tracking(0.75)
                     .foregroundStyle(.tertiary)
             }
             Text(title)
                 .font(DiscoverTypography.sectionTitle)
+                .foregroundStyle(.primary)
         }
     }
 }
@@ -1318,67 +1364,38 @@ enum DiscoverEditorialPanelTone {
 
     func backgroundColors(accent: Color) -> [Color] {
         switch self {
-        case .feature:
-            return [accent.opacity(0.14), Color.primary.opacity(0.03), Color.white.opacity(0.16)]
-        case .notebook:
-            return [Color.primary.opacity(0.018), accent.opacity(0.055), Color.white.opacity(0.10)]
-        case .atlas:
-            return [accent.opacity(0.09), Color.primary.opacity(0.022), Color.white.opacity(0.12)]
-        case .archive:
-            return [accent.opacity(0.08), Color.orange.opacity(0.05), Color.white.opacity(0.14)]
-        case .timewarp:
-            return [accent.opacity(0.12), Color.primary.opacity(0.026), Color.white.opacity(0.16)]
+        case .feature, .notebook, .atlas, .archive, .timewarp:
+            return [
+                Color(nsColor: .controlBackgroundColor).opacity(0.34),
+                Color(nsColor: .windowBackgroundColor).opacity(0.18)
+            ]
         }
     }
 
     var topRuleHeight: CGFloat {
         switch self {
-        case .feature: return 3
-        case .timewarp: return 2.5
-        case .notebook, .atlas, .archive: return 2
+        case .feature, .notebook, .atlas, .archive, .timewarp: return 0
         }
     }
 
     var cornerRadius: CGFloat {
         switch self {
-        case .feature:
-            return 26
-        case .notebook, .atlas:
-            return 22
-        case .archive:
-            return 20
-        case .timewarp:
-            return 24
+        case .feature, .notebook, .atlas, .archive, .timewarp:
+            return 16
         }
     }
 
     var borderOpacity: Double {
         switch self {
-        case .feature:
-            return 0.16
-        case .notebook:
-            return 0.12
-        case .atlas:
-            return 0.13
-        case .archive:
-            return 0.11
-        case .timewarp:
-            return 0.16
+        case .feature, .notebook, .atlas, .archive, .timewarp:
+            return 0.08
         }
     }
 
     var shadowOpacity: Double {
         switch self {
-        case .feature:
-            return 0.08
-        case .notebook:
-            return 0.05
-        case .atlas:
-            return 0.055
-        case .archive:
+        case .feature, .notebook, .atlas, .archive, .timewarp:
             return 0.04
-        case .timewarp:
-            return 0.07
         }
     }
 }
@@ -1388,6 +1405,7 @@ struct DiscoverEditorialPanel<Content: View>: View {
     var tone: DiscoverEditorialPanelTone = .feature
     var contentPadding: CGFloat = 16
     let content: Content
+    @Environment(\.colorScheme) private var colorScheme
 
     init(
         accent: Color,
@@ -1405,34 +1423,63 @@ struct DiscoverEditorialPanel<Content: View>: View {
         let cornerRadius = tone.cornerRadius
 
         VStack(alignment: .leading, spacing: 0) {
-            LinearGradient(
-                colors: [accent.opacity(0.8), accent.opacity(0.18)],
-                startPoint: .leading,
-                endPoint: .trailing
-            )
-            .frame(height: tone.topRuleHeight)
-
             content
                 .padding(contentPadding)
         }
-        .background(
-            LinearGradient(
-                colors: tone.backgroundColors(accent: accent),
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            ),
-            in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-        )
-        .overlay {
-            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                .strokeBorder(accent.opacity(tone.borderOpacity), lineWidth: 0.9)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background { editorialGlassBackground(cornerRadius: cornerRadius) }
+        .overlay(alignment: .top) {
+            Rectangle()
+                .fill(accent.opacity(0.30))
+                .frame(height: 2)
+                .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
         }
         .overlay {
             RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                .strokeBorder(Color.white.opacity(0.18), lineWidth: 0.6)
-                .blendMode(.screen)
+                .strokeBorder(Color(nsColor: .separatorColor).opacity(0.34), lineWidth: 0.7)
         }
-        .shadow(color: accent.opacity(tone.shadowOpacity), radius: 18, y: 8)
+        .shadow(color: Color.black.opacity(tone.shadowOpacity), radius: 8, y: 3)
+    }
+
+    @ViewBuilder
+    private func editorialGlassBackground(cornerRadius: CGFloat) -> some View {
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+        let accentOpacity = colorScheme == .dark ? 0.055 : 0.078
+
+        if #available(macOS 26, *) {
+            shape
+                .fill(.clear)
+                .glassEffect(.regular, in: .rect(cornerRadius: cornerRadius))
+                .overlay {
+                    shape.fill(
+                        LinearGradient(
+                            colors: [
+                                accent.opacity(accentOpacity),
+                                Color(nsColor: .controlBackgroundColor).opacity(0.20),
+                                Color(nsColor: .windowBackgroundColor).opacity(colorScheme == .dark ? 0.035 : 0.10)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                }
+        } else {
+            shape
+                .fill(.regularMaterial)
+                .overlay {
+                    shape.fill(
+                        LinearGradient(
+                            colors: [
+                                accent.opacity(accentOpacity),
+                                Color(nsColor: .controlBackgroundColor).opacity(0.25),
+                                Color(nsColor: .windowBackgroundColor).opacity(0.14)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                }
+        }
     }
 }
 
@@ -1440,6 +1487,7 @@ struct DiscoverInsetPanel<Content: View>: View {
     let accent: Color
     var contentPadding: CGFloat = 12
     let content: Content
+    @Environment(\.colorScheme) private var colorScheme
 
     init(
         accent: Color,
@@ -1456,21 +1504,47 @@ struct DiscoverInsetPanel<Content: View>: View {
             content
                 .padding(contentPadding)
         }
-        .background(
-            LinearGradient(
-                colors: [
-                    accent.opacity(0.055),
-                    Color.primary.opacity(0.018),
-                    Color.white.opacity(0.08)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            ),
-            in: RoundedRectangle(cornerRadius: 18, style: .continuous)
-        )
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background { insetGlassBackground }
         .overlay {
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .strokeBorder(accent.opacity(0.1), lineWidth: 0.8)
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(Color(nsColor: .separatorColor).opacity(0.32), lineWidth: 0.7)
+        }
+    }
+
+    @ViewBuilder
+    private var insetGlassBackground: some View {
+        let cornerRadius: CGFloat = 14
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+
+        if #available(macOS 26, *) {
+            shape
+                .fill(.clear)
+                .glassEffect(.regular, in: .rect(cornerRadius: cornerRadius))
+                .overlay {
+                    shape.fill(
+                        LinearGradient(
+                            colors: [
+                                accent.opacity(colorScheme == .dark ? 0.045 : 0.07),
+                                Color.clear
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                }
+        } else {
+            shape
+                .fill(.thinMaterial)
+                .overlay {
+                    shape.fill(
+                        LinearGradient(
+                            colors: [accent.opacity(0.06), Color.clear],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                }
         }
     }
 }
@@ -1503,7 +1577,7 @@ struct DiscoverLongestReadEntry: Identifiable {
     }
 }
 
-struct DiscoverPlaylistColumn<Content: View>: View {
+struct DiscoverExpandableCollectionCard<Content: View>: View {
     let title: String
     let subtitle: String
     let meta: String?
@@ -1511,10 +1585,20 @@ struct DiscoverPlaylistColumn<Content: View>: View {
     let tint: Color
     let showsLoading: Bool
     let isKeyboardFocused: Bool
-    let showsSurface: Bool
+    @Binding var isExpanded: Bool
+    let collapsedPreviewTitles: [String]
     let content: Content
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.colorScheme) private var colorScheme
     @State private var isHovered = false
+
+    private var expansionAnimation: Animation? {
+        reduceMotion ? nil : .snappy(duration: 0.18)
+    }
+
+    private var hoverAnimation: Animation? {
+        reduceMotion ? nil : .snappy(duration: 0.16)
+    }
 
     init(
         title: String,
@@ -1524,7 +1608,8 @@ struct DiscoverPlaylistColumn<Content: View>: View {
         tint: Color,
         showsLoading: Bool = false,
         isKeyboardFocused: Bool = false,
-        showsSurface: Bool = true,
+        isExpanded: Binding<Bool>,
+        collapsedPreviewTitles: [String] = [],
         @ViewBuilder content: () -> Content
     ) {
         self.title = title
@@ -1534,84 +1619,260 @@ struct DiscoverPlaylistColumn<Content: View>: View {
         self.tint = tint
         self.showsLoading = showsLoading
         self.isKeyboardFocused = isKeyboardFocused
-        self.showsSurface = showsSurface
+        self._isExpanded = isExpanded
+        self.collapsedPreviewTitles = collapsedPreviewTitles
         self.content = content()
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .top, spacing: 9) {
-                Image(systemName: systemImage)
-                    .font(.system(size: 13.5, weight: .semibold))
-                    .foregroundStyle(tint)
-                    .frame(width: 19, height: 19)
-                    .background(tint.opacity(0.16), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+        let cornerRadius: CGFloat = 18
 
-                VStack(alignment: .leading, spacing: 1.5) {
-                    Text(title)
-                        .font(.system(size: 13.5, weight: .semibold, design: .rounded))
-                    Text(subtitle)
-                        .font(.system(size: 10.5, weight: .medium))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                    if let meta, !meta.isEmpty {
-                        Text(meta)
-                            .font(.system(size: 10, weight: .medium, design: .rounded))
-                            .foregroundStyle(.tertiary)
-                            .lineLimit(1)
-                    }
-                }
+        VStack(alignment: .leading, spacing: 0) {
+            headerButton
 
-                Spacer(minLength: 6)
+            cardBodyContent
+        }
+        .padding(15)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background { collectionGlassBackground(cornerRadius: cornerRadius) }
+        .overlay(alignment: .leading) {
+            RoundedRectangle(cornerRadius: 2, style: .continuous)
+                .fill(tint.opacity(isKeyboardFocused ? 0.80 : (isHovered ? 0.64 : 0.42)))
+                .frame(width: 3)
+                .padding(.vertical, 13)
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                .strokeBorder(
+                    isKeyboardFocused
+                        ? tint.opacity(0.62)
+                        : Color(nsColor: .separatorColor).opacity(isHovered ? 0.48 : 0.30),
+                    lineWidth: isKeyboardFocused ? 1.1 : 0.7
+                )
+        }
+        .discoverHoverEffect(.card, isActive: isHovered || isKeyboardFocused, reduceMotion: reduceMotion)
+        .animation(hoverAnimation, value: isKeyboardFocused)
+        .animation(hoverAnimation, value: isHovered)
+        .animation(expansionAnimation, value: isExpanded)
+        .onHover { isHovered = $0 }
+    }
 
-                if showsLoading {
-                    AppLoadingActivityMark(tone: .accent, tint: tint)
-                        .padding(.top, 1)
-                }
+    private var headerButton: some View {
+        Button {
+            withAnimation(expansionAnimation) {
+                isExpanded.toggle()
             }
+        } label: {
+            HStack(alignment: .center, spacing: 12) {
+                collectionIcon
+                collectionTitleBlock
+                Spacer(minLength: 8)
+                loadingIndicator
+                disclosureIndicator
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(isExpanded ? "Collapse \(title)" : "Expand \(title)")
+        .help(isExpanded ? "Collapse \(title)" : "Expand \(title)")
+    }
 
-            VStack(alignment: .leading, spacing: 5) {
+    private var collectionIcon: some View {
+        Image(systemName: systemImage)
+            .font(.system(size: 15, weight: .semibold))
+            .foregroundStyle(.white.opacity(0.96))
+            .frame(width: 34, height: 34)
+            .background(
+                LinearGradient(
+                    colors: [
+                        tint.opacity(0.94),
+                        tint.opacity(colorScheme == .dark ? 0.60 : 0.72)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ),
+                in: RoundedRectangle(cornerRadius: 10, style: .continuous)
+            )
+            .shadow(color: tint.opacity(isHovered || isKeyboardFocused ? 0.22 : 0.12), radius: 8, y: 3)
+            .symbolEffect(.bounce, value: isExpanded)
+    }
+
+    private var collectionTitleBlock: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(title)
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(.primary)
+            Text(subtitle)
+                .font(.system(size: 11.5, weight: .medium))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+            if let meta, !meta.isEmpty {
+                Text(meta)
+                    .font(.system(size: 10.5, weight: .medium, design: .rounded))
+                    .foregroundStyle(.tertiary)
+                    .lineLimit(1)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var loadingIndicator: some View {
+        if showsLoading {
+            AppLoadingActivityMark(tone: .accent, tint: tint)
+        }
+    }
+
+    private var disclosureIndicator: some View {
+        Image(systemName: "chevron.down")
+            .font(.system(size: 11.5, weight: .semibold))
+            .foregroundStyle(isExpanded ? tint : Color.secondary.opacity(0.62))
+            .frame(width: 28, height: 28)
+            .background(.thinMaterial, in: Circle())
+            .overlay {
+                Circle()
+                    .strokeBorder(tint.opacity(isExpanded ? 0.26 : 0.12), lineWidth: 0.7)
+            }
+            .rotationEffect(.degrees(isExpanded ? 0 : -90))
+            .animation(expansionAnimation, value: isExpanded)
+    }
+
+    @ViewBuilder
+    private var cardBodyContent: some View {
+        if isExpanded {
+            expandedContent
+                .padding(.top, 12)
+                .transition(
+                    .asymmetric(
+                        insertion: .opacity.combined(with: .offset(y: -4)),
+                        removal: .opacity.combined(with: .offset(y: -2))
+                    )
+                )
+        } else if !collapsedPreviewTitles.isEmpty {
+            collapsedPreview
+                .padding(.top, 10)
+                .transition(
+                    .asymmetric(
+                        insertion: .opacity.combined(with: .offset(y: -3)),
+                        removal: .opacity.combined(with: .offset(y: -2))
+                    )
+                )
+        }
+    }
+
+    private var expandedContent: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Rectangle()
+                .fill(Color(nsColor: .separatorColor).opacity(0.36))
+                .frame(height: 0.7)
+
+            VStack(alignment: .leading, spacing: 6) {
                 content
             }
         }
-        .padding(12)
-        .background(
-            Group {
-                if showsSurface {
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .fill(.regularMaterial)
-                } else {
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .fill(Color.primary.opacity(isHovered || isKeyboardFocused ? 0.045 : 0.025))
-                }
-            }
-        )
-        .overlay {
-            RoundedRectangle(cornerRadius: showsSurface ? 16 : 18, style: .continuous)
-                .strokeBorder(
-                    isKeyboardFocused
-                        ? tint.opacity(0.48)
-                        : Color.primary.opacity(isHovered ? (showsSurface ? 0.12 : 0.09) : (showsSurface ? 0.07 : 0.05)),
-                    lineWidth: isKeyboardFocused ? 1.1 : 0.8
-                )
-        }
-        .overlay {
-            if showsSurface {
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .strokeBorder(
+        .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
+    }
+
+    @ViewBuilder
+    private func collectionGlassBackground(cornerRadius: CGFloat) -> some View {
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+        let isActive = isHovered || isKeyboardFocused
+        let glowOpacity = isActive ? 0.18 : 0.11
+        let baseWash = colorScheme == .dark ? 0.42 : 0.82
+        let tintWash = colorScheme == .dark ? 0.045 : 0.060
+
+        if #available(macOS 26, *) {
+            shape
+                .fill(.regularMaterial)
+                .overlay {
+                    shape.fill(
                         LinearGradient(
-                            colors: [tint.opacity(0.18), Color.primary.opacity(0.02)],
+                            colors: [
+                                tint.opacity(glowOpacity),
+                                tint.opacity(tintWash),
+                                Color.clear
+                            ],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
-                        ),
-                        lineWidth: 0.9
+                        )
                     )
+                }
+                .overlay {
+                    shape
+                        .inset(by: 0.5)
+                        .fill(Color(nsColor: .windowBackgroundColor).opacity(baseWash))
+                }
+                .overlay {
+                    shape
+                        .inset(by: 1)
+                        .fill(
+                        LinearGradient(
+                            colors: [
+                                Color.white.opacity(colorScheme == .dark ? 0.035 : 0.38),
+                                Color.white.opacity(colorScheme == .dark ? 0.012 : 0.10),
+                                tint.opacity(colorScheme == .dark ? 0.020 : 0.030)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                }
+                .overlay {
+                    shape
+                        .strokeBorder(Color.white.opacity(colorScheme == .dark ? 0.08 : 0.46), lineWidth: 0.8)
+                        .blendMode(.plusLighter)
+                }
+        } else {
+            shape
+                .fill(.regularMaterial)
+                .overlay {
+                    shape.fill(Color(nsColor: .windowBackgroundColor).opacity(baseWash))
+                }
+                .overlay {
+                    shape.fill(
+                        LinearGradient(
+                            colors: [
+                                tint.opacity(glowOpacity),
+                                tint.opacity(0.028),
+                                Color.clear
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                }
+        }
+    }
+
+    private var collapsedPreview: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            ForEach(Array(collapsedPreviewTitles.enumerated()), id: \.offset) { index, title in
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text("\(index + 1)")
+                        .font(.system(size: 10.5, weight: .semibold, design: .rounded))
+                        .foregroundStyle(tint)
+                        .monospacedDigit()
+                        .frame(width: 18, alignment: .leading)
+
+                    Text(title)
+                        .font(.system(size: 12.5, weight: .medium))
+                        .foregroundStyle(.primary.opacity(0.88))
+                        .lineLimit(1)
+
+                    Spacer(minLength: 0)
+                }
+                .padding(.horizontal, 9)
+                .padding(.vertical, 5)
+                .background(
+                    Color(nsColor: .windowBackgroundColor).opacity(colorScheme == .dark ? 0.36 : 0.78),
+                    in: RoundedRectangle(cornerRadius: 8, style: .continuous)
+                )
+                .overlay {
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .strokeBorder(Color(nsColor: .separatorColor).opacity(0.26), lineWidth: 0.6)
+                }
             }
         }
-        .scaleEffect(reduceMotion ? 1 : ((isHovered || isKeyboardFocused) ? 1.004 : 1))
-        .animation(reduceMotion ? nil : .easeOut(duration: 0.14), value: isHovered)
-        .animation(reduceMotion ? nil : .easeOut(duration: 0.14), value: isKeyboardFocused)
-        .onHover { isHovered = $0 }
     }
 }
 
@@ -1652,16 +1913,37 @@ struct DiscoverPlaylistArticleRow: View {
     let onFocus: (() -> Void)?
     let onOpen: (WikipediaService.SearchResult, Bool) -> Void
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.colorScheme) private var colorScheme
     @State private var isHovered = false
+
+    private var rowFill: Color {
+        if isKeyboardFocused {
+            return statTint.opacity(colorScheme == .dark ? 0.24 : 0.17)
+        }
+        if isHovered {
+            return Color(nsColor: .windowBackgroundColor).opacity(colorScheme == .dark ? 0.48 : 0.84)
+        }
+        return Color(nsColor: .windowBackgroundColor).opacity(colorScheme == .dark ? 0.36 : 0.74)
+    }
+
+    private var rowStroke: Color {
+        if isKeyboardFocused {
+            return statTint.opacity(0.56)
+        }
+        if isHovered {
+            return Color(nsColor: .separatorColor).opacity(0.42)
+        }
+        return Color(nsColor: .separatorColor).opacity(0.20)
+    }
 
     var body: some View {
         Button {
             onFocus?()
             onOpen(result, SystemBridge.isCommandPressed)
         } label: {
-            HStack(alignment: .top, spacing: 8) {
+            HStack(alignment: .top, spacing: 10) {
                 Text("\(rank)")
-                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                    .font(.system(size: 12.5, weight: .semibold, design: .rounded))
                     .monospacedDigit()
                     .foregroundStyle(.secondary)
                     .frame(width: 18, alignment: .leading)
@@ -1675,11 +1957,11 @@ struct DiscoverPlaylistArticleRow: View {
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(result.title)
-                        .font(.system(size: 12.5, weight: .semibold))
+                        .font(MacWikiTypography.compactRowTitle)
                         .lineLimit(2)
                     if let description = result.description, !description.isEmpty {
                         Text(description)
-                            .font(.system(size: 10.5, weight: .regular))
+                            .font(MacWikiTypography.settingsHelp)
                             .foregroundStyle(.secondary)
                             .lineLimit(2)
                     }
@@ -1689,7 +1971,7 @@ struct DiscoverPlaylistArticleRow: View {
 
                 VStack(alignment: .trailing, spacing: 1.5) {
                     Text(primaryStat)
-                        .font(.system(size: 10.5, weight: .semibold))
+                        .font(MacWikiTypography.compactStatistic)
                         .foregroundStyle(statTint)
                         .multilineTextAlignment(.trailing)
                         .lineLimit(1)
@@ -1697,7 +1979,7 @@ struct DiscoverPlaylistArticleRow: View {
 
                     if let secondaryStat, !secondaryStat.isEmpty {
                         Text(secondaryStat)
-                            .font(.system(size: 10, weight: .medium))
+                            .font(MacWikiTypography.compactStatistic)
                             .foregroundStyle(.secondary)
                             .multilineTextAlignment(.trailing)
                             .lineLimit(1)
@@ -1705,32 +1987,22 @@ struct DiscoverPlaylistArticleRow: View {
                     }
                 }
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 7)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(
-                        isKeyboardFocused
-                            ? statTint.opacity(0.16)
-                            : (isHovered ? Color.primary.opacity(0.05) : Color.clear)
-                    )
+                    .fill(rowFill)
             )
             .overlay {
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .strokeBorder(
-                        isKeyboardFocused
-                            ? statTint.opacity(0.55)
-                            : Color.primary.opacity(isHovered ? 0.14 : 0),
-                        lineWidth: isKeyboardFocused ? 1.05 : 0.8
-                    )
+                    .strokeBorder(rowStroke, lineWidth: isKeyboardFocused ? 1.05 : 0.75)
             }
         }
         .buttonStyle(DiscoverInteractivePressStyle())
-        .scaleEffect(reduceMotion ? 1 : ((isHovered || isKeyboardFocused) ? 1.005 : 1))
         .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         .onHover { isHovered = $0 }
-        .animation(reduceMotion ? nil : .easeOut(duration: 0.13), value: isHovered)
+        .discoverHoverEffect(.row, isActive: isHovered || isKeyboardFocused, reduceMotion: reduceMotion)
         .animation(reduceMotion ? nil : .easeOut(duration: 0.13), value: isKeyboardFocused)
         .accessibilityLabel(result.title)
         .accessibilityValue(secondaryStat.map { "\(primaryStat), \($0)" } ?? primaryStat)
@@ -1739,17 +2011,17 @@ struct DiscoverPlaylistArticleRow: View {
 }
 
 enum DiscoverTypography {
-    static let sectionTitle = Font.system(size: 21, weight: .semibold, design: .serif)
+    static let sectionTitle = Font.system(size: 20, weight: .semibold)
     static let sectionSubtitle = Font.system(size: 10.5, weight: .semibold, design: .rounded)
-    static let featureTitle = Font.system(size: 31, weight: .semibold, design: .serif)
-    static let featureDescription = Font.system(size: 13.5, weight: .regular)
-    static let newsCardTitle = Font.system(size: 13.5, weight: .semibold, design: .rounded)
-    static let newsRailTitle = Font.system(size: 14.5, weight: .semibold)
+    static let featureTitle = Font.system(size: 29, weight: .semibold)
+    static let featureDescription = Font.system(size: 14, weight: .regular)
+    static let newsCardTitle = Font.system(size: 14.5, weight: .semibold)
+    static let newsRailTitle = Font.system(size: 15, weight: .semibold)
     static let newsCardDescription = Font.system(size: 11.5, weight: .regular)
     static let compactRank = Font.system(size: 14.5, weight: .semibold, design: .rounded)
     static let compactTitle = Font.system(size: 12.5, weight: .medium)
     static let compactDescription = Font.system(size: 11, weight: .regular)
-    static let storyBody = Font.system(size: 14, weight: .regular, design: .serif)
+    static let storyBody = Font.system(size: 14, weight: .regular)
     static let mediaTitle = Font.system(size: 16.5, weight: .semibold, design: .rounded)
     static let mediaDescription = Font.system(size: 12.5, weight: .regular)
     static let mediaMeta = Font.system(size: 11.5, weight: .medium)
@@ -1759,6 +2031,8 @@ struct DiscoverFeatureModule: View {
     let result: WikipediaService.SearchResult
     let teaserText: String?
     let isTeaserLoading: Bool
+    let trendPulse: WikipediaService.TrendPulse?
+    let isTrendPulseLoading: Bool
     let visualContextImages: [WikipediaService.VisualContextImage]
     let isVisualContextLoading: Bool
     let heroImageHeight: CGFloat
@@ -1767,6 +2041,7 @@ struct DiscoverFeatureModule: View {
     let isCompactLayout: Bool
     let onOpen: (WikipediaService.SearchResult, Bool) -> Void
     let onOpenURL: (URL) -> Void
+    let onTrendTapped: (WikipediaService.TrendPulse) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -1774,10 +2049,13 @@ struct DiscoverFeatureModule: View {
                 result: result,
                 teaserText: teaserText,
                 isTeaserLoading: isTeaserLoading,
+                trendPulse: trendPulse,
+                isTrendPulseLoading: isTrendPulseLoading,
                 heroImageHeight: heroImageHeight,
                 titleLineLimit: titleLineLimit,
                 descriptionLineLimit: descriptionLineLimit,
                 onOpen: onOpen,
+                onTrendTapped: onTrendTapped,
                 showsSurface: false
             )
             .padding(12)
@@ -1803,7 +2081,7 @@ struct DiscoverFeatureModule: View {
                     )
                     .padding(12)
                 } else {
-                    Text("PLACEHOLDER")
+                    Text(DiscoverEditionCopy.visualContextUnavailable)
                         .font(.system(size: 12.5, weight: .medium))
                         .foregroundStyle(.secondary)
                         .padding(.horizontal, 12)
@@ -1811,10 +2089,11 @@ struct DiscoverFeatureModule: View {
                 }
             }
         }
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .strokeBorder(Color.primary.opacity(0.07), lineWidth: 0.9)
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .strokeBorder(Color(nsColor: .separatorColor).opacity(0.34), lineWidth: 0.7)
         }
     }
 }
@@ -1823,13 +2102,17 @@ struct DiscoverFeatureCard: View {
     let result: WikipediaService.SearchResult
     let teaserText: String?
     let isTeaserLoading: Bool
+    let trendPulse: WikipediaService.TrendPulse?
+    let isTrendPulseLoading: Bool
     let heroImageHeight: CGFloat
     let titleLineLimit: Int
     let descriptionLineLimit: Int
     let onOpen: (WikipediaService.SearchResult, Bool) -> Void
+    let onTrendTapped: (WikipediaService.TrendPulse) -> Void
     var showsSurface: Bool = true
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isHovered = false
+    @State private var suppressPrimaryTapFromTrend = false
 
     private var displayTitle: String {
         let trimmed = result.title.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -1845,20 +2128,24 @@ struct DiscoverFeatureCard: View {
 
     var body: some View {
         Button {
+            if suppressPrimaryTapFromTrend {
+                suppressPrimaryTapFromTrend = false
+                return
+            }
             onOpen(result, SystemBridge.isCommandPressed)
         } label: {
             VStack(alignment: .leading, spacing: 0) {
                 featureImage
                 .frame(maxWidth: .infinity)
                 .frame(height: heroImageHeight)
+                .clipped()
                 .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
 
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("PLACEHOLDER")
-                        .font(.system(size: 10.5, weight: .semibold, design: .rounded))
+                    Text(DiscoverEditionCopy.leadKicker)
+                        .font(.system(size: 11, weight: .semibold, design: .rounded))
                         .textCase(.uppercase)
-                        .tracking(0.9)
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(.secondary)
 
                     Text(displayTitle)
                         .font(DiscoverTypography.featureTitle)
@@ -1873,6 +2160,8 @@ struct DiscoverFeatureCard: View {
                             .lineLimit(descriptionLineLimit)
                             .lineSpacing(1.5)
                     }
+
+                    featuredStats
 
                     if isTeaserLoading {
                         AppLoadingInlineLabel(
@@ -1901,27 +2190,51 @@ struct DiscoverFeatureCard: View {
         .background(
             Group {
                 if showsSurface {
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
                         .fill(.regularMaterial)
                 } else {
                     Color.clear
                 }
             }
         )
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay {
             if showsSurface {
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .strokeBorder(Color.primary.opacity(isHovered ? 0.13 : 0.07), lineWidth: 1)
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .strokeBorder(Color(nsColor: .separatorColor).opacity(isHovered ? 0.46 : 0.32), lineWidth: 0.8)
             } else {
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .strokeBorder(Color.primary.opacity(isHovered ? 0.1 : 0.04), lineWidth: 0.8)
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .strokeBorder(Color(nsColor: .separatorColor).opacity(isHovered ? 0.36 : 0.18), lineWidth: 0.7)
             }
         }
-        .scaleEffect(reduceMotion ? 1 : (isHovered ? 1.005 : 1))
-        .animation(reduceMotion ? nil : .easeOut(duration: 0.14), value: isHovered)
+        .discoverHoverEffect(.hero, isActive: isHovered, reduceMotion: reduceMotion)
         .onHover { isHovered = $0 }
-        .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+
+    @ViewBuilder
+    private var featuredStats: some View {
+        if let trendPulse {
+            DiscoverTrendPulseBadge(
+                pulse: trendPulse,
+                onTap: {
+                    suppressPrimaryTapFromTrend = true
+                    onTrendTapped(trendPulse)
+                    Task { @MainActor in
+                        try? await Task.sleep(nanoseconds: 700_000_000)
+                        suppressPrimaryTapFromTrend = false
+                    }
+                }
+            )
+            .padding(.top, 3)
+        } else if isTrendPulseLoading {
+            AppLoadingInlineLabel(
+                text: "Loading page views…",
+                tone: .retro,
+                font: .system(size: 11.5, weight: .medium)
+            )
+            .padding(.top, 3)
+        }
     }
 
     @ViewBuilder
@@ -1929,7 +2242,7 @@ struct DiscoverFeatureCard: View {
         if let thumbnailURL = result.thumbnailURL {
             CachedThumbnailImage(
                 url: thumbnailURL,
-                targetSize: CGSize(width: 320, height: heroImageHeight),
+                targetSize: CGSize(width: 980, height: heroImageHeight),
                 animatesNetworkSuccess: !reduceMotion
             ) { image in
                 ZStack {
@@ -2020,13 +2333,13 @@ struct DiscoverNewsCard: View {
         .buttonStyle(DiscoverInteractivePressStyle())
         .accessibilityLabel(result.title)
         .padding(style == .rail ? 10 : 11)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .strokeBorder(Color.primary.opacity(isHovered ? 0.14 : 0.08), lineWidth: 0.8)
+                .strokeBorder(Color(nsColor: .separatorColor).opacity(isHovered ? 0.46 : 0.32), lineWidth: 0.7)
         }
-        .scaleEffect(reduceMotion ? 1 : (isHovered ? 1.01 : 1))
-        .animation(reduceMotion ? nil : .easeOut(duration: 0.14), value: isHovered)
+        .discoverHoverEffect(.card, isActive: isHovered, reduceMotion: reduceMotion)
         .onHover { isHovered = $0 }
         .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
@@ -2062,6 +2375,10 @@ struct DiscoverNewsCard: View {
                             .foregroundStyle(.tertiary)
                     }
             }
+            .frame(width: style == .rail ? style.thumbnailTargetSize.width : nil)
+            .frame(maxWidth: style == .standard ? .infinity : nil)
+            .frame(height: style.thumbnailTargetSize.height)
+            .clipped()
             .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         }
     }
@@ -2167,6 +2484,11 @@ struct DiscoverTrendPulseBadge: View {
         )
     }
 
+    private var trendSymbol: String {
+        guard let deltaFraction else { return "chart.line.uptrend.xyaxis" }
+        return deltaFraction < 0 ? "chart.line.downtrend.xyaxis" : "chart.line.uptrend.xyaxis"
+    }
+
     private var trendColor: Color {
         guard let deltaFraction else { return .secondary }
         if deltaFraction > 0 { return Color.green.opacity(0.85) }
@@ -2180,8 +2502,12 @@ struct DiscoverTrendPulseBadge: View {
 
     var body: some View {
         HStack(spacing: 6) {
+            Image(systemName: trendSymbol)
+                .font(.system(size: 9.5, weight: .semibold))
+                .foregroundStyle(trendColor)
+
             DiscoverSparkline(points: pulse.points, tint: trendColor)
-                .frame(width: 64, height: 16)
+                .frame(width: 54, height: 14)
 
             Text(deltaText)
                 .font(.system(size: 10.5, weight: .semibold, design: .rounded))
@@ -2193,12 +2519,26 @@ struct DiscoverTrendPulseBadge: View {
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
         }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 3.5)
+        .background(trendColor.opacity(0.10), in: Capsule(style: .continuous))
+        .overlay {
+            Capsule(style: .continuous)
+                .strokeBorder(trendColor.opacity(0.18), lineWidth: 0.7)
+        }
         .contentShape(Capsule())
         .highPriorityGesture(
             TapGesture().onEnded {
                 onTap?()
             }
         )
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityLabel("\(deltaText), \(latestViewsText) views")
+        .accessibilityHint("Show views details")
+        .accessibilityAction {
+            onTap?()
+        }
         .help("Show views details")
     }
 }

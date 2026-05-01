@@ -27,9 +27,10 @@ struct DiscoverSearchResultsSurface: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.vertical, 8)
+                    .padding(14)
+                    .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
             } else {
-                VStack(spacing: 0) {
+                VStack(spacing: 8) {
                     ForEach(searchCoordinator.searchResults.prefix(20)) { result in
                         let rowKey = "search:\(result.id):\(ReadStateSync.normalizedTitle(result.title))"
                         let isSaved = savedTitles.contains(ReadStateSync.normalizedTitle(result.title))
@@ -70,12 +71,8 @@ struct DiscoverSearchResultsSurface: View {
                                 )
                             }
                         }
-                        if result.id != searchCoordinator.searchResults.prefix(20).last?.id {
-                            Divider().opacity(0.35)
-                        }
                     }
                 }
-                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
             }
         }
     }

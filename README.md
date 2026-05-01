@@ -15,7 +15,7 @@ MacWiki reimagines Wikipedia reading on macOS with:
 - macOS 26.0+
 - Xcode 26+ (optional, for debugging)
 - Swift 6.2+
-- Apple Developer account (for App Store distribution)
+- Apple Developer account with a Developer ID certificate (for signed public beta distribution)
 
 MacWiki intentionally targets macOS 26 and newer so the app can lean on the current SwiftUI, AppKit, and Liquid Glass system behavior without carrying older-system compatibility branches.
 
@@ -32,6 +32,31 @@ swift build
 .build/debug/MacWiki
 ```
 
+## Public Beta Release
+
+For public beta work, the minimum bar is:
+
+- a clean git tree,
+- successful `swift build`, `swift test`, and `swift build -c release`,
+- a completed manual QA pass from `PUBLIC_BETA_QA_MATRIX.md`,
+- a Developer ID signed and notarized artifact.
+
+Fast preflight:
+
+```bash
+./scripts/preflight_beta_release.sh \
+  --identity "Developer ID Application: YOUR NAME (TEAMID)" \
+  --notary-profile "macwiki-notary"
+```
+
+Guided GitHub prerelease flow:
+
+```bash
+./scripts/release_beta.sh \
+  --identity "Developer ID Application: YOUR NAME (TEAMID)" \
+  --notary-profile "macwiki-notary"
+```
+
 ## Project Structure
 
 ```
@@ -42,7 +67,7 @@ MacWiki/
 │   ├── Services/      # API and persistence
 │   ├── Views/         # SwiftUI views
 │   └── Utilities/     # Helpers and extensions
-└── Tests/             # Unit and UI tests
+└── Tests/             # Unit tests
 ```
 
 ## Open Source

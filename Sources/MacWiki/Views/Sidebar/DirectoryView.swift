@@ -6,7 +6,6 @@ struct DirectoryView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @AppStorage(AppStorageKey.Search.presentationMode) private var searchPresentationMode: SearchPresentationMode = .overlay
     @AppStorage(AppStorageKey.Recents.scope) private var recentsScope: RecentsScope = .currentTab
     @AppStorage(AppStorageKey.Discover.sidebarTimeMachineHidden) private var discoverSidebarTimeMachineHidden = false
     @AppStorage(ExperimentFlag.wikiHopPOCEnabled.key) private var wikiHopPOCEnabled = false
@@ -283,6 +282,16 @@ struct DirectoryView: View {
         return discoverMostReadItems(from: feed)
     }
 
+    private var discoverPulseItems: [WikipediaService.SearchResult] {
+        guard let feed = discoverFeedStore.feed else { return [] }
+        var items: [WikipediaService.SearchResult] = []
+        if let featuredArticle = feed.featuredArticle {
+            items.append(featuredArticle)
+        }
+        items.append(contentsOf: discoverMostReadItems(from: feed))
+        return items
+    }
+
     private func titleFingerprint<S: Sequence>(
         _ titles: S,
         seeds: [AnyHashable] = []
@@ -302,7 +311,7 @@ struct DirectoryView: View {
             return titleFingerprint([], seeds: [AnyHashable("inactive-discover-pulse")])
         }
         return titleFingerprint(
-            discoverMostReadItems(from: feed).map(\.title),
+            discoverPulseItems.map(\.title),
             seeds: [AnyHashable(feed.dateKey), AnyHashable("discover-pulse")]
         )
     }
@@ -412,11 +421,12 @@ struct DirectoryView: View {
         selectedList != nil ||
         selectedLabel != nil ||
         selectedTag != nil ||
+        rootSelection == .discover ||
         rootSelection == .recents
     }
 
     private var isSidebarSearchPresented: Bool {
-        searchPresentationMode == .sidebar && appState.showSearch
+        appState.showSearch
     }
 
     private var topDirectoryTitle: String {
@@ -428,6 +438,9 @@ struct DirectoryView: View {
         }
         if let tag = selectedTag {
             return tag.name
+        }
+        if rootSelection == .discover {
+            return "Discover"
         }
         if recentsScope == .currentTab,
            let activeId = appState.activeTabId,
@@ -592,7 +605,7 @@ struct DirectoryView: View {
         }
     }
 
-    private var pinnedDirectoryHeaderHeight: CGFloat { 54 }
+    private var pinnedDirectoryHeaderHeight: CGFloat { 68 }
 
     private var plainDirectoryTopInset: CGFloat {
         max(0, topObscuredHeight) + 10
@@ -600,38 +613,22 @@ struct DirectoryView: View {
 
     private var directoryList: some View {
         ZStack(alignment: .top) {
-            Group {
-                List {
-                    directoryContent
-                }
-                .contentMargins(
-                    .top,
-                    shouldShowTopDirectoryChrome ? pinnedDirectoryHeaderHeight : plainDirectoryTopInset,
-                    for: .scrollIndicators
-                )
-                .safeAreaInset(edge: .top, spacing: 0) {
-                    if shouldShowTopDirectoryChrome {
-                        directoryPinnedHeader
-                    }
-                }
-
-                if shouldShowRecentsEmptyStateOverlay {
-                    recentsEmptyStateOverlay
+            List {
+                directoryContent
+            }
+            .contentMargins(
+                .top,
+                shouldShowTopDirectoryChrome ? pinnedDirectoryHeaderHeight : plainDirectoryTopInset,
+                for: .scrollIndicators
+            )
+            .safeAreaInset(edge: .top, spacing: 0) {
+                if shouldShowTopDirectoryChrome {
+                    directoryPinnedHeader
                 }
             }
-            .opacity(showsSidebarTimeTravelSkeleton ? 0.30 : 1)
-            .blur(radius: showsSidebarTimeTravelSkeleton && !reduceMotion ? 1.1 : 0)
-            .allowsHitTesting(!showsSidebarTimeTravelSkeleton)
 
-            if showsSidebarTimeTravelSkeleton {
-                SidebarTimeTravelSkeletonOverlay(
-                    dateLabel: discoverTimeMachineLongDateLabel,
-                    topInset: shouldShowTopDirectoryChrome
-                        ? pinnedDirectoryHeaderHeight
-                        : plainDirectoryTopInset
-                )
-                .transition(AppLoadingMotion.overlayTransition(reduceMotion: reduceMotion, anchor: .top))
-                .zIndex(1)
+            if shouldShowRecentsEmptyStateOverlay {
+                recentsEmptyStateOverlay
             }
         }
         .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: showsSidebarTimeTravelSkeleton)
@@ -657,7 +654,7 @@ struct DirectoryView: View {
                 return
             }
             discoverTrendPulseStore.queueLoad(
-                results: discoverTrendingItems,
+                results: discoverPulseItems,
                 referenceDate: discoverTrendReferenceDate
             )
         }
@@ -833,8 +830,8 @@ struct DirectoryView: View {
             directoryHeaderControls
         }
         .padding(.horizontal, 12)
-        .padding(.top, 10)
-        .padding(.bottom, 8)
+        .padding(.top, 16)
+        .padding(.bottom, 10)
         .background(.bar)
         .overlay(alignment: .bottom) {
             Rectangle()
@@ -853,13 +850,16 @@ struct DirectoryView: View {
     private func updateTopObscuredHeight(_ newValue: CGFloat) {
         let resolved = max(0, newValue)
         guard abs(topObscuredHeight - resolved) > 0.5 else { return }
-        topObscuredHeight = resolved
+        DispatchQueue.main.async {
+            guard abs(topObscuredHeight - resolved) > 0.5 else { return }
+            topObscuredHeight = resolved
+        }
     }
 
     private var directoryHeaderIdentity: some View {
-        VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: 4) {
             Text(topDirectoryTitle)
-                .font(.headline)
+                .font(MacWikiTypography.columnHeaderTitle)
                 .foregroundStyle(.primary)
                 .lineLimit(1)
 
@@ -869,47 +869,94 @@ struct DirectoryView: View {
 
     @ViewBuilder
     private var directoryHeaderMetadataLine: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(spacing: 6) {
-                directoryCountLabel
+        if rootSelection == .discover {
+            discoverHeaderMetadataLine
+        } else {
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 6) {
+                    directoryCountLabel
 
-                if hasSelectedSavedArticles {
-                    Text("·")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(.tertiary)
+                    if hasSelectedSavedArticles {
+                        Text("·")
+                            .font(MacWikiTypography.columnHeaderMetadata)
+                            .foregroundStyle(.tertiary)
 
-                    directorySelectionLabel
+                        directorySelectionLabel
+                    }
                 }
-            }
 
-            directoryCountLabel
+                directoryCountLabel
+            }
+        }
+    }
+
+    private var discoverHeaderMetadataLine: some View {
+        HStack(spacing: 6) {
+            Text(discoverTimeMachineHeaderDateLabel)
+                .font(MacWikiTypography.columnHeaderMetadata)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+
+            if discoverFeedStore.isLoading {
+                Text("·")
+                    .font(MacWikiTypography.columnHeaderMetadata)
+                    .foregroundStyle(.tertiary)
+
+                Text(discoverFeedStore.feed == nil ? "Loading" : "Updating")
+                    .font(MacWikiTypography.columnHeaderMetadata)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
         }
     }
 
     private var directoryCountLabel: some View {
         HStack(spacing: 3) {
             Text("\(directoryVisibleArticleCount)")
-                .font(.caption.weight(.semibold))
+                .font(MacWikiTypography.columnHeaderMetadata)
                 .monospacedDigit()
                 .foregroundStyle(.secondary)
 
             Text(directoryVisibleArticleCount == 1 ? "article" : "articles")
-                .font(.caption)
-                .foregroundStyle(.tertiary)
+                .font(MacWikiTypography.columnHeaderMetadata)
+                .foregroundStyle(.secondary)
         }
     }
 
     private var directorySelectionLabel: some View {
         Text("\(selectedSavedArticleCount) selected")
-            .font(.caption)
+            .font(MacWikiTypography.columnHeaderMetadata)
             .foregroundStyle(.secondary)
     }
 
+    @ViewBuilder
     private var directoryHeaderControls: some View {
+        if rootSelection == .discover {
+            discoverHeaderControls
+        } else {
+            ControlGroup {
+                directoryUnreadFilterButton
+                directorySortMenu
+                directoryBatchActionsMenu
+            }
+            .controlSize(.small)
+        }
+    }
+
+    private var discoverHeaderControls: some View {
         ControlGroup {
-            directoryUnreadFilterButton
-            directorySortMenu
-            directoryBatchActionsMenu
+            Button {
+                queueDiscoverLoadDebounced(forceRefresh: true, delayNanoseconds: 0)
+            } label: {
+                SwiftUI.Label("Refresh Discover", systemImage: "arrow.clockwise")
+                    .labelStyle(.iconOnly)
+                    .font(.system(size: ChromeIconMetrics.symbolPointSize, weight: ChromeIconMetrics.regularWeight))
+                    .imageScale(.medium)
+                    .foregroundStyle(.secondary)
+                    .frame(width: TopChromeControlMetrics.groupButtonSize, height: TopChromeControlMetrics.groupButtonSize)
+            }
+            .disabled(discoverFeedStore.isLoading)
+            .help("Refresh Discover")
         }
         .controlSize(.small)
     }
@@ -1754,6 +1801,28 @@ extension DirectoryView {
         )
     }
 
+    private var timeMachineScanningBadge: some View {
+        HStack(spacing: 5) {
+            AppLoadingActivityMark(tone: .retro)
+
+            Text("SCANNING")
+                .font(.system(size: 8.5, weight: .bold, design: .monospaced))
+                .foregroundStyle(timeMachineAccentPrimary.opacity(0.86))
+                .lineLimit(1)
+        }
+        .fixedSize()
+        .padding(.horizontal, 7)
+        .padding(.vertical, 3)
+        .background(
+            Capsule(style: .continuous)
+                .fill(timeMachineAccentPrimary.opacity(colorScheme == .dark ? 0.18 : 0.10))
+        )
+        .overlay(
+            Capsule(style: .continuous)
+                .strokeBorder(timeMachineControlStrokeColor, lineWidth: 0.6)
+        )
+    }
+
     @ViewBuilder
     func discoverSections() -> some View {
         Section {
@@ -1813,6 +1882,13 @@ extension DirectoryView {
                             .lineLimit(1)
                             .minimumScaleFactor(0.90)
                             .layoutPriority(1)
+
+                        Spacer(minLength: 0)
+
+                        if showsSidebarTimeTravelSkeleton {
+                            timeMachineScanningBadge
+                                .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .trailing)))
+                        }
                     }
 
                     HStack(spacing: 5) {
@@ -1856,17 +1932,27 @@ extension DirectoryView {
                     RoundedRectangle(cornerRadius: 10, style: .continuous)
                         .strokeBorder(timeMachineControlStrokeColor.opacity(colorScheme == .dark ? 0.75 : 0.85), lineWidth: 0.7)
                 )
+                .overlay {
+                    if showsSidebarTimeTravelSkeleton {
+                        SidebarGlitchScanlineOverlay(lineOpacity: colorScheme == .dark ? 0.030 : 0.020)
+                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                            .blendMode(.screen)
+                            .opacity(reduceMotion ? 0.08 : 0.16)
+                            .allowsHitTesting(false)
+                    }
+                }
                 .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.16 : 0.07), radius: 4, y: 1)
+                .animation(reduceMotion ? nil : .easeOut(duration: 0.14), value: showsSidebarTimeTravelSkeleton)
                 .help("Time Machine lets you see what people were reading in the past.")
                 .padding(.vertical, 3)
                 .listRowSeparator(.hidden)
                 .listRowInsets(EdgeInsets(top: 3, leading: 0, bottom: 3, trailing: 0))
             }
-        } header: {
-            Text(discoverTimeMachineHeaderDateLabel)
         }
 
-        if discoverFeedStore.isLoading && discoverFeedStore.feed == nil {
+        if showsSidebarTimeTravelSkeleton {
+            sidebarTimeTravelLoadingSections
+        } else if discoverFeedStore.isLoading && discoverFeedStore.feed == nil {
             Section {
                 AppLoadingInlineLabel(
                     text: "Loading discover feed…",
@@ -1879,9 +1965,9 @@ extension DirectoryView {
             Section {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Discover unavailable")
-                        .font(.subheadline.weight(.semibold))
+                        .font(MacWikiTypography.compactRowTitle)
                     Text(discoverError)
-                        .font(.caption)
+                        .font(MacWikiTypography.settingsHelp)
                         .foregroundStyle(.secondary)
                 }
                 .padding(.vertical, 6)
@@ -1891,7 +1977,7 @@ extension DirectoryView {
 
             if let featured = feed.featuredArticle {
                 Section("Featured Article") {
-                    discoverArticleRow(featured)
+                    discoverArticleRow(featured, showTrendPulse: true)
                 }
             }
 
@@ -1975,6 +2061,25 @@ extension DirectoryView {
                         }
                     }
                 }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var sidebarTimeTravelLoadingSections: some View {
+        Section("Featured Article") {
+            SidebarTimeTravelLoadingRow(index: 0, style: .feature)
+        }
+
+        Section("Most Read") {
+            ForEach(1..<6, id: \.self) { index in
+                SidebarTimeTravelLoadingRow(index: index, style: .article)
+            }
+        }
+
+        Section("This Day in History") {
+            ForEach(6..<9, id: \.self) { index in
+                SidebarTimeTravelLoadingRow(index: index, style: .timeline)
             }
         }
     }
@@ -2072,6 +2177,18 @@ extension DirectoryView {
         )
     }
 
+    private func articleDragPayload(for article: Article, isRead: Bool) -> SavedArticleDragPayload {
+        let metadata = hydratedMetadata(for: article.title)
+        return SavedArticleDragPayload(
+            title: article.title,
+            articleDescription: metadata?.description ?? article.description,
+            extract: metadata?.extract ?? article.extract,
+            thumbnailURL: metadata?.thumbnailURL ?? article.thumbnailURL,
+            isRead: isRead,
+            wordCount: metadata?.wordCount ?? article.wordCount
+        )
+    }
+
     private func openDiscoverArticle(_ result: WikipediaService.SearchResult, inNewTab: Bool?) {
         let article = discoverArticle(from: result)
         let shouldOpenInNewTab = inNewTab ?? SystemBridge.isCommandPressed
@@ -2147,6 +2264,11 @@ extension DirectoryView {
                     .popover(isPresented: pageViewsPopoverBinding(for: rowKey), arrowEdge: .trailing) {
                         pageViewsPopover(for: rowKey)
                     }
+                    .draggable(articleDragPayload(for: item.article, isRead: isRead)) {
+                        SwiftUI.Label(item.article.title, systemImage: "doc.text")
+                            .padding(8)
+                            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
+                    }
                 }
             }
         }
@@ -2192,6 +2314,8 @@ extension DirectoryView {
                         onTagClick: { tag in
                             localTagFilter = (localTagFilter?.id == tag.id) ? nil : tag
                         },
+                        alwaysShowsLabelMetadata: true,
+                        showsListMembership: true,
                         onNewLabel: { article in
                             onNewLabelWithArticle(article)
                         },
@@ -2248,6 +2372,11 @@ extension DirectoryView {
                     }
                     .popover(isPresented: pageViewsPopoverBinding(for: rowKey), arrowEdge: .trailing) {
                         pageViewsPopover(for: rowKey)
+                    }
+                    .draggable(articleDragPayload(for: article, isRead: isRead)) {
+                        SwiftUI.Label(article.title, systemImage: "doc.text")
+                            .padding(8)
+                            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
                     }
                 }
             }

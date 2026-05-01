@@ -38,22 +38,13 @@ struct DiscoverFeedSurface: View {
                     allLists: allLists,
                     allLabels: allLabels,
                     allTags: allTags,
+                    showsTimeTravelSkeleton: showsTimeTravelSkeleton,
+                    timeMachineTargetDate: referenceDate,
                     onOpen: onOpen
                 )
                 .opacity(isAppeared ? 1 : 0)
                 .offset(y: reduceMotion ? 0 : (isAppeared ? 0 : 10))
                 .animation(reduceMotion ? nil : .easeOut(duration: 0.22), value: isAppeared)
-                .opacity(showsTimeTravelSkeleton ? 0.34 : 1)
-                .blur(radius: showsTimeTravelSkeleton && !reduceMotion ? 1.4 : 0)
-                .allowsHitTesting(!showsTimeTravelSkeleton)
-
-                if showsTimeTravelSkeleton {
-                    DiscoverTimeTravelSkeletonView(
-                        targetDate: referenceDate,
-                        availableWidth: availableWidth
-                    )
-                    .transition(AppLoadingMotion.overlayTransition(reduceMotion: reduceMotion, anchor: .top))
-                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: showsTimeTravelSkeleton)

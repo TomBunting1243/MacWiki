@@ -3,19 +3,15 @@ import SwiftData
 
 struct HighlightRowView: View {
     let highlight: Highlight
-    let allTags: [Tag]
     let onDelete: () -> Void
-    let onTagSelected: ((Tag) -> Void)?
 
     @Environment(AppState.self) private var appState
     @Environment(\.modelContext) private var modelContext
     @Environment(\.colorScheme) private var colorScheme
-    @AppStorage(AppStorageKey.Highlights.markerStyle) private var highlightMarkerStyle: HighlightMarkerStyle = .dot
     @State private var isEditing = false
     @State private var editedNote = ""
     @State private var isHovered = false
     @State private var isExpanded = false
-    @State private var showNewTagSheet = false
     @AppStorage(AppStorageKey.Highlights.headerWrap) private var highlightHeaderWrap = false
     @FocusState private var isNoteEditorFocused: Bool
 
@@ -50,14 +46,6 @@ struct HighlightRowView: View {
             .task(id: appState.pendingHighlightNoteEditorRequest?.requestID) {
                 consumePendingNoteEditorRequestIfNeeded()
             }
-            .sheet(isPresented: $showNewTagSheet) {
-                TagDetailSheet(isPresented: $showNewTagSheet, tagToEdit: nil) { tag in
-                    if highlight.tags.contains(where: { $0.id == tag.id }) {
-                        return
-                    }
-                    highlight.tags.append(tag)
-                }
-            }
     }
 
     private var interactiveRow: some View {
@@ -79,19 +67,12 @@ struct HighlightRowView: View {
             .padding(.horizontal, 14)
             .padding(.vertical, 12)
             .background(rowBackgroundShape)
-            .padding(.leading, highlightMarkerStyle == .bar ? 6 : 0)
-            .overlay(alignment: .leading, content: leadingMarkerOverlay)
             .overlay(content: rowStrokeOverlay)
     }
 
     private var rowBackgroundShape: some View {
         RoundedRectangle(cornerRadius: 12)
             .fill(rowBackground)
-    }
-
-    @ViewBuilder
-    private func leadingMarkerOverlay() -> some View {
-        markerView
     }
 
     @ViewBuilder
@@ -108,15 +89,7 @@ struct HighlightRowView: View {
     private var rowContent: some View {
         HStack(alignment: .top, spacing: 12) {
             VStack(alignment: .leading, spacing: 10) {
-                HStack {
-                    Spacer(minLength: 8)
-                    Text(shortRelativeAge)
-                        .font(.caption2.weight(.medium))
-                        .foregroundStyle(.quaternary)
-                        .monospacedDigit()
-                        .lineLimit(1)
-                        .fixedSize(horizontal: true, vertical: false)
-                }
+                labelRow
 
                 if isExpanded {
                     Text(highlight.text)
@@ -136,42 +109,16 @@ struct HighlightRowView: View {
 
                 if let note = highlight.note, !note.isEmpty {
                     Text(note)
-                        .font(.caption)
+                        .font(MacWikiTypography.settingsHelp)
                         .foregroundStyle(.secondary)
                         .lineLimit(isExpanded ? nil : 3)
-                }
-
-                if isExpanded, let context = contextText {
-                    context
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(5)
                 }
 
                 if isEditing {
                     noteEditor
                 }
 
-                if !sortedTags.isEmpty {
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 64), spacing: 6)], spacing: 6) {
-                        ForEach(sortedTags) { tag in
-                            TagChipView(title: tag.name, isSelected: appState.highlightTagFilterId == tag.id) {
-                                onTagSelected?(tag)
-                            }
-                        }
-                    }
-                }
-
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Text(headerTitle)
-                        .font(.caption2.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(highlightHeaderWrap ? nil : 1)
-
-                    Spacer(minLength: 8)
-
-                    quickActionButtons
-                }
+                actionRow
 
                 if highlight.isStale {
                     HStack(spacing: 6) {
@@ -204,6 +151,39 @@ struct HighlightRowView: View {
         }
     }
 
+    private var labelRow: some View {
+        HStack(spacing: 6) {
+            Text(headerTitle)
+                .font(MacWikiTypography.metadataLabel)
+                .foregroundStyle(.secondary)
+                .lineLimit(highlightHeaderWrap ? nil : 1)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(Color.gray.opacity(colorScheme == .dark ? 0.16 : 0.12), in: Capsule())
+
+            Spacer(minLength: 4)
+
+            Text(shortRelativeAge)
+                .font(MacWikiTypography.compactRowMetadata)
+                .foregroundStyle(.secondary)
+                .monospacedDigit()
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
+
+            Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                .font(.system(size: 9, weight: .semibold))
+                .foregroundStyle(.tertiary)
+        }
+    }
+
+    private var actionRow: some View {
+        HStack(spacing: 8) {
+            quickActionButtons
+
+            Spacer(minLength: 0)
+        }
+    }
+
     @ViewBuilder
     private var contextMenuItems: some View {
         if highlight.isArchived {
@@ -215,6 +195,13 @@ struct HighlightRowView: View {
 
             Divider()
         } else if highlight.isStale {
+            Button {
+                requestHighlightRehydrate()
+            } label: {
+                SwiftUI.Label("Retry Highlight", systemImage: "arrow.triangle.2.circlepath")
+            }
+            .disabled(appState.isHighlightRehydrateInProgress)
+
             Button {
                 appState.pendingHighlightArticleRefresh = AppState.HighlightArticleRefreshRequest(
                     id: UUID(),
@@ -245,6 +232,7 @@ struct HighlightRowView: View {
                 Button {
                     withAnimation(.easeOut(duration: 0.2)) {
                         highlight.color = color
+                        highlight.updatedAt = Date()
                         try? modelContext.save()
                         appState.pendingHighlightColorChange = AppState.HighlightColorChangeRequest(
                             id: highlight.id,
@@ -267,41 +255,6 @@ struct HighlightRowView: View {
             }
         } label: {
             SwiftUI.Label("Change Color", systemImage: "paintpalette")
-        }
-
-        Divider()
-
-        Menu {
-            Button {
-                showNewTagSheet = true
-            } label: {
-                SwiftUI.Label("New Tag", systemImage: "plus")
-            }
-
-            if !allTags.isEmpty {
-                Divider()
-            }
-
-            if allTags.isEmpty {
-                Text("No tags yet")
-            } else {
-                ForEach(allTags) { tag in
-                    Button {
-                        toggleTag(tag)
-                    } label: {
-                        HStack {
-                            Text(tag.name)
-                            Spacer()
-                            if highlight.tags.contains(where: { $0.id == tag.id }) {
-                                Image(systemName: "checkmark")
-                                    .font(.caption)
-                            }
-                        }
-                    }
-                }
-            }
-        } label: {
-            SwiftUI.Label("Tags", systemImage: "tag")
         }
 
         Divider()
@@ -329,49 +282,6 @@ struct HighlightRowView: View {
         }
     }
 
-    @ViewBuilder
-    private var markerView: some View {
-        switch highlightMarkerStyle {
-        case .dot:
-            Circle()
-                .fill(highlight.color.swiftUIColor)
-                .frame(width: 8, height: 8)
-                .padding(.top, 6)
-                .padding(.leading, 12)
-        case .bar:
-            RoundedRectangle(cornerRadius: 2, style: .continuous)
-                .fill(highlight.color.swiftUIColor)
-                .frame(width: 4)
-                .padding(.vertical, 8)
-                .padding(.leading, 6)
-        case .background:
-            EmptyView()
-        }
-    }
-
-    private var contextText: Text? {
-        let beforeRaw = (highlight.contextBefore ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-        let afterRaw = (highlight.contextAfter ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !beforeRaw.isEmpty || !afterRaw.isEmpty else { return nil }
-
-        let before = trimmedOverlapSuffix(beforeRaw, highlight.text)
-        let after = trimmedOverlapPrefix(afterRaw, highlight.text)
-        if before.isEmpty && after.isEmpty { return nil }
-
-        let combined = "\(before) \(after)"
-            .replacingOccurrences(of: "  ", with: " ")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        if combined.isEmpty { return nil }
-
-        if highlight.text.localizedCaseInsensitiveContains(combined) {
-            return nil
-        }
-
-        let prefix = before.isEmpty ? "" : "\(before) "
-        let suffix = after.isEmpty ? "" : " \(after)"
-        return Text("…\(prefix)\(suffix)…")
-    }
-
     private func jumpToHighlight() {
         appState.selectedHighlightId = highlight.id.uuidString
         appState.pendingHighlightScroll = highlight.id
@@ -389,7 +299,7 @@ struct HighlightRowView: View {
         HStack(spacing: 6) {
             Button(
                 highlight.note?.isEmpty ?? true ? "Add Note" : "Edit Note",
-                systemImage: "note.text"
+                systemImage: "pencil"
             ) {
                 editedNote = highlight.note ?? ""
                 withAnimation(.easeInOut(duration: 0.2)) {
@@ -398,9 +308,9 @@ struct HighlightRowView: View {
                 }
             }
             .labelStyle(.iconOnly)
-            .font(.system(size: 10, weight: .semibold))
+            .font(.system(size: 11, weight: .semibold))
             .foregroundStyle(isHovered ? .primary : .secondary)
-            .frame(width: 20, height: 20)
+            .frame(width: 22, height: 22)
             .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: 6, style: .continuous)
@@ -408,13 +318,13 @@ struct HighlightRowView: View {
             }
             .buttonStyle(.plain)
 
-            Button("Jump to Highlight", systemImage: "arrow.down.right") {
+            Button("Jump to Highlight", systemImage: "arrow.down.left") {
                 jumpToHighlight()
             }
             .labelStyle(.iconOnly)
-            .font(.system(size: 10, weight: .semibold))
+            .font(.system(size: 11, weight: .semibold))
             .foregroundStyle(isHovered ? .primary : .secondary)
-            .frame(width: 20, height: 20)
+            .frame(width: 22, height: 22)
             .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: 6, style: .continuous)
@@ -426,29 +336,23 @@ struct HighlightRowView: View {
     }
 
     private var rowBackground: Color {
-        if highlightMarkerStyle == .background {
-            if isSelected {
-                return highlight.color.swiftUIColor.opacity(colorScheme == .dark ? 0.26 : 0.18)
-            }
-            return highlight.color.swiftUIColor.opacity(colorScheme == .dark ? 0.16 : 0.10)
-        }
-
         if isSelected {
-            return Color.accentColor.opacity(colorScheme == .dark ? 0.2 : 0.12)
+            return highlight.color.swiftUIColor.opacity(colorScheme == .dark ? 0.28 : 0.20)
         }
 
-        return Color.gray.opacity(isHovered ? 0.08 : 0.035)
+        if isHovered {
+            return highlight.color.swiftUIColor.opacity(colorScheme == .dark ? 0.20 : 0.14)
+        }
+
+        return highlight.color.swiftUIColor.opacity(colorScheme == .dark ? 0.13 : 0.08)
     }
 
     private var selectionStrokeWidth: CGFloat {
-        highlightMarkerStyle == .background ? 1.6 : 1.0
+        1.4
     }
 
     private var selectionStrokeColor: Color {
-        if highlightMarkerStyle == .background {
-            return highlight.color.swiftUIColor.opacity(0.6)
-        }
-        return Color.accentColor.opacity(0.6)
+        highlight.color.accentColor.opacity(0.68)
     }
 
     private var shortRelativeAge: String {
@@ -478,10 +382,6 @@ struct HighlightRowView: View {
         }
     }
 
-    private var sortedTags: [Tag] {
-        highlight.tags.sorted { $0.sortOrder < $1.sortOrder }
-    }
-
     private var headerTitle: String {
         if let section = highlight.sectionTitle,
            !section.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -490,45 +390,11 @@ struct HighlightRowView: View {
         return "Overview"
     }
 
-    private func trimmedOverlapSuffix(_ text: String, _ highlightText: String) -> String {
-        let maxOverlap = min(text.count, highlightText.count)
-        guard maxOverlap > 0 else { return text }
-
-        let highlightPrefix = Array(highlightText)
-        let textChars = Array(text)
-
-        for length in stride(from: maxOverlap, through: 1, by: -1) {
-            let suffix = textChars.suffix(length)
-            let prefix = highlightPrefix.prefix(length)
-            if suffix.elementsEqual(prefix) {
-                return String(textChars.dropLast(length)).trimmingCharacters(in: .whitespaces)
-            }
-        }
-        return text
-    }
-
-    private func trimmedOverlapPrefix(_ text: String, _ highlightText: String) -> String {
-        let maxOverlap = min(text.count, highlightText.count)
-        guard maxOverlap > 0 else { return text }
-
-        let highlightSuffix = Array(highlightText)
-        let textChars = Array(text)
-
-        for length in stride(from: maxOverlap, through: 1, by: -1) {
-            let prefix = textChars.prefix(length)
-            let suffix = highlightSuffix.suffix(length)
-            if prefix.elementsEqual(suffix) {
-                return String(textChars.dropFirst(length)).trimmingCharacters(in: .whitespaces)
-            }
-        }
-        return text
-    }
-
     private var noteEditor: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Text("Note")
-                    .font(.caption2.weight(.semibold))
+                    .font(MacWikiTypography.metadataLabel)
                     .foregroundStyle(.secondary)
 
                 Spacer()
@@ -570,49 +436,6 @@ struct HighlightRowView: View {
             }
 
             HStack {
-                Text("Tags")
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(.secondary)
-
-                Spacer()
-
-                Menu {
-                    Button {
-                        showNewTagSheet = true
-                    } label: {
-                        SwiftUI.Label("New Tag", systemImage: "plus")
-                    }
-
-                    if !allTags.isEmpty {
-                        Divider()
-                    }
-
-                    if allTags.isEmpty {
-                        Text("No tags yet")
-                    } else {
-                        ForEach(allTags) { tag in
-                            Button {
-                                toggleTag(tag)
-                            } label: {
-                                HStack {
-                                    Text(tag.name)
-                                    Spacer()
-                                    if highlight.tags.contains(where: { $0.id == tag.id }) {
-                                        Image(systemName: "checkmark")
-                                            .font(.caption)
-                                    }
-                                }
-                            }
-                        }
-                    }
-                } label: {
-                    SwiftUI.Label("Edit Tags", systemImage: "tag")
-                        .font(.caption)
-                }
-                .menuStyle(.borderlessButton)
-            }
-
-            HStack {
                 Spacer()
 
                 Button("Cancel") {
@@ -638,19 +461,15 @@ struct HighlightRowView: View {
         }
     }
 
-    private func toggleTag(_ tag: Tag) {
-        if let index = highlight.tags.firstIndex(where: { $0.id == tag.id }) {
-            highlight.tags.remove(at: index)
-        } else {
-            highlight.tags.append(tag)
-        }
-        try? modelContext.save()
-    }
-
     private func restoreHighlight() {
         highlight.isArchived = false
         highlight.updatedAt = Date()
         try? modelContext.save()
+    }
+
+    private func requestHighlightRehydrate() {
+        appState.pendingHighlightRehydrate = AppState.HighlightRehydrateRequest(highlight: highlight)
+        appState.lastHighlightRehydrateResult = nil
     }
 
     private func consumePendingNoteEditorRequestIfNeeded() {

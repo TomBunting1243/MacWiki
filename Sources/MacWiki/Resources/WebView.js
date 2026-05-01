@@ -12,6 +12,32 @@ function isCitationLink(target, resolvedURL) {
     return false;
 }
 
+function isMediaLinkTarget(anchor, node) {
+    if (!anchor) return false;
+    if (anchor.classList && anchor.classList.contains('image')) {
+        return true;
+    }
+
+    var element = node;
+    if (element && element.nodeType !== Node.ELEMENT_NODE) {
+        element = element.parentElement || null;
+    }
+    if (!element || !element.closest) return false;
+
+    var imageAnchor = element.closest('a.image');
+    if (imageAnchor === anchor) {
+        return true;
+    }
+
+    var mediaNode = element.closest('img, picture, figure, video, audio, source');
+    if (mediaNode && anchor.contains(mediaNode)) {
+        return true;
+    }
+
+    var mediaContainer = element.closest('.mw-file-element, .thumb, .gallerybox');
+    return !!(mediaContainer && anchor.contains(mediaContainer));
+}
+
 function normalizedHashIdentifier(hash) {
     if (!hash) return null;
     var rawIdentifier = hash.replace(/^#/, '');
@@ -166,6 +192,15 @@ document.addEventListener('click', function (e) {
         window._macwikiHideLinkHoverPreview();
     }
 
+    if (isMediaLinkTarget(target, e.target)) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (typeof e.stopImmediatePropagation === 'function') {
+            e.stopImmediatePropagation();
+        }
+        return;
+    }
+
     var rawHref = (target.getAttribute('href') || '').trim();
     if (!rawHref) return;
 
@@ -251,6 +286,9 @@ document.addEventListener('contextmenu', function (e) {
         target = target.parentElement;
     }
     if (target && target.href) {
+        if (isMediaLinkTarget(target, e.target)) {
+            return;
+        }
         if (window._macwikiHideLinkHoverPreview) {
             window._macwikiHideLinkHoverPreview();
         }
@@ -269,12 +307,34 @@ document.addEventListener('contextmenu', function (e) {
     if (window._macwikiLinkHoverPreviewInstalled) return;
     window._macwikiLinkHoverPreviewInstalled = true;
 
+    if (typeof window._macwikiLinkPreviewImmediateModifier === 'undefined') {
+        window._macwikiLinkPreviewImmediateModifier = 'command';
+    }
+
     var hoverDelayMs = 280;
-    var hideDelayMs = 110;
+    var hideDelayMs = 180;
     var hoverTimer = null;
     var hideTimer = null;
     var pendingSignature = null;
     var activeSignature = null;
+    var hoveredAnchor = null;
+    var hoveredNode = null;
+    var tooltipSuppressedAnchor = null;
+    var tooltipSuppressedTitle = null;
+    var isCommandKeyActive = false;
+
+    function normalizeImmediateModifierValue(value) {
+        var normalized = String(value || '').trim().toLowerCase();
+        if (normalized === 'command') {
+            return 'command';
+        }
+        return 'off';
+    }
+
+    window.setLinkPreviewImmediateModifier = function (value) {
+        window._macwikiLinkPreviewImmediateModifier = normalizeImmediateModifierValue(value);
+        return window._macwikiLinkPreviewImmediateModifier;
+    };
 
     function clearHoverTimer() {
         if (!hoverTimer) return;
@@ -295,9 +355,36 @@ document.addEventListener('contextmenu', function (e) {
         window.webkit.messageHandlers.linkHoverChanged.postMessage(payload);
     }
 
+    function clearHoveredTarget() {
+        hoveredAnchor = null;
+        hoveredNode = null;
+        restoreSuppressedTooltip();
+    }
+
+    function restoreSuppressedTooltip() {
+        if (!tooltipSuppressedAnchor) return;
+        if (tooltipSuppressedTitle !== null) {
+            tooltipSuppressedAnchor.setAttribute('title', tooltipSuppressedTitle);
+        }
+        tooltipSuppressedAnchor = null;
+        tooltipSuppressedTitle = null;
+    }
+
+    function suppressNativeTooltip(anchor) {
+        if (tooltipSuppressedAnchor === anchor) return;
+        restoreSuppressedTooltip();
+
+        if (!anchor || !anchor.hasAttribute('title')) return;
+
+        tooltipSuppressedAnchor = anchor;
+        tooltipSuppressedTitle = anchor.getAttribute('title');
+        anchor.removeAttribute('title');
+    }
+
     function hidePreviewNow() {
         clearHoverTimer();
         clearHideTimer();
+        clearHoveredTarget();
         pendingSignature = null;
         if (activeSignature === null) return;
         activeSignature = null;
@@ -317,11 +404,19 @@ document.addEventListener('contextmenu', function (e) {
     }
 
     function closestAnchor(node) {
-        var target = node;
+        var target = elementFromNode(node);
         while (target && target.tagName !== 'A') {
             target = target.parentElement;
         }
         return target;
+    }
+
+    function elementFromNode(node) {
+        if (!node) return null;
+        if (node.nodeType === Node.ELEMENT_NODE) {
+            return node;
+        }
+        return node.parentElement || null;
     }
 
     function normalizeWikiTitle(rawTitle) {
@@ -393,7 +488,19 @@ document.addEventListener('contextmenu', function (e) {
         return normalizeWikiTitle(rawTitle);
     }
 
-    function payloadForAnchor(anchor) {
+    function isMediaNamespaceTitle(title) {
+        var lowered = String(title || '').trim().toLowerCase();
+        return lowered.indexOf('file:') === 0 ||
+            lowered.indexOf('image:') === 0 ||
+            lowered.indexOf('media:') === 0;
+    }
+
+    function immediateRevealRequested() {
+        return normalizeImmediateModifierValue(window._macwikiLinkPreviewImmediateModifier) === 'command' &&
+            isCommandKeyActive;
+    }
+
+    function payloadForAnchor(anchor, node) {
         if (!anchor) return null;
 
         var href = (anchor.getAttribute('href') || '').trim();
@@ -409,9 +516,11 @@ document.addEventListener('contextmenu', function (e) {
 
         if (resolvedURL.protocol !== 'http:' && resolvedURL.protocol !== 'https:') return null;
         if (isCitationLink(anchor, resolvedURL)) return null;
+        if (isMediaLinkTarget(anchor, node)) return null;
 
         var articleTitle = decodeWikiTitle(resolvedURL);
         if (!articleTitle) return null;
+        if (isMediaNamespaceTitle(articleTitle)) return null;
 
         var sameDocumentFragment =
             resolvedURL.origin === window.location.origin &&
@@ -433,43 +542,87 @@ document.addEventListener('contextmenu', function (e) {
         };
     }
 
-    function queuePreview(anchor) {
-        var payload = payloadForAnchor(anchor);
-        if (!payload) {
-            scheduleHidePreview();
+    function commitPreview(payload) {
+        hoverTimer = null;
+        pendingSignature = null;
+        activeSignature = payload.signature;
+        postHover(payload);
+    }
+
+    function schedulePreviewPayload(payload, immediate) {
+        clearHideTimer();
+        if (payload.signature === activeSignature) {
             return;
         }
-
-        clearHideTimer();
-        if (payload.signature === activeSignature || payload.signature === pendingSignature) {
+        if (payload.signature === pendingSignature && !immediate) {
             return;
         }
 
         clearHoverTimer();
         pendingSignature = payload.signature;
+
+        if (immediate) {
+            commitPreview(payload);
+            return;
+        }
+
         hoverTimer = setTimeout(function () {
-            hoverTimer = null;
-            pendingSignature = null;
-            activeSignature = payload.signature;
-            postHover(payload);
+            commitPreview(payload);
         }, hoverDelayMs);
+    }
+
+    function queuePreview(anchor, node) {
+        hoveredAnchor = anchor;
+        hoveredNode = node;
+
+        var payload = payloadForAnchor(anchor, node);
+        if (!payload) {
+            restoreSuppressedTooltip();
+            scheduleHidePreview();
+            return;
+        }
+
+        suppressNativeTooltip(anchor);
+        schedulePreviewPayload(payload, immediateRevealRequested());
+    }
+
+    function revealHoveredAnchorImmediately() {
+        if (!hoveredAnchor) return;
+        var payload = payloadForAnchor(hoveredAnchor, hoveredNode);
+        if (!payload) return;
+        schedulePreviewPayload(payload, true);
+    }
+
+    function updateModifierStateFromEvent(event) {
+        isCommandKeyActive = !!(event && event.metaKey);
+    }
+
+    function isModifierOnlyKeyEvent(event) {
+        if (!event) return false;
+        return event.key === 'Meta' ||
+            event.key === 'Alt' ||
+            event.key === 'Shift' ||
+            event.key === 'Control';
     }
 
     window._macwikiHideLinkHoverPreview = hidePreviewNow;
 
     document.addEventListener('mousemove', function (e) {
+        updateModifierStateFromEvent(e);
         var anchor = closestAnchor(e.target);
         if (!anchor) {
+            clearHoveredTarget();
             if (activeSignature !== null || pendingSignature !== null) {
                 scheduleHidePreview();
             }
             return;
         }
-        queuePreview(anchor);
+        queuePreview(anchor, e.target);
     }, true);
 
     document.addEventListener('mouseout', function (e) {
         if (e.relatedTarget) return;
+        clearHoveredTarget();
         if (activeSignature !== null || pendingSignature !== null) {
             scheduleHidePreview();
         }
@@ -483,13 +636,29 @@ document.addEventListener('contextmenu', function (e) {
         hidePreviewNow();
     }, true);
 
-    document.addEventListener('keydown', function () {
+    document.addEventListener('keydown', function (e) {
+        var wasCommandKeyActive = isCommandKeyActive;
+        updateModifierStateFromEvent(e);
+        if (isModifierOnlyKeyEvent(e)) {
+            if (!wasCommandKeyActive && isCommandKeyActive && immediateRevealRequested()) {
+                revealHoveredAnchorImmediately();
+            }
+            return;
+        }
         hidePreviewNow();
     }, true);
 
-    window.addEventListener('blur', hidePreviewNow, true);
+    document.addEventListener('keyup', function (e) {
+        updateModifierStateFromEvent(e);
+    }, true);
+
+    window.addEventListener('blur', function () {
+        isCommandKeyActive = false;
+        hidePreviewNow();
+    }, true);
     document.addEventListener('visibilitychange', function () {
         if (document.visibilityState !== 'visible') {
+            isCommandKeyActive = false;
             hidePreviewNow();
         }
     });
@@ -1344,9 +1513,21 @@ document.addEventListener('contextmenu', function (e) {
             noteUserScrollIntent();
         }
     }, true);
-    window.addEventListener('resize', function () {
+    function preserveProgressAcrossResize() {
+        var progressBeforeResize = currentProgress(currentScrollY());
         markMaxScrollDirty(30);
-        schedulePostScroll(true);
+
+        setTimeout(function () {
+            var maxScroll = getMaxScroll(true);
+            if (maxScroll > 0 && progressBeforeResize > 0) {
+                window.scrollTo(0, Math.round(maxScroll * progressBeforeResize));
+            }
+            schedulePostScroll(true);
+        }, 60);
+    }
+
+    window.addEventListener('resize', function () {
+        preserveProgressAcrossResize();
     });
     window.addEventListener('load', function () {
         markMaxScrollDirty(45);
@@ -3320,7 +3501,6 @@ document.addEventListener('contextmenu', function (e) {
 // Detect right-click on active text selection for native highlight creation menu.
 document.addEventListener('contextmenu', function (e) {
     if (e.defaultPrevented) return;
-    if (!window._macwikiNativeHighlightingMenuEnabled) return;
     if (!window.webkit || !window.webkit.messageHandlers || !window.webkit.messageHandlers.textSelectionContextRequested) {
         return;
     }

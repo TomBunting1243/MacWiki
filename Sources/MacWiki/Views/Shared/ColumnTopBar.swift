@@ -85,6 +85,7 @@ enum TopChromeControlSurface {
 
 enum ColumnMotion {
     static let sidebarVisibility = Animation.interactiveSpring(response: 0.30, dampingFraction: 0.90, blendDuration: 0.12)
+    static let readerOnlyVisibility = Animation.interactiveSpring(response: 0.44, dampingFraction: 0.93, blendDuration: 0.18)
     static let inspectorVisibility = Animation.interactiveSpring(response: 0.32, dampingFraction: 0.89, blendDuration: 0.12)
     static let sidebarRevealFollowDelay: Double = 0.14
 }
@@ -238,113 +239,34 @@ struct SidebarPaneBackground: View {
     }
 }
 
-struct LeadingSidebarFloatingPaneBackground: View {
-    @AppStorage(MacWikiGlassRuntime.forceLegacyFallbackKey) private var forceLegacyGlassFallback = false
-    @Environment(\.colorScheme) private var colorScheme
-
-    private enum Metrics {
-        static let cornerRadius: CGFloat = 24
-    }
-
-    private var panelShape: UnevenRoundedRectangle {
-        UnevenRoundedRectangle(
-            topLeadingRadius: Metrics.cornerRadius,
-            bottomLeadingRadius: Metrics.cornerRadius,
-            bottomTrailingRadius: Metrics.cornerRadius,
-            topTrailingRadius: Metrics.cornerRadius,
-            style: .continuous
-        )
-    }
-
-    var body: some View {
-        if #available(macOS 26, *),
-           MacWikiGlassRuntime.usesNativeGlass(forceLegacyFallback: forceLegacyGlassFallback) {
-            panelShape
-                .fill(.clear)
-                .glassEffect(.regular, in: panelShape)
-        } else {
-            panelShape
-                .fill(.thinMaterial)
-                .overlay {
-                    panelShape
-                        .strokeBorder(
-                            Color.white.opacity(colorScheme == .dark ? 0.035 : 0.055),
-                            lineWidth: 0.6
-                        )
-                }
-        }
-    }
-}
-
-struct LeadingSidebarChromeMergeBackground: View {
-    private enum Metrics {
-        static let bridgeWidth: CGFloat = 112
-        static let bridgeHeight: CGFloat = 26
-        static let bridgeTopOffset: CGFloat = 8
-        static let bridgeTrailingOffset: CGFloat = 18
-    }
-
-    var body: some View {
-        ZStack(alignment: .topTrailing) {
-            LeadingSidebarFloatingPaneBackground()
-
-            LeadingSidebarChromeBridgeBackground()
-                .frame(width: Metrics.bridgeWidth, height: Metrics.bridgeHeight)
-                .offset(x: Metrics.bridgeTrailingOffset, y: Metrics.bridgeTopOffset)
-                .allowsHitTesting(false)
-                .accessibilityHidden(true)
-        }
-    }
-}
-
-private struct LeadingSidebarChromeBridgeBackground: View {
-    @AppStorage(MacWikiGlassRuntime.forceLegacyFallbackKey) private var forceLegacyGlassFallback = false
-    @Environment(\.colorScheme) private var colorScheme
-
-    private var bridgeShape: UnevenRoundedRectangle {
-        UnevenRoundedRectangle(
-            topLeadingRadius: 16,
-            bottomLeadingRadius: 18,
-            bottomTrailingRadius: 12,
-            topTrailingRadius: 12,
-            style: .continuous
-        )
-    }
-
-    var body: some View {
-        if #available(macOS 26, *),
-           MacWikiGlassRuntime.usesNativeGlass(forceLegacyFallback: forceLegacyGlassFallback) {
-            bridgeShape
-                .fill(.clear)
-                .glassEffect(.regular, in: bridgeShape)
-        } else {
-            bridgeShape
-                .fill(.thinMaterial)
-                .overlay {
-                    bridgeShape
-                        .strokeBorder(
-                            Color.white.opacity(colorScheme == .dark ? 0.03 : 0.05),
-                            lineWidth: 0.5
-                        )
-                }
-        }
-    }
-}
-
 struct ReaderTabLaneBackground: View {
-    @AppStorage(MacWikiGlassRuntime.forceLegacyFallbackKey) private var forceLegacyGlassFallback = false
+    @AppStorage(AppStorageKey.Chrome.liquidGlassChrome) private var liquidGlassChrome = true
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        if #available(macOS 26, *),
-           MacWikiGlassRuntime.usesNativeGlass(forceLegacyFallback: forceLegacyGlassFallback) {
-            Rectangle()
-                .fill(.clear)
-                .glassEffect(.regular, in: .rect)
-        } else {
-            Rectangle()
-                .fill(.thinMaterial)
+        ZStack {
+            if liquidGlassChrome {
+                Rectangle()
+                    .fill(.thinMaterial)
+
+                Rectangle()
+                    .fill(Color(nsColor: .controlBackgroundColor))
+                    .opacity(colorScheme == .dark ? 0.08 : 0.12)
+
+                LinearGradient(
+                    colors: [
+                        Color.white.opacity(colorScheme == .dark ? 0.050 : 0.16),
+                        Color.white.opacity(0)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .blendMode(.screen)
+            } else {
+                Color.clear
+            }
         }
+            .allowsHitTesting(false)
     }
 }
 

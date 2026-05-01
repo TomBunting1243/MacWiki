@@ -25,6 +25,9 @@ struct WebView: NSViewRepresentable {
     /// Callback when a Wikipedia link is tapped
     var onLinkTapped: ((String) -> Void)?
 
+    /// Callback when a Wikipedia article should open in a separate app window.
+    var onOpenArticleInNewWindow: ((Article) -> Void)?
+
     /// Callback when text is selected (for showing highlight toolbar)
     var onTextSelected: ((TextSelectionData) -> Void)?
 
@@ -73,8 +76,11 @@ struct WebView: NSViewRepresentable {
     /// Signature of the hover-preview overlay currently presented by SwiftUI.
     var activeLinkHoverPreviewSignature: String?
 
+    /// Modifier that bypasses the standard hover delay for link previews.
+    var linkPreviewImmediateModifier: ReaderLinkPreviewImmediateModifier = .default
+
     /// Enables native context-menu driven text highlighting interactions.
-    var nativeHighlightingMenuEnabled: Bool = false
+    var nativeHighlightingMenuEnabled: Bool = AppStorageKey.Chrome.nativeHighlightingMenuEnabledDefault
 
     /// Optional open-path timer for phase instrumentation.
     var openTimer: Binding<ArticleOpenTimer>?
@@ -141,7 +147,7 @@ struct WebView: NSViewRepresentable {
     }
 
     /// Encodes a Swift string as a safe JavaScript string literal.
-    private static func javaScriptStringLiteral(_ value: String) -> String {
+    static func javaScriptStringLiteral(_ value: String) -> String {
         guard let data = try? JSONEncoder().encode(value),
               let encoded = String(data: data, encoding: .utf8) else {
             return "\"\""
@@ -155,6 +161,7 @@ struct WebView: NSViewRepresentable {
             let webView = checkout.webView
             webView.navigationDelegate = context.coordinator
             webView.uiDelegate = context.coordinator
+            webView.allowsLinkPreview = false
             context.coordinator.bootstrapAppearance = readerAppearance
             context.coordinator.lastLoadedArticleTitle = checkout.lastLoadedArticleTitle
             context.coordinator.lastLoadedHTMLSignature = checkout.lastLoadedHTMLSignature
@@ -172,6 +179,7 @@ struct WebView: NSViewRepresentable {
         let webView = WKWebView(frame: .zero, configuration: configuration)
         webView.navigationDelegate = context.coordinator
         webView.uiDelegate = context.coordinator
+        webView.allowsLinkPreview = false
         webView.setValue(false, forKey: "drawsBackground")
         if #available(macOS 11.0, *) {
             webView.underPageBackgroundColor = .clear
@@ -200,6 +208,12 @@ struct WebView: NSViewRepresentable {
             forMainFrameOnly: true
         )
         webView.configuration.userContentController.addUserScript(nativeHighlightMenuBootstrapScript)
+        let linkPreviewImmediateModifierBootstrapScript = WKUserScript(
+            source: "window._macwikiLinkPreviewImmediateModifier = '\(linkPreviewImmediateModifier.javaScriptValue)';",
+            injectionTime: .atDocumentStart,
+            forMainFrameOnly: true
+        )
+        webView.configuration.userContentController.addUserScript(linkPreviewImmediateModifierBootstrapScript)
         context.coordinator.bootstrapAppearance = readerAppearance
 
         // Inject custom CSS for native reader aesthetic
@@ -777,6 +791,7 @@ struct WebView: NSViewRepresentable {
         context.coordinator.onVisibleSectionChange = onVisibleSectionChange
         context.coordinator.onContentReveal = onContentReveal
         context.coordinator.onLinkHoverPreviewChange = onLinkHoverPreviewChange
+        context.coordinator.linkPreviewImmediateModifier = linkPreviewImmediateModifier
         context.coordinator.nativeHighlightingMenuEnabled = nativeHighlightingMenuEnabled
         context.coordinator.openTimer = openTimer
         context.coordinator.isSectionTrackingRequested =
@@ -787,6 +802,7 @@ struct WebView: NSViewRepresentable {
             isHovering: linkHoverPreviewOverlayHovering,
             presentedSignature: activeLinkHoverPreviewSignature
         )
+        context.coordinator.syncLinkPreviewImmediateModifier(on: webView)
         context.coordinator.syncNativeHighlightMenuMode(on: webView)
 
         // Process all pending actions (don't early-return so multiple can be handled)
@@ -947,31 +963,14 @@ struct WebView: NSViewRepresentable {
                 webView.evaluateJavaScript(script) { result, error in
                     if error != nil {
                         DispatchQueue.main.async {
-                            self.appState?.isHighlightRehydrateInProgress = false
-                            self.appState?.lastHighlightRehydrateResult = AppState.HighlightRehydrateResult(
-                                id: pending.id,
-                                success: false,
-                                timestamp: Date()
-                            )
+                            context.coordinator.completePendingHighlightRehydrate(pending, success: false)
                         }
                         return
                     }
 
                     let success = result as? Bool ?? false
                     DispatchQueue.main.async {
-                        self.appState?.isHighlightRehydrateInProgress = false
-                        self.appState?.lastHighlightRehydrateResult = AppState.HighlightRehydrateResult(
-                            id: pending.id,
-                            success: success,
-                            timestamp: Date()
-                        )
-                    }
-
-                    guard success else { return }
-
-                    if let target = context.coordinator.highlights.first(where: { $0.id == pending.id }) {
-                        target.isStale = false
-                        try? context.coordinator.modelContext?.save()
+                        context.coordinator.completePendingHighlightRehydrate(pending, success: success)
                     }
                 }
             }
@@ -1042,6 +1041,7 @@ struct WebView: NSViewRepresentable {
         Coordinator(
             tabID: tabID,
             onLinkTapped: onLinkTapped,
+            onOpenArticleInNewWindow: onOpenArticleInNewWindow,
             scrollPosition: $scrollPosition,
             onScrollProgress: onScrollProgress,
             fallbackScrollProgress: fallbackScrollProgress,
@@ -1059,6 +1059,7 @@ struct WebView: NSViewRepresentable {
             onVisibleSectionChange: onVisibleSectionChange,
             onContentReveal: onContentReveal,
             onLinkHoverPreviewChange: onLinkHoverPreviewChange,
+            linkPreviewImmediateModifier: linkPreviewImmediateModifier,
             nativeHighlightingMenuEnabled: nativeHighlightingMenuEnabled
         )
     }
@@ -1078,6 +1079,7 @@ struct WebView: NSViewRepresentable {
     class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WKScriptMessageHandler {
         let tabID: UUID
         var onLinkTapped: ((String) -> Void)?
+        var onOpenArticleInNewWindow: ((Article) -> Void)?
         var onTextSelected: ((TextSelectionData) -> Void)?
         var onSelectionCleared: (() -> Void)?
         var scrollPosition: Binding<CGFloat>
@@ -1101,10 +1103,12 @@ struct WebView: NSViewRepresentable {
         var onVisibleSectionChange: ((String?) -> Void)?
         var onContentReveal: (() -> Void)?
         var onLinkHoverPreviewChange: ((WebViewLinkHoverRequest?) -> Void)?
+        var linkPreviewImmediateModifier: ReaderLinkPreviewImmediateModifier
         var nativeHighlightingMenuEnabled: Bool
         var openTimer: Binding<ArticleOpenTimer>?
         var lastAppliedReaderAppearance: ReaderAppearance?
         var lastAppliedReaderTopInset: CGFloat = -1
+        var lastAppliedLinkPreviewImmediateModifier: ReaderLinkPreviewImmediateModifier?
         var lastAppliedNativeHighlightingMenuEnabled: Bool?
         var isSectionTrackingRequested: Bool = false
         var isReferencesRequested: Bool = false
@@ -1168,6 +1172,7 @@ struct WebView: NSViewRepresentable {
         init(
             tabID: UUID,
             onLinkTapped: ((String) -> Void)?,
+            onOpenArticleInNewWindow: ((Article) -> Void)?,
             scrollPosition: Binding<CGFloat>,
             onScrollProgress: ((Double) -> Void)?,
             fallbackScrollProgress: Double?,
@@ -1185,10 +1190,12 @@ struct WebView: NSViewRepresentable {
             onVisibleSectionChange: ((String?) -> Void)?,
             onContentReveal: (() -> Void)?,
             onLinkHoverPreviewChange: ((WebViewLinkHoverRequest?) -> Void)?,
+            linkPreviewImmediateModifier: ReaderLinkPreviewImmediateModifier,
             nativeHighlightingMenuEnabled: Bool
         ) {
             self.tabID = tabID
             self.onLinkTapped = onLinkTapped
+            self.onOpenArticleInNewWindow = onOpenArticleInNewWindow
             self.scrollPosition = scrollPosition
             self.onScrollProgress = onScrollProgress
             self.fallbackScrollProgress = fallbackScrollProgress
@@ -1206,6 +1213,7 @@ struct WebView: NSViewRepresentable {
             self.onVisibleSectionChange = onVisibleSectionChange
             self.onContentReveal = onContentReveal
             self.onLinkHoverPreviewChange = onLinkHoverPreviewChange
+            self.linkPreviewImmediateModifier = linkPreviewImmediateModifier
             self.nativeHighlightingMenuEnabled = nativeHighlightingMenuEnabled
         }
 
@@ -1559,6 +1567,7 @@ extension WebView {
         self.articleTitle = articleTitle
         self.baseURL = baseURL
         self.onLinkTapped = onLinkTapped
+        self.onOpenArticleInNewWindow = nil
         self._scrollPosition = .constant(0)
         self.fallbackScrollProgress = nil
     }

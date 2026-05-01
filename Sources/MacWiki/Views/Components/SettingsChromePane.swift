@@ -1,0 +1,40 @@
+import SwiftUI
+import MacWikiSettingsCatalog
+
+struct SettingsChromePane: View {
+    @AppStorage(AppStorageKey.Chrome.liquidGlassChrome) private var liquidGlassChrome = true
+    @AppStorage(MacWikiGlassRuntime.forceLegacyFallbackKey) private var forceLegacyGlassFallback = false
+    @AppStorage(TabAccompanimentStorageKey.showSavedMarker) private var showSavedTabMarker = true
+    @AppStorage(TabAccompanimentStorageKey.showHighlightMarker) private var showHighlightTabMarker = true
+    @AppStorage(TabAccompanimentStorageKey.showReadMarker) private var showReadTabMarker = true
+    @AppStorage(TabAccompanimentStorageKey.showProgressTrack) private var showTabProgressTrack = true
+    @AppStorage(TabAccompanimentStorageKey.showActiveDepth) private var showTabActiveDepth = true
+
+    var body: some View {
+        let section = SettingsCatalog.section(.chrome)
+
+        SettingsPaneContainer(
+            title: section.title,
+            summary: section.summary,
+            systemImage: section.systemImage
+        ) {
+            SettingsGroup("Window Surfaces", systemImage: "sparkles.rectangle.stack") {
+                Toggle("Liquid Glass Chrome", isOn: $liquidGlassChrome)
+                SettingsHelpText("Use translucent Liquid Glass treatment for custom reader tabs, floating overlays, and top chrome.")
+
+                Toggle("Use Legacy Glass Fallbacks", isOn: $forceLegacyGlassFallback)
+                SettingsHelpText("Disable macOS 26 glass APIs and render the older material-based fallback path instead.")
+            }
+
+            SettingsGroup("Tab Accompaniments", systemImage: "rectangle.stack.badge.plus") {
+                Toggle("Saved Marker", isOn: $showSavedTabMarker)
+                Toggle("Highlight Marker", isOn: $showHighlightTabMarker)
+                Toggle("Read Marker", isOn: $showReadTabMarker)
+                Toggle("Reading Progress Rail", isOn: $showTabProgressTrack)
+                Toggle("Active Tab Depth", isOn: $showTabActiveDepth)
+
+                SettingsHelpText("These power-user cues make saved, highlighted, read, and active-depth state visible directly in the reader tab strip.")
+            }
+        }
+    }
+}

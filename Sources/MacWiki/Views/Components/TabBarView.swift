@@ -66,15 +66,15 @@ enum TabBarChromeStyle {
 
 private enum TabChromeHierarchy {
     static func titleActiveOpacity(darkMode: Bool) -> Double {
-        darkMode ? 0.88 : 0.82
+        darkMode ? 0.98 : 0.96
     }
 
     static func titleHoverOpacity(darkMode: Bool) -> Double {
-        darkMode ? 0.62 : 0.56
+        darkMode ? 0.92 : 0.90
     }
 
     static func titleInactiveOpacity(darkMode: Bool) -> Double {
-        darkMode ? 0.50 : 0.44
+        darkMode ? 0.84 : 0.82
     }
 
     static func iconPrimaryOpacity(darkMode: Bool) -> Double {
@@ -108,6 +108,20 @@ private enum TabChromeHierarchy {
     static func activeGlassTintOpacity(darkMode: Bool) -> Double {
         darkMode ? 0.010 : 0.008
     }
+
+    static func nativeAccessoryTintOpacity(darkMode: Bool, compactAccessory: Bool) -> Double {
+        if darkMode {
+            return compactAccessory ? 0.16 : 0.18
+        }
+        return compactAccessory ? 0.42 : 0.48
+    }
+
+    static func nativeAccessoryStrokeOpacity(darkMode: Bool, compactAccessory: Bool) -> Double {
+        if darkMode {
+            return compactAccessory ? 0.074 : 0.082
+        }
+        return compactAccessory ? 0.056 : 0.064
+    }
 }
 
 /// Horizontal scrollable tab bar for managing open articles
@@ -116,7 +130,7 @@ struct TabBarView: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage(MacWikiGlassRuntime.forceLegacyFallbackKey) private var forceLegacyGlassFallback = false
-    @AppStorage(AppStorageKey.Chrome.tabBarLiquidGlass) private var tabBarLiquidGlass = true
+    @AppStorage(AppStorageKey.Chrome.liquidGlassChrome) private var liquidGlassChrome = true
     @AppStorage(TabAccompanimentStorageKey.showSavedMarker) private var showSavedTabMarker = true
     @AppStorage(TabAccompanimentStorageKey.showHighlightMarker) private var showHighlightTabMarker = true
     @AppStorage(TabAccompanimentStorageKey.showReadMarker) private var showReadTabMarker = true
@@ -250,7 +264,7 @@ struct TabBarView: View {
                                     tabIndex: index,
                                     lists: lists,
                                     allLabels: allLabels,
-                                    tabBarLiquidGlass: tabBarLiquidGlass,
+                                    liquidGlassChrome: liquidGlassChrome,
                                     isActive: appState.activeTabId == tab.id,
                                     isDragged: draggedTabId == tab.id,
                                     dragOffset: draggedTabId == tab.id ? dragOffset : 0,
@@ -385,7 +399,7 @@ struct TabBarView: View {
                         .frame(height: 0.5)
                 }
         } else if chromeStyle == .standalone {
-            if tabBarLiquidGlass {
+            if liquidGlassChrome {
                 Rectangle().fill(.ultraThinMaterial)
             } else {
                 Rectangle()
@@ -406,7 +420,7 @@ struct TabBarView: View {
             let compactAccessory = chromeStyle == .strip
             if #available(macOS 26, *), usesNativeGlassAccessories {
                 nativeStripAccessoryBackground(cornerRadius: cornerRadius)
-            } else if tabBarLiquidGlass {
+            } else if liquidGlassChrome {
                 let fillOpacity = darkMode
                     ? (compactAccessory ? 0.14 : 0.16)
                     : (compactAccessory ? 0.085 : 0.10)
@@ -434,7 +448,7 @@ struct TabBarView: View {
                             )
                     )
             }
-        } else if tabBarLiquidGlass {
+        } else if liquidGlassChrome {
             Circle()
                 .fill(.thinMaterial)
                 .overlay(
@@ -551,22 +565,41 @@ struct TabBarView: View {
     }
 
     private var usesNativeGlassAccessories: Bool {
-        guard tabBarLiquidGlass else { return false }
-        return MacWikiGlassRuntime.usesNativeGlass(forceLegacyFallback: forceLegacyGlassFallback) &&
-            chromeStyle.isCompactChrome
+        MacWikiGlassRuntime.usesNativeGlass(
+            isEnabled: liquidGlassChrome,
+            forceLegacyFallback: forceLegacyGlassFallback
+        ) && chromeStyle.isCompactChrome
     }
 
     @available(macOS 26, *)
     private func nativeStripAccessoryBackground(cornerRadius: CGFloat) -> some View {
-        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-            .fill(
-                Color(nsColor: .controlBackgroundColor)
-                    .opacity(colorScheme == .dark ? 0.34 : 0.58)
-            )
+        let compactAccessory = chromeStyle == .strip
+        let darkMode = colorScheme == .dark
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+
+        return shape
+            .fill(.thinMaterial)
             .overlay {
-                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                shape
+                    .fill(
+                        Color(nsColor: .controlBackgroundColor)
+                            .opacity(
+                                TabChromeHierarchy.nativeAccessoryTintOpacity(
+                                    darkMode: darkMode,
+                                    compactAccessory: compactAccessory
+                                )
+                            )
+                    )
+            }
+            .overlay {
+                shape
                     .strokeBorder(
-                        Color.primary.opacity(colorScheme == .dark ? 0.055 : 0.075),
+                        Color.primary.opacity(
+                            TabChromeHierarchy.nativeAccessoryStrokeOpacity(
+                                darkMode: darkMode,
+                                compactAccessory: compactAccessory
+                            )
+                        ),
                         lineWidth: 0.5
                     )
             }
@@ -614,22 +647,14 @@ struct TabBarView: View {
     
     /// O(1) shift calculation using memoized target index
     private func shiftAmount(for index: Int) -> CGFloat {
-        guard let draggedTabId, index != draggedSourceIndex else {
-            return 0
-        }
-        
-        let tabWidth = tabFrames[draggedTabId]?.width ?? 180
-        let shiftDistance = tabWidth + tabSpacing
-        
-        if draggedSourceIndex < index && index <= currentTargetIndex {
-            // Tab needs to shift left
-            return -shiftDistance
-        } else if draggedSourceIndex > index && index >= currentTargetIndex {
-            // Tab needs to shift right
-            return shiftDistance
-        }
-        
-        return 0
+        TabBarDragPlanner.shiftAmount(
+            for: index,
+            draggedTabID: draggedTabId,
+            draggedSourceIndex: draggedSourceIndex,
+            currentTargetIndex: currentTargetIndex,
+            tabFrames: tabFrames,
+            tabSpacing: tabSpacing
+        )
     }
     
     /// Finalize the drag operation
@@ -655,58 +680,33 @@ struct TabBarView: View {
     }
 
     private func targetIndex(for pointerX: CGFloat, fallback: Int) -> Int {
-        var closestIndex = fallback
-        var closestDistance = CGFloat.greatestFiniteMagnitude
-        
-        for (index, tab) in appState.openTabs.enumerated() {
-            guard let frame = tabFrames[tab.id] else { continue }
-            let distance = abs(frame.midX - pointerX)
-            if distance < closestDistance {
-                closestDistance = distance
-                closestIndex = index
-            }
-        }
-
-        // Small hysteresis band avoids "ping-pong" reorders near tab boundaries.
-        if closestIndex != currentTargetIndex,
-           appState.openTabs.indices.contains(currentTargetIndex),
-           let currentFrame = tabFrames[appState.openTabs[currentTargetIndex].id] {
-            let currentDistance = abs(currentFrame.midX - pointerX)
-            let hysteresis: CGFloat = 8
-            if closestDistance + hysteresis >= currentDistance {
-                return currentTargetIndex
-            }
-        }
-
-        return closestIndex
+        TabBarDragPlanner.targetIndex(
+            pointerX: pointerX,
+            currentTargetIndex: currentTargetIndex,
+            tabOrder: appState.openTabs.map(\.id),
+            tabFrames: tabFrames,
+            fallback: fallback
+        )
     }
 
     private func maybeAutoScrollDuringDrag(pointerX: CGFloat) {
-        guard !tabsViewportFrame.isEmpty, appState.openTabs.count > 1 else { return }
-        guard tabsContentWidth > tabsViewportWidth + 8 else { return }
-
         let now = Date().timeIntervalSince1970
         if now - lastDragAutoScrollTimestamp < interactionProfile.dragAutoScrollThrottle {
             return
         }
 
-        let edgeThreshold = interactionProfile.dragEdgeThreshold
-        let leadingDistance = pointerX - tabsViewportFrame.minX
-        let trailingDistance = tabsViewportFrame.maxX - pointerX
-        let nearLeadingEdge = leadingDistance < edgeThreshold
-        let nearTrailingEdge = trailingDistance < edgeThreshold
-        let isDeepEdge = min(leadingDistance, trailingDistance) < (edgeThreshold * 0.45)
-        let step = isDeepEdge ? 2 : 1
-
-        var targetIndex: Int?
-        if nearLeadingEdge {
-            targetIndex = max(0, currentTargetIndex - step)
-        } else if nearTrailingEdge {
-            targetIndex = min(appState.openTabs.count - 1, currentTargetIndex + step)
+        guard let index = TabBarDragPlanner.autoScrollTargetIndex(
+            pointerX: pointerX,
+            viewportFrame: tabsViewportFrame,
+            viewportWidth: tabsViewportWidth,
+            contentWidth: tabsContentWidth,
+            currentTargetIndex: currentTargetIndex,
+            tabCount: appState.openTabs.count,
+            edgeThreshold: interactionProfile.dragEdgeThreshold
+        ),
+        appState.openTabs.indices.contains(index) else {
+            return
         }
-
-        guard let index = targetIndex,
-              appState.openTabs.indices.contains(index) else { return }
 
         let targetId = appState.openTabs[index].id
         guard pendingScrollTabId != targetId else { return }
@@ -913,6 +913,32 @@ private struct TabInteractionProfile {
     }
 }
 
+enum TabAccessibilityStatus {
+    static func value(
+        isActive: Bool,
+        isSaved: Bool,
+        hasHighlights: Bool,
+        isRead: Bool,
+        showsProgress: Bool,
+        progress: Double
+    ) -> String {
+        var parts: [String] = [isActive ? "Active tab" : "Inactive tab"]
+        if isSaved {
+            parts.append("saved")
+        }
+        if hasHighlights {
+            parts.append("has highlights")
+        }
+        if isRead {
+            parts.append("read")
+        } else if showsProgress {
+            let percent = Int((min(max(progress, 0), 1) * 100).rounded())
+            parts.append("\(percent)% read")
+        }
+        return parts.joined(separator: ", ")
+    }
+}
+
 /// Individual draggable tab item component
 private struct DraggableTabItemView: View {
     @Environment(AppState.self) private var appState
@@ -923,7 +949,7 @@ private struct DraggableTabItemView: View {
     let tabIndex: Int
     let lists: [ReadingList]
     let allLabels: [Label]
-    let tabBarLiquidGlass: Bool
+    let liquidGlassChrome: Bool
     let isActive: Bool
     let isDragged: Bool
     let dragOffset: CGFloat
@@ -1045,6 +1071,17 @@ private struct DraggableTabItemView: View {
         (normalizedProgress > 0.12 || isReadComplete)
     }
 
+    private var tabAccessibilityValue: String {
+        TabAccessibilityStatus.value(
+            isActive: isActive,
+            isSaved: isSaved,
+            hasHighlights: hasHighlights,
+            isRead: isReadComplete,
+            showsProgress: !tab.isPlaceholder && normalizedProgress > 0,
+            progress: normalizedProgress
+        )
+    }
+
     private var tabHeight: CGFloat {
         switch chromeStyle {
         case .standalone:
@@ -1161,8 +1198,11 @@ private struct DraggableTabItemView: View {
             .buttonStyle(.plain)
             .accessibilityElement(children: .combine)
             .accessibilityLabel(tab.title)
-            .accessibilityValue(isActive ? "Active tab" : "Tab")
+            .accessibilityValue(tabAccessibilityValue)
             .accessibilityHint("Opens this tab")
+            .accessibilityAction(named: Text("Close Tab")) {
+                onClose()
+            }
 
             closeButtonView
                 .padding(.trailing, horizontalPadding)
@@ -1224,28 +1264,14 @@ private struct DraggableTabItemView: View {
     @ViewBuilder
     private var stripGlassCellBackground: some View {
         let darkMode = colorScheme == .dark
-        if usesNativeStripGlassCells {
-            if isActive || isHovered {
-                nativeStripGlassCellBackground
-            } else {
-                RoundedRectangle(cornerRadius: tabCornerRadius, style: .continuous)
-                    .fill(Color.clear)
-                    .overlay {
-                        RoundedRectangle(cornerRadius: tabCornerRadius, style: .continuous)
-                            .strokeBorder(
-                                Color.primary.opacity(colorScheme == .dark ? 0.040 : 0.055),
-                                lineWidth: 0.42
-                            )
-                    }
-            }
-        } else if tabBarLiquidGlass {
+        if liquidGlassChrome {
             let accessoryStyle = chromeStyle == .titlebarAccessory
             let edgeOpacity = darkMode
-                ? (isActive ? (accessoryStyle ? 0.058 : 0.072) : (isHovered ? (accessoryStyle ? 0.040 : 0.046) : (accessoryStyle ? 0.024 : 0.030)))
-                : (isActive ? (accessoryStyle ? 0.052 : 0.066) : (isHovered ? (accessoryStyle ? 0.036 : 0.044) : (accessoryStyle ? 0.020 : 0.028)))
+                ? (isActive ? (accessoryStyle ? 0.072 : 0.086) : (isHovered ? (accessoryStyle ? 0.052 : 0.060) : (accessoryStyle ? 0.036 : 0.042)))
+                : (isActive ? (accessoryStyle ? 0.072 : 0.086) : (isHovered ? (accessoryStyle ? 0.054 : 0.064) : (accessoryStyle ? 0.044 : 0.052)))
             let neutralFillOpacity = darkMode
-                ? (isActive ? (accessoryStyle ? 0.14 : 0.18) : (isHovered ? (accessoryStyle ? 0.075 : 0.10) : (accessoryStyle ? 0.038 : 0.055)))
-                : (isActive ? (accessoryStyle ? 0.095 : 0.12) : (isHovered ? (accessoryStyle ? 0.050 : 0.065) : (accessoryStyle ? 0.026 : 0.036)))
+                ? (isActive ? (accessoryStyle ? 0.22 : 0.26) : (isHovered ? (accessoryStyle ? 0.16 : 0.19) : (accessoryStyle ? 0.11 : 0.13)))
+                : (isActive ? (accessoryStyle ? 0.50 : 0.56) : (isHovered ? (accessoryStyle ? 0.40 : 0.46) : (accessoryStyle ? 0.31 : 0.36)))
             RoundedRectangle(cornerRadius: tabCornerRadius, style: .continuous)
                 .fill(AnyShapeStyle(.thinMaterial))
                 .overlay {
@@ -1294,50 +1320,6 @@ private struct DraggableTabItemView: View {
                             lineWidth: isActive ? 0.50 : 0.46
                         )
                 )
-        }
-    }
-
-    private var usesNativeStripGlassCells: Bool {
-        guard tabBarLiquidGlass else { return false }
-        return MacWikiGlassRuntime.usesNativeGlass(forceLegacyFallback: forceLegacyGlassFallback) &&
-            chromeStyle.isCompactChrome
-    }
-
-    @ViewBuilder
-    private var nativeStripGlassCellBackground: some View {
-        if #available(macOS 26, *) {
-            let darkMode = colorScheme == .dark
-            if isActive {
-                RoundedRectangle(cornerRadius: tabCornerRadius, style: .continuous)
-                    .fill(
-                        Color(nsColor: .controlBackgroundColor)
-                            .opacity(chromeStyle == .titlebarAccessory ? (darkMode ? 0.30 : 0.62) : (darkMode ? 0.38 : 0.72))
-                    )
-                    .overlay {
-                        RoundedRectangle(cornerRadius: tabCornerRadius, style: .continuous)
-                            .fill(Color.accentColor.opacity(darkMode ? 0.008 : 0.006))
-                    }
-                    .overlay {
-                        RoundedRectangle(cornerRadius: tabCornerRadius, style: .continuous)
-                            .strokeBorder(
-                                Color.primary.opacity(darkMode ? 0.060 : 0.080),
-                                lineWidth: 0.48
-                            )
-                    }
-            } else {
-                RoundedRectangle(cornerRadius: tabCornerRadius, style: .continuous)
-                    .fill(
-                        Color(nsColor: .windowBackgroundColor)
-                            .opacity(chromeStyle == .titlebarAccessory ? (darkMode ? 0.08 : 0.16) : (darkMode ? 0.10 : 0.20))
-                    )
-                    .overlay {
-                        RoundedRectangle(cornerRadius: tabCornerRadius, style: .continuous)
-                            .strokeBorder(
-                                Color.primary.opacity(darkMode ? 0.028 : 0.040),
-                                lineWidth: 0.40
-                            )
-                    }
-            }
         }
     }
     
@@ -1432,6 +1414,7 @@ private struct DraggableTabItemView: View {
             }
         }
         .padding(.trailing, 1)
+        .accessibilityHidden(true)
     }
 
     private var progressTrackOverlay: some View {
@@ -1455,6 +1438,7 @@ private struct DraggableTabItemView: View {
             .offset(x: horizontalPadding, y: -2)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
             .allowsHitTesting(false)
+            .accessibilityHidden(true)
         }
     }
     
@@ -1475,13 +1459,14 @@ private struct DraggableTabItemView: View {
     private var titleForegroundStyle: AnyShapeStyle {
         if chromeStyle.isCompactChrome {
             let darkMode = colorScheme == .dark
+            let titleColor = darkMode ? Color.white : Color.black
             if isActive {
-                return AnyShapeStyle(Color.primary.opacity(TabChromeHierarchy.titleActiveOpacity(darkMode: darkMode)))
+                return AnyShapeStyle(titleColor.opacity(TabChromeHierarchy.titleActiveOpacity(darkMode: darkMode)))
             }
             if isHovered {
-                return AnyShapeStyle(Color.primary.opacity(TabChromeHierarchy.titleHoverOpacity(darkMode: darkMode)))
+                return AnyShapeStyle(titleColor.opacity(TabChromeHierarchy.titleHoverOpacity(darkMode: darkMode)))
             }
-            return AnyShapeStyle(Color.primary.opacity(TabChromeHierarchy.titleInactiveOpacity(darkMode: darkMode)))
+            return AnyShapeStyle(titleColor.opacity(TabChromeHierarchy.titleInactiveOpacity(darkMode: darkMode)))
         }
         return AnyShapeStyle(isActive ? Color.primary : Color.secondary)
     }
@@ -1518,7 +1503,7 @@ private struct DraggableTabItemView: View {
     private func syncCloseButton(animated: Bool = true) {
         let shouldShow: Bool
         if chromeStyle.isCompactChrome {
-            shouldShow = isHovered && !isDragged
+            shouldShow = (isHovered || isActive) && !isDragged
         } else {
             shouldShow = (isHovered || isActive) && !isDragged
         }

@@ -35,24 +35,22 @@ struct ReadProgressIndicator: View {
 
     var body: some View {
         let clamped = min(max(progress, 0), 1)
-        let unreadProgress = isRead ? 0 : (1 - clamped)
+        let fillProgress = isRead ? 1 : clamped
 
         ZStack {
             Circle()
                 .stroke(trackColor, lineWidth: lineWidth)
 
-            // Keep the progress animation while making unread the stronger state:
-            // full tint when untouched, shrinking tint as reading progresses, empty when read.
-            if unreadProgress >= 0.999 {
+            if fillProgress >= 0.999 {
                 Circle()
                     .fill(tint)
-            } else if unreadProgress > 0.001 {
-                PieSlice(progress: unreadProgress)
+            } else if fillProgress > 0.001 {
+                PieSlice(progress: fillProgress)
                     .fill(tint)
             }
         }
         .frame(width: size, height: size)
-        .animation(.easeInOut(duration: 0.15), value: unreadProgress)
+        .animation(.easeInOut(duration: 0.15), value: fillProgress)
         .animation(.easeInOut(duration: 0.15), value: isRead)
     }
 }

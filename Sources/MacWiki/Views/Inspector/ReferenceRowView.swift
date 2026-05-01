@@ -5,7 +5,7 @@ struct ReferenceRowView: View {
     let displayLabel: String
     let isSelected: Bool
     let isFocused: Bool
-    let hasLink: Bool
+    let hasOpenTarget: Bool
     let onToggleSelection: () -> Void
     let onOpen: () -> Void
     let onCopy: (ReferenceExportFormat) -> Void
@@ -13,6 +13,7 @@ struct ReferenceRowView: View {
 
     @Environment(\.colorScheme) private var colorScheme
     @State private var isHovered = false
+    @State private var isExpanded = false
     @State private var focusPulse = false
     @State private var pulseResetWorkItem: DispatchWorkItem?
 
@@ -30,21 +31,26 @@ struct ReferenceRowView: View {
             .padding(.top, 2)
 
             VStack(alignment: .leading, spacing: 8) {
-                Button(action: onFocus) {
+                Button {
+                    onFocus()
+                    withAnimation(.spring(response: 0.24, dampingFraction: 0.84)) {
+                        isExpanded.toggle()
+                    }
+                } label: {
                     VStack(alignment: .leading, spacing: 8) {
                         labelRow
 
                         Text(item.text)
                             .font(.callout)
                             .foregroundStyle(.primary)
-                            .lineLimit(4)
+                            .lineLimit(isExpanded ? nil : 4)
                             .lineSpacing(2)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .accessibilityHint("Focus this reference")
+                .accessibilityHint(isExpanded ? "Collapse this reference" : "Expand this reference")
 
                 actionRow
             }
@@ -77,6 +83,9 @@ struct ReferenceRowView: View {
         }
         .onChange(of: isFocused) { _, newValue in
             if newValue {
+                withAnimation(.spring(response: 0.24, dampingFraction: 0.84)) {
+                    isExpanded = true
+                }
                 triggerFocusPulse()
             } else {
                 pulseResetWorkItem?.cancel()
@@ -114,13 +123,13 @@ struct ReferenceRowView: View {
                 SwiftUI.Label(isSelected ? "Deselect" : "Select", systemImage: isSelected ? "minus.circle" : "checkmark.circle")
             }
 
-            if hasLink {
+            if hasOpenTarget {
                 Divider()
 
                 Button {
                     onOpen()
                 } label: {
-                    SwiftUI.Label("Open Source", systemImage: "arrow.up.right.square")
+                    SwiftUI.Label("Open Source", systemImage: "safari")
                 }
             }
         }
@@ -129,7 +138,7 @@ struct ReferenceRowView: View {
     private var labelRow: some View {
         HStack(spacing: 6) {
             Text("[\(displayLabel)]")
-                .font(.caption2.weight(.semibold))
+                .font(MacWikiTypography.referenceBadge)
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 6)
                 .padding(.vertical, 2)
@@ -137,18 +146,24 @@ struct ReferenceRowView: View {
 
             if let group = item.group, !group.isEmpty {
                 Text(group)
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(.tertiary)
+                    .font(MacWikiTypography.referenceBadge)
+                    .foregroundStyle(.secondary)
             }
+
+            Spacer(minLength: 4)
+
+            Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                .font(.system(size: 9, weight: .semibold))
+                .foregroundStyle(.tertiary)
         }
     }
 
     private var actionRow: some View {
         HStack(spacing: 8) {
-            Button("Open Source", systemImage: "arrow.up.right.square", action: onOpen)
+            Button("Open Source", systemImage: "safari", action: onOpen)
             .labelStyle(.iconOnly)
             .font(.system(size: 11, weight: .semibold))
-            .foregroundStyle(hasLink ? .secondary : .tertiary)
+            .foregroundStyle(hasOpenTarget ? .secondary : .tertiary)
             .frame(width: 22, height: 22)
             .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
             .overlay {
@@ -156,10 +171,10 @@ struct ReferenceRowView: View {
                     .strokeBorder(Color.white.opacity(0.12), lineWidth: 0.8)
             }
             .buttonStyle(.plain)
-            .disabled(!hasLink)
-            .help(hasLink ? "Open source" : "No link available")
+            .disabled(!hasOpenTarget)
+            .help(hasOpenTarget ? "Open source or search by title" : "No source text available")
 
-            Button("Copy Reference", systemImage: "doc.on.doc") {
+            Button("Copy Reference", systemImage: "doc.on.clipboard") {
                 onCopy(.plainText)
             }
             .labelStyle(.iconOnly)

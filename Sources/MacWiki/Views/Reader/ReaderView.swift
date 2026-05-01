@@ -5,8 +5,7 @@ private enum ReaderMotion {
     static let surfaceSwap = Animation.easeOut(duration: 0.22)
     static let surfaceInsertionScale: CGFloat = 0.995
     static let webRevealDuration: Double = 0.20
-    static let hoverPreviewRevealDuration: Double = 0.16
-    static let hoverPreviewInsertionScale: CGFloat = 0.985
+    static let hoverPreviewInsertionScale: CGFloat = 0.975
     static let hoverPreviewHapticDelay: Double = 0.08
     static let hoverPreviewHapticCooldown: TimeInterval = 0.30
     static let skeletonRevealDuration: Double = AppLoadingMotion.skeletonRevealDuration
@@ -23,44 +22,72 @@ private enum ReaderMotion {
 
 private enum LinkHoverOverlayMetrics {
     static let edgeInset: CGFloat = 14
-    static let attachmentGap: CGFloat = 12
+    static let attachmentGap: CGFloat = 8
     static let leadingBias: CGFloat = 28
+    static let hoverHaloInset: CGFloat = 18
 }
 
 private struct ReaderLinkHoverPreviewOverlay: View {
     let request: WebViewLinkHoverRequest
     let onOpen: () -> Void
     let onOpenInNewTab: () -> Void
+    let onOpenInNewWindow: () -> Void
     let onSave: () -> Void
     var onReveal: () -> Void = {}
     var onHoverStateChange: (Bool) -> Void = { _ in }
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var preferredPreviewHeight: CGFloat = LinkHoverPreviewMetrics.height
+
+    private var previewSwapTransition: AnyTransition {
+        reduceMotion
+            ? .identity
+            : .opacity.combined(with: .scale(scale: 0.988, anchor: .top))
+    }
 
     var body: some View {
         GeometryReader { proxy in
             let previewSize = resolvedPreviewSize(in: proxy.size)
-            let previewOrigin = resolvedPreviewOrigin(for: previewSize, in: proxy.size)
-
-            LinkHoverPreviewPane(
-                title: request.articleTitle ?? "Article",
-                url: request.url,
-                onOpen: onOpen,
-                onOpenInNewTab: onOpenInNewTab,
-                onSave: onSave,
-                previewSize: previewSize,
-                onPreferredHeightChange: { newHeight in
-                    let clampedHeight = min(
-                        max(newHeight, LinkHoverPreviewMetrics.height),
-                        max(0, proxy.size.height - (LinkHoverOverlayMetrics.edgeInset * 2))
-                    )
-                    guard abs(preferredPreviewHeight - clampedHeight) > 0.5 else { return }
-                    preferredPreviewHeight = clampedHeight
-                },
-                onHoverStateChange: onHoverStateChange
+            let interactiveSize = resolvedInteractiveSize(for: previewSize)
+            let interactiveOrigin = resolvedInteractiveOrigin(
+                for: previewSize,
+                interactiveSize: interactiveSize,
+                in: proxy.size
             )
+
+            ZStack {
+                LinkHoverPreviewPane(
+                    title: request.articleTitle ?? "Article",
+                    fallbackURL: request.url,
+                    onOpen: onOpen,
+                    onOpenInNewTab: onOpenInNewTab,
+                    onOpenInNewWindow: onOpenInNewWindow,
+                    onSave: onSave,
+                    previewSize: previewSize,
+                    onPreferredHeightChange: { newHeight in
+                        let availableHeight = max(
+                            0,
+                            proxy.size.height -
+                                (LinkHoverOverlayMetrics.edgeInset * 2) -
+                                (LinkHoverOverlayMetrics.hoverHaloInset * 2)
+                        )
+                        let clampedHeight = min(
+                            max(newHeight, LinkHoverPreviewMetrics.height),
+                            availableHeight
+                        )
+                        guard abs(preferredPreviewHeight - clampedHeight) > 0.5 else { return }
+                        preferredPreviewHeight = clampedHeight
+                    }
+                )
+                .id(request.signature)
+                .transition(previewSwapTransition)
+            }
+            .padding(LinkHoverOverlayMetrics.hoverHaloInset)
+            .frame(width: interactiveSize.width, height: interactiveSize.height)
+            .contentShape(Rectangle())
+            .onHover(perform: onHoverStateChange)
             .position(
-                x: previewOrigin.x + (previewSize.width * 0.5),
-                y: previewOrigin.y + (previewSize.height * 0.5)
+                x: interactiveOrigin.x + (interactiveSize.width * 0.5),
+                y: interactiveOrigin.y + (interactiveSize.height * 0.5)
             )
             .onAppear(perform: onReveal)
             .onChange(of: request.signature) { oldSignature, newSignature in
@@ -68,29 +95,61 @@ private struct ReaderLinkHoverPreviewOverlay: View {
                 preferredPreviewHeight = LinkHoverPreviewMetrics.height
                 onReveal()
             }
+            .animation(reduceMotion ? nil : .easeInOut(duration: 0.16), value: request.signature)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
     private func resolvedPreviewSize(in container: CGSize) -> CGSize {
-        let availableWidth = max(0, container.width - (LinkHoverOverlayMetrics.edgeInset * 2))
-        let availableHeight = max(0, container.height - (LinkHoverOverlayMetrics.edgeInset * 2))
+        let availableWidth = max(
+            0,
+            container.width -
+                (LinkHoverOverlayMetrics.edgeInset * 2) -
+                (LinkHoverOverlayMetrics.hoverHaloInset * 2)
+        )
+        let availableHeight = max(
+            0,
+            container.height -
+                (LinkHoverOverlayMetrics.edgeInset * 2) -
+                (LinkHoverOverlayMetrics.hoverHaloInset * 2)
+        )
         return CGSize(
             width: min(LinkHoverPreviewMetrics.width, availableWidth),
             height: min(max(preferredPreviewHeight, LinkHoverPreviewMetrics.height), availableHeight)
         )
     }
 
-    private func resolvedPreviewOrigin(for previewSize: CGSize, in container: CGSize) -> CGPoint {
+    private func resolvedInteractiveSize(for previewSize: CGSize) -> CGSize {
+        CGSize(
+            width: previewSize.width + (LinkHoverOverlayMetrics.hoverHaloInset * 2),
+            height: previewSize.height + (LinkHoverOverlayMetrics.hoverHaloInset * 2)
+        )
+    }
+
+    private func resolvedInteractiveOrigin(
+        for previewSize: CGSize,
+        interactiveSize: CGSize,
+        in container: CGSize
+    ) -> CGPoint {
         let minX = LinkHoverOverlayMetrics.edgeInset
-        let maxX = max(minX, container.width - previewSize.width - LinkHoverOverlayMetrics.edgeInset)
-        let preferredX = request.point.x - LinkHoverOverlayMetrics.leadingBias
+        let maxX = max(minX, container.width - interactiveSize.width - LinkHoverOverlayMetrics.edgeInset)
+        let preferredX =
+            request.point.x -
+            LinkHoverOverlayMetrics.leadingBias -
+            LinkHoverOverlayMetrics.hoverHaloInset
         let originX = min(max(preferredX, minX), maxX)
 
         let minY = LinkHoverOverlayMetrics.edgeInset
-        let maxY = max(minY, container.height - previewSize.height - LinkHoverOverlayMetrics.edgeInset)
-        let preferredBelowY = request.point.y + LinkHoverOverlayMetrics.attachmentGap
-        let preferredAboveY = request.point.y - previewSize.height - LinkHoverOverlayMetrics.attachmentGap
+        let maxY = max(minY, container.height - interactiveSize.height - LinkHoverOverlayMetrics.edgeInset)
+        let preferredBelowY =
+            request.point.y +
+            LinkHoverOverlayMetrics.attachmentGap -
+            LinkHoverOverlayMetrics.hoverHaloInset
+        let preferredAboveY =
+            request.point.y -
+            previewSize.height -
+            LinkHoverOverlayMetrics.attachmentGap -
+            LinkHoverOverlayMetrics.hoverHaloInset
         let originY: CGFloat
         if preferredBelowY <= maxY {
             originY = min(max(preferredBelowY, minY), maxY)
@@ -166,10 +225,13 @@ struct ReaderView: View {
         )
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear {
-            WebViewPool.shared.retain(only: Set(appState.openTabs.map(\.id)))
+            WebViewPool.shared.retain(only: Set(appState.openTabs.map(\.id)), for: appState.webViewPoolOwnerID)
         }
         .onChange(of: appState.openTabs.map(\.id)) { _, tabIDs in
-            WebViewPool.shared.retain(only: Set(tabIDs))
+            WebViewPool.shared.retain(only: Set(tabIDs), for: appState.webViewPoolOwnerID)
+        }
+        .onDisappear {
+            WebViewPool.shared.releaseOwner(appState.webViewPoolOwnerID)
         }
     }
 
@@ -192,8 +254,6 @@ struct NewTabPageView: View {
     }
 }
 
-/// Quick search overlay with live Wikipedia search
-
 /// Article view with WebView content rendering
 struct ArticleView: View {
     private struct PendingHydratedMetadata: Equatable {
@@ -207,6 +267,7 @@ struct ArticleView: View {
     let article: Article
     @Binding var scrollPosition: CGFloat
     @Environment(AppState.self) private var appState
+    @Environment(\.openWindow) private var openWindow
     @Environment(\.modelContext) private var modelContext
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -245,9 +306,10 @@ struct ArticleView: View {
     @AppStorage(ReaderAppearanceStorageKey.contentWidth) private var readerContentWidth: Double = ReaderAppearance.default.contentWidth
     @AppStorage(ReaderAppearanceStorageKey.horizontalPadding) private var readerHorizontalPadding: Double = ReaderAppearance.default.horizontalPadding
     @AppStorage(ReaderAppearanceStorageKey.headingScale) private var readerHeadingScale: Double = ReaderAppearance.default.headingScale
-    @AppStorage(AppStorageKey.Chrome.tabBarLiquidGlass) private var tabBarLiquidGlass = true
+    @AppStorage(AppStorageKey.Reader.linkPreviewImmediateModifier) private var linkPreviewImmediateModifier: ReaderLinkPreviewImmediateModifier = .default
+    @AppStorage(AppStorageKey.Chrome.liquidGlassChrome) private var liquidGlassChrome = true
     @AppStorage(MacWikiGlassRuntime.forceLegacyFallbackKey) private var forceLegacyGlassFallback = false
-    @AppStorage(AppStorageKey.Chrome.nativeHighlightingMenuEnabled) private var nativeHighlightingMenuEnabled = false
+    @AppStorage(AppStorageKey.Chrome.nativeHighlightingMenuEnabled) private var nativeHighlightingMenuEnabled = AppStorageKey.Chrome.nativeHighlightingMenuEnabledDefault
 
     init(tabId: UUID, article: Article, scrollPosition: Binding<CGFloat>) {
         self.tabId = tabId
@@ -314,7 +376,11 @@ struct ArticleView: View {
         }
         let resolved: CGFloat
         if hasToolbarControls {
-            resolved = resolvedTopObscuredHeight + 10 + compactWidthBoost
+            let chromeOverlapInset = max(
+                readerChromeMetrics.titlebarTabStripHeight + 8,
+                resolvedTopObscuredHeight - 44
+            )
+            resolved = chromeOverlapInset + compactWidthBoost
         } else {
             resolved = resolvedTopObscuredHeight + 8
         }
@@ -337,9 +403,6 @@ struct ArticleView: View {
     }
 
     private var usesNativeFindNavigator: Bool {
-        if #available(macOS 26, *) {
-            return true
-        }
         return false
     }
 
@@ -372,7 +435,10 @@ struct ArticleView: View {
     private var linkHoverPreviewTransition: AnyTransition {
         reduceMotion
             ? .identity
-            : .opacity.combined(with: .scale(scale: ReaderMotion.hoverPreviewInsertionScale, anchor: .topLeading))
+            : .asymmetric(
+                insertion: .opacity.combined(with: .scale(scale: ReaderMotion.hoverPreviewInsertionScale, anchor: .top)),
+                removal: .opacity
+            )
     }
     
     var body: some View {
@@ -512,12 +578,15 @@ struct ArticleView: View {
                 onLinkTapped: { title in
                     openLinkedArticle(title: title)
                 },
+                onOpenArticleInNewWindow: { article in
+                    openWindow(value: article)
+                },
                 onTextSelected: { selectionData in
-                    if nativeHighlightingMenuEnabled {
+                    guard !nativeHighlightingMenuEnabled else {
                         appState.currentTextSelection = nil
-                    } else {
-                        appState.currentTextSelection = selectionData
+                        return
                     }
+                    appState.currentTextSelection = selectionData
                 },
                 onSelectionCleared: {
                     appState.currentTextSelection = nil
@@ -571,6 +640,7 @@ struct ArticleView: View {
                 },
                 linkHoverPreviewOverlayHovering: isHoveringLinkHoverPreview,
                 activeLinkHoverPreviewSignature: linkHoverPreviewRequest?.signature,
+                linkPreviewImmediateModifier: linkPreviewImmediateModifier,
                 nativeHighlightingMenuEnabled: nativeHighlightingMenuEnabled,
                 openTimer: $openTimer,
                 appState: appState,
@@ -589,6 +659,9 @@ struct ArticleView: View {
                         },
                         onOpenInNewTab: {
                             openLinkHoverPreview(request, inNewTab: true)
+                        },
+                        onOpenInNewWindow: {
+                            openLinkHoverPreviewInNewWindow(request)
                         },
                         onSave: {
                             saveLinkHoverPreview(request)
@@ -626,17 +699,19 @@ struct ArticleView: View {
     }
 
     private var markAsReadPrompt: some View {
-        HStack(spacing: 12) {
-            markAsReadIcon
-            markAsReadCopy
+        MacWikiGlassGroup(spacing: 7) {
+            HStack(spacing: 12) {
+                markAsReadIcon
+                markAsReadCopy
 
-            Spacer(minLength: 6)
+                Spacer(minLength: 6)
 
-            markAsReadActions
+                markAsReadActions
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 9)
+            .background(markAsReadPromptBackground)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 9)
-        .background(markAsReadPromptBackground)
         .shadow(color: .black.opacity(colorScheme == .dark ? 0.16 : 0.06), radius: 10, y: 4)
         .compositingGroup()
         .frame(maxWidth: 620)
@@ -714,8 +789,10 @@ struct ArticleView: View {
     private var markAsReadPromptBackground: some View {
         let shape = RoundedRectangle(cornerRadius: ReaderMotion.promptCornerRadius, style: .continuous)
         if #available(macOS 26, *),
-           tabBarLiquidGlass &&
-            MacWikiGlassRuntime.usesNativeGlass(forceLegacyFallback: forceLegacyGlassFallback) {
+           MacWikiGlassRuntime.usesNativeGlass(
+            isEnabled: liquidGlassChrome,
+            forceLegacyFallback: forceLegacyGlassFallback
+           ) {
             shape
                 .fill(.clear)
                 .glassEffect(.regular, in: .rect(cornerRadius: ReaderMotion.promptCornerRadius))
@@ -755,8 +832,10 @@ struct ArticleView: View {
     private var markAsReadPrimaryActionBackground: some View {
         let shape = Capsule(style: .continuous)
         if #available(macOS 26, *),
-           tabBarLiquidGlass &&
-            MacWikiGlassRuntime.usesNativeGlass(forceLegacyFallback: forceLegacyGlassFallback) {
+           MacWikiGlassRuntime.usesNativeGlass(
+            isEnabled: liquidGlassChrome,
+            forceLegacyFallback: forceLegacyGlassFallback
+           ) {
             shape
                 .fill(.clear)
                 .glassEffect(.regular.interactive(), in: .capsule)
@@ -1093,6 +1172,16 @@ struct ArticleView: View {
         }
     }
 
+    private func openLinkHoverPreviewInNewWindow(_ request: WebViewLinkHoverRequest) {
+        updateLinkHoverPreview(nil)
+        guard let article = hoverPreviewArticle(for: request) else {
+            _ = SystemBridge.openURLExternally(request.url)
+            return
+        }
+
+        openWindow(value: article)
+    }
+
     private func saveLinkHoverPreview(_ request: WebViewLinkHoverRequest) {
         updateLinkHoverPreview(nil)
         guard let article = hoverPreviewArticle(for: request) else { return }
@@ -1120,7 +1209,7 @@ struct ArticleView: View {
         if reduceMotion {
             updates()
         } else {
-            withAnimation(.easeOut(duration: ReaderMotion.hoverPreviewRevealDuration), updates)
+            withAnimation(.spring(response: 0.24, dampingFraction: 0.90, blendDuration: 0.04), updates)
         }
     }
 

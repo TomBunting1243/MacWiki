@@ -3,7 +3,14 @@ import SwiftUI
 
 extension AppState {
     func setNavigationColumnsVisible(_ isVisible: Bool) {
+        listContentsColumnVisible = isVisible
         navigationSplitViewVisibility = isVisible ? .all : .detailOnly
+    }
+
+    func toggleNavigationColumnsVisibility() {
+        guard !isWikiHopNavigationLocked else { return }
+
+        setNavigationColumnsVisible(!(listsSidebarVisible || directoryColumnVisible))
     }
 
     func toggleListsSidebarVisibility() {
@@ -11,7 +18,7 @@ extension AppState {
 
         switch navigationSplitViewVisibility {
         case .all, .automatic:
-            navigationSplitViewVisibility = .doubleColumn
+            navigationSplitViewVisibility = listContentsColumnVisible ? .doubleColumn : .detailOnly
         case .doubleColumn, .detailOnly:
             navigationSplitViewVisibility = .all
         default:
@@ -19,7 +26,30 @@ extension AppState {
         }
     }
 
+    func toggleDirectoryColumnVisibility() {
+        guard !isWikiHopNavigationLocked else { return }
+
+        if directoryColumnVisible {
+            listContentsColumnVisible = false
+            navigationSplitViewVisibilityBeforeReaderOnly = navigationSplitViewVisibility
+            if listsSidebarVisible {
+                navigationSplitViewVisibility = .all
+            } else {
+                navigationSplitViewVisibility = .detailOnly
+            }
+        } else {
+            listContentsColumnVisible = true
+            if navigationSplitViewVisibility == .detailOnly {
+                navigationSplitViewVisibility = navigationSplitViewVisibilityBeforeReaderOnly
+            } else {
+                navigationSplitViewVisibility = .all
+            }
+        }
+    }
+
     func setNavigationSplitViewVisibility(listsVisible: Bool, directoryVisible: Bool) {
+        listContentsColumnVisible = directoryVisible
+
         switch (listsVisible, directoryVisible) {
         case (true, true):
             navigationSplitViewVisibility = .all

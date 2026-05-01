@@ -109,10 +109,14 @@ struct MacWikiApp: App {
         let shellLayoutMigrationKey = "mainWindow.shellLayoutVersion"
         let currentShellLayoutVersion = 12
 
+        // Search is now a single sidebar-resident surface. Drop the retired overlay preference.
+        defaults.removeObject(forKey: AppStorageKey.Search.presentationMode)
+
         if defaults.integer(forKey: shellLayoutMigrationKey) < currentShellLayoutVersion {
-            defaults.removeObject(forKey: "mainWindow.sidebarWidth")
-            defaults.removeObject(forKey: "mainWindow.directoryWidth")
-            defaults.removeObject(forKey: "mainWindow.inspectorWidth")
+            defaults.removeObject(forKey: AppStorageKey.MainWindow.sidebarWidth)
+            defaults.removeObject(forKey: AppStorageKey.MainWindow.directoryWidth)
+            defaults.removeObject(forKey: AppStorageKey.MainWindow.inspectorWidth)
+            defaults.removeObject(forKey: AppStorageKey.ArticleWindow.inspectorWidth)
             defaults.removeObject(forKey: "NSToolbar Configuration main-window-toolbar")
             defaults.removeObject(forKey: "NSToolbar Configuration main-window-toolbar-v2")
             defaults.removeObject(forKey: "NSToolbar Configuration main-window-toolbar-v3")
@@ -145,9 +149,10 @@ struct MacWikiApp: App {
             }
         }
 
-        sanitizePersistedSplitWidth(defaults, key: "mainWindow.sidebarWidth", minimum: 180, maximum: 320)
-        sanitizePersistedSplitWidth(defaults, key: "mainWindow.directoryWidth", minimum: 260, maximum: 420)
-        sanitizePersistedSplitWidth(defaults, key: "mainWindow.inspectorWidth", minimum: 260, maximum: 340)
+        sanitizePersistedSplitWidth(defaults, key: AppStorageKey.MainWindow.sidebarWidth, minimum: 176, maximum: 260)
+        sanitizePersistedSplitWidth(defaults, key: AppStorageKey.MainWindow.directoryWidth, minimum: 260, maximum: 420)
+        sanitizePersistedSplitWidth(defaults, key: AppStorageKey.MainWindow.inspectorWidth, minimum: 260, maximum: 460)
+        sanitizePersistedSplitWidth(defaults, key: AppStorageKey.ArticleWindow.inspectorWidth, minimum: 260, maximum: 460)
     }
 
     private static func sanitizePersistedSplitWidth(
@@ -249,6 +254,7 @@ struct MacWikiApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .focusedSceneValue(\.macWikiCommandAppState, appState)
                 .toolbar(removing: .title)
                 .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
                 .alert(item: $launchIssue) { issue in
@@ -280,132 +286,32 @@ struct MacWikiApp: App {
             height: Self.launchWindowSize.height
         )
         .commands {
-            CommandGroup(replacing: .appInfo) {
-                Button("About MacWiki") {
-                    showAboutPanel()
-                }
-            }
+            MacWikiCommands(
+                fallbackAppState: appState,
+                showAboutPanel: showAboutPanel,
+                adjustReaderFontSize: { adjustReaderFontSize(by: $0) },
+                resetReaderFontSize: resetReaderFontSize
+            )
+        }
 
-            SidebarCommands()
-            ToolbarCommands()
-
-            // Search commands
-            CommandGroup(after: .textEditing) {
-                Button("Search Wikipedia") {
-                    appState.startSearch(context: .navigation)
-                }
-                .keyboardShortcut("k", modifiers: .command)
-                .disabled(appState.isWikiHopNavigationLocked)
-
-                Button("Find in Page") {
-                    appState.presentFindOnPage()
-                }
-                .keyboardShortcut("f", modifiers: .command)
-                .disabled(appState.currentArticle == nil)
-            }
-            
-            // Tab commands
-            CommandGroup(after: .newItem) {
-                Button("New Reading List") {
-                    NotificationCenter.default.post(name: .macWikiRequestNewReadingList, object: nil)
-                }
-                .keyboardShortcut("n", modifiers: [.command, .option, .shift])
-
-                Button("New Folder") {
-                    NotificationCenter.default.post(name: .macWikiRequestNewFolder, object: nil)
-                }
-                .keyboardShortcut("n", modifiers: [.command, .shift])
-
-                Divider()
-
-                Button("New Tab") {
-                    appState.createNewTab()
-                }
-                .keyboardShortcut("t", modifiers: .command)
-                .disabled(appState.isWikiHopNavigationLocked)
-                
-                Button("Close Tab") {
-                    appState.closeActiveTab()
-                }
-                .keyboardShortcut("w", modifiers: .command)
-                .disabled(appState.activeTabId == nil || appState.isWikiHopNavigationLocked)
-
-                Button("Reopen Closed Tab") {
-                    appState.reopenLastClosedTab()
-                }
-                .keyboardShortcut("t", modifiers: [.command, .shift])
-                .disabled(appState.recentlyClosedTabs.isEmpty || appState.isWikiHopNavigationLocked)
-            }
-            
-            // Article commands
-            CommandGroup(replacing: .saveItem) {
-                Button("Save Article...") {
-                    appState.presentOptionClickSavePromptForCurrentArticle()
-                }
-                .keyboardShortcut("s", modifiers: .command)
-                .disabled(appState.currentArticle == nil)
-            }
-
-            CommandGroup(after: .pasteboard) {
-                Button("Add to List...") {
-                    appState.showAddToList = true
-                }
-                .keyboardShortcut("l", modifiers: .command)
-                .disabled(appState.activeTabId == nil)
-            }
-            
-            // Navigation commands
-            CommandGroup(after: .toolbar) {
-                Button("Next Tab") {
-                    appState.nextTab()
-                }
-                .keyboardShortcut(.tab, modifiers: .control)
-                .disabled(appState.openTabs.isEmpty || appState.isWikiHopNavigationLocked)
-
-                Button("Next Tab") {
-                    appState.nextTab()
-                }
-                .keyboardShortcut(.rightArrow, modifiers: [.command, .option])
-                .disabled(appState.openTabs.isEmpty || appState.isWikiHopNavigationLocked)
-                
-                Button("Previous Tab") {
-                    appState.previousTab()
-                }
-                .keyboardShortcut(.tab, modifiers: [.control, .shift])
-                .disabled(appState.openTabs.isEmpty || appState.isWikiHopNavigationLocked)
-
-                Button("Previous Tab") {
-                    appState.previousTab()
-                }
-                .keyboardShortcut(.leftArrow, modifiers: [.command, .option])
-                .disabled(appState.openTabs.isEmpty || appState.isWikiHopNavigationLocked)
-
-                Divider()
-
-                Button("Toggle Inspector") {
-                    appState.toggleInspectorVisibility()
-                }
-                .keyboardShortcut("i", modifiers: [.command, .shift])
-            }
-
-            // Reader typography shortcuts
-            CommandGroup(after: .windowSize) {
-                Button("Increase Reader Font Size") {
-                    adjustReaderFontSize(by: 1)
-                }
-                .keyboardShortcut("=", modifiers: .command)
-
-                Button("Decrease Reader Font Size") {
-                    adjustReaderFontSize(by: -1)
-                }
-                .keyboardShortcut("-", modifiers: .command)
-
-                Button("Reset Reader Font Size") {
-                    resetReaderFontSize()
-                }
-                .keyboardShortcut("0", modifiers: .command)
+        WindowGroup("Article", for: Article.self) { $article in
+            if let article = article {
+                ArticleWindowRootView(initialArticle: article)
+            } else {
+                ContentUnavailableView(
+                    "No Article Selected",
+                    systemImage: "doc.text",
+                    description: Text("Open an article from a context menu to create a dedicated article window.")
+                )
             }
         }
+        .modelContainer(bootstrap.modelContainer)
+        .restorationBehavior(.disabled)
+        .windowBackgroundDragBehavior(.enabled)
+        .defaultSize(
+            width: Self.launchWindowSize.width,
+            height: Self.launchWindowSize.height
+        )
         
         Settings {
             SettingsView()

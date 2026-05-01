@@ -20,7 +20,7 @@ final class WebViewPool {
 
     private var entriesByTabID: [UUID: Entry] = [:]
     private var lruOrder: [UUID] = []
-    private var retainedTabIDs: Set<UUID> = []
+    private var retainedTabIDsByOwner: [UUID: Set<UUID>] = [:]
     private let maxRetainedWebViews = 4
 
     private init() {}
@@ -46,7 +46,7 @@ final class WebViewPool {
         lastLoadedHTMLSignature: UInt64
     ) {
         guard !lastLoadedArticleTitle.isEmpty else { return }
-        if !retainedTabIDs.isEmpty, !retainedTabIDs.contains(tabID) {
+        if !canStoreWebView(for: tabID) {
             release(webView)
             return
         }
@@ -65,9 +65,48 @@ final class WebViewPool {
         trimToBudget()
     }
 
-    func retain(only tabIDs: Set<UUID>) {
-        retainedTabIDs = tabIDs
-        let toRemove = entriesByTabID.keys.filter { !tabIDs.contains($0) }
+    func retain(only tabIDs: Set<UUID>, for ownerID: UUID) {
+        retainedTabIDsByOwner[ownerID] = tabIDs
+        releaseEntriesOutsideRetainedUnion()
+    }
+
+    func releaseOwner(_ ownerID: UUID) {
+        retainedTabIDsByOwner.removeValue(forKey: ownerID)
+        releaseEntriesOutsideRetainedUnion()
+    }
+
+#if DEBUG
+    func retainedTabIDsForTesting() -> Set<UUID> {
+        retainedTabIDsSnapshot
+    }
+
+    func canStoreWebViewForTesting(for tabID: UUID) -> Bool {
+        canStoreWebView(for: tabID)
+    }
+
+    func resetForTesting() {
+        for entry in entriesByTabID.values {
+            release(entry.webView)
+        }
+        entriesByTabID.removeAll()
+        lruOrder.removeAll()
+        retainedTabIDsByOwner.removeAll()
+    }
+#endif
+
+    private var retainedTabIDsSnapshot: Set<UUID> {
+        retainedTabIDsByOwner.values.reduce(into: Set<UUID>()) { union, tabIDs in
+            union.formUnion(tabIDs)
+        }
+    }
+
+    private func canStoreWebView(for tabID: UUID) -> Bool {
+        retainedTabIDsByOwner.isEmpty || retainedTabIDsSnapshot.contains(tabID)
+    }
+
+    private func releaseEntriesOutsideRetainedUnion() {
+        let retainedTabIDs = retainedTabIDsSnapshot
+        let toRemove = entriesByTabID.keys.filter { !retainedTabIDs.contains($0) }
         for tabID in toRemove {
             guard let entry = entriesByTabID.removeValue(forKey: tabID) else { continue }
             lruOrder.removeAll { $0 == tabID }

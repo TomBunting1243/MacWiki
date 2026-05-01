@@ -175,6 +175,8 @@ struct LabelArticlesView: View {
                         onTagClick: { tag in
                             localTagFilter = (localTagFilter?.id == tag.id) ? nil : tag
                         },
+                        showsLabelMetadata: false,
+                        showsListMembership: true,
                         onNewLabel: { draft in
                             onNewLabelWithArticle(draft)
                         },

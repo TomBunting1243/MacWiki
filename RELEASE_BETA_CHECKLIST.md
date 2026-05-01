@@ -7,15 +7,19 @@ Use this checklist every time you publish a beta to GitHub.
 Run the full non-manual preflight in one command:
 
 ```bash
-./scripts/preflight_beta_release.sh
+./scripts/preflight_beta_release.sh \
+  --identity "Developer ID Application: YOUR NAME (TEAMID)" \
+  --notary-profile "macwiki-notary"
 ```
 
-That command covers icon/plist checks, secret scan, build/test/release gates, and `.app` packaging.
+That command covers metadata consistency, repo hygiene, secret scan, build/test/release gates, signing, notarization, stapling, and `.app` packaging.
 
 For the full guided publish flow (prompts + GitHub release upload), run:
 
 ```bash
-./scripts/release_beta.sh
+./scripts/release_beta.sh \
+  --identity "Developer ID Application: YOUR NAME (TEAMID)" \
+  --notary-profile "macwiki-notary"
 ```
 
 ## 1) Product Freeze
@@ -36,6 +40,7 @@ For the full guided publish flow (prompts + GitHub release upload), run:
   ./scripts/generate_app_icon.sh /absolute/path/to/custom-1024.png
   ```
 - [ ] App name, version, and build metadata are correct (`Info.plist`).
+- [ ] Package target, `Info.plist`, README, and packaged binary all agree on the minimum macOS version.
 - [ ] Settings opens from `Cmd+,`.
 - [ ] About panel includes app name/version plus license/trademark links.
 - [ ] Keyboard-first flows work (`Cmd+K`, `Cmd+T`, `Cmd+Shift+I`).
@@ -67,35 +72,41 @@ For the full guided publish flow (prompts + GitHub release upload), run:
   ```
 - [ ] `.app` beta artifact is packaged:
   ```bash
-  ./scripts/package_beta_app.sh
+  ./scripts/package_beta_app.sh \
+    --identity "Developer ID Application: YOUR NAME (TEAMID)" \
+    --notary-profile "macwiki-notary"
   ```
-- [ ] Manual QA pass for fragile flows (currently: nested reading-list folder collapse/rename/drag).
+- [ ] Manual QA matrix is complete: `PUBLIC_BETA_QA_MATRIX.md`.
 
 ## 5) Repo Hygiene (Before First Public Push)
 
 - [ ] Confirm local-only files are ignored and untracked:
   - `.agent/`
   - `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `ANTIGRAVITY.md`
+  - `MODEL_HANDOVER_*.md`
+  - `macwiki-sidebar-audit.png`
   - `.build/`, `.swiftpm/`, `MacWikiURLCache/`, profiling files
 - [ ] Verify:
   ```bash
   git status --short
   ```
+- [ ] Release scripts are being run from a clean git tree only.
 
 ## 6) Publish to GitHub
 
 Recommended: use the guided script.
 
 ```bash
-./scripts/release_beta.sh
+./scripts/release_beta.sh \
+  --identity "Developer ID Application: YOUR NAME (TEAMID)" \
+  --notary-profile "macwiki-notary"
 ```
 
 Manual commands are still available if needed:
 
 ```bash
-git add .
-git commit -m "Release: v0.5.0-beta.N"
-git push origin main
+git status --short
+git push origin <current-branch>
 git tag -a v0.5.0-beta.N -m "MacWiki beta v0.5.0-beta.N"
 git push origin v0.5.0-beta.N
 gh release create v0.5.0-beta.N --prerelease --generate-notes --title "MacWiki v0.5.0-beta.N"
@@ -116,16 +127,19 @@ gh release upload v0.5.0-beta.N dist/MacWiki-v0.5.0-beta.N.zip --clobber
 
 If your packaged filename includes a timestamp, either rename it first or use the exact generated path.
 
-## 9) Signing and Notarization (Recommended for External Testers)
+## 9) Signing and Notarization (Required For Public Beta)
 
-- [ ] Use Developer ID signing identity for `package_beta_app.sh`:
+- [ ] Use a Developer ID signing identity for `package_beta_app.sh`:
   ```bash
-  ./scripts/package_beta_app.sh --identity "Developer ID Application: YOUR NAME (TEAMID)"
+  ./scripts/package_beta_app.sh \
+    --identity "Developer ID Application: YOUR NAME (TEAMID)" \
+    --notary-profile "macwiki-notary"
   ```
-- [ ] Notarize and staple before broad external distribution.
+- [ ] The packaged app is notarized, stapled, and accepted by Gatekeeper before announcement.
 
 ## 10) Post-Release
 
 - [ ] Smoke-test the released tag on a clean machine/user account.
 - [ ] Track top issues discovered by beta users.
+- [ ] Archive the current performance run from `scripts/profile_reader_open.sh` with the release artifacts or QA notes.
 - [ ] Record outcomes in development log and QA report.

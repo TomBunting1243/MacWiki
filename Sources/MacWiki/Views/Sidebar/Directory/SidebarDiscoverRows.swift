@@ -42,18 +42,18 @@ struct DiscoverTimelineRow: View {
     private var rowContent: some View {
         HStack(alignment: .top, spacing: 8) {
             Text(event.year)
-                .font(.caption.weight(.bold))
+                .font(MacWikiTypography.compactRowMetadata)
                 .foregroundStyle(.secondary)
                 .frame(width: 54, alignment: .leading)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(event.text)
-                    .font(.subheadline.weight(.medium))
+                    .font(MacWikiTypography.compactRowBody)
                     .lineSpacing(2)
                     .lineLimit(3)
                 if let article = event.article {
                     Text(article.title)
-                        .font(.caption.weight(.semibold))
+                        .font(MacWikiTypography.compactRowMetadata)
                         .foregroundStyle(Color.accentColor)
                         .lineLimit(1)
                 }
@@ -80,18 +80,18 @@ struct DiscoverFactRow: View {
         } label: {
             HStack(alignment: .top, spacing: 8) {
                 Image(systemName: "lightbulb")
-                    .font(.caption.weight(.semibold))
+                    .font(MacWikiTypography.compactRowMetadata)
                     .foregroundStyle(.secondary)
                     .padding(.top, 1)
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(fact.text)
-                        .font(.subheadline.weight(.medium))
+                        .font(MacWikiTypography.compactRowBody)
                         .lineSpacing(2)
                         .lineLimit(3)
                     if let article = fact.article {
                         Text(article.title)
-                            .font(.caption.weight(.semibold))
+                            .font(MacWikiTypography.compactRowMetadata)
                             .foregroundStyle(Color.accentColor)
                             .lineLimit(1)
                     }
@@ -140,7 +140,7 @@ struct DiscoverStoryRow: View {
         VStack(alignment: .leading, spacing: 6) {
             if !story.story.isEmpty {
                 Text(renderedStoryText)
-                    .font(.subheadline.weight(.medium))
+                    .font(MacWikiTypography.compactRowBody)
                     .lineSpacing(2)
                     .lineLimit(3)
             }
@@ -152,7 +152,7 @@ struct DiscoverStoryRow: View {
                             onOpenArticle(article, SystemBridge.isCommandPressed)
                         } label: {
                             Text(article.title)
-                                .font(.caption.weight(.semibold))
+                                .font(MacWikiTypography.compactRowMetadata)
                                 .lineLimit(1)
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 4)
@@ -301,18 +301,18 @@ struct DiscoverHolidayListRow: View {
     private var rowContent: some View {
         HStack(alignment: .top, spacing: 8) {
             Image(systemName: "calendar")
-                .font(.caption.weight(.semibold))
+                .font(MacWikiTypography.compactRowMetadata)
                 .foregroundStyle(.secondary)
                 .padding(.top, 1)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(holiday.text)
-                    .font(.subheadline.weight(.medium))
+                    .font(MacWikiTypography.compactRowBody)
                     .lineSpacing(2)
                     .lineLimit(3)
                 if let article = holiday.article {
                     Text(article.title)
-                        .font(.caption.weight(.semibold))
+                        .font(MacWikiTypography.compactRowMetadata)
                         .foregroundStyle(Color.accentColor)
                         .lineLimit(1)
                 }

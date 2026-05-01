@@ -30,7 +30,14 @@ struct SidebarPageViewsPopoverContent: View {
     }
 
     private var requestedDays: Int {
-        selectedRange.requestedDays(relativeTo: referenceDate)
+        presentationContext.requestedDays
+    }
+
+    private var presentationContext: DiscoverPageViewsPresentationContext {
+        DiscoverPageViewsPresentationContext(
+            selectedDate: referenceDate,
+            selectedRange: selectedRange
+        )
     }
 
     private var loadKey: String {
@@ -38,14 +45,19 @@ struct SidebarPageViewsPopoverContent: View {
             .lowercased()
             .replacingOccurrences(of: "_", with: " ")
             .trimmingCharacters(in: .whitespacesAndNewlines)
-        let endStamp = Int(referenceDate.timeIntervalSinceReferenceDate)
+        let endStamp = Int(presentationContext.historyEndDate.timeIntervalSinceReferenceDate)
         return "\(normalizedTitle)|\(endStamp)|\(selectedRange.rawValue)|\(requestedDays)"
     }
 
     var body: some View {
         Group {
             if let pulse {
-                TrendPulsePopoverView(title: title, pulse: pulse, selectedRange: $selectedRange)
+                TrendPulsePopoverView(
+                    title: title,
+                    pulse: pulse,
+                    selectedRange: $selectedRange,
+                    presentationContext: presentationContext
+                )
             } else if isLoading {
                 VStack(alignment: .leading, spacing: 10) {
                     Text("Views")
@@ -104,7 +116,7 @@ struct SidebarPageViewsPopoverContent: View {
         do {
             let fetched = try await WikipediaService.shared.fetchTrendPulse(
                 for: title,
-                referenceDate: referenceDate,
+                referenceDate: presentationContext.historyEndDate,
                 days: requestedDays
             )
             guard !Task.isCancelled else { return }

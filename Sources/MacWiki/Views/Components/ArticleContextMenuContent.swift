@@ -4,7 +4,10 @@ import SwiftData
 /// Unified context menu content for articles across all views.
 /// Ensures exact parity for Tags, Labels, Regular Lists, Tab History, and Recents.
 struct ArticleContextMenuContent: View {
+    @Environment(\.openWindow) private var openWindow
+
     // Article info
+    let articleID: String?
     let title: String
     let description: String?
     let extract: String?
@@ -42,6 +45,16 @@ struct ArticleContextMenuContent: View {
 
     private var currentTagIDs: Set<UUID> {
         Set(currentTags.map(\.id))
+    }
+
+    private var windowArticle: Article {
+        Article(
+            id: articleID ?? title,
+            title: title,
+            description: description,
+            extract: extract,
+            thumbnailURL: thumbnailURL
+        )
     }
 
     private var addToListMenuTitle: String {
@@ -154,6 +167,12 @@ struct ArticleContextMenuContent: View {
             onOpenInNewTab()
         } label: {
             SwiftUI.Label("Open in New Tab", systemImage: "plus.rectangle.on.rectangle")
+        }
+
+        Button {
+            openWindow(value: windowArticle)
+        } label: {
+            SwiftUI.Label("Open in New Window", systemImage: "macwindow.badge.plus")
         }
 
         if let onShowPageViews {
@@ -278,6 +297,7 @@ extension ArticleContextMenuContent {
             resolvedTags = currentTags
         }
 
+        self.articleID = article.id
         self.title = article.title
         self.description = article.description
         self.extract = article.extract
@@ -384,23 +404,19 @@ extension ArticleContextMenuContent {
         self.onMoveToList = nil
         
         self.onAddToList = { list in
-            if list.articles.contains(where: {
-                ReadStateSync.normalizedTitle($0.title) == normalizedTitle
-            }) {
-                return
+            if let existing = existingSavedArticle() {
+                ArticleLibraryActions.addSavedArticle(
+                    existing,
+                    to: list,
+                    modelContext: modelContext
+                )
+            } else {
+                ArticleLibraryActions.saveToList(
+                    article,
+                    list: list,
+                    modelContext: modelContext
+                )
             }
-
-            let saved = SavedArticle(
-                title: article.title,
-                description: article.description,
-                extract: article.extract,
-                thumbnailURL: article.thumbnailURL,
-                list: list
-            )
-            list.articles.append(saved)
-            list.updatedAt = Date()
-            try? modelContext.save()
-            SavedArticleSummaryBackfill.enqueueIfNeeded(saved, modelContext: modelContext)
         }
         
         self.onRemove = onRemove

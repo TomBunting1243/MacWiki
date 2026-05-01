@@ -1,43 +1,12 @@
 import SwiftUI
 import SwiftData
 
-private enum InspectorModePillStyle {
-    static func foregroundPrimaryOpacity(darkMode: Bool) -> Double {
-        darkMode ? 0.74 : 0.68
-    }
-
-    static func foregroundSelectedOpacity(darkMode: Bool) -> Double {
-        darkMode ? 0.86 : 0.80
-    }
-
-    static func foregroundHoverOpacity(darkMode: Bool) -> Double {
-        darkMode ? 0.80 : 0.74
-    }
-
-    static func activeFillOpacity(darkMode: Bool) -> Double {
-        darkMode ? 0.016 : 0.010
-    }
-
-    static func activeStrokeOpacity(darkMode: Bool) -> Double {
-        darkMode ? 0.070 : 0.046
-    }
-
-    static func hoverFillOpacity(darkMode: Bool) -> Double {
-        darkMode ? 0.028 : 0.018
-    }
-
-    static func hoverStrokeOpacity(darkMode: Bool) -> Double {
-        darkMode ? 0.060 : 0.040
-    }
-}
-
 /// Inspector panel with grouped, context-sensitive modes.
 struct InspectorPanel: View {
     @Environment(AppState.self) private var appState
     @Environment(\.modelContext) private var modelContext
     @Environment(\.openURL) private var openURL
     @Environment(\.colorScheme) private var colorScheme
-    @AppStorage(AppStorageKey.Chrome.tabBarLiquidGlass) private var tabBarLiquidGlass = true
     @AppStorage(AppStorageKey.Inspector.infoSplitRatio) private var infoSplitRatioSetting: Double = 0
     @AppStorage(AppStorageKey.Inspector.metadataSectionHeight) private var metadataSectionHeightSetting: Double = 0
     @AppStorage(AppStorageKey.Inspector.tocSectionHeight) private var tocSectionHeightSetting: Double = 0
@@ -54,6 +23,7 @@ struct InspectorPanel: View {
     @State private var cachedCurrentArticleTags: [Tag] = []
     @State private var liveMetadataSectionHeight: CGFloat?
     @State private var infoViewportHeight: CGFloat = 0
+    @State private var infoTopContentHeight: CGFloat = 0
 
     init(
         showNewLabelSheet: Binding<Bool>,
@@ -77,17 +47,18 @@ struct InspectorPanel: View {
         static let contentTopPadding: CGFloat = 8
         static let sectionSpacing: CGFloat = 14
         static let sectionCornerRadius: CGFloat = 12
-        static let headerBarHeight: CGFloat = 44
-        static let headerHorizontalPadding: CGFloat = 14
-        static let modeSelectorLabelPointSize: CGFloat = 11.5
-        static let tocHeightRange: ClosedRange<CGFloat> = 72...560
+        static let headerBarHeight: CGFloat = 50
+        static let headerHorizontalPadding: CGFloat = 10
+        static let tocHeightRange: ClosedRange<CGFloat> = 72...1200
         static let metadataHeightRange: ClosedRange<CGFloat> = 56...520
         static let resizeHandleTopPadding: CGFloat = 0
         static let splitResizeUpdateThreshold: CGFloat = 0.01
-        static let defaultInfoSplitRatio: CGFloat = 0.5
         static let infoSplitBudgetRatio: CGFloat = 0.58
-        static let infoSplitBudgetRange: ClosedRange<CGFloat> = 280...620
+        static let infoSplitBudgetRange: ClosedRange<CGFloat> = 128...1400
         static let infoSplitFallbackBudget: CGFloat = 420
+        static let infoVerticalPadding: CGFloat = 26
+        static let splitSectionChromeHeight: CGFloat = 96
+        static let splitHandleHeight: CGFloat = 7
     }
 
     private var usesSplitLayout: Bool {
@@ -96,105 +67,89 @@ struct InspectorPanel: View {
     }
 
     private var infoSplitBudget: CGFloat {
-        let proposedBudget: CGFloat
-        if infoViewportHeight.isFinite, infoViewportHeight > 0 {
-            proposedBudget = infoViewportHeight * max(InspectorLayout.infoSplitBudgetRatio, 0)
-        } else {
-            proposedBudget = InspectorLayout.infoSplitFallbackBudget
+        if infoViewportHeight > 0, infoTopContentHeight > 0 {
+            let sectionSpacingBudget = InspectorLayout.sectionSpacing * 3
+            let remainingScrollableBudget = infoViewportHeight
+                - infoTopContentHeight
+                - InspectorLayout.infoVerticalPadding
+                - InspectorLayout.splitSectionChromeHeight
+                - InspectorLayout.splitHandleHeight
+                - sectionSpacingBudget
+            return InspectorSplitState.budget(
+                viewportHeight: max(0, remainingScrollableBudget),
+                budgetRatio: 1,
+                budgetRange: InspectorLayout.infoSplitBudgetRange,
+                fallbackBudget: InspectorLayout.infoSplitFallbackBudget
+            )
         }
-        return min(
-            max(proposedBudget, InspectorLayout.infoSplitBudgetRange.lowerBound),
-            InspectorLayout.infoSplitBudgetRange.upperBound
+
+        return InspectorSplitState.budget(
+            viewportHeight: infoViewportHeight,
+            budgetRatio: InspectorLayout.infoSplitBudgetRatio,
+            budgetRange: InspectorLayout.infoSplitBudgetRange,
+            fallbackBudget: InspectorLayout.infoSplitFallbackBudget
         )
     }
 
     private var persistedMetadataSplitRatio: CGFloat? {
-        if infoSplitRatioSetting.isFinite,
-           infoSplitRatioSetting > 0,
-           infoSplitRatioSetting < 1 {
-            return CGFloat(infoSplitRatioSetting)
-        }
-
-        if let storedMetadata = sanitizedPersistedHeight(
-            metadataSectionHeightSetting,
-            range: InspectorLayout.metadataHeightRange
-        ),
-           let storedTOC = sanitizedPersistedHeight(
-            tocSectionHeightSetting,
-            range: InspectorLayout.tocHeightRange
-           ) {
-            let combined = storedMetadata + storedTOC
-            guard combined > 0 else { return nil }
-            return storedMetadata / combined
-        }
-
-        return nil
-    }
-
-    private var effectiveMetadataSplitRatio: CGFloat {
-        persistedMetadataSplitRatio ?? InspectorLayout.defaultInfoSplitRatio
-    }
-
-    private var resolvedSplitHeights: InspectorInfoSectionSplitSizer.Result {
-        let budget = infoSplitBudget
-        guard budget.isFinite, budget > 0 else {
-            return InspectorInfoSectionSplitSizer.Result(
-                metadataHeight: InspectorLayout.metadataHeightRange.lowerBound,
-                tocHeight: InspectorLayout.tocHeightRange.lowerBound
-            )
-        }
-
-        let metadataMinRatio = InspectorLayout.metadataHeightRange.lowerBound / budget
-        let metadataMaxRatio = 1 - (InspectorLayout.tocHeightRange.lowerBound / budget)
-        let ratio = min(max(effectiveMetadataSplitRatio, metadataMinRatio), metadataMaxRatio)
-
-        var metadataHeight = clampMetadataHeight(budget * ratio)
-        var tocHeight = clampTOCHeight(budget - metadataHeight)
-
-        var overflow = (metadataHeight + tocHeight) - budget
-        if overflow > 0.001 {
-            let metadataSlack = metadataHeight - InspectorLayout.metadataHeightRange.lowerBound
-            let tocSlack = tocHeight - InspectorLayout.tocHeightRange.lowerBound
-            if metadataSlack >= tocSlack, metadataSlack > 0 {
-                let reduction = min(overflow, metadataSlack)
-                metadataHeight -= reduction
-                overflow -= reduction
-            }
-            if overflow > 0.001, tocSlack > 0 {
-                let reduction = min(overflow, tocSlack)
-                tocHeight -= reduction
-                overflow -= reduction
-            }
-        }
-
-        let remaining = budget - (metadataHeight + tocHeight)
-        if remaining > 0.001 {
-            let tocHeadroom = max(0, InspectorLayout.tocHeightRange.upperBound - tocHeight)
-            let tocIncrease = min(remaining, tocHeadroom)
-            tocHeight += tocIncrease
-
-            let metadataHeadroom = max(0, InspectorLayout.metadataHeightRange.upperBound - metadataHeight)
-            let metadataIncrease = min(remaining - tocIncrease, metadataHeadroom)
-            metadataHeight += metadataIncrease
-        }
-
-        return InspectorInfoSectionSplitSizer.Result(
-            metadataHeight: clampMetadataHeight(metadataHeight),
-            tocHeight: clampTOCHeight(tocHeight)
+        InspectorSplitState.persistedMetadataSplitRatio(
+            infoSplitRatioSetting: infoSplitRatioSetting,
+            metadataSectionHeightSetting: metadataSectionHeightSetting,
+            tocSectionHeightSetting: tocSectionHeightSetting,
+            metadataRange: InspectorLayout.metadataHeightRange,
+            tocRange: InspectorLayout.tocHeightRange
         )
     }
 
-    private var estimatedTableOfContentsSectionHeight: CGFloat {
+    private var resolvedSplitHeights: InspectorInfoSectionSplitSizer.Result {
+        let splitHeights: InspectorInfoSectionSplitSizer.Result
+        if let persistedMetadataSplitRatio {
+            splitHeights = InspectorSplitState.resolveSplitHeights(
+                budget: infoSplitBudget,
+                effectiveRatio: persistedMetadataSplitRatio,
+                metadataRange: InspectorLayout.metadataHeightRange,
+                tocRange: InspectorLayout.tocHeightRange
+            )
+        } else {
+            splitHeights = InspectorInfoSectionSplitSizer.calculate(
+                metadataContentHeight: estimatedMetadataContentHeight,
+                tocContentHeight: estimatedTableOfContentsContentHeight,
+                viewportHeight: infoSplitBudget,
+                metadataRange: InspectorLayout.metadataHeightRange,
+                tocRange: InspectorLayout.tocHeightRange,
+                budgetRange: InspectorLayout.infoSplitBudgetRange,
+                budgetRatio: 1,
+                fallbackBudget: infoSplitBudget
+            )
+        }
+
+        return InspectorSplitState.expandTOCIntoAvailableSpace(
+            splitHeights,
+            budget: infoSplitBudget,
+            metadataContentHeight: estimatedMetadataContentHeight,
+            tocContentHeight: estimatedTableOfContentsContentHeight,
+            metadataRange: InspectorLayout.metadataHeightRange,
+            tocRange: InspectorLayout.tocHeightRange
+        )
+    }
+
+    private var estimatedTableOfContentsContentHeight: CGFloat {
         let rows = CGFloat(appState.currentArticleTableOfContents.count)
-        let estimate = rows * 28 + 12
-        return clampTOCHeight(estimate)
+        return rows * 28 + 12
+    }
+
+    private var estimatedTableOfContentsSectionHeight: CGFloat {
+        clampTOCHeight(estimatedTableOfContentsContentHeight)
+    }
+
+    private var estimatedMetadataContentHeight: CGFloat {
+        let rowCount = CGFloat(appState.currentArticleMetadata.count)
+        guard rowCount > 0 else { return InspectorLayout.metadataHeightRange.lowerBound }
+        return (rowCount * 44) + 24
     }
 
     private var estimatedMetadataSectionHeight: CGFloat {
-        let rowCount = CGFloat(appState.currentArticleMetadata.count)
-        guard rowCount > 0 else { return InspectorLayout.metadataHeightRange.lowerBound }
-        let estimate = (rowCount * 44) + 24
-        return clampMetadataHeight(estimate)
+        clampMetadataHeight(estimatedMetadataContentHeight)
     }
 
     private var tableOfContentsSectionHeight: CGFloat {
@@ -313,18 +268,16 @@ struct InspectorPanel: View {
     }
 
     private var showsInspectorHeaderBar: Bool {
-        appState.currentArticle != nil
+        true
     }
     
     private var inspectorHeaderBar: some View {
         ZStack {
-            HStack(spacing: 0) {
-                Spacer(minLength: 0)
+            if appState.currentArticle != nil {
                 inspectorModeSelector
-                Spacer(minLength: 0)
+                    .padding(.horizontal, InspectorLayout.headerHorizontalPadding)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
             }
-            .padding(.horizontal, InspectorLayout.headerHorizontalPadding)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
         }
         .frame(height: InspectorLayout.headerBarHeight)
         .overlay(alignment: .bottom) {
@@ -332,16 +285,14 @@ struct InspectorPanel: View {
                 .fill(Color.primary.opacity(ColumnChromeMetrics.dividerOpacity(for: colorScheme)))
                 .frame(height: 0.5)
         }
-        .animation(.interactiveSpring(response: 0.22, dampingFraction: 0.90), value: appState.inspectorMode)
+        .animation(.easeOut(duration: 0.12), value: appState.inspectorMode)
         .zIndex(1)
     }
 
     private var inspectorModeSelector: some View {
         InspectorModeControl(
             selectedMode: inspectorModeSelection,
-            modes: inspectorModeOrder,
-            labelPointSize: InspectorLayout.modeSelectorLabelPointSize,
-            useLiquidGlass: tabBarLiquidGlass
+            modes: inspectorModeOrder
         )
         .accessibilityLabel("Inspector mode")
     }
@@ -375,37 +326,28 @@ struct InspectorPanel: View {
         GeometryReader { proxy in
             Group {
                 if let article = appState.currentArticle {
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: InspectorLayout.sectionSpacing) {
-                            articleSummaryHeader(article)
+                    VStack(alignment: .leading, spacing: InspectorLayout.sectionSpacing) {
+                        infoTopModules(article)
 
-                            InspectorLabelSection(
-                                article: article,
-                                allLabels: allLabels
-                            )
-
-                            InspectorTagStatusBox(article: article, tags: cachedCurrentArticleTags, allTags: allTags)
-
-                            if !appState.currentArticleMetadata.isEmpty {
-                                metadataSection
-                            }
-
-                            if !appState.currentArticleTableOfContents.isEmpty {
-                                tableOfContentsSection
-                                    .transition(standardTOCTransition)
-                            }
+                        if !appState.currentArticleMetadata.isEmpty {
+                            metadataSection
                         }
-                        .padding(.horizontal, 14)
-                        .padding(.top, 12)
-                        .padding(.bottom, 18)
-                        .frame(
-                            maxWidth: .infinity,
-                            minHeight: proxy.size.height,
-                            alignment: .topLeading
-                        )
-                        .animation(.easeInOut(duration: 0.25), value: appState.currentArticleMetadata.isEmpty)
+
+                        if usesSplitLayout {
+                            metadataTOCResizeHandle
+                        }
+
+                        if !appState.currentArticleTableOfContents.isEmpty {
+                            tableOfContentsSection
+                                .transition(standardTOCTransition)
+                        }
                     }
-                    .scrollIndicators(.hidden)
+                    .padding(.horizontal, 14)
+                    .padding(.top, 12)
+                    .padding(.bottom, 14)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                    .clipped()
+                    .animation(.easeInOut(duration: 0.25), value: appState.currentArticleMetadata.isEmpty)
                 } else {
                     ColumnEmptyStateView(
                         title: "No Article",
@@ -422,9 +364,38 @@ struct InspectorPanel: View {
             .onChange(of: proxy.size.height) { _, newHeight in
                 updateInfoViewportHeight(newHeight)
             }
+            .onPreferenceChange(InfoTopContentHeightPreferenceKey.self) { newHeight in
+                updateInfoTopContentHeight(newHeight)
+            }
         }
         .task(id: appState.currentArticle?.title) {
             await loadOrCreateArticleState()
+        }
+    }
+
+    private func infoTopModules(_ article: Article) -> some View {
+        VStack(alignment: .leading, spacing: InspectorLayout.sectionSpacing) {
+            articleSummaryHeader(article)
+
+            InspectorLabelSection(
+                article: article,
+                allLabels: allLabels
+            )
+
+            InspectorTagStatusBox(
+                article: article,
+                tags: cachedCurrentArticleTags,
+                allTags: allTags,
+                highlights: cachedCurrentArticleHighlights
+            )
+        }
+        .background {
+            GeometryReader { proxy in
+                Color.clear.preference(
+                    key: InfoTopContentHeightPreferenceKey.self,
+                    value: proxy.size.height
+                )
+            }
         }
     }
 
@@ -432,53 +403,15 @@ struct InspectorPanel: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 10) {
                 Text("Contents")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
+                    .font(MacWikiTypography.inspectorSectionLabel)
+                    .foregroundStyle(.primary)
             }
 
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 4) {
                         ForEach(Array(appState.currentArticleTableOfContents.enumerated()), id: \.offset) { index, item in
-                            let isActive = appState.currentVisibleTableOfContentsSectionId == item.id
-                            let indent = CGFloat(max(item.level - 2, 0)) * 14
-                            Button {
-                                appState.pendingTableOfContentsScrollTarget = item.id
-                                appState.currentVisibleTableOfContentsSectionId = item.id
-                            } label: {
-                                HStack(spacing: 6) {
-                                    if item.level > 2 {
-                                        Image(systemName: "chevron.right")
-                                            .font(.system(size: 8, weight: .semibold))
-                                            .foregroundStyle(.tertiary)
-                                    }
-
-                                    Text(item.title)
-                                        .font(.caption)
-                                        .fontWeight(isActive ? .medium : .regular)
-                                        .foregroundStyle(isActive ? .primary : .secondary)
-                                        .contentTransition(.interpolate)
-                                        .lineLimit(1)
-                                }
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.leading, indent)
-                                .padding(.vertical, 4)
-                                .padding(.horizontal, 6)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 7, style: .continuous)
-                                        .fill(Color.accentColor.opacity(isActive ? 0.14 : 0))
-                                )
-                                .overlay(
-                                    // Use modifier with opacity instead of conditional – maintains view identity
-                                    RoundedRectangle(cornerRadius: 7, style: .continuous)
-                                        .strokeBorder(Color.accentColor.opacity(0.28), lineWidth: 0.8)
-                                        .opacity(isActive ? 1 : 0)
-                                )
-                                .contentShape(Rectangle())
-                            }
-                            .buttonStyle(.plain)
-                            .animation(.interactiveSpring(response: 0.15, dampingFraction: 0.8), value: isActive)
-                            .id(index)
+                            tableOfContentsRow(item: item, index: index)
                         }
                     }
                 }
@@ -487,7 +420,7 @@ struct InspectorPanel: View {
                     guard let targetIndex = appState.currentArticleTableOfContents.firstIndex(where: { $0.id == newId }) else {
                         return
                     }
-                    withAnimation(.easeInOut(duration: 0.2)) {
+                    withAnimation(.interactiveSpring(response: 0.30, dampingFraction: 0.82, blendDuration: 0.08)) {
                         proxy.scrollTo(targetIndex, anchor: .center)
                     }
                 }
@@ -500,37 +433,87 @@ struct InspectorPanel: View {
         }
     }
 
+    private func tableOfContentsRow(item: ArticleTableOfContentsItem, index: Int) -> some View {
+        let isActive = appState.currentVisibleTableOfContentsSectionId == item.id
+        let indent = CGFloat(max(item.level - 2, 0)) * 14
+
+        return Button {
+            appState.pendingTableOfContentsScrollTarget = item.id
+            appState.currentVisibleTableOfContentsSectionId = item.id
+        } label: {
+            HStack(spacing: 6) {
+                if item.level > 2 {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 8, weight: .semibold))
+                        .foregroundStyle(
+                            isActive
+                                ? AnyShapeStyle(SidebarRowSelectionVisuals.tint)
+                                : AnyShapeStyle(.tertiary)
+                        )
+                }
+
+                Text(item.title)
+                    .font(isActive ? MacWikiTypography.inspectorTOCItemActive : MacWikiTypography.inspectorTOCItem)
+                    .foregroundStyle(
+                        isActive
+                            ? AnyShapeStyle(SidebarRowSelectionVisuals.tint)
+                            : AnyShapeStyle(.secondary)
+                    )
+                    .contentTransition(.interpolate)
+                    .lineLimit(1)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.leading, indent)
+            .padding(.vertical, 4)
+            .padding(.horizontal, 6)
+            .background(
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .fill(SidebarRowSelectionVisuals.tint.opacity(isActive ? 0.14 : 0))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .strokeBorder(SidebarRowSelectionVisuals.tint.opacity(0.28), lineWidth: 0.8)
+                    .opacity(isActive ? 1 : 0)
+            )
+            .scaleEffect(isActive ? 1.015 : 1, anchor: .leading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .animation(.interactiveSpring(response: 0.22, dampingFraction: 0.74, blendDuration: 0.06), value: isActive)
+        .id(index)
+    }
+
     private var metadataSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Metadata")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
+                .font(MacWikiTypography.inspectorSectionLabel)
+                .foregroundStyle(.primary)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
             metadataScrollContent
                 .frame(height: metadataSectionHeight, alignment: .top)
-
-            if usesSplitLayout {
-                SectionResizeHandle(
-                    currentHeight: metadataSectionHeight,
-                    range: InspectorLayout.metadataHeightRange,
-                    onHeightChanged: { newHeight in
-                        updateMetadataResizeHeight(newHeight)
-                    },
-                    onDragEnded: { projectedHeight in
-                        endMetadataResize(at: projectedHeight)
-                    },
-                    onReset: {
-                        resetMetadataResizeHeight()
-                    }
-                )
-                .padding(.top, InspectorLayout.resizeHandleTopPadding)
-            }
         }
         .padding(12)
         .background {
             inspectorSectionBackground()
         }
+    }
+
+    private var metadataTOCResizeHandle: some View {
+        SectionResizeHandle(
+            currentHeight: metadataSectionHeight,
+            range: InspectorLayout.metadataHeightRange,
+            onHeightChanged: { newHeight in
+                updateMetadataResizeHeight(newHeight)
+            },
+            onDragEnded: { projectedHeight in
+                endMetadataResize(at: projectedHeight)
+            },
+            onReset: {
+                resetMetadataResizeHeight()
+            }
+        )
+        .padding(.vertical, InspectorLayout.resizeHandleTopPadding)
     }
 
     private var metadataScrollContent: some View {
@@ -618,17 +601,11 @@ struct InspectorPanel: View {
     }
 
     private func clampTOCHeight(_ value: CGFloat) -> CGFloat {
-        guard value.isFinite else {
-            return InspectorLayout.tocHeightRange.lowerBound
-        }
-        return min(max(value, InspectorLayout.tocHeightRange.lowerBound), InspectorLayout.tocHeightRange.upperBound)
+        InspectorSplitState.clampedHeight(value, range: InspectorLayout.tocHeightRange)
     }
 
     private func clampMetadataHeight(_ value: CGFloat) -> CGFloat {
-        guard value.isFinite else {
-            return InspectorLayout.metadataHeightRange.lowerBound
-        }
-        return min(max(value, InspectorLayout.metadataHeightRange.lowerBound), InspectorLayout.metadataHeightRange.upperBound)
+        InspectorSplitState.clampedHeight(value, range: InspectorLayout.metadataHeightRange)
     }
 
     private func updateInfoViewportHeight(_ newHeight: CGFloat) {
@@ -636,6 +613,13 @@ struct InspectorPanel: View {
         guard newHeight > 0 else { return }
         guard abs(infoViewportHeight - newHeight) >= 0.5 else { return }
         infoViewportHeight = newHeight
+    }
+
+    private func updateInfoTopContentHeight(_ newHeight: CGFloat) {
+        guard newHeight.isFinite else { return }
+        guard newHeight >= 0 else { return }
+        guard abs(infoTopContentHeight - newHeight) >= 0.5 else { return }
+        infoTopContentHeight = newHeight
     }
 
     private func updateMetadataResizeHeight(_ newHeight: CGFloat) {
@@ -672,40 +656,30 @@ struct InspectorPanel: View {
     }
 
     private func clampedMetadataSplitHeight(_ candidate: CGFloat) -> CGFloat {
-        let budget = infoSplitBudget
-        let minimumMetadata = InspectorLayout.metadataHeightRange.lowerBound
-        let maximumMetadata = min(
-            InspectorLayout.metadataHeightRange.upperBound,
-            budget - InspectorLayout.tocHeightRange.lowerBound
+        InspectorSplitState.clampedMetadataSplitHeight(
+            candidate: candidate,
+            budget: infoSplitBudget,
+            metadataRange: InspectorLayout.metadataHeightRange,
+            tocRange: InspectorLayout.tocHeightRange
         )
-        guard maximumMetadata >= minimumMetadata else {
-            return minimumMetadata
-        }
-        return min(max(candidate, minimumMetadata), maximumMetadata)
     }
 
     private func sanitizedPersistedHeight(
         _ storedValue: Double,
         range: ClosedRange<CGFloat>
     ) -> CGFloat? {
-        guard storedValue.isFinite, storedValue > 0 else {
-            return nil
-        }
-        let value = CGFloat(storedValue)
-        guard value.isFinite else { return nil }
-        return min(max(value, range.lowerBound), range.upperBound)
+        InspectorSplitState.sanitizedPersistedHeight(storedValue, range: range)
     }
 
     private func sanitizePersistedSplitSettingsIfNeeded() {
-        if !infoSplitRatioSetting.isFinite || infoSplitRatioSetting < 0 || infoSplitRatioSetting > 1 {
-            infoSplitRatioSetting = 0
-        }
-        if !metadataSectionHeightSetting.isFinite || metadataSectionHeightSetting < 0 {
-            metadataSectionHeightSetting = 0
-        }
-        if !tocSectionHeightSetting.isFinite || tocSectionHeightSetting < 0 {
-            tocSectionHeightSetting = 0
-        }
+        let sanitized = InspectorSplitState.sanitizePersistedSettings(
+            infoSplitRatioSetting: infoSplitRatioSetting,
+            metadataSectionHeightSetting: metadataSectionHeightSetting,
+            tocSectionHeightSetting: tocSectionHeightSetting
+        )
+        infoSplitRatioSetting = sanitized.ratio
+        metadataSectionHeightSetting = sanitized.metadataHeight
+        tocSectionHeightSetting = sanitized.tocHeight
     }
 
     private func refreshCachedArticleDerivedData() {
@@ -824,351 +798,128 @@ struct InspectorPanel: View {
 private struct InspectorModeControl: View {
     @Binding var selectedMode: InspectorMode
     let modes: [InspectorMode]
-    let labelPointSize: CGFloat
-    let useLiquidGlass: Bool
 
     @Environment(\.colorScheme) private var colorScheme
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @AppStorage(MacWikiGlassRuntime.forceLegacyFallbackKey) private var forceLegacyGlassFallback = false
     @State private var hoveredMode: InspectorMode?
-    @Namespace private var activeModeNamespace
 
     private enum Metrics {
-        static let minimumSegmentWidth: CGFloat = 32
-        static let segmentHorizontalPadding: CGFloat = 10
-        static let segmentVerticalPadding: CGFloat = 6
-        static let pillSpacing: CGFloat = 4
-        static let pillCornerRadius: CGFloat = 12
-        static let railHorizontalPadding: CGFloat = 4
-        static let railVerticalPadding: CGFloat = 4
-        static let railHeight: CGFloat = 38
+        static let railHeight: CGFloat = 30
+        static let railCornerRadius: CGFloat = 10
+        static let selectedHeight: CGFloat = 28
+        static let selectedCornerRadius: CGFloat = 8
+        static let iconPointSize: CGFloat = 13
+        static let dividerHeight: CGFloat = 16
+        static let railInset: CGFloat = 1
     }
 
     var body: some View {
-        glassySegmentedControl(darkMode: colorScheme == .dark)
-    }
+        ZStack {
+            railBackground
 
-    private var usesNativeGlass: Bool {
-        useLiquidGlass &&
-            MacWikiGlassRuntime.usesNativeGlass(forceLegacyFallback: forceLegacyGlassFallback)
-    }
+            HStack(spacing: 0) {
+                ForEach(Array(modes.enumerated()), id: \.element) { index, mode in
+                    modeButton(mode)
+                        .frame(maxWidth: .infinity)
 
-    @ViewBuilder
-    private func glassySegmentedControl(darkMode: Bool) -> some View {
-        if #available(macOS 26, *), usesNativeGlass {
-            nativeGlassySegmentedControl(darkMode: darkMode)
-        } else {
-            fallbackGlassySegmentedControl(darkMode: darkMode)
-        }
-    }
-
-    private func fallbackGlassySegmentedControl(darkMode: Bool) -> some View {
-        MacWikiGlassGroup(spacing: Metrics.pillSpacing) {
-            HStack(spacing: Metrics.pillSpacing) {
-                ForEach(modes, id: \.self) { mode in
-                    fallbackModeButton(mode, darkMode: darkMode)
+                    if index < modes.count - 1 {
+                        Rectangle()
+                            .fill(dividerColor)
+                            .frame(width: 1, height: Metrics.dividerHeight)
+                    }
                 }
             }
-            .padding(.horizontal, Metrics.railHorizontalPadding)
-            .padding(.vertical, Metrics.railVerticalPadding)
-            .frame(height: Metrics.railHeight)
-            .background {
-                railBackground(darkMode: darkMode)
-            }
+            .padding(.horizontal, Metrics.railInset)
         }
+        .frame(maxWidth: .infinity)
+        .frame(height: Metrics.railHeight)
+        .accessibilityElement(children: .contain)
         .accessibilityLabel("Inspector mode")
     }
 
-    @available(macOS 26, *)
-    private func nativeGlassySegmentedControl(darkMode: Bool) -> some View {
-        MacWikiGlassGroup(spacing: Metrics.pillSpacing) {
-            HStack(spacing: Metrics.pillSpacing) {
-                ForEach(modes, id: \.self) { mode in
-                    nativeModeButton(mode, darkMode: darkMode)
-                }
-            }
-        }
-        .accessibilityLabel("Inspector mode")
-    }
-
-    private func fallbackModeButton(_ mode: InspectorMode, darkMode: Bool) -> some View {
-        let isActive = selectedMode == mode
-        let isHovered = hoveredMode == mode && !isActive
+    private func modeButton(_ mode: InspectorMode) -> some View {
+        let isSelected = selectedMode == mode
+        let isHovered = hoveredMode == mode && !isSelected
 
         return Button {
-            selectMode(mode)
+            guard selectedMode != mode else { return }
+            selectedMode = mode
         } label: {
-            modeSymbol(mode, isActive: isActive, isHovered: isHovered, darkMode: darkMode)
-                .frame(minWidth: Metrics.minimumSegmentWidth)
-                .padding(.horizontal, Metrics.segmentHorizontalPadding)
-                .padding(.vertical, Metrics.segmentVerticalPadding)
+            Image(systemName: isSelected ? mode.selectedIconName : mode.iconName)
+                .symbolRenderingMode(.hierarchical)
+                .font(.system(size: Metrics.iconPointSize, weight: isSelected ? .semibold : .regular))
+                .foregroundStyle(foregroundStyle(isSelected: isSelected, isHovered: isHovered))
+                .frame(maxWidth: .infinity)
+                .frame(height: Metrics.selectedHeight)
+                .background {
+                    modeButtonBackground(isSelected: isSelected, isHovered: isHovered)
+                        .frame(maxWidth: .infinity)
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: Metrics.railHeight)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .background {
-            if isActive {
-                activePillBackground(darkMode: darkMode)
-                    .matchedGeometryEffect(id: "inspector-mode-active-pill", in: activeModeNamespace)
-            } else if isHovered {
-                hoverPillBackground(darkMode: darkMode)
-            }
-        }
-        .clipShape(RoundedRectangle(cornerRadius: Metrics.pillCornerRadius, style: .continuous))
-        .contentShape(RoundedRectangle(cornerRadius: Metrics.pillCornerRadius, style: .continuous))
         .onHover { hovering in
-            if hovering {
-                hoveredMode = mode
-            } else if hoveredMode == mode {
-                hoveredMode = nil
-            }
+            hoveredMode = hovering ? mode : (hoveredMode == mode ? nil : hoveredMode)
         }
         .help(mode.rawValue)
         .accessibilityLabel(mode.rawValue)
+        .accessibilityValue(isSelected ? "Selected" : "")
     }
 
-    @available(macOS 26, *)
-    private func nativeModeButton(_ mode: InspectorMode, darkMode: Bool) -> some View {
-        let isActive = selectedMode == mode
-        let isHovered = hoveredMode == mode && !isActive
+    private var railBackground: some View {
+        let shape = RoundedRectangle(cornerRadius: Metrics.railCornerRadius, style: .continuous)
 
-        return Button {
-            selectMode(mode)
-        } label: {
-            modeSymbol(mode, isActive: isActive, isHovered: isHovered, darkMode: darkMode)
-                .frame(minWidth: Metrics.minimumSegmentWidth)
-                .padding(.horizontal, Metrics.segmentHorizontalPadding)
-                .padding(.vertical, Metrics.segmentVerticalPadding)
-        }
-        .buttonStyle(.plain)
-        .glassEffect(.regular.interactive(), in: .capsule)
-        .overlay {
-            Capsule()
-                .fill(
-                    Color.white.opacity(
-                        darkMode
-                            ? (isActive ? 0.08 : (isHovered ? 0.040 : 0.022))
-                            : (isActive ? 0.26 : (isHovered ? 0.12 : 0.07))
-                    )
-                )
-        }
-        .overlay {
-            if isActive {
-                Capsule()
-                    .fill(Color.accentColor.opacity(darkMode ? 0.18 : 0.10))
+        return shape
+            .fill(.ultraThinMaterial)
+            .overlay {
+                shape
+                    .fill(Color(nsColor: .windowBackgroundColor).opacity(colorScheme == .dark ? 0.07 : 0.10))
             }
-        }
-        .overlay {
-            Capsule()
-                .strokeBorder(
-                    Color.white.opacity(
-                        darkMode
-                            ? (isActive ? 0.16 : (isHovered ? 0.10 : 0.08))
-                            : (isActive ? 0.15 : (isHovered ? 0.10 : 0.08))
-                    ),
-                    lineWidth: isActive ? 0.9 : 0.7
-                )
-        }
-        .shadow(
-            color: Color.black.opacity(
-                darkMode
-                    ? (isActive ? 0.16 : 0.08)
-                    : (isActive ? 0.05 : 0.02)
-            ),
-            radius: isActive ? 7 : 4,
-            y: isActive ? 3 : 1
-        )
-        .onHover { hovering in
-            if hovering {
-                hoveredMode = mode
-            } else if hoveredMode == mode {
-                hoveredMode = nil
+            .overlay {
+                shape
+                    .fill(Color.primary.opacity(colorScheme == .dark ? 0.026 : 0.016))
             }
-        }
-        .help(mode.rawValue)
-        .accessibilityLabel(mode.rawValue)
+            .overlay {
+                shape
+                    .strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.070 : 0.038), lineWidth: 0.5)
+            }
     }
 
-    private func modeSymbol(
-        _ mode: InspectorMode,
-        isActive: Bool,
-        isHovered: Bool,
-        darkMode: Bool
-    ) -> some View {
-        Image(systemName: isActive ? mode.selectedIconName : mode.iconName)
-            .symbolRenderingMode(.hierarchical)
-            .font(.system(size: 13, weight: isActive ? .semibold : .medium))
-            .foregroundStyle(foregroundColor(isActive: isActive, isHovered: isHovered, darkMode: darkMode))
+    private var dividerColor: Color {
+        Color.primary.opacity(colorScheme == .dark ? 0.10 : 0.070)
     }
 
-    private func foregroundColor(isActive: Bool, isHovered: Bool, darkMode: Bool) -> Color {
-        if isActive {
-            return darkMode
-                ? Color.white.opacity(0.94)
-                : Color.primary.opacity(0.84)
+    private func foregroundStyle(isSelected: Bool, isHovered: Bool) -> AnyShapeStyle {
+        if isSelected {
+            return AnyShapeStyle(Color.primary.opacity(colorScheme == .dark ? 0.92 : 0.82))
         }
         if isHovered {
-            return Color.primary.opacity(darkMode ? 0.84 : 0.68)
+            return AnyShapeStyle(Color.primary.opacity(colorScheme == .dark ? 0.84 : 0.74))
         }
-        if usesNativeGlass {
-            return .primary
-        }
-        return Color.primary.opacity(darkMode ? 0.58 : 0.28)
+        return AnyShapeStyle(Color.primary.opacity(colorScheme == .dark ? 0.62 : 0.54))
     }
 
     @ViewBuilder
-    private func railBackground(darkMode: Bool) -> some View {
-        if usesNativeGlass {
-            if #available(macOS 26, *) {
-                nativeRailBackground(darkMode: darkMode)
-            } else {
-                fallbackRailBackground(darkMode: darkMode)
-            }
-        } else if useLiquidGlass {
-            fallbackRailBackground(darkMode: darkMode)
+    private func modeButtonBackground(isSelected: Bool, isHovered: Bool) -> some View {
+        let shape = RoundedRectangle(cornerRadius: Metrics.selectedCornerRadius, style: .continuous)
+
+        if isSelected {
+            shape
+                .fill(.thinMaterial)
+                .overlay {
+                    shape.fill(Color.primary.opacity(colorScheme == .dark ? 0.070 : 0.045))
+                }
+                .overlay {
+                    shape
+                        .strokeBorder(Color.white.opacity(colorScheme == .dark ? 0.14 : 0.26), lineWidth: 0.5)
+                }
+                .shadow(color: .black.opacity(colorScheme == .dark ? 0.10 : 0.04), radius: 3, x: 0, y: 1)
+        } else if isHovered {
+            shape
+                .fill(Color.primary.opacity(colorScheme == .dark ? 0.08 : 0.055))
         } else {
-            RoundedRectangle(cornerRadius: Metrics.pillCornerRadius, style: .continuous)
-                .fill(Color(nsColor: .controlBackgroundColor).opacity(darkMode ? 0.58 : 0.74))
-        }
-    }
-
-    @ViewBuilder
-    private func activePillBackground(darkMode: Bool) -> some View {
-        if usesNativeGlass {
-            if #available(macOS 26, *) {
-                nativeActivePillBackground(darkMode: darkMode)
-            } else {
-                fallbackActivePillBackground(darkMode: darkMode)
-            }
-        } else if useLiquidGlass {
-            fallbackActivePillBackground(darkMode: darkMode)
-        } else {
-            fallbackActivePillBackground(darkMode: darkMode)
-        }
-    }
-
-    private func hoverPillBackground(darkMode: Bool) -> some View {
-        RoundedRectangle(cornerRadius: Metrics.pillCornerRadius, style: .continuous)
-            .fill(Color.primary.opacity(darkMode ? 0.060 : 0.030))
-            .overlay {
-                RoundedRectangle(cornerRadius: Metrics.pillCornerRadius, style: .continuous)
-                    .strokeBorder(
-                        Color.primary.opacity(darkMode ? 0.075 : 0.045),
-                        lineWidth: 0.50
-                    )
-            }
-    }
-
-    private func fallbackRailBackground(darkMode: Bool) -> some View {
-        RoundedRectangle(cornerRadius: Metrics.pillCornerRadius, style: .continuous)
-            .fill(Color(nsColor: .windowBackgroundColor).opacity(darkMode ? 0.10 : 0.045))
-            .overlay {
-                RoundedRectangle(cornerRadius: Metrics.pillCornerRadius, style: .continuous)
-                    .strokeBorder(
-                        Color.primary.opacity(darkMode ? 0.060 : 0.038),
-                        lineWidth: 0.5
-                    )
-            }
-    }
-
-    private func fallbackActivePillBackground(darkMode: Bool) -> some View {
-        RoundedRectangle(cornerRadius: Metrics.pillCornerRadius, style: .continuous)
-            .fill(
-                LinearGradient(
-                    colors: darkMode
-                        ? [
-                            Color.white.opacity(0.16),
-                            Color.accentColor.opacity(0.22)
-                        ]
-                        : [
-                            Color.white.opacity(0.70),
-                            Color.accentColor.opacity(0.14)
-                        ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-            )
-            .overlay {
-                RoundedRectangle(cornerRadius: Metrics.pillCornerRadius, style: .continuous)
-                    .strokeBorder(
-                        darkMode
-                            ? Color.white.opacity(0.16)
-                            : Color.primary.opacity(0.08),
-                        lineWidth: 0.6
-                    )
-            }
-            .overlay {
-                RoundedRectangle(cornerRadius: Metrics.pillCornerRadius, style: .continuous)
-                    .fill(
-                        darkMode
-                            ? Color.accentColor.opacity(0.10)
-                            : Color.white.opacity(0.22)
-                    )
-            }
-    }
-
-    @available(macOS 26, *)
-    private func nativeRailBackground(darkMode: Bool) -> some View {
-        Color.clear
-            .glassEffect(.regular, in: .capsule)
-            .overlay {
-                Capsule()
-                    .fill(Color.white.opacity(darkMode ? 0.015 : 0.06))
-            }
-            .overlay {
-                Capsule()
-                    .strokeBorder(
-                        Color.white.opacity(darkMode ? 0.10 : 0.14),
-                        lineWidth: 0.7
-                    )
-            }
-    }
-
-    @available(macOS 26, *)
-    private func nativeActivePillBackground(darkMode: Bool) -> some View {
-        Capsule()
-            .fill(Color.clear)
-            .glassEffect(.regular.interactive(), in: .capsule)
-            .overlay {
-                Capsule()
-                    .fill(
-                        darkMode
-                            ? Color.white.opacity(0.08)
-                            : Color.white.opacity(0.48)
-                    )
-            }
-            .overlay {
-                Capsule()
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                Color.white.opacity(darkMode ? 0.22 : 0.64),
-                                Color.accentColor.opacity(darkMode ? 0.24 : 0.12)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .blendMode(.screen)
-            }
-            .overlay {
-                Capsule()
-                    .strokeBorder(
-                        darkMode
-                            ? Color.white.opacity(0.20)
-                            : Color.primary.opacity(0.08),
-                        lineWidth: 0.9
-                    )
-            }
-            .shadow(color: Color.black.opacity(darkMode ? 0.20 : 0.05), radius: 8, y: 3)
-    }
-
-    private func selectMode(_ mode: InspectorMode) {
-        if reduceMotion {
-            selectedMode = mode
-        } else {
-            withAnimation(.interactiveSpring(response: 0.24, dampingFraction: 0.90, blendDuration: 0.08)) {
-                selectedMode = mode
-            }
+            Color.clear
         }
     }
 }
@@ -1232,6 +983,14 @@ private struct SectionResizeHandle: View {
         .onTapGesture(count: 2) {
             onReset()
         }
+    }
+}
+
+private struct InfoTopContentHeightPreferenceKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
     }
 }
 

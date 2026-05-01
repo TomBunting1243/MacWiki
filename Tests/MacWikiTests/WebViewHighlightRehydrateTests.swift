@@ -1,0 +1,164 @@
+import SwiftData
+import SwiftUI
+import Testing
+
+@testable import MacWiki
+
+@MainActor
+struct WebViewHighlightRehydrateTests {
+    @Test func marksFailedHighlightsStaleFromHighlightResult() throws {
+        let modelContext = try makeInMemoryModelContext()
+        let restored = Highlight(
+            text: "restored text",
+            articleTitle: "Rehydration",
+            startOffset: 0,
+            length: 13
+        )
+        let failed = Highlight(
+            text: "missing text",
+            articleTitle: "Rehydration",
+            startOffset: 20,
+            length: 12
+        )
+        restored.isStale = true
+        failed.isStale = false
+        modelContext.insert(restored)
+        modelContext.insert(failed)
+
+        let coordinator = makeCoordinator(
+            highlights: [restored, failed],
+            modelContext: modelContext
+        )
+
+        coordinator.handleScriptMessage(
+            name: "highlightResult",
+            body: [
+                "total": 2,
+                "success": 1,
+                "failedIds": [failed.id.uuidString]
+            ]
+        )
+
+        #expect(restored.isStale == false)
+        #expect(failed.isStale == true)
+    }
+
+    @Test func retrySuccessClearsStaleFlagAndPublishesResult() throws {
+        let modelContext = try makeInMemoryModelContext()
+        let highlight = Highlight(
+            text: "found again",
+            articleTitle: "Rehydration",
+            startOffset: 4,
+            length: 11
+        )
+        highlight.isStale = true
+        let originalUpdatedAt = highlight.updatedAt
+        modelContext.insert(highlight)
+
+        let appState = AppState(loadPersistedState: false)
+        let pending = AppState.HighlightRehydrateRequest(highlight: highlight)
+        appState.pendingHighlightRehydrate = pending
+        appState.isHighlightRehydrateInProgress = true
+
+        let coordinator = makeCoordinator(
+            highlights: [highlight],
+            modelContext: modelContext,
+            appState: appState
+        )
+        let timestamp = originalUpdatedAt.addingTimeInterval(60)
+
+        coordinator.completePendingHighlightRehydrate(
+            pending,
+            success: true,
+            timestamp: timestamp
+        )
+
+        #expect(appState.pendingHighlightRehydrate == nil)
+        #expect(appState.isHighlightRehydrateInProgress == false)
+        #expect(appState.lastHighlightRehydrateResult?.id == highlight.id)
+        #expect(appState.lastHighlightRehydrateResult?.success == true)
+        #expect(appState.lastHighlightRehydrateResult?.timestamp == timestamp)
+        #expect(highlight.isStale == false)
+        #expect(highlight.updatedAt == timestamp)
+    }
+
+    @Test func retryFailureLeavesHighlightStaleAndPublishesResult() throws {
+        let modelContext = try makeInMemoryModelContext()
+        let highlight = Highlight(
+            text: "still missing",
+            articleTitle: "Rehydration",
+            startOffset: 4,
+            length: 13
+        )
+        highlight.isStale = true
+        let originalUpdatedAt = highlight.updatedAt
+        modelContext.insert(highlight)
+
+        let appState = AppState(loadPersistedState: false)
+        let pending = AppState.HighlightRehydrateRequest(highlight: highlight)
+        appState.pendingHighlightRehydrate = pending
+        appState.isHighlightRehydrateInProgress = true
+
+        let coordinator = makeCoordinator(
+            highlights: [highlight],
+            modelContext: modelContext,
+            appState: appState
+        )
+        let timestamp = originalUpdatedAt.addingTimeInterval(60)
+
+        coordinator.completePendingHighlightRehydrate(
+            pending,
+            success: false,
+            timestamp: timestamp
+        )
+
+        #expect(appState.pendingHighlightRehydrate == nil)
+        #expect(appState.isHighlightRehydrateInProgress == false)
+        #expect(appState.lastHighlightRehydrateResult?.id == highlight.id)
+        #expect(appState.lastHighlightRehydrateResult?.success == false)
+        #expect(appState.lastHighlightRehydrateResult?.timestamp == timestamp)
+        #expect(highlight.isStale == true)
+        #expect(highlight.updatedAt == originalUpdatedAt)
+    }
+
+    private func makeCoordinator(
+        highlights: [Highlight],
+        modelContext: ModelContext,
+        appState: AppState? = nil
+    ) -> WebView.Coordinator {
+        WebView.Coordinator(
+            tabID: UUID(),
+            onLinkTapped: nil,
+            onOpenArticleInNewWindow: nil,
+            scrollPosition: .constant(0),
+            onScrollProgress: nil,
+            fallbackScrollProgress: nil,
+            appState: appState,
+            modelContext: modelContext,
+            onTextSelected: nil,
+            onSelectionCleared: nil,
+            highlights: highlights,
+            articleTitle: "Rehydration",
+            readerAppearance: .default,
+            readerTopInset: 56,
+            preferImmediateReveal: false,
+            onTableOfContentsUpdate: nil,
+            onReferencesUpdate: nil,
+            onVisibleSectionChange: nil,
+            onContentReveal: nil,
+            onLinkHoverPreviewChange: nil,
+            linkPreviewImmediateModifier: .default,
+            nativeHighlightingMenuEnabled: true
+        )
+    }
+
+    private func makeInMemoryModelContext() throws -> ModelContext {
+        let configuration = ModelConfiguration(isStoredInMemoryOnly: true)
+        let container = try ModelContainer(
+            for: Highlight.self,
+            Tag.self,
+            configurations: configuration
+        )
+        return ModelContext(container)
+    }
+}

@@ -5,6 +5,7 @@ import SwiftData
 
 struct InspectorLabelSection: View {
     @Environment(\.modelContext) private var modelContext
+    @Query(sort: \ReadingList.updatedAt, order: .reverse) private var allLists: [ReadingList]
 
     let article: Article
     let allLabels: [Label]
@@ -46,7 +47,7 @@ struct InspectorLabelSection: View {
         .buttonStyle(.plain)
         .menuIndicator(.hidden)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .animation(.easeInOut(duration: 0.15), value: selectedLabelId)
+        .animation(.spring(response: 0.25, dampingFraction: 0.82), value: selectedLabelId)
         .animation(.easeOut(duration: 0.12), value: isHovered)
         .onHover { hovering in
             isHovered = hovering
@@ -82,9 +83,10 @@ struct InspectorLabelSection: View {
                 .frame(width: 10, height: 10)
 
             Text(currentLabel?.name ?? "Add Label")
-                .font(.caption.weight(.semibold))
+                .font(MacWikiTypography.controlAuxiliary)
                 .foregroundStyle(hasLabel ? (color ?? .primary) : .secondary)
                 .lineLimit(1)
+                .contentTransition(.interpolate)
 
             Spacer(minLength: 8)
 
@@ -112,6 +114,7 @@ struct InspectorLabelSection: View {
                     lineWidth: isHovered ? 1.0 : 0.8
                 )
         }
+        .animation(.spring(response: 0.24, dampingFraction: 0.78), value: selectedLabelId)
     }
 
     // MARK: - Menu Items
@@ -162,10 +165,36 @@ struct InspectorLabelSection: View {
     // MARK: - Actions
 
     private func applyLabel(_ label: Label?) {
-        ensureArticleState()?.labelId = label?.id
-        for saved in fetchSavedArticlesMatchingActiveTitle() {
+        let state = ensureArticleState()
+        state?.labelId = label?.id
+        state?.updatedAt = Date()
+
+        let savedArticles = fetchSavedArticlesMatchingActiveTitle()
+        for saved in savedArticles {
             saved.labelId = label?.id
         }
+
+        if let label, savedArticles.isEmpty {
+            let saved = SavedArticle(
+                title: article.title,
+                description: article.description,
+                extract: article.extract,
+                thumbnailURL: article.thumbnailURL,
+                wordCount: article.wordCount
+            )
+            saved.labelId = label.id
+            saved.isRead = state?.isRead ?? false
+
+            if let list = allLists.first(where: { $0.name == "Inbox" }) ?? allLists.first {
+                list.articles.append(saved)
+                list.updatedAt = Date()
+            } else {
+                modelContext.insert(saved)
+            }
+
+            SavedArticleSummaryBackfill.enqueueIfNeeded(saved, modelContext: modelContext)
+        }
+
         try? modelContext.save()
     }
 
@@ -211,10 +240,12 @@ struct InspectorLabelSection: View {
 struct InspectorTagStatusBox: View {
     @Environment(AppState.self) private var appState
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.colorScheme) private var colorScheme
 
     let article: Article
     let tags: [Tag]
     let allTags: [Tag]
+    let highlights: [Highlight]
 
     @State private var articleState: ArticleState?
     @State private var newTagName = ""
@@ -260,12 +291,25 @@ struct InspectorTagStatusBox: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             // Header
-            HStack {
+            HStack(spacing: 8) {
+                Image(systemName: "tag")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(Color.accentColor.opacity(0.9))
+
                 Text("Tags")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
+                    .font(MacWikiTypography.inspectorSectionLabel)
+                    .foregroundStyle(.primary)
 
                 Spacer()
+
+                if !tags.isEmpty {
+                    Text("\(tags.count)")
+                        .font(MacWikiTypography.compactRowMetadata)
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(.thinMaterial, in: Capsule())
+                }
 
                 Button(isExpanded ? "Collapse Tags" : "Add Tags", systemImage: "chevron.down") {
                     withAnimation(.easeInOut(duration: 0.25)) {
@@ -327,8 +371,9 @@ struct InspectorTagStatusBox: View {
                 }
             } else if !isExpanded {
                 Text("No tags yet")
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
+                    .font(MacWikiTypography.settingsHelp)
+                    .foregroundStyle(.secondary)
+                    .padding(.vertical, 2)
             }
 
             // Inline tag editor
@@ -339,11 +384,7 @@ struct InspectorTagStatusBox: View {
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.quaternary.opacity(0.24), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.8)
-        }
+        .background(tagModuleBackground)
         .onTapGesture {
             withAnimation(.easeInOut(duration: 0.15)) {
                 tagMarkedForRemoval = nil
@@ -385,7 +426,7 @@ struct InspectorTagStatusBox: View {
 
                 TextField("Add or search tags", text: $newTagName)
                     .textFieldStyle(.plain)
-                    .font(.caption)
+                    .font(MacWikiTypography.settingsHelp)
                     .focused($isFieldFocused)
                     .onSubmit {
                         addOrAssignTag()
@@ -426,7 +467,7 @@ struct InspectorTagStatusBox: View {
                         Image(systemName: "plus.circle.fill")
                             .font(.system(size: 11))
                         Text("Create \"\(trimmed)\"")
-                            .font(.caption2.weight(.semibold))
+                            .font(MacWikiTypography.compactRowMetadata)
                     }
                     .foregroundStyle(Color.accentColor)
                     .padding(.horizontal, 12)
@@ -457,7 +498,7 @@ struct InspectorTagStatusBox: View {
                                     Image(systemName: "plus")
                                         .font(.system(size: 8, weight: .bold))
                                     Text(tag.name)
-                                        .font(.caption2.weight(.semibold))
+                                        .font(MacWikiTypography.compactRowMetadata)
                                 }
                                 .foregroundStyle(.secondary)
                                 .padding(.horizontal, 8)
@@ -480,11 +521,21 @@ struct InspectorTagStatusBox: View {
                 .frame(maxHeight: 120)
             } else if allTags.isEmpty && newTagName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 Text("Type a name to create your first tag.")
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
+                    .font(MacWikiTypography.settingsHelp)
+                    .foregroundStyle(.secondary)
                     .padding(.top, 4)
             }
         }
+    }
+
+    private var tagModuleBackground: some View {
+        let shape = RoundedRectangle(cornerRadius: 14, style: .continuous)
+
+        return shape
+            .fill(.quaternary.opacity(colorScheme == .dark ? 0.22 : 0.30))
+            .overlay {
+                shape.strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.10 : 0.08), lineWidth: 0.8)
+            }
     }
 
     // MARK: - Tag Actions
@@ -520,6 +571,16 @@ struct InspectorTagStatusBox: View {
         guard let state = ensureArticleState() else { return }
         state.tags.removeAll { $0.id == tag.id }
         state.updatedAt = Date()
+
+        for highlight in highlights where highlight.tags.contains(where: { $0.id == tag.id }) {
+            highlight.tags.removeAll { $0.id == tag.id }
+            highlight.updatedAt = Date()
+        }
+
+        if appState.highlightTagFilterId == tag.id {
+            appState.highlightTagFilterId = nil
+        }
+
         try? modelContext.save()
     }
 

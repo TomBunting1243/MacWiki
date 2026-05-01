@@ -48,7 +48,11 @@ enum ArticleLibraryActions {
         for article in savedArticles {
             article.labelId = labelId
 
-            if let state = articleState(for: article.title, modelContext: modelContext) {
+            if let labelId,
+               let state = ensureArticleState(for: article.title, modelContext: modelContext) {
+                state.labelId = labelId
+                state.updatedAt = Date()
+            } else if let state = articleState(for: article.title, modelContext: modelContext) {
                 state.labelId = labelId
                 state.updatedAt = Date()
             }
@@ -57,6 +61,93 @@ enum ArticleLibraryActions {
         }
 
         try? modelContext.save()
+    }
+
+    @discardableResult
+    static func moveDroppedArticle(
+        _ payload: SavedArticleDragPayload,
+        to targetList: ReadingList,
+        modelContext: ModelContext
+    ) -> Bool {
+        guard payload.sourceListID != targetList.id else { return false }
+        if let savedArticle = resolvedSavedArticle(
+            for: payload,
+            modelContext: modelContext,
+            createsIfNeeded: false
+        ) {
+            guard savedArticle.readingList?.id != targetList.id else { return false }
+            guard !containsArticle(withTitle: savedArticle.title, in: targetList) else { return false }
+
+            moveArticle(
+                savedArticle,
+                from: savedArticle.readingList,
+                to: targetList,
+                modelContext: modelContext
+            )
+            return true
+        }
+
+        guard let title = payload.title else { return false }
+        guard !containsArticle(withTitle: title, in: targetList) else { return false }
+        return resolvedSavedArticle(
+            for: payload,
+            modelContext: modelContext,
+            defaultList: targetList
+        ) != nil
+    }
+
+    @discardableResult
+    static func applyDroppedArticle(
+        _ payload: SavedArticleDragPayload,
+        labelId: UUID,
+        defaultList: ReadingList? = nil,
+        modelContext: ModelContext
+    ) -> Bool {
+        guard let savedArticle = resolvedSavedArticle(
+            for: payload,
+            modelContext: modelContext,
+            defaultList: defaultList
+        ) else {
+            return false
+        }
+        guard savedArticle.labelId != labelId else { return false }
+
+        applyLabel(labelId, to: [savedArticle], modelContext: modelContext)
+        return true
+    }
+
+    @discardableResult
+    static func addDroppedArticle(
+        _ payload: SavedArticleDragPayload,
+        tag: Tag,
+        modelContext: ModelContext
+    ) -> Bool {
+        if let savedArticle = resolvedSavedArticle(
+            for: payload,
+            modelContext: modelContext,
+            createsIfNeeded: false
+        ) {
+            if articleState(for: savedArticle.title, modelContext: modelContext)?.tags.contains(where: { $0.id == tag.id }) == true {
+                return false
+            }
+
+            addTag(tag, to: [savedArticle], modelContext: modelContext)
+            return true
+        }
+
+        guard let title = payload.title,
+              let state = ensureArticleState(for: title, modelContext: modelContext) else {
+            return false
+        }
+
+        if state.tags.contains(where: { $0.id == tag.id }) {
+            return false
+        }
+
+        state.tags.append(tag)
+        state.updatedAt = Date()
+        try? modelContext.save()
+        return true
     }
 
     static func addTag(
@@ -266,9 +357,9 @@ enum ArticleLibraryActions {
         if let source {
             source.articles.removeAll { $0.id == article.id }
             source.updatedAt = Date()
-        } else {
-            modelContext.delete(article)
         }
+
+        modelContext.delete(article)
 
         try? modelContext.save()
     }
@@ -276,6 +367,72 @@ enum ArticleLibraryActions {
     static func containsArticle(withTitle title: String, in list: ReadingList) -> Bool {
         let normalizedTitle = ReadStateSync.normalizedTitle(title)
         return list.articles.contains { ReadStateSync.normalizedTitle($0.title) == normalizedTitle }
+    }
+
+    static func savedArticle(
+        for id: UUID,
+        modelContext: ModelContext
+    ) -> SavedArticle? {
+        let descriptor = FetchDescriptor<SavedArticle>(
+            predicate: #Predicate { $0.id == id }
+        )
+        return try? modelContext.fetch(descriptor).first
+    }
+
+    static func savedArticle(
+        forTitle title: String,
+        modelContext: ModelContext
+    ) -> SavedArticle? {
+        let normalizedTitle = ReadStateSync.normalizedTitle(title)
+        let descriptor = FetchDescriptor<SavedArticle>()
+        let savedArticles = (try? modelContext.fetch(descriptor)) ?? []
+        return savedArticles.first {
+            ReadStateSync.normalizedTitle($0.title) == normalizedTitle
+        }
+    }
+
+    @discardableResult
+    static func resolvedSavedArticle(
+        for payload: SavedArticleDragPayload,
+        modelContext: ModelContext,
+        defaultList: ReadingList? = nil,
+        createsIfNeeded: Bool = true
+    ) -> SavedArticle? {
+        if let id = payload.savedArticleID,
+           let existing = savedArticle(for: id, modelContext: modelContext) {
+            return existing
+        }
+
+        if let title = payload.title,
+           let existing = savedArticle(forTitle: title, modelContext: modelContext) {
+            return existing
+        }
+
+        guard createsIfNeeded else { return nil }
+        guard let title = payload.title else { return nil }
+
+        let saved = SavedArticle(
+            title: title,
+            description: payload.articleDescription,
+            extract: payload.extract,
+            thumbnailURL: payload.thumbnailURL,
+            list: defaultList,
+            wordCount: payload.wordCount
+        )
+        if let isRead = payload.isRead {
+            saved.isRead = isRead
+        }
+
+        if let defaultList {
+            defaultList.articles.append(saved)
+            defaultList.updatedAt = Date()
+        } else {
+            modelContext.insert(saved)
+        }
+
+        try? modelContext.save()
+        SavedArticleSummaryBackfill.enqueueIfNeeded(saved, modelContext: modelContext)
+        return saved
     }
 
     static func articleState(

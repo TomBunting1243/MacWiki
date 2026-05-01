@@ -216,7 +216,7 @@ extension WebView.Coordinator {
         }
         if force || (now - lastSaveRequestTimestamp) >= adaptiveSaveRequestInterval {
             lastSaveRequestTimestamp = now
-            appState?.requestSave()
+            appState?.tabSessionStore.requestSave()
         }
     }
 

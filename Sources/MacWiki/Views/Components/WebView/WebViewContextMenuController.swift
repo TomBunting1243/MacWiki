@@ -7,6 +7,7 @@ enum WebViewContextMenuController {
         case open
         case openInNewTab
         case openInNewBackgroundTab
+        case openInNewWindow
         case copyTitle
         case copyLink
         case saveToList
