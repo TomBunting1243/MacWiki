@@ -309,7 +309,6 @@ struct ArticleView: View {
     @AppStorage(AppStorageKey.Reader.linkPreviewImmediateModifier) private var linkPreviewImmediateModifier: ReaderLinkPreviewImmediateModifier = .default
     @AppStorage(AppStorageKey.Chrome.liquidGlassChrome) private var liquidGlassChrome = true
     @AppStorage(MacWikiGlassRuntime.forceLegacyFallbackKey) private var forceLegacyGlassFallback = false
-    @AppStorage(AppStorageKey.Chrome.nativeHighlightingMenuEnabled) private var nativeHighlightingMenuEnabled = AppStorageKey.Chrome.nativeHighlightingMenuEnabledDefault
 
     init(tabId: UUID, article: Article, scrollPosition: Binding<CGFloat>) {
         self.tabId = tabId
@@ -554,11 +553,6 @@ struct ArticleView: View {
             articleLoader.schedulePinSync(shouldPin, forArticleTitle: article.title)
             appState.setArticleHTMLPinned(shouldPin, forTitle: article.title)
         }
-        .onChange(of: nativeHighlightingMenuEnabled) { _, enabled in
-            if enabled {
-                appState.currentTextSelection = nil
-            }
-        }
         .animation(
             reduceMotion ? nil : ReaderMotion.promptSpring,
             value: showMarkAsReadPrompt
@@ -582,10 +576,6 @@ struct ArticleView: View {
                     openWindow(value: article)
                 },
                 onTextSelected: { selectionData in
-                    guard !nativeHighlightingMenuEnabled else {
-                        appState.currentTextSelection = nil
-                        return
-                    }
                     appState.currentTextSelection = selectionData
                 },
                 onSelectionCleared: {
@@ -608,9 +598,7 @@ struct ArticleView: View {
                 },
                 onReferencesUpdate: { sections in
                     guard appState.currentArticle?.title == article.title else { return }
-                    if appState.currentArticleReferences != sections {
-                        appState.currentArticleReferences = sections
-                    }
+                    appState.currentArticleReferences = sections
                 },
                 onVisibleSectionChange: { sectionId in
                     guard appState.currentArticle?.title == article.title else { return }
@@ -641,7 +629,7 @@ struct ArticleView: View {
                 linkHoverPreviewOverlayHovering: isHoveringLinkHoverPreview,
                 activeLinkHoverPreviewSignature: linkHoverPreviewRequest?.signature,
                 linkPreviewImmediateModifier: linkPreviewImmediateModifier,
-                nativeHighlightingMenuEnabled: nativeHighlightingMenuEnabled,
+                nativeHighlightingMenuEnabled: false,
                 openTimer: $openTimer,
                 appState: appState,
                 inspectorVisible: appState.inspectorVisible,
@@ -680,9 +668,7 @@ struct ArticleView: View {
             }
             .overlay {
                 // Highlight toolbar overlay
-                if !nativeHighlightingMenuEnabled {
-                    HighlightToolbarOverlay(articleTitle: article.title)
-                }
+                HighlightToolbarOverlay(articleTitle: article.title)
             }
 
             if #available(macOS 26, *) {
@@ -982,42 +968,56 @@ struct ArticleView: View {
             appState.isHighlightArticleRefreshInProgress = false
         }
 
-        await loadArticle(forceRefresh: true)
+        let refreshSucceeded = await loadArticle(forceRefresh: true)
         appState.lastHighlightArticleRefreshResult = AppState.HighlightArticleRefreshResult(
             requestId: request.id,
             articleTitle: article.title,
-            success: errorMessage == nil,
+            success: refreshSucceeded,
             timestamp: Date()
         )
     }
 
-    private func loadArticle(preloadedHTML: String? = nil, forceRefresh: Bool = false) async {
+    @discardableResult
+    private func loadArticle(preloadedHTML: String? = nil, forceRefresh: Bool = false) async -> Bool {
         let resolvedPreloadedHTML = forceRefresh ? nil : preloadedHTML
         let hasReusableWebSurface = !forceRefresh && WebViewPool.shared.hasReusableWebView(for: tabId)
-        loadedArticleKey = nil
-        isWebContentReady = false
-        hasPublishedLiveReadingProgressForCurrentOpen = false
-        isLoadingSkeletonVisible = false
-        suppressLoadingSkeletonForCurrentOpen = hasReusableWebSurface
-        openTimer.begin(title: article.title, preloaded: resolvedPreloadedHTML != nil)
-        scheduleLoadingSkeletonAppearance(
-            preloaded: resolvedPreloadedHTML != nil,
-            suppressed: hasReusableWebSurface
-        )
+        let shouldPreserveVisibleContent =
+            forceRefresh &&
+            htmlContent != nil &&
+            loadedArticleKey == article.id
+
+        if shouldPreserveVisibleContent {
+            skeletonVisibilityTicket = UUID()
+            isLoadingSkeletonVisible = false
+            suppressLoadingSkeletonForCurrentOpen = true
+            isLoading = false
+            isWebContentReady = true
+        } else {
+            loadedArticleKey = nil
+            isWebContentReady = false
+            hasPublishedLiveReadingProgressForCurrentOpen = false
+            isLoadingSkeletonVisible = false
+            suppressLoadingSkeletonForCurrentOpen = hasReusableWebSurface
+            openTimer.begin(title: article.title, preloaded: resolvedPreloadedHTML != nil)
+            scheduleLoadingSkeletonAppearance(
+                preloaded: resolvedPreloadedHTML != nil,
+                suppressed: hasReusableWebSurface
+            )
+        }
         if let preloadedHTML = resolvedPreloadedHTML {
             htmlContent = preloadedHTML
             loadedArticleKey = article.id
             preferImmediateWebReveal = true
             isLoading = false
             openTimer.markHTMLBound()
-        } else {
+        } else if !shouldPreserveVisibleContent {
             htmlContent = nil
             preferImmediateWebReveal = false
             isLoading = true
         }
         errorMessage = nil
         pendingHydratedMetadata = nil
-        if !appState.currentArticleMetadata.isEmpty {
+        if !shouldPreserveVisibleContent, !appState.currentArticleMetadata.isEmpty {
             appState.currentArticleMetadata = []
         }
 
@@ -1032,7 +1032,17 @@ struct ArticleView: View {
                 preferImmediateWebReveal = shouldRevealImmediately
             }
 
-            if htmlContent == nil {
+            if forceRefresh {
+                if htmlContent != content.html {
+                    htmlContent = content.html
+                    loadedArticleKey = article.id
+                    openTimer.markHTMLBound()
+                    isWebContentReady = false
+                    preferImmediateWebReveal = content.isWarmCacheHit
+                } else if loadedArticleKey != article.id {
+                    loadedArticleKey = article.id
+                }
+            } else if htmlContent == nil {
                 htmlContent = content.html
                 loadedArticleKey = article.id
                 openTimer.markHTMLBound()
@@ -1058,21 +1068,25 @@ struct ArticleView: View {
                     pendingHydratedMetadata = hydrated
                 }
             }
+            return true
         } catch {
             if error is CancellationError {
-                return
+                return false
             }
             if let urlError = error as? URLError, urlError.code == .cancelled {
-                return
+                return false
             }
-            guard !Task.isCancelled else { return }
+            guard !Task.isCancelled else { return false }
 
-            loadedArticleKey = nil
-            errorMessage = error.localizedDescription
+            if !shouldPreserveVisibleContent {
+                loadedArticleKey = nil
+                errorMessage = error.localizedDescription
+            }
             preferImmediateWebReveal = false
             isLoading = false
             isWebContentReady = true
             isLoadingSkeletonVisible = false
+            return false
         }
     }
 

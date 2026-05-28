@@ -7,6 +7,7 @@ struct InspectorPanel: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.openURL) private var openURL
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage(AppStorageKey.Inspector.infoSplitRatio) private var infoSplitRatioSetting: Double = 0
     @AppStorage(AppStorageKey.Inspector.metadataSectionHeight) private var metadataSectionHeightSetting: Double = 0
     @AppStorage(AppStorageKey.Inspector.tocSectionHeight) private var tocSectionHeightSetting: Double = 0
@@ -59,6 +60,8 @@ struct InspectorPanel: View {
         static let infoVerticalPadding: CGFloat = 26
         static let splitSectionChromeHeight: CGFloat = 96
         static let splitHandleHeight: CGFloat = 7
+        static let metadataTransitionAnimation = Animation.easeOut(duration: 0.22)
+        static let metadataHeightAnimation = Animation.easeOut(duration: 0.18)
     }
 
     private var usesSplitLayout: Bool {
@@ -190,6 +193,16 @@ struct InspectorPanel: View {
                 .combined(with: .move(edge: .bottom))
                 .combined(with: .scale(scale: 0.985, anchor: .top))
         )
+    }
+
+    private var metadataSectionTransition: AnyTransition {
+        reduceMotion
+            ? .opacity
+            : .opacity.combined(with: .scale(scale: 0.992, anchor: .top))
+    }
+
+    private var metadataIdentityKey: String {
+        appState.currentArticleMetadata.map { "\($0.label)=\($0.value)" }.joined(separator: "|")
     }
 
     private var derivedArticleDataRefreshKey: String {
@@ -331,6 +344,7 @@ struct InspectorPanel: View {
 
                         if !appState.currentArticleMetadata.isEmpty {
                             metadataSection
+                                .transition(metadataSectionTransition)
                         }
 
                         if usesSplitLayout {
@@ -347,7 +361,7 @@ struct InspectorPanel: View {
                     .padding(.bottom, 14)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                     .clipped()
-                    .animation(.easeInOut(duration: 0.25), value: appState.currentArticleMetadata.isEmpty)
+                    .animation(reduceMotion ? nil : InspectorLayout.metadataTransitionAnimation, value: appState.currentArticleMetadata.isEmpty)
                 } else {
                     ColumnEmptyStateView(
                         title: "No Article",
@@ -492,11 +506,13 @@ struct InspectorPanel: View {
 
             metadataScrollContent
                 .frame(height: metadataSectionHeight, alignment: .top)
+                .animation(reduceMotion ? nil : InspectorLayout.metadataHeightAnimation, value: metadataSectionHeight)
         }
         .padding(12)
         .background {
             inspectorSectionBackground()
         }
+        .animation(reduceMotion ? nil : InspectorLayout.metadataHeightAnimation, value: metadataIdentityKey)
     }
 
     private var metadataTOCResizeHandle: some View {

@@ -17,6 +17,7 @@ struct DirectoryColumnView: View {
 
     let selectedLabel: Label?
     let selectedTag: Tag?
+    let sidebarSearchModel: SidebarSearchSurfaceModel
     let onNewLabelWithArticle: (SavedArticle) -> Void
     let onNewTagWithArticle: (Article) -> Void
 
@@ -33,6 +34,7 @@ struct DirectoryColumnView: View {
                 rootSelection: $rootSelection,
                 selectedLabel: selectedLabel,
                 selectedTag: selectedTag,
+                sidebarSearchModel: sidebarSearchModel,
                 onNewLabelWithArticle: onNewLabelWithArticle,
                 onNewTagWithArticle: onNewTagWithArticle
             )

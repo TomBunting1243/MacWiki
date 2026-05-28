@@ -256,7 +256,9 @@ struct MacWikiApp: App {
             ContentView()
                 .focusedSceneValue(\.macWikiCommandAppState, appState)
                 .toolbar(removing: .title)
+                .toolbar(removing: .sidebarToggle)
                 .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
+                .configuredMacWikiWindowChrome()
                 .alert(item: $launchIssue) { issue in
                     Alert(
                         title: Text(issue.title),

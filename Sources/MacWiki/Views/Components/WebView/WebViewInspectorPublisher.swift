@@ -103,8 +103,6 @@ final class WebViewInspectorPublisher {
             for item in section.items {
                 hasher.combine(item.id)
                 hasher.combine(item.label)
-                hasher.combine(item.text)
-                hasher.combine(item.html)
                 hasher.combine(item.group)
                 hasher.combine(item.links.count)
                 for link in item.links {

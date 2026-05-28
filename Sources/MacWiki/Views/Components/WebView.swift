@@ -80,7 +80,7 @@ struct WebView: NSViewRepresentable {
     var linkPreviewImmediateModifier: ReaderLinkPreviewImmediateModifier = .default
 
     /// Enables native context-menu driven text highlighting interactions.
-    var nativeHighlightingMenuEnabled: Bool = AppStorageKey.Chrome.nativeHighlightingMenuEnabledDefault
+    var nativeHighlightingMenuEnabled: Bool = false
 
     /// Optional open-path timer for phase instrumentation.
     var openTimer: Binding<ArticleOpenTimer>?

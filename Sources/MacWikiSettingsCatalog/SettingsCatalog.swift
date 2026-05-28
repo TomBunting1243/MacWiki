@@ -196,16 +196,6 @@ public enum SettingsCatalog {
                     control: "Toggle",
                     values: ["On", "Off"],
                     codeReference: "AppStorageKey.Highlights.headerWrap"
-                ),
-                option(
-                    id: "library.nativeHighlightingMenu",
-                    title: "Native Highlighting Menu",
-                    summary: "Uses macOS text-selection highlighting behavior inside article pages.",
-                    storageKey: "nativeHighlightingMenuEnabled",
-                    defaultValue: "On",
-                    control: "Toggle",
-                    values: ["On", "Off"],
-                    codeReference: "AppStorageKey.Chrome.nativeHighlightingMenuEnabled"
                 )
             ]
         ),
@@ -233,7 +223,8 @@ public enum SettingsCatalog {
                     defaultValue: "Discover Feed",
                     control: "Picker",
                     values: ["Discover Feed", "Wiki-Hop"],
-                    codeReference: "DiscoverStartMode.storageKey"
+                    codeReference: "DiscoverStartMode.storageKey",
+                    appearsInSettings: false
                 ),
                 option(
                     id: "navigation.hideSidebarTimeMachine",
@@ -349,7 +340,8 @@ public enum SettingsCatalog {
                     defaultValue: "Off",
                     control: "Toggle",
                     values: ["On", "Off"],
-                    codeReference: "ExperimentFlag.wikiHopPOCEnabled.key"
+                    codeReference: "ExperimentFlag.wikiHopPOCEnabled.key",
+                    appearsInSettings: false
                 ),
                 option(
                     id: "advanced.wikiHopPostV1Gate",

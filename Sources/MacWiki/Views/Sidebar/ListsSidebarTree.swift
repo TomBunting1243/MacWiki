@@ -16,7 +16,6 @@ struct ListsSidebarTreeSection: Identifiable {
 
 struct ListsSidebarTreeNode: Identifiable {
     enum Kind {
-        case search(isDisabled: Bool)
         case root(SidebarRootSelection)
         case list(ReadingList)
         case label(Label)
@@ -29,8 +28,6 @@ struct ListsSidebarTreeNode: Identifiable {
 
     var id: String {
         switch kind {
-        case .search:
-            return "search"
         case .root(let selection):
             return "root:\(selection.rawValue)"
         case .list(let list):
@@ -49,14 +46,12 @@ struct ListsSidebarTreeNode: Identifiable {
 enum ListsSidebarTreeBuilder {
     static func build(
         snapshot: ListsSidebarSnapshot,
-        isSearchDisabled: Bool,
         isWikiHopAvailable: Bool
     ) -> [ListsSidebarTreeSection] {
         [
             ListsSidebarTreeSection(
                 kind: .explore,
                 nodes: exploreNodes(
-                    isSearchDisabled: isSearchDisabled,
                     isWikiHopAvailable: isWikiHopAvailable
                 )
             ),
@@ -76,12 +71,10 @@ enum ListsSidebarTreeBuilder {
     }
 
     private static func exploreNodes(
-        isSearchDisabled: Bool,
         isWikiHopAvailable: Bool
     ) -> [ListsSidebarTreeNode] {
         var nodes: [ListsSidebarTreeNode] = [
             ListsSidebarTreeNode(kind: .root(.discover), children: []),
-            ListsSidebarTreeNode(kind: .search(isDisabled: isSearchDisabled), children: []),
             ListsSidebarTreeNode(kind: .root(.recents), children: [])
         ]
 

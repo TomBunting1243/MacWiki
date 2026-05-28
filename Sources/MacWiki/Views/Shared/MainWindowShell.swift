@@ -6,6 +6,7 @@ struct MainWindowShell: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage(AppStorageKey.MainWindow.sidebarWidth) private var sidebarWidth = AppStorageKey.MainWindow.sidebarWidthDefault
     @AppStorage(AppStorageKey.MainWindow.inspectorWidth) private var inspectorWidth = AppStorageKey.MainWindow.inspectorWidthDefault
+    @State private var sidebarSearchModel = SidebarSearchSurfaceModel()
 
     @Binding var selectedList: ReadingList?
     @Binding var selectedLabel: Label?
@@ -74,6 +75,7 @@ struct MainWindowShell: View {
                 selectedLabel: $selectedLabel,
                 selectedTag: $selectedTag,
                 rootSelection: $rootSelection,
+                sidebarSearchModel: sidebarSearchModel,
                 onEditLabel: onEditLabel,
                 onAddNewLabel: onAddNewLabel
             )
@@ -83,6 +85,7 @@ struct MainWindowShell: View {
                 rootSelection: $rootSelection,
                 selectedLabel: selectedLabel,
                 selectedTag: selectedTag,
+                sidebarSearchModel: sidebarSearchModel,
                 onNewLabelWithArticle: onNewLabelWithArticle,
                 onNewTagWithArticle: onNewTagWithArticle
             )
@@ -101,6 +104,7 @@ struct MainWindowShell: View {
                 selectedLabel: $selectedLabel,
                 selectedTag: $selectedTag,
                 rootSelection: $rootSelection,
+                sidebarSearchModel: sidebarSearchModel,
                 onEditLabel: onEditLabel,
                 onAddNewLabel: onAddNewLabel
             )

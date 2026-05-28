@@ -2690,23 +2690,6 @@ function collectReferenceLinks(node) {
     return links;
 }
 
-function serializeReferenceHTML(node) {
-    if (!node) return '';
-    var clone = node.cloneNode(true);
-    var anchors = clone.querySelectorAll ? clone.querySelectorAll('a[href]') : [];
-    anchors.forEach(function (anchor) {
-        var href = (anchor.getAttribute('href') || '').trim();
-        if (!href) return;
-        try {
-            var resolved = new URL(href, document.baseURI);
-            anchor.setAttribute('href', resolved.toString());
-        } catch (_) {
-            return;
-        }
-    });
-    return clone.innerHTML.trim();
-}
-
 function extractReferenceItemsFromList(list) {
     if (!list) return [];
     var items = [];
@@ -2737,7 +2720,7 @@ function extractReferenceItemsFromList(list) {
             id: id,
             label: label || null,
             text: text,
-            html: serializeReferenceHTML(referenceNode),
+            html: null,
             links: collectReferenceLinks(referenceNode),
             group: group
         });
@@ -2771,7 +2754,7 @@ function extractReferenceItemsFromSection(section, sectionKey) {
             id: id,
             label: null,
             text: text,
-            html: serializeReferenceHTML(item),
+            html: null,
             links: collectReferenceLinks(item),
             group: null
         });

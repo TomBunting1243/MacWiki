@@ -7,9 +7,6 @@ struct SettingsAdvancedPane: View {
     @Environment(AppState.self) private var appState
     @Environment(\.modelContext) private var modelContext
 
-    @AppStorage(ExperimentFlag.wikiHopPOCEnabled.key) private var wikiHopPOCEnabled = false
-    @AppStorage(AppStorageKey.Features.wikiHopPostV1Enabled) private var wikiHopPostV1Enabled = false
-
     @State private var cacheMetrics: WikipediaService.CacheMetrics?
     @State private var performanceMetrics = PerformanceMetricsStore.shared
     @State private var isCacheActionRunning = false
@@ -33,27 +30,6 @@ struct SettingsAdvancedPane: View {
             summary: section.summary,
             systemImage: section.systemImage
         ) {
-            SettingsGroup("Experiments", systemImage: "flask") {
-                if wikiHopPostV1Enabled {
-                    Toggle(
-                        "Enable Wiki-Hop",
-                        isOn: Binding(
-                            get: { wikiHopPOCEnabled },
-                            set: { newValue in
-                                appState.setWikiHopExperimentEnabled(newValue)
-                            }
-                        )
-                    )
-                    SettingsHelpText("Wiki-Hop is a Wikipedia navigation challenge built on article links.")
-                } else {
-                    LabeledContent("Wiki-Hop") {
-                        Text("Deferred")
-                            .foregroundStyle(.secondary)
-                    }
-                    SettingsHelpText("The Wiki-Hop experiment is gated for the post-v1 roadmap in the current build.")
-                }
-            }
-
             SettingsGroup("Storage", systemImage: "internaldrive") {
                 storageMetrics
                 storageActions

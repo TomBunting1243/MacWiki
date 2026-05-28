@@ -8,7 +8,6 @@ struct SettingsLibraryPane: View {
     @AppStorage(AppStorageKey.Labels.displayMode) private var labelDisplayMode: LabelDisplayMode = .rowHighlight
     @AppStorage(AppStorageKey.Highlights.markerStyle) private var highlightMarkerStyle: HighlightMarkerStyle = .dot
     @AppStorage(AppStorageKey.Highlights.headerWrap) private var highlightHeaderWrap = false
-    @AppStorage(AppStorageKey.Chrome.nativeHighlightingMenuEnabled) private var nativeHighlightingMenuEnabled = AppStorageKey.Chrome.nativeHighlightingMenuEnabledDefault
     @AppStorage(AppStorageKey.ListsSidebar.sortOrder) private var listSortOrder: ListSortOrder = .updatedDate
     @AppStorage(AppStorageKey.OptionClickSave.defaultListID) private var defaultListID: String = ""
 
@@ -72,9 +71,6 @@ struct SettingsLibraryPane: View {
 
                 Toggle("Wrap Highlight Header", isOn: $highlightHeaderWrap)
                 SettingsHelpText("Long highlight section titles can wrap instead of being clipped.")
-
-                Toggle("Native Highlighting Menu", isOn: $nativeHighlightingMenuEnabled)
-                SettingsHelpText("Use the macOS text-selection menu for creating highlights inside article pages.")
             }
         }
     }

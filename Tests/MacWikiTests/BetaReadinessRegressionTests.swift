@@ -31,10 +31,6 @@ struct BetaReadinessRegressionTests {
         #expect(pool.canStoreWebViewForTesting(for: UUID()) == true)
     }
 
-    @Test func nativeHighlightingDefaultStaysEnabled() {
-        #expect(AppStorageKey.Chrome.nativeHighlightingMenuEnabledDefault == true)
-    }
-
     @Test func liquidGlassChromeKeepsLegacyStorageKey() {
         #expect(AppStorageKey.Chrome.liquidGlassChrome == "tabBarLiquidGlass")
         #expect(AppStorageKey.Chrome.tabBarLiquidGlass == AppStorageKey.Chrome.liquidGlassChrome)
@@ -183,11 +179,18 @@ struct BetaReadinessRegressionTests {
     @Test func articleNewWindowUsesDedicatedReaderInspectorShell() throws {
         let articleWindowSource = try source("Sources/MacWiki/Views/Shared/ArticleWindowRootView.swift")
         let appSource = try source("Sources/MacWiki/App/MacWikiApp.swift")
+        let windowChromeSource = try source("Sources/MacWiki/Views/Shared/WindowChromeConfigurator.swift")
 
         #expect(articleWindowSource.contains("HSplitView"))
         #expect(articleWindowSource.contains("ReaderView()"))
         #expect(articleWindowSource.contains("InspectorColumnView("))
         #expect(articleWindowSource.contains(".toolbarBackgroundVisibility(.hidden, for: .windowToolbar)"))
+        #expect(articleWindowSource.contains(".toolbar(removing: .sidebarToggle)"))
+        #expect(articleWindowSource.contains(".configuredMacWikiWindowChrome()"))
+        #expect(appSource.contains(".toolbar(removing: .sidebarToggle)"))
+        #expect(appSource.contains(".configuredMacWikiWindowChrome()"))
+        #expect(windowChromeSource.contains("navigationSplitView.toggleSidebar"))
+        #expect(windowChromeSource.contains("SwiftUI.splitViewSeparator"))
         #expect(!articleWindowSource.contains("NavigationSplitView"))
         #expect(!articleWindowSource.contains("MainWindowShell"))
         #expect(!articleWindowSource.contains("ListsColumnView"))

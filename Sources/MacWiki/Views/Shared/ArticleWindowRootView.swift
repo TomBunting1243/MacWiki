@@ -43,7 +43,9 @@ struct ArticleWindowRootView: View {
                 articleForNewTag: $articleForNewTag
             )
             .toolbar(removing: .title)
+            .toolbar(removing: .sidebarToggle)
             .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
+            .configuredMacWikiWindowChrome()
             .focusedSceneValue(\.macWikiCommandAppState, appState)
             .environment(appState)
             .task(id: initialArticle) {

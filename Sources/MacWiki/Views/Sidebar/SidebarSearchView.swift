@@ -12,7 +12,7 @@ struct SidebarSearchView: View {
     @Query private var savedArticles: [SavedArticle]
     @Query(sort: \Highlight.createdAt, order: .reverse) private var highlights: [Highlight]
 
-    @State private var model = SidebarSearchSurfaceModel()
+    let model: SidebarSearchSurfaceModel
     @FocusState private var isSearchFieldFocused: Bool
 
     private var searchSurfaceFingerprint: Int {

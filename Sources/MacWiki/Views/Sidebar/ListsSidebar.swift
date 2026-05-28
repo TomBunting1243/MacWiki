@@ -42,6 +42,7 @@ struct ListsSidebar: View {
     @Binding var selectedLabel: Label?
     @Binding var selectedTag: Tag?
     @Binding var rootSelection: SidebarRootSelection
+    let sidebarSearchModel: SidebarSearchSurfaceModel
     @State private var showNewListSheet = false
     @State private var showNewAreaSheet = false
     @State private var sidebarSelectionSet: Set<SidebarSelectionID> = []
@@ -118,7 +119,6 @@ struct ListsSidebar: View {
     private var sidebarSections: [ListsSidebarTreeSection] {
         ListsSidebarTreeBuilder.build(
             snapshot: collectionsSnapshot,
-            isSearchDisabled: appState.isWikiHopNavigationLocked,
             isWikiHopAvailable: isWikiHopAvailable
         )
     }
@@ -423,6 +423,8 @@ struct ListsSidebar: View {
         switch section.kind {
         case .explore:
             Section {
+                sidebarSearchButton
+
                 ForEach(section.nodes) { node in
                     sidebarNodeView(node)
                 }
@@ -545,14 +547,6 @@ struct ListsSidebar: View {
     @ViewBuilder
     private func sidebarNodeView(_ node: ListsSidebarTreeNode) -> some View {
         switch node.kind {
-        case .search(let isDisabled):
-            sidebarSelectableRow(
-                selection: .search,
-                isSelected: sidebarSelectionSet.contains(.search),
-                isDisabled: isDisabled
-            ) {
-                rootRowLabel("Search", systemImage: "magnifyingglass")
-            }
         case .root(let selection):
             sidebarSelectableRow(
                 selection: .root(selection),
@@ -622,6 +616,16 @@ struct ListsSidebar: View {
                 onPersistChange: requestModelContextSave,
                 isSelected: selectedAreaIDs.contains(area.id)
             )
+        }
+    }
+
+    private var sidebarSearchButton: some View {
+        sidebarSelectableRow(
+            selection: .search,
+            isSelected: sidebarSelectionSet.contains(.search),
+            isDisabled: appState.isWikiHopNavigationLocked
+        ) {
+            rootRowLabel("Search", systemImage: "magnifyingglass")
         }
     }
 

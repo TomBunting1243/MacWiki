@@ -4,8 +4,6 @@ enum AppStorageKey {
     enum Chrome {
         static let liquidGlassChrome = "tabBarLiquidGlass"
         static let tabBarLiquidGlass = liquidGlassChrome
-        static let nativeHighlightingMenuEnabled = "nativeHighlightingMenuEnabled"
-        static let nativeHighlightingMenuEnabledDefault = true
     }
 
     enum Reader {

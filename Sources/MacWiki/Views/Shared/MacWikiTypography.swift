@@ -4,7 +4,6 @@ enum MacWikiTypography {
     static let columnSectionLabel = Font.subheadline.weight(.semibold)
     static let columnHeaderTitle = Font.system(size: 20, weight: .semibold)
     static let columnHeaderMetadata = Font.callout.weight(.semibold)
-    static let columnSearchField = Font.system(size: 17, weight: .regular)
 
     static let articleListTitle = Font.body.weight(.semibold)
     static let articleListSubtitle = Font.subheadline

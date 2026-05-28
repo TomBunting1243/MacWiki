@@ -8,6 +8,7 @@ struct ListsColumnView: View {
     @Binding var selectedTag: Tag?
     @Binding var rootSelection: SidebarRootSelection
 
+    let sidebarSearchModel: SidebarSearchSurfaceModel
     let onEditLabel: (Label) -> Void
     let onAddNewLabel: () -> Void
 
@@ -17,6 +18,7 @@ struct ListsColumnView: View {
             selectedLabel: $selectedLabel,
             selectedTag: $selectedTag,
             rootSelection: $rootSelection,
+            sidebarSearchModel: sidebarSearchModel,
             onEditLabel: onEditLabel,
             onAddNewLabel: onAddNewLabel
         )

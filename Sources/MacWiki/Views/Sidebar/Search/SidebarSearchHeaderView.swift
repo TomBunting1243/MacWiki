@@ -1,6 +1,11 @@
 import SwiftUI
 
 struct SidebarSearchHeaderView: View {
+    private enum Metrics {
+        static let titleFont = Font.system(size: 17, weight: .semibold)
+        static let metadataFont = Font.subheadline.weight(.semibold)
+    }
+
     let model: SidebarSearchSurfaceModel
     let allLists: [ReadingList]
     @FocusState.Binding var isSearchFieldFocused: Bool
@@ -15,14 +20,14 @@ struct SidebarSearchHeaderView: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack(alignment: .bottom, spacing: 12) {
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: 2) {
                     Text("Search")
-                        .font(MacWikiTypography.columnHeaderTitle)
+                        .font(Metrics.titleFont)
                         .foregroundStyle(.primary)
                         .lineLimit(1)
 
                     Text(model.headerMetadataText)
-                        .font(MacWikiTypography.columnHeaderMetadata)
+                        .font(Metrics.metadataFont)
                         .monospacedDigit()
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
@@ -52,12 +57,12 @@ struct SidebarSearchHeaderView: View {
                 }
             }
             .padding(.horizontal, ColumnChromeMetrics.horizontalPadding)
-            .padding(.top, 16)
-            .padding(.bottom, 11)
+            .padding(.top, 12)
+            .padding(.bottom, 10)
 
             searchField
-            .padding(.horizontal, ColumnChromeMetrics.horizontalPadding)
-            .padding(.bottom, 12)
+                .padding(.horizontal, ColumnChromeMetrics.horizontalPadding)
+                .padding(.bottom, 12)
         }
         .overlay(alignment: .bottom) {
             Rectangle()
@@ -69,43 +74,46 @@ struct SidebarSearchHeaderView: View {
     private var searchField: some View {
         @Bindable var searchCoordinator = model.searchCoordinator
 
-        return HStack(spacing: 8) {
+        return HStack(spacing: 7) {
             Image(systemName: "magnifyingglass")
-                .font(.system(size: 16, weight: .semibold))
+                .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(.secondary)
+                .frame(width: 15, alignment: .center)
 
-            TextField("Search Wikipedia...", text: $searchCoordinator.searchText)
+            TextField("Search Wikipedia", text: $searchCoordinator.searchText)
                 .textFieldStyle(.plain)
-                .font(MacWikiTypography.columnSearchField)
+                .font(.system(size: 13))
                 .focused($isSearchFieldFocused)
                 .onSubmit(onSubmit)
                 .accessibilityLabel("Search Wikipedia")
                 .accessibilityIdentifier("sidebar-search-field")
 
-            if model.searchCoordinator.isLoading {
+            if searchCoordinator.isLoading {
                 AppLoadingActivityMark(tone: .accent)
-                    .frame(width: 14, height: 14)
-            } else if model.searchCoordinator.hasInput {
+                    .frame(width: 13, height: 13)
+            } else if searchCoordinator.hasInput {
                 Button("Clear Search", systemImage: "xmark.circle.fill") {
-                    model.searchCoordinator.clearSearch()
+                    searchCoordinator.clearSearch()
+                    isSearchFieldFocused = true
                 }
                 .labelStyle(.iconOnly)
-                .font(.system(size: 13))
-                .foregroundStyle(.tertiary)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.secondary)
+                .frame(width: 16, height: 16)
                 .buttonStyle(.plain)
                 .help("Clear Search")
             }
         }
-        .padding(.horizontal, 12)
-        .frame(height: 36)
+        .padding(.horizontal, 9)
+        .frame(height: 30)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
-            RoundedRectangle(cornerRadius: 10)
-                .fill(Color.primary.opacity(colorScheme == .dark ? 0.14 : 0.05))
+            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                .fill(Color(nsColor: .controlBackgroundColor))
         )
         .overlay {
-            RoundedRectangle(cornerRadius: 10)
-                .strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.16 : 0.09), lineWidth: 0.6)
+            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                .strokeBorder(Color(nsColor: .separatorColor).opacity(colorScheme == .dark ? 0.35 : 0.55), lineWidth: 0.5)
         }
     }
 

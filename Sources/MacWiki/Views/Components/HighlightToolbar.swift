@@ -4,14 +4,14 @@ import SwiftData
 /// Floating toolbar that appears when text is selected in the article
 struct HighlightToolbar: View {
     @Environment(\.colorScheme) private var colorScheme
+    @AppStorage(AppStorageKey.Chrome.liquidGlassChrome) private var liquidGlassChrome = true
+    @AppStorage(MacWikiGlassRuntime.forceLegacyFallbackKey) private var forceLegacyGlassFallback = false
     let selectionData: TextSelectionData
     let articleTitle: String
     let onDismiss: () -> Void
 
     @Environment(AppState.self) private var appState
     @Environment(\.modelContext) private var modelContext
-    @AppStorage(AppStorageKey.Chrome.liquidGlassChrome) private var liquidGlassChrome = true
-    @AppStorage(MacWikiGlassRuntime.forceLegacyFallbackKey) private var forceLegacyGlassFallback = false
     @State private var selectedColor: HighlightColor = .yellow
     @State private var isHoveringColor: HighlightColor?
     @State private var hoveredAction: HighlightToolbarAction?
@@ -30,28 +30,14 @@ struct HighlightToolbar: View {
         case dismiss
     }
 
-    private var usesNativeGlass: Bool {
-        MacWikiGlassRuntime.usesNativeGlass(
-            isEnabled: liquidGlassChrome,
-            forceLegacyFallback: forceLegacyGlassFallback
-        )
-    }
-
     var body: some View {
         MacWikiGlassGroup(spacing: 8) {
             colorPickerView
                 .padding(.horizontal, 10)
                 .padding(.vertical, 8)
                 .background(toolbarBackground)
-                .overlay {
-                    RoundedRectangle(cornerRadius: Metrics.cornerRadius, style: .continuous)
-                        .strokeBorder(
-                            Color.primary.opacity(colorScheme == .dark ? 0.075 : 0.046),
-                            lineWidth: 0.5
-                        )
-                }
         }
-        .shadow(color: .black.opacity(colorScheme == .dark ? 0.16 : 0.06), radius: 10, x: 0, y: 4)
+        .shadow(color: .black.opacity(colorScheme == .dark ? 0.32 : 0.16), radius: 16, x: 0, y: 8)
     }
 
     private var colorPickerView: some View {
@@ -160,22 +146,38 @@ struct HighlightToolbar: View {
                 .overlay {
                     shape.fill(Color(nsColor: .windowBackgroundColor).opacity(colorScheme == .dark ? 0.022 : 0.014))
                 }
+                .overlay {
+                    shape.strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.070 : 0.046), lineWidth: 0.52)
+                }
         } else {
             shape
-                .fill(.thinMaterial)
+                .fill(Color(nsColor: colorScheme == .dark ? .controlBackgroundColor : .windowBackgroundColor))
                 .overlay {
-                    shape.fill(Color(nsColor: .windowBackgroundColor).opacity(colorScheme == .dark ? 0.10 : 0.06))
+                    shape.fill(Color.primary.opacity(colorScheme == .dark ? 0.08 : 0.02))
+                }
+                .overlay {
+                    shape.strokeBorder(
+                        Color.primary.opacity(colorScheme == .dark ? 0.18 : 0.10),
+                        lineWidth: 0.7
+                    )
                 }
         }
     }
 
+    private var usesNativeGlass: Bool {
+        MacWikiGlassRuntime.usesNativeGlass(
+            isEnabled: liquidGlassChrome,
+            forceLegacyFallback: forceLegacyGlassFallback
+        )
+    }
+
     private var controlGroupBackground: some View {
         RoundedRectangle(cornerRadius: Metrics.groupCornerRadius, style: .continuous)
-            .fill(Color(nsColor: .windowBackgroundColor).opacity(colorScheme == .dark ? 0.10 : 0.055))
+            .fill(Color(nsColor: colorScheme == .dark ? .windowBackgroundColor : .controlBackgroundColor))
             .overlay {
                 RoundedRectangle(cornerRadius: Metrics.groupCornerRadius, style: .continuous)
                     .strokeBorder(
-                        Color.primary.opacity(colorScheme == .dark ? 0.048 : 0.030),
+                        Color.primary.opacity(colorScheme == .dark ? 0.18 : 0.10),
                         lineWidth: 0.45
                     )
             }
@@ -229,14 +231,14 @@ struct HighlightToolbar: View {
         RoundedRectangle(cornerRadius: 7, style: .continuous)
             .fill(
                 Color(nsColor: .windowBackgroundColor)
-                    .opacity(hoveredAction == action ? (colorScheme == .dark ? 0.12 : 0.065) : 0)
+                    .opacity(hoveredAction == action ? (colorScheme == .dark ? 0.28 : 0.36) : 0)
             )
             .overlay {
                 RoundedRectangle(cornerRadius: 7, style: .continuous)
                     .strokeBorder(
                         hoveredAction == action
-                            ? Color.primary.opacity(colorScheme == .dark ? 0.075 : 0.045)
-                            : Color.primary.opacity(colorScheme == .dark ? 0.028 : 0.018),
+                            ? Color.primary.opacity(colorScheme == .dark ? 0.18 : 0.12)
+                            : Color.primary.opacity(colorScheme == .dark ? 0.08 : 0.055),
                         lineWidth: 0.45
                     )
             }

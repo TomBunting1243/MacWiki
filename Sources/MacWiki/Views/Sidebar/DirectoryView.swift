@@ -14,6 +14,7 @@ struct DirectoryView: View {
     @Binding var rootSelection: SidebarRootSelection
     var selectedLabel: Label?
     var selectedTag: Tag?
+    let sidebarSearchModel: SidebarSearchSurfaceModel
     let onNewLabelWithArticle: (SavedArticle) -> Void
     let onNewTagWithArticle: (Article) -> Void
     @Query(sort: \ReadingList.updatedAt, order: .reverse) private var allLists: [ReadingList]
@@ -535,7 +536,7 @@ struct DirectoryView: View {
     var body: some View {
         VStack(spacing: 0) {
             if isSidebarSearchPresented {
-                SidebarSearchView()
+                SidebarSearchView(model: sidebarSearchModel)
             } else {
                 directoryList
             }

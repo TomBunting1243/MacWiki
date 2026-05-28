@@ -1,11 +1,36 @@
 import SwiftUI
 
 struct MetadataView: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     let items: [WikipediaService.MetadataItem]
     var onRowBottomsChange: (([CGFloat]) -> Void)? = nil
 
     private enum MetadataLayout {
         static let markdownParseByteLimit = 8_192
+        static let rowAnimation = Animation.easeOut(duration: 0.18)
+    }
+
+    private var displayItems: [MetadataDisplayItem] {
+        var labelOccurrences: [String: Int] = [:]
+        return items.enumerated().map { index, item in
+            let occurrence = labelOccurrences[item.label, default: 0]
+            labelOccurrences[item.label] = occurrence + 1
+            let displayID = occurrence == 0 ? item.label : "\(item.label)#\(occurrence)"
+
+            return MetadataDisplayItem(
+                id: displayID,
+                sourceIndex: index,
+                item: item,
+                isLast: index == items.indices.last
+            )
+        }
+    }
+
+    private var rowTransition: AnyTransition {
+        reduceMotion
+            ? .opacity
+            : .opacity.combined(with: .move(edge: .top))
     }
     
     var body: some View {
@@ -18,21 +43,22 @@ struct MetadataView: View {
                 )
                 .padding(.top, 40)
             } else {
-                ForEach(Array(items.enumerated()), id: \.offset) { index, item in
+                ForEach(displayItems) { displayItem in
                     VStack(alignment: .leading, spacing: 0) {
                         VStack(alignment: .leading, spacing: 4) {
-                            Text(item.label)
+                            Text(displayItem.item.label)
                                 .font(MacWikiTypography.metadataLabel)
                                 .foregroundStyle(.secondary)
 
-                            metadataValueText(item.value)
+                            metadataValueText(displayItem.item.value)
                                 .font(MacWikiTypography.metadataValue)
                                 .foregroundStyle(.primary)
                                 .multilineTextAlignment(.leading)
                                 .fixedSize(horizontal: false, vertical: true)
+                                .contentTransition(.opacity)
                         }
 
-                        if item.id != items.last?.id {
+                        if !displayItem.isLast {
                             Divider()
                                 .opacity(0.38)
                                 .padding(.top, 12)
@@ -42,13 +68,16 @@ struct MetadataView: View {
                         GeometryReader { proxy in
                             Color.clear.preference(
                                 key: MetadataRowBoundaryPreferenceKey.self,
-                                value: [IndexedBoundary(index: index, value: proxy.frame(in: .named("MetadataRows")).maxY)]
+                                value: [IndexedBoundary(index: displayItem.sourceIndex, value: proxy.frame(in: .named("MetadataRows")).maxY)]
                             )
                         }
                     }
+                    .transition(rowTransition)
                 }
             }
         }
+        .animation(reduceMotion ? nil : MetadataLayout.rowAnimation, value: displayItems.map(\.id))
+        .animation(reduceMotion ? nil : MetadataLayout.rowAnimation, value: displayItems.map(\.valueFingerprint))
         .coordinateSpace(name: "MetadataRows")
         .onPreferenceChange(MetadataRowBoundaryPreferenceKey.self) { boundaries in
             guard let onRowBottomsChange else { return }
@@ -73,6 +102,17 @@ struct MetadataView: View {
             return Text(attributed)
         }
         return Text(verbatim: value)
+    }
+}
+
+private struct MetadataDisplayItem: Identifiable {
+    let id: String
+    let sourceIndex: Int
+    let item: WikipediaService.MetadataItem
+    let isLast: Bool
+
+    var valueFingerprint: String {
+        "\(id)=\(item.value)"
     }
 }
 

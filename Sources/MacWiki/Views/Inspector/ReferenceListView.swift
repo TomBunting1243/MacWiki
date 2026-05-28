@@ -79,15 +79,19 @@ struct ReferenceListView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .scrollIndicators(.visible)
+                .onAppear {
+                    scrollToSelectedReferenceIfPresent(with: proxy, animated: false)
+                }
                 .onChange(of: appState.selectedReferenceId) { _, newValue in
-                    guard let newValue else { return }
+                    guard newValue != nil else { return }
                     if suppressNextReferenceScroll {
                         suppressNextReferenceScroll = false
                         return
                     }
-                    withAnimation(.easeOut(duration: 0.2)) {
-                        proxy.scrollTo(newValue, anchor: .center)
-                    }
+                    scrollToSelectedReferenceIfPresent(with: proxy, animated: true)
+                }
+                .onChange(of: visibleReferenceIds) { _, _ in
+                    scrollToSelectedReferenceIfPresent(with: proxy, animated: false)
                 }
             }
 
@@ -181,6 +185,25 @@ private extension ReferenceListView {
     func reconcileSelection(with newSections: [ArticleReferenceSection]) {
         let validIds = Set(newSections.flatMap { $0.items.map(\.id) })
         selectedReferenceIds = selectedReferenceIds.intersection(validIds)
+    }
+
+    var visibleReferenceIds: Set<String> {
+        Set(visibleSections.flatMap { $0.items.map(\.id) })
+    }
+
+    func scrollToSelectedReferenceIfPresent(with proxy: ScrollViewProxy, animated: Bool) {
+        guard let selectedReferenceId = appState.selectedReferenceId,
+              visibleReferenceIds.contains(selectedReferenceId) else { return }
+
+        let scroll = {
+            proxy.scrollTo(selectedReferenceId, anchor: .center)
+        }
+
+        if animated {
+            withAnimation(.easeOut(duration: 0.2), scroll)
+        } else {
+            scroll()
+        }
     }
 
 }
