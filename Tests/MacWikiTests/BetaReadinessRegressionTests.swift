@@ -542,13 +542,24 @@ struct BetaReadinessRegressionTests {
     @Test func publicBetaQAMatrixNamesCandidateAndHarnesses() throws {
         let qaMatrix = try source("PUBLIC_BETA_QA_MATRIX.md")
 
-        #expect(qaMatrix.contains("MacWiki-1.0-build1-20260601-103053.app"))
+        #expect(qaMatrix.contains("ls -1dt /Users/tombunting/Developer/MacWiki/dist/MacWiki-1.0-build1-*.app | head -1"))
         #expect(qaMatrix.contains("APP_PATH="))
         #expect(qaMatrix.contains("APP_BIN=\"$APP_PATH/Contents/MacOS/MacWiki\" scripts/qa_sidebar_search_width_classes.sh"))
         #expect(qaMatrix.contains("APP_BIN=\"$APP_PATH/Contents/MacOS/MacWiki\" scripts/qa_folder_collapse_selected_list.sh"))
         #expect(qaMatrix.contains("APP_BIN=\"$APP_PATH/Contents/MacOS/MacWiki\" scripts/qa_nested_folder_rename.sh"))
         #expect(qaMatrix.contains("scripts/qa_settings_popups_smoke.sh"))
-        #expect(qaMatrix.contains("scripts/profile_reader_open.sh --skip-build"))
+        #expect(qaMatrix.contains("APP_BINARY=\"$APP_PATH/Contents/MacOS/MacWiki\" scripts/profile_reader_open.sh --skip-build"))
+    }
+
+    @Test func readerOpenProfileHarnessCanTargetPackagedCandidate() throws {
+        let profileScript = try source("scripts/profile_reader_open.sh")
+
+        #expect(profileScript.contains("--app-binary PATH"))
+        #expect(profileScript.contains("APP_BINARY=\"${APP_BINARY:-$REPO_ROOT/.build/debug/MacWiki}\""))
+        #expect(profileScript.contains("--app-binary)"))
+        #expect(profileScript.contains("APP_BINARY=\"$2\""))
+        #expect(profileScript.contains("pkill -x \"$APP_NAME\""))
+        #expect(!profileScript.contains("APP_BINARY=\"$REPO_ROOT/.build/debug/MacWiki\""))
     }
 
     private func source(_ relativePath: String) throws -> String {

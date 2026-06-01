@@ -4,10 +4,10 @@ Use this matrix as a release gate for every public beta. A public beta is not re
 
 ## Candidate And Harnesses
 
-Start from the exact packaged candidate being released, not a stale debug build. For the current internal candidate:
+Start from the exact packaged candidate being released, not a stale debug build. For the current internal candidate, resolve the freshest packaged app and verify its embedded build trace before running any harness:
 
 ```bash
-APP_PATH="/Users/tombunting/Developer/MacWiki/dist/MacWiki-1.0-build1-20260601-103053.app"
+APP_PATH="$(ls -1dt /Users/tombunting/Developer/MacWiki/dist/MacWiki-1.0-build1-*.app | head -1)"
 /usr/libexec/PlistBuddy -c "Print :GitCommit" "$APP_PATH/Contents/Resources/BuildInfo.plist"
 /usr/libexec/PlistBuddy -c "Print :GitDirty" "$APP_PATH/Contents/Resources/BuildInfo.plist"
 ```
@@ -19,7 +19,7 @@ APP_BIN="$APP_PATH/Contents/MacOS/MacWiki" scripts/qa_sidebar_search_width_class
 APP_BIN="$APP_PATH/Contents/MacOS/MacWiki" scripts/qa_folder_collapse_selected_list.sh
 APP_BIN="$APP_PATH/Contents/MacOS/MacWiki" scripts/qa_nested_folder_rename.sh
 scripts/qa_settings_popups_smoke.sh
-scripts/profile_reader_open.sh --skip-build
+APP_BINARY="$APP_PATH/Contents/MacOS/MacWiki" scripts/profile_reader_open.sh --skip-build
 ```
 
 ## Shell And Reading Lists

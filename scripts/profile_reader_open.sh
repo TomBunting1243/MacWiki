@@ -13,6 +13,7 @@ and writes a markdown report.
 Options:
   --article-title TEXT         Target article title (default: "Nintendo Wii")
   --article-id TEXT            Target article id (default: "Nintendo Wii")
+  --app-binary PATH            App executable to benchmark (default: APP_BINARY or .build/debug/MacWiki)
   --cold-runs N               Number of cold runs (default: 1)
   --warm-runs N               Number of warm runs (default: 3)
   --timeout-seconds N         Max wait per run for article-open log (default: 45)
@@ -31,7 +32,8 @@ EOF
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-APP_BINARY="$REPO_ROOT/.build/debug/MacWiki"
+APP_NAME="${APP_NAME:-MacWiki}"
+APP_BINARY="${APP_BINARY:-$REPO_ROOT/.build/debug/MacWiki}"
 STATE_FILE="$HOME/Library/Application Support/MacWiki/state.json"
 STATE_DIR="$(dirname "$STATE_FILE")"
 CACHE_ROOT="$HOME/Library/Caches/MacWiki"
@@ -61,6 +63,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --article-id)
       article_id="$2"
+      shift 2
+      ;;
+    --app-binary)
+      APP_BINARY="$2"
       shift 2
       ;;
     --cold-runs)
@@ -142,7 +148,7 @@ state_had_original=0
 echo -e "label\tmode\tlog_line" >"$raw_runs_tsv"
 
 kill_macwiki() {
-  pkill -x MacWiki >/dev/null 2>&1 || true
+  pkill -x "$APP_NAME" >/dev/null 2>&1 || true
   sleep 0.6
 }
 
@@ -309,7 +315,11 @@ drive_scroll_input() {
   local delay="$3"
   (
     sleep "$delay"
-    osascript -e 'tell application "MacWiki" to activate' >/dev/null 2>&1 || true
+    osascript - "$APP_NAME" >/dev/null 2>&1 <<'APPLESCRIPT' || true
+on run argv
+  tell application (item 1 of argv) to activate
+end run
+APPLESCRIPT
     for ((i = 0; i < pulses; i++)); do
       osascript -e 'tell application "System Events" to key code 49' >/dev/null 2>&1 || true
       sleep "$interval"
