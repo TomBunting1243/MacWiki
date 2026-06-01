@@ -599,6 +599,36 @@ struct BetaReadinessRegressionTests {
         #expect(!discoverScript.contains("tell application \"MacWiki\" to activate"))
     }
 
+    @Test func readingListQAHarnessesUsePortableAppBinaryDefaults() throws {
+        let folderCollapseScript = try source("scripts/qa_folder_collapse_selected_list.sh")
+        let nestedRenameScript = try source("scripts/qa_nested_folder_rename.sh")
+
+        for script in [folderCollapseScript, nestedRenameScript] {
+            #expect(script.contains("REPO_ROOT=\"$(cd \"$SCRIPT_DIR/..\" && pwd)\""))
+            #expect(script.contains("APP_BIN_DEFAULT=\"$REPO_ROOT/.build/arm64-apple-macosx/debug/MacWiki\""))
+            #expect(script.contains("APP_BIN_FALLBACK=\"$REPO_ROOT/.build/debug/MacWiki\""))
+            #expect(script.contains("APP_BIN=\"${APP_BIN:-$APP_BIN_DEFAULT}\""))
+            #expect(script.contains("if [[ ! -x \"$APP_BIN\" && -x \"$APP_BIN_FALLBACK\" ]]; then"))
+            #expect(!script.contains("WORKDIR=\"/Users/tombunting/Developer/MacWiki\""))
+            #expect(!script.contains("APP_BIN=\"${APP_BIN:-$WORKDIR/.build/debug/MacWiki}\""))
+        }
+    }
+
+    @Test func qaHarnessesAvoidMachineSpecificRepositoryPaths() throws {
+        let scriptNames = [
+            "scripts/qa_context_menu_ocr.sh",
+            "scripts/qa_folder_collapse_selected_list.sh",
+            "scripts/qa_nested_folder_rename.sh",
+            "scripts/qa_discover_scroll_time_machine.sh"
+        ]
+
+        for scriptName in scriptNames {
+            let script = try source(scriptName)
+            #expect(!script.contains("WORKDIR=\"/Users/tombunting/Developer/MacWiki\""))
+            #expect(!script.contains("DerivedData/MacWiki-hgaamxiclllsfufsrrsbkmjdjcle"))
+        }
+    }
+
     private func source(_ relativePath: String) throws -> String {
         try String(contentsOf: repositoryRoot().appendingPathComponent(relativePath), encoding: .utf8)
     }

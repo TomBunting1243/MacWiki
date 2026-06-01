@@ -2,7 +2,6 @@
 
 set -euo pipefail
 
-WORKDIR="/Users/tombunting/Developer/MacWiki"
 APP_NAME="${APP_NAME:-MacWiki}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 

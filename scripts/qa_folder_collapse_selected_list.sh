@@ -2,11 +2,17 @@
 
 set -euo pipefail
 
-WORKDIR="/Users/tombunting/Developer/MacWiki"
 APP_NAME="${APP_NAME:-MacWiki}"
-APP_BIN="${APP_BIN:-$WORKDIR/.build/debug/MacWiki}"
-RESTART_APP="${RESTART_APP:-1}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+APP_BIN_DEFAULT="$REPO_ROOT/.build/arm64-apple-macosx/debug/MacWiki"
+APP_BIN_FALLBACK="$REPO_ROOT/.build/debug/MacWiki"
+APP_BIN="${APP_BIN:-$APP_BIN_DEFAULT}"
+RESTART_APP="${RESTART_APP:-1}"
+
+if [[ ! -x "$APP_BIN" && -x "$APP_BIN_FALLBACK" ]]; then
+  APP_BIN="$APP_BIN_FALLBACK"
+fi
 
 timestamp="$(date +%Y%m%d_%H%M%S)"
 suffix="$(printf '%04d' "$((RANDOM % 10000))")"
