@@ -87,8 +87,55 @@ struct BetaReadinessRegressionTests {
         )
 
         #expect(sliderRow.contains(".accessibilityHidden(true)"))
-        #expect(sliderRow.contains(".accessibilityLabel(title)"))
-        #expect(sliderRow.contains(".accessibilityValue(valueText)"))
+        #expect(sliderRow.contains("AccessibleSettingsSlider("))
+        #expect(settingsControlsSource.contains("private struct AccessibleSettingsSlider: NSViewRepresentable"))
+        #expect(settingsControlsSource.contains("slider.setAccessibilityTitle(title)"))
+        #expect(settingsControlsSource.contains("slider.setAccessibilityLabel(title)"))
+        #expect(settingsControlsSource.contains("slider.setAccessibilityValue(valueText)"))
+        #expect(settingsControlsSource.contains("slider.setAccessibilityValueDescription(valueText)"))
+        #expect(!sliderRow.contains(".accessibilityElement(children: .ignore)"))
+    }
+
+    @Test func inspectorResizeHandleHasKeyboardAccessibleAdjustment() throws {
+        let inspectorSource = try source("Sources/MacWiki/Views/Inspector/InspectorPanel.swift")
+        let resizeHandle = sourceSection(
+            inspectorSource,
+            startingAt: "private struct SectionResizeHandle",
+            endingBefore: "private struct InfoTopContentHeightPreferenceKey"
+        )
+
+        #expect(resizeHandle.contains(".accessibilityLabel(\"Resize metadata and contents sections\")"))
+        #expect(resizeHandle.contains(".accessibilityValue(\"\\(Int(currentHeight.rounded())) pixels\")"))
+        #expect(resizeHandle.contains(".accessibilityAdjustableAction"))
+        #expect(resizeHandle.contains("case .increment:"))
+        #expect(resizeHandle.contains("case .decrement:"))
+        #expect(resizeHandle.contains(".accessibilityAction(named: \"Reset\", onReset)"))
+        #expect(resizeHandle.contains("private func adjustHeight(by delta: CGFloat)"))
+    }
+
+    @Test func mainWindowIsPresentedOnColdLaunchWhileArticleSceneStaysValueDriven() throws {
+        let appSource = try source("Sources/MacWiki/App/MacWikiApp.swift")
+        let mainScene = sourceSection(
+            appSource,
+            startingAt: "Window(\"MacWiki\", id: \"main\")",
+            endingBefore: "WindowGroup(\"Article\", for: Article.self)"
+        )
+        let articleScene = sourceSection(
+            appSource,
+            startingAt: "WindowGroup(\"Article\", for: Article.self)",
+            endingBefore: "Settings {"
+        )
+
+        #expect(mainScene.contains("Window(\"MacWiki\", id: \"main\")"))
+        #expect(mainScene.contains(".defaultLaunchBehavior(.presented)"))
+        #expect(articleScene.contains(".defaultLaunchBehavior(.suppressed)"))
+        #expect(appSource.contains("func applicationShouldHandleReopen"))
+        #expect(appSource.contains("MacWikiRuntime.shared.presentMainWindowIfNeeded()"))
+        #expect(appSource.contains("private final class MacWikiRuntime"))
+        #expect(appSource.contains("existingWindow.makeKeyAndOrderFront(nil)"))
+        #expect(appSource.contains("private func hasOnScreenWindow() -> Bool"))
+        #expect(appSource.contains("CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID)"))
+        #expect(appSource.contains("NSHostingView("))
     }
 
     @Test func revisionMetadataUnknownCacheDoesNotBlockHydrationRetry() async {

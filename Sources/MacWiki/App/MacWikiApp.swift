@@ -14,6 +14,98 @@ final class MacWikiAppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.activate(ignoringOtherApps: true)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+            MacWikiRuntime.shared.presentMainWindowIfNeeded()
+        }
+    }
+
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        if !flag {
+            MacWikiRuntime.shared.presentMainWindowIfNeeded()
+            return false
+        }
+        return true
+    }
+}
+
+@MainActor
+private final class MacWikiRuntime {
+    static let shared = MacWikiRuntime()
+
+    private var appState: AppState?
+    private var modelContainer: ModelContainer?
+    private var fallbackMainWindow: NSWindow?
+
+    func configure(appState: AppState, modelContainer: ModelContainer) {
+        self.appState = appState
+        self.modelContainer = modelContainer
+    }
+
+    func presentMainWindowIfNeeded() {
+        if let existingWindow = NSApp.windows.first(where: { window in
+            !(window is NSPanel) && window.canBecomeKey
+        }) {
+            appBootstrapLogger.notice("Ordering existing main window to front")
+            existingWindow.deminiaturize(nil)
+            existingWindow.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+            if hasOnScreenWindow() {
+                return
+            }
+        }
+
+        if let fallbackMainWindow {
+            appBootstrapLogger.notice("Reopening fallback main window")
+            fallbackMainWindow.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+            return
+        }
+
+        guard let appState, let modelContainer else {
+            appBootstrapLogger.error("Cannot present fallback main window before runtime configuration")
+            return
+        }
+        appBootstrapLogger.notice("Presenting fallback main window")
+        let visibleFrame = NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
+        let window = NSWindow(
+            contentRect: visibleFrame,
+            styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
+            backing: .buffered,
+            defer: false
+        )
+        window.title = "MacWiki"
+        window.isReleasedWhenClosed = false
+        window.setFrame(visibleFrame, display: false)
+        window.contentView = NSHostingView(
+            rootView: ContentView()
+                .focusedSceneValue(\.macWikiCommandAppState, appState)
+                .toolbar(removing: .title)
+                .toolbar(removing: .sidebarToggle)
+                .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
+                .configuredMacWikiWindowChrome()
+                .environment(appState)
+                .modelContainer(modelContainer)
+        )
+        fallbackMainWindow = window
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
+    private func hasOnScreenWindow() -> Bool {
+        let processID = Int(ProcessInfo.processInfo.processIdentifier)
+        guard let windowInfo = CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID) as? [[String: Any]] else {
+            return false
+        }
+        return windowInfo.contains { info in
+            guard
+                info[kCGWindowOwnerPID as String] as? Int == processID,
+                let layer = info[kCGWindowLayer as String] as? Int,
+                layer == 0
+            else {
+                return false
+            }
+            return true
+        }
     }
 }
 
@@ -45,9 +137,14 @@ struct MacWikiApp: App {
         Self.configureGlobalURLCache()
         Self.sanitizePersistedWindowAndSplitViewState()
         let bootstrap = Self.makeModelContainerBootstrap()
+        let appState = AppState()
         self.bootstrap = bootstrap
-        _appState = State(initialValue: AppState())
+        _appState = State(initialValue: appState)
         _launchIssue = State(initialValue: nil)
+        MacWikiRuntime.shared.configure(appState: appState, modelContainer: bootstrap.modelContainer)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+            MacWikiRuntime.shared.presentMainWindowIfNeeded()
+        }
     }
 
     private static var modelSchema: Schema {
@@ -252,7 +349,7 @@ struct MacWikiApp: App {
     }
 
     var body: some Scene {
-        WindowGroup {
+        Window("MacWiki", id: "main") {
             ContentView()
                 .focusedSceneValue(\.macWikiCommandAppState, appState)
                 .toolbar(removing: .title)
@@ -287,6 +384,7 @@ struct MacWikiApp: App {
             width: Self.launchWindowSize.width,
             height: Self.launchWindowSize.height
         )
+        .defaultLaunchBehavior(.presented)
         .commands {
             MacWikiCommands(
                 fallbackAppState: appState,
@@ -314,6 +412,7 @@ struct MacWikiApp: App {
             width: Self.launchWindowSize.width,
             height: Self.launchWindowSize.height
         )
+        .defaultLaunchBehavior(.suppressed)
         
         Settings {
             SettingsView()

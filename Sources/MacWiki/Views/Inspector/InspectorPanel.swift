@@ -964,7 +964,19 @@ private struct SectionResizeHandle: View {
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Resize metadata and contents sections")
+        .accessibilityValue("\(Int(currentHeight.rounded())) pixels")
         .accessibilityHint("Drag up or down to resize. Double click to reset.")
+        .accessibilityAdjustableAction { direction in
+            switch direction {
+            case .increment:
+                adjustHeight(by: 24)
+            case .decrement:
+                adjustHeight(by: -24)
+            default:
+                break
+            }
+        }
+        .accessibilityAction(named: "Reset", onReset)
         .highPriorityGesture(
             // Use a global coordinate space so translation remains stable while
             // the splitter itself moves during live resize.
@@ -999,6 +1011,13 @@ private struct SectionResizeHandle: View {
         .onTapGesture(count: 2) {
             onReset()
         }
+    }
+
+    private func adjustHeight(by delta: CGFloat) {
+        let baseHeight = currentHeight.isFinite ? currentHeight : range.lowerBound
+        let clamped = min(max(baseHeight + delta, range.lowerBound), range.upperBound)
+        onHeightChanged(clamped)
+        onDragEnded(clamped)
     }
 }
 
