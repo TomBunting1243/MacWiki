@@ -4,7 +4,14 @@ set -euo pipefail
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 capture_window_script="$script_dir/capture_macwiki_window.sh"
 repo_root="$(cd "$script_dir/.." && pwd)"
-app_binary="$repo_root/.build/arm64-apple-macosx/debug/MacWiki"
+APP_NAME="${APP_NAME:-MacWiki}"
+app_binary_default="$repo_root/.build/arm64-apple-macosx/debug/MacWiki"
+app_binary_fallback="$repo_root/.build/debug/MacWiki"
+APP_BIN="${APP_BIN:-$app_binary_default}"
+
+if [[ ! -x "$APP_BIN" && -x "$app_binary_fallback" ]]; then
+  APP_BIN="$app_binary_fallback"
+fi
 
 if [[ ! -x "$capture_window_script" ]]; then
   echo "Missing required capture script: $capture_window_script" >&2
@@ -12,23 +19,26 @@ if [[ ! -x "$capture_window_script" ]]; then
 fi
 
 launch_macwiki_if_needed() {
-  if pgrep -x MacWiki >/dev/null 2>&1; then
+  if pgrep -x "$APP_NAME" >/dev/null 2>&1; then
     return
   fi
 
-  if [[ -x "$app_binary" ]]; then
-    "$app_binary" >/tmp/macwiki-audit/macwiki-audit-launch.log 2>&1 &
+  if [[ -x "$APP_BIN" ]]; then
+    "$APP_BIN" >/tmp/macwiki-audit/macwiki-audit-launch.log 2>&1 &
     sleep 1.2
   fi
 }
 
 raise_macwiki_window() {
-  osascript <<APPLESCRIPT >/dev/null 2>&1 || true
+  osascript - "$APP_NAME" <<'APPLESCRIPT' >/dev/null 2>&1 || true
+on run argv
+  set appName to item 1 of argv
 tell application "System Events"
-  if exists (first process whose name is "MacWiki") then
-    set frontmost of first process whose name is "MacWiki" to true
+  if exists (first process whose name is appName) then
+    set frontmost of first process whose name is appName to true
   end if
 end tell
+end run
 APPLESCRIPT
 }
 
@@ -64,7 +74,7 @@ APPLESCRIPT
 capture_with_retry() {
   local destination="$1"
 
-  if "$capture_window_script" "$destination" >/dev/null 2>&1; then
+  if APP_NAME="$APP_NAME" APP_BIN="$APP_BIN" "$capture_window_script" "$destination" >/dev/null 2>&1; then
     return 0
   fi
 
@@ -72,7 +82,7 @@ capture_with_retry() {
   raise_macwiki_window
   sleep 1
 
-  if "$capture_window_script" "$destination" >/dev/null 2>&1; then
+  if APP_NAME="$APP_NAME" APP_BIN="$APP_BIN" "$capture_window_script" "$destination" >/dev/null 2>&1; then
     return 0
   fi
 
@@ -110,6 +120,7 @@ fi
   echo
   echo "- Captured: $(date)"
   echo "- Output directory: \`$output_dir\`"
+  echo "- App binary: \`$APP_BIN\`"
   echo "- Prep delay per state: \`${prep_delay}s\`"
   echo
   echo "## Images"

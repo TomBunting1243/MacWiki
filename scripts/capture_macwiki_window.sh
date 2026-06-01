@@ -6,21 +6,29 @@ repo_root="$(cd "$script_dir/.." && pwd)"
 
 output_path="${1:-/tmp/macwiki-audit/macwiki-window-$(date +%Y%m%d_%H%M%S).png}"
 launch_delay_seconds="${MACWIKI_CAPTURE_DELAY:-0.35}"
+APP_NAME="${APP_NAME:-MacWiki}"
+app_binary_default="$repo_root/.build/arm64-apple-macosx/debug/MacWiki"
+app_binary_fallback="$repo_root/.build/debug/MacWiki"
+app_binary="${APP_BIN:-$app_binary_default}"
+
+if [[ ! -x "$app_binary" && -x "$app_binary_fallback" ]]; then
+  app_binary="$app_binary_fallback"
+fi
 
 mkdir -p "$(dirname "$output_path")"
+mkdir -p /tmp/macwiki-audit
 
-if ! pgrep -x MacWiki >/dev/null 2>&1; then
-  app_binary="$repo_root/.build/arm64-apple-macosx/debug/MacWiki"
+if ! pgrep -x "$APP_NAME" >/dev/null 2>&1; then
   if [[ -x "$app_binary" ]]; then
     "$app_binary" >/tmp/macwiki-audit/capture-window-launch.log 2>&1 &
     sleep 1
   else
-    echo "MacWiki is not running and debug binary was not found at: $app_binary" >&2
+    echo "$APP_NAME is not running and app binary was not found at: $app_binary" >&2
     exit 1
   fi
 fi
 
-macwiki_pid="$(pgrep -x MacWiki | head -n 1 || true)"
+macwiki_pid="$(pgrep -x "$APP_NAME" | head -n 1 || true)"
 if [[ -n "$macwiki_pid" ]]; then
 osascript <<APPLESCRIPT >/dev/null 2>&1 || true
 tell application "System Events"
@@ -32,9 +40,10 @@ APPLESCRIPT
 fi
 sleep "$launch_delay_seconds"
 
-capture_pids="$(pgrep -x MacWiki | tr '\n' ',' | sed 's/,$//')"
+capture_pids="$({ pgrep -x "$APP_NAME" || true; } | tr '\n' ',' | sed 's/,$//')"
 window_number="$(
 MACWIKI_CAPTURE_PIDS="$capture_pids" \
+MACWIKI_CAPTURE_APP_NAME="$APP_NAME" \
 swift - <<'SWIFT'
 import CoreGraphics
 import Foundation
@@ -56,11 +65,12 @@ let pidSet: Set<Int> = {
     }
     return Set(raw.split(separator: ",").compactMap { Int($0) })
 }()
+let appName = ProcessInfo.processInfo.environment["MACWIKI_CAPTURE_APP_NAME"] ?? "MacWiki"
 
 let candidates: [(number: Int, area: Double)] = windowInfo.compactMap { window in
     let ownerName = (window[ownerKey] as? String) ?? ""
     let ownerPID = window[pidKey] as? Int ?? -1
-    let ownerNameMatch = ownerName.localizedCaseInsensitiveContains("macwiki")
+    let ownerNameMatch = ownerName.localizedCaseInsensitiveContains(appName)
     let ownerPidMatch = pidSet.contains(ownerPID)
 
     guard ownerNameMatch || ownerPidMatch else { return nil }
@@ -111,7 +121,7 @@ APPLESCRIPT
     fi
   fi
 
-  echo "Failed to resolve a visible MacWiki window id for targeted capture." >&2
+  echo "Failed to resolve a visible $APP_NAME window id for targeted capture." >&2
   exit 1
 fi
 

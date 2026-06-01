@@ -562,6 +562,25 @@ struct BetaReadinessRegressionTests {
         #expect(!profileScript.contains("APP_BINARY=\"$REPO_ROOT/.build/debug/MacWiki\""))
     }
 
+    @Test func auditCaptureHarnessesCanTargetPackagedCandidate() throws {
+        let captureScript = try source("scripts/capture_macwiki_window.sh")
+        let captureSetScript = try source("scripts/capture_macwiki_audit_set.sh")
+
+        #expect(captureScript.contains("APP_NAME=\"${APP_NAME:-MacWiki}\""))
+        #expect(captureScript.contains("app_binary=\"${APP_BIN:-$app_binary_default}\""))
+        #expect(captureScript.contains("pgrep -x \"$APP_NAME\""))
+        #expect(captureScript.contains("{ pgrep -x \"$APP_NAME\" || true; }"))
+        #expect(captureScript.contains("MACWIKI_CAPTURE_APP_NAME=\"$APP_NAME\""))
+        #expect(captureScript.contains("mkdir -p /tmp/macwiki-audit"))
+        #expect(!captureScript.contains("pgrep -x MacWiki"))
+
+        #expect(captureSetScript.contains("APP_NAME=\"${APP_NAME:-MacWiki}\""))
+        #expect(captureSetScript.contains("APP_BIN=\"${APP_BIN:-$app_binary_default}\""))
+        #expect(captureSetScript.contains("APP_NAME=\"$APP_NAME\" APP_BIN=\"$APP_BIN\" \"$capture_window_script\""))
+        #expect(captureSetScript.contains("App binary: \\`$APP_BIN\\`"))
+        #expect(!captureSetScript.contains("app_binary=\"$repo_root/.build/arm64-apple-macosx/debug/MacWiki\""))
+    }
+
     private func source(_ relativePath: String) throws -> String {
         try String(contentsOf: repositoryRoot().appendingPathComponent(relativePath), encoding: .utf8)
     }
