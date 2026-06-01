@@ -77,16 +77,25 @@ if (!win) {
 
 const popups = [];
 for (const g of win.groups()) collectPopups(g, popups);
-if (popups.length < 4) {
-  console.log('ERROR: expected >=4 popups, found ' + popups.length);
+if (popups.length < 2) {
+  console.log('ERROR: expected >=2 visible popup controls, found ' + popups.length);
   throw new Error('insufficient popup controls');
 }
 
-// Popup order in this UI:
-// [0] Font, [1] Discover Button Opens, [2] Search Presentation, [3] Recents Shows
-const discover = togglePopupDownUp(popups[1]);
-const search = togglePopupDownUp(popups[2]);
-const recents = togglePopupDownUp(popups[3]);
+function popupName(popup, index) {
+  for (const read of [
+    () => popup.name(),
+    () => popup.description(),
+    () => popup.title(),
+    () => popupValue(popup)
+  ]) {
+    try {
+      const value = String(read());
+      if (value.length > 0) return value;
+    } catch (e) {}
+  }
+  return `Popup ${index + 1}`;
+}
 
 function validate(name, result) {
   const changed = result.changed !== result.before;
@@ -104,13 +113,13 @@ function validate(name, result) {
 }
 
 let ok = true;
-ok = validate('Discover Button Opens', discover) && ok;
-ok = validate('Search Presentation', search) && ok;
-ok = validate('Recents Shows', recents) && ok;
+popups.forEach((popup, index) => {
+  ok = validate(popupName(popup, index), togglePopupDownUp(popup)) && ok;
+});
 
 if (!ok) {
   throw new Error('settings popup smoke failed');
 }
 
-console.log('PASS: Settings popup controls changed and restored successfully.');
+console.log(`PASS: ${popups.length} Settings popup controls changed and restored successfully.`);
 JXA

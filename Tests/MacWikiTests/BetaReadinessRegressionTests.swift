@@ -503,7 +503,10 @@ struct BetaReadinessRegressionTests {
         #expect(settingsQAScript.contains("APP_NAME=\"${APP_NAME:-MacWiki}\""))
         #expect(settingsQAScript.contains("ObjC.import('stdlib')"))
         #expect(settingsQAScript.contains("ObjC.unwrap($.getenv('APP_NAME')) || 'MacWiki'"))
+        #expect(settingsQAScript.contains("popups.forEach((popup, index) =>"))
+        #expect(settingsQAScript.contains("expected >=2 visible popup controls"))
         #expect(!settingsQAScript.contains("const appName = 'MacWiki';"))
+        #expect(!settingsQAScript.contains("Search Presentation"))
     }
 
     @Test func packagedArtifactsIncludeBuildTraceabilityPlist() throws {
