@@ -14,6 +14,13 @@ SKIP_BUILD=0
 AD_HOC_SIGN=0
 NOTARY_PROFILE=""
 
+plist_add_string() {
+  local plist_path="$1"
+  local key="$2"
+  local value="$3"
+  /usr/libexec/PlistBuddy -c "Add :$key string $value" "$plist_path"
+}
+
 usage() {
   cat <<'EOF'
 Package MacWiki as a distributable .app for beta testing.
@@ -204,6 +211,7 @@ STAMP="$(date +%Y%m%d-%H%M%S)"
 APP_BASENAME="MacWiki-${VERSION}-build${BUILD_NUMBER}-${STAMP}"
 APP_PATH="$OUTPUT_DIR/$APP_BASENAME.app"
 ZIP_PATH="$OUTPUT_DIR/$APP_BASENAME.zip"
+BUILD_INFO_PATH="$APP_PATH/Contents/Resources/BuildInfo.plist"
 
 mkdir -p "$APP_PATH/Contents/MacOS" "$APP_PATH/Contents/Resources"
 cp "$EXECUTABLE_PATH" "$APP_PATH/Contents/MacOS/MacWiki"
@@ -222,6 +230,38 @@ fi
 
 /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" "$APP_PATH/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUMBER" "$APP_PATH/Contents/Info.plist"
+
+GIT_COMMIT="unknown"
+GIT_BRANCH="unknown"
+GIT_DIRTY="unknown"
+if git -C "$ROOT_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  GIT_COMMIT="$(git -C "$ROOT_DIR" rev-parse HEAD)"
+  GIT_BRANCH="$(git -C "$ROOT_DIR" branch --show-current)"
+  if [[ -z "$GIT_BRANCH" ]]; then
+    GIT_BRANCH="detached"
+  fi
+  if [[ -n "$(git -C "$ROOT_DIR" status --porcelain --untracked-files=all)" ]]; then
+    GIT_DIRTY="true"
+  else
+    GIT_DIRTY="false"
+  fi
+fi
+XCODE_VERSION="unavailable"
+if command -v xcodebuild >/dev/null 2>&1; then
+  XCODE_VERSION="$(xcodebuild -version | tr '\n' ' ' | sed -E 's/[[:space:]]+$//')"
+fi
+SWIFT_VERSION="$(swift --version 2>&1 | head -n 1)"
+
+/usr/libexec/PlistBuddy -c "Clear dict" "$BUILD_INFO_PATH" >/dev/null 2>&1
+plist_add_string "$BUILD_INFO_PATH" "AppName" "MacWiki"
+plist_add_string "$BUILD_INFO_PATH" "Version" "$VERSION"
+plist_add_string "$BUILD_INFO_PATH" "BuildNumber" "$BUILD_NUMBER"
+plist_add_string "$BUILD_INFO_PATH" "PackageTimestampUTC" "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+plist_add_string "$BUILD_INFO_PATH" "GitCommit" "$GIT_COMMIT"
+plist_add_string "$BUILD_INFO_PATH" "GitBranch" "$GIT_BRANCH"
+plist_add_string "$BUILD_INFO_PATH" "GitDirty" "$GIT_DIRTY"
+plist_add_string "$BUILD_INFO_PATH" "XcodeVersion" "$XCODE_VERSION"
+plist_add_string "$BUILD_INFO_PATH" "SwiftVersion" "$SWIFT_VERSION"
 
 chmod +x "$APP_PATH/Contents/MacOS/MacWiki"
 verify_minimum_os_match "$APP_PATH/Contents/Info.plist" "$APP_PATH/Contents/MacOS/MacWiki" "Packaged app"

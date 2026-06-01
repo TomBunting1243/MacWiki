@@ -506,6 +506,20 @@ struct BetaReadinessRegressionTests {
         #expect(!settingsQAScript.contains("const appName = 'MacWiki';"))
     }
 
+    @Test func packagedArtifactsIncludeBuildTraceabilityPlist() throws {
+        let packageScript = try source("scripts/package_beta_app.sh")
+
+        #expect(packageScript.contains("BUILD_INFO_PATH=\"$APP_PATH/Contents/Resources/BuildInfo.plist\""))
+        #expect(packageScript.contains("git -C \"$ROOT_DIR\" rev-parse HEAD"))
+        #expect(packageScript.contains("git -C \"$ROOT_DIR\" branch --show-current"))
+        #expect(packageScript.contains("git -C \"$ROOT_DIR\" status --porcelain --untracked-files=all"))
+        #expect(packageScript.contains("xcodebuild -version"))
+        #expect(packageScript.contains("swift --version 2>&1 | head -n 1"))
+        #expect(packageScript.contains("PackageTimestampUTC"))
+        #expect(packageScript.contains("plist_add_string \"$BUILD_INFO_PATH\" \"GitCommit\" \"$GIT_COMMIT\""))
+        #expect(packageScript.contains("plist_add_string \"$BUILD_INFO_PATH\" \"GitDirty\" \"$GIT_DIRTY\""))
+    }
+
     private func source(_ relativePath: String) throws -> String {
         try String(contentsOf: repositoryRoot().appendingPathComponent(relativePath), encoding: .utf8)
     }
