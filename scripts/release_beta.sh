@@ -64,6 +64,25 @@ run_cmd() {
   fi
 }
 
+latest_zip_path() {
+  ls -td "dist/MacWiki-${PACKAGE_VERSION}-build${BUILD_NUMBER}-"*.zip 2>/dev/null | head -1 || true
+}
+
+package_release_artifact() {
+  run_cmd ./scripts/package_beta_app.sh \
+    --version "$PACKAGE_VERSION" \
+    --build "$BUILD_NUMBER" \
+    --skip-build \
+    --identity "$SIGN_IDENTITY" \
+    --notary-profile "$NOTARY_PROFILE"
+
+  if [[ "$DRY_RUN" -eq 1 ]]; then
+    ZIP_PATH="dist/MacWiki-${PACKAGE_VERSION}-build${BUILD_NUMBER}-DRY-RUN.zip"
+  else
+    ZIP_PATH="$(latest_zip_path)"
+  fi
+}
+
 prompt_if_empty() {
   local var_name="$1"
   local prompt_text="$2"
@@ -234,18 +253,15 @@ if [[ "$SKIP_PREFLIGHT" -eq 0 ]]; then
     --build "$BUILD_NUMBER" \
     --identity "$SIGN_IDENTITY" \
     --notary-profile "$NOTARY_PROFILE"
+else
+  echo "Preflight skipped; packaging a fresh signed/notarized artifact before release."
+  package_release_artifact
 fi
 
-ZIP_PATH="$(ls -td "dist/MacWiki-${PACKAGE_VERSION}-build${BUILD_NUMBER}-"*.zip 2>/dev/null | head -1 || true)"
+ZIP_PATH="${ZIP_PATH:-$(latest_zip_path)}"
 if [[ -z "$ZIP_PATH" ]]; then
   echo "No packaged zip found for $PACKAGE_VERSION build $BUILD_NUMBER in dist/. Running packaging now."
-  run_cmd ./scripts/package_beta_app.sh \
-    --version "$PACKAGE_VERSION" \
-    --build "$BUILD_NUMBER" \
-    --skip-build \
-    --identity "$SIGN_IDENTITY" \
-    --notary-profile "$NOTARY_PROFILE"
-  ZIP_PATH="$(ls -td "dist/MacWiki-${PACKAGE_VERSION}-build${BUILD_NUMBER}-"*.zip 2>/dev/null | head -1 || true)"
+  package_release_artifact
 fi
 if [[ -z "$ZIP_PATH" ]]; then
   echo "Failed to locate packaged zip in dist/."

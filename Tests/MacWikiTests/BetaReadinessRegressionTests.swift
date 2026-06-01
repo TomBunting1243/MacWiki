@@ -482,6 +482,21 @@ struct BetaReadinessRegressionTests {
         #expect(contextMenuSource.contains("openLinkFromContextMenuInNewWindow"))
     }
 
+    @Test func releaseFlowPackagesFreshArtifactWhenPreflightIsSkipped() throws {
+        let releaseScript = try source("scripts/release_beta.sh")
+        let skippedPreflightBlock = sourceSection(
+            releaseScript,
+            startingAt: "else\n  echo \"Preflight skipped; packaging a fresh signed/notarized artifact before release.\"",
+            endingBefore: "ZIP_PATH=\"${ZIP_PATH:-$(latest_zip_path)}\""
+        )
+
+        #expect(releaseScript.contains("latest_zip_path()"))
+        #expect(releaseScript.contains("package_release_artifact()"))
+        #expect(skippedPreflightBlock.contains("package_release_artifact"))
+        #expect(releaseScript.contains("ZIP_PATH=\"dist/MacWiki-${PACKAGE_VERSION}-build${BUILD_NUMBER}-DRY-RUN.zip\""))
+        #expect(!releaseScript.contains("gh release upload \"$VERSION\" \"dist/MacWiki-${PACKAGE_VERSION}-build${BUILD_NUMBER}-\""))
+    }
+
     private func source(_ relativePath: String) throws -> String {
         try String(contentsOf: repositoryRoot().appendingPathComponent(relativePath), encoding: .utf8)
     }
