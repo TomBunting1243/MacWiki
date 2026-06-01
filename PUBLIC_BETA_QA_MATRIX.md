@@ -36,6 +36,7 @@ Use this matrix as a release gate for every public beta. A public beta is not re
 - [ ] Discover Time Machine loads a new date and the result surfaces update without stale state.
 - [ ] Theme switching updates shell, reader, and discover surfaces consistently.
 - [ ] `Cmd+,` opens Settings and reset/cache actions present the expected confirmations.
+- [ ] Settings Reading sliders expose one useful VoiceOver control each, with understandable label and value.
 - [ ] Focus mode still enters and exits cleanly through both shortcut and menu flows.
 
 ## Accessibility And Distribution
@@ -43,6 +44,9 @@ Use this matrix as a release gate for every public beta. A public beta is not re
 - [ ] VoiceOver smoke pass on core shell navigation, tab strip, reader, and inspector surfaces.
 - [ ] Keyboard-only pass for the major shortcut flows (`Cmd+K`, `Cmd+T`, `Cmd+Shift+I`, `Cmd+,`).
 - [ ] Fresh install launch succeeds without manual Gatekeeper bypass.
+- [ ] Packaged app launches to a visible main window on cold launch and after Dock reopen.
+- [ ] If Storage Recovery Mode is triggered, the warning is visible before the user can assume changes will persist.
+- [ ] Packaged `BuildInfo.plist` matches the release commit and reports `GitDirty=false`.
 - [ ] Relaunch persistence works for the last-used layout, tabs, and reading position.
 
 ## Performance

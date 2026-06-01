@@ -39,7 +39,8 @@ For the full guided publish flow (prompts + GitHub release upload), run:
   ```bash
   ./scripts/generate_app_icon.sh /absolute/path/to/custom-1024.png
   ```
-- [ ] App name, version, and build metadata are correct (`Info.plist`).
+- [ ] App name, version, and bundle metadata are correct (`Info.plist`).
+- [ ] Packaged `Contents/Resources/BuildInfo.plist` records the release commit, branch, `GitDirty=false`, Xcode version, and Swift version.
 - [ ] Package target, `Info.plist`, README, and packaged binary all agree on the minimum macOS version.
 - [ ] Settings opens from `Cmd+,`.
 - [ ] About panel includes app name/version plus license/trademark links.
@@ -75,6 +76,11 @@ For the full guided publish flow (prompts + GitHub release upload), run:
   ./scripts/package_beta_app.sh \
     --identity "Developer ID Application: YOUR NAME (TEAMID)" \
     --notary-profile "macwiki-notary"
+  ```
+- [ ] The packaged artifact is traceable to this release commit:
+  ```bash
+  /usr/libexec/PlistBuddy -c "Print :GitCommit" "dist/<MacWiki.app>/Contents/Resources/BuildInfo.plist"
+  /usr/libexec/PlistBuddy -c "Print :GitDirty" "dist/<MacWiki.app>/Contents/Resources/BuildInfo.plist"
   ```
 - [ ] Manual QA matrix is complete: `PUBLIC_BETA_QA_MATRIX.md`.
 

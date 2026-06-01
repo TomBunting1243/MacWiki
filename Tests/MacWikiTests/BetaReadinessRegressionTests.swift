@@ -520,6 +520,22 @@ struct BetaReadinessRegressionTests {
         #expect(packageScript.contains("plist_add_string \"$BUILD_INFO_PATH\" \"GitDirty\" \"$GIT_DIRTY\""))
     }
 
+    @Test func publicBetaDocsRequireTraceablePackageAndStorageRecoveryQA() throws {
+        let releaseChecklist = try source("RELEASE_BETA_CHECKLIST.md")
+        let qaMatrix = try source("PUBLIC_BETA_QA_MATRIX.md")
+
+        #expect(releaseChecklist.contains("BuildInfo.plist"))
+        #expect(releaseChecklist.contains("GitDirty=false"))
+        #expect(releaseChecklist.contains("Print :GitCommit"))
+        #expect(releaseChecklist.contains("Print :GitDirty"))
+
+        #expect(qaMatrix.contains("Settings Reading sliders expose one useful VoiceOver control each"))
+        #expect(qaMatrix.contains("visible main window on cold launch and after Dock reopen"))
+        #expect(qaMatrix.contains("Storage Recovery Mode"))
+        #expect(qaMatrix.contains("BuildInfo.plist"))
+        #expect(qaMatrix.contains("GitDirty=false"))
+    }
+
     private func source(_ relativePath: String) throws -> String {
         try String(contentsOf: repositoryRoot().appendingPathComponent(relativePath), encoding: .utf8)
     }
