@@ -18,6 +18,7 @@ Run the helper scripts where they cover a checklist area, then finish the remain
 APP_BIN="$APP_PATH/Contents/MacOS/MacWiki" scripts/qa_sidebar_search_width_classes.sh
 APP_BIN="$APP_PATH/Contents/MacOS/MacWiki" scripts/qa_folder_collapse_selected_list.sh
 APP_BIN="$APP_PATH/Contents/MacOS/MacWiki" scripts/qa_nested_folder_rename.sh
+APP_BIN="$APP_PATH/Contents/MacOS/MacWiki" scripts/qa_discover_scroll_time_machine.sh
 scripts/qa_settings_popups_smoke.sh
 APP_BINARY="$APP_PATH/Contents/MacOS/MacWiki" scripts/profile_reader_open.sh --skip-build
 ```

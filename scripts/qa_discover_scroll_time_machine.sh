@@ -5,8 +5,14 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-DERIVED_APP_DEFAULT="$HOME/Library/Developer/Xcode/DerivedData/MacWiki-hgaamxiclllsfufsrrsbkmjdjcle/Build/Products/Debug/MacWiki"
-APP_BIN="${APP_BIN:-$DERIVED_APP_DEFAULT}"
+APP_NAME="${APP_NAME:-MacWiki}"
+APP_BIN_DEFAULT="$REPO_ROOT/.build/arm64-apple-macosx/debug/MacWiki"
+APP_BIN_FALLBACK="$REPO_ROOT/.build/debug/MacWiki"
+APP_BIN="${APP_BIN:-$APP_BIN_DEFAULT}"
+
+if [[ ! -x "$APP_BIN" && -x "$APP_BIN_FALLBACK" ]]; then
+  APP_BIN="$APP_BIN_FALLBACK"
+fi
 OUTPUT_DIR="${1:-/tmp/macwiki-qa/discover-$(date +%Y%m%d_%H%M%S)}"
 DATE_LIST_CSV="${DATE_LIST_CSV:-2026-02-24,2025-12-25,2025-07-04,2024-02-29}"
 USER_AGENT="${USER_AGENT:-MacWiki/1.0 (contact@example.com)}"
@@ -45,17 +51,18 @@ echo "Output: $OUTPUT_DIR"
 prepare_deterministic_launch() {
   defaults write "$APP_BUNDLE_ID" discoverOpenMode -string "$DISCOVER_OPEN_MODE" >/dev/null 2>&1 || true
   if [[ "$FORCE_FRESH_LAUNCH" == "1" ]]; then
-    pkill -x MacWiki >/dev/null 2>&1 || true
+    pkill -x "$APP_NAME" >/dev/null 2>&1 || true
     sleep 0.6
   fi
 }
 
 find_macwiki_window_bounds() {
-  swift - <<'SWIFT'
+  MACWIKI_QA_APP_NAME="$APP_NAME" swift - <<'SWIFT'
 import CoreGraphics
 import Foundation
 
 let windows = (CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID) as? [[String: Any]]) ?? []
+let appName = ProcessInfo.processInfo.environment["MACWIKI_QA_APP_NAME"] ?? "MacWiki"
 let ownerKey = kCGWindowOwnerName as String
 let pidKey = kCGWindowOwnerPID as String
 let layerKey = kCGWindowLayer as String
@@ -67,7 +74,7 @@ var bestBounds: [String: Double] = [:]
 
 for w in windows {
     let owner = (w[ownerKey] as? String) ?? ""
-    guard owner.localizedCaseInsensitiveContains("macwiki") else { continue }
+    guard owner.localizedCaseInsensitiveContains(appName) else { continue }
     guard ((w[layerKey] as? Int) ?? 1) == 0 else { continue }
     let boundsAny = (w[boundsKey] as? [String: Any]) ?? [:]
     let x = (boundsAny["X"] as? Double) ?? 0
@@ -101,7 +108,7 @@ ensure_macwiki_window() {
 
     if (( attempts == 0 )); then
       if [[ -x "$APP_BIN" ]]; then
-        echo "Launching MacWiki from $APP_BIN" >&2
+        echo "Launching $APP_NAME from $APP_BIN" >&2
         open -n "$APP_BIN" >/tmp/macwiki-qa-discover-launch.log 2>&1 || true
       else
         echo "ERROR: App binary not found: $APP_BIN" >&2
@@ -113,13 +120,15 @@ ensure_macwiki_window() {
     attempts=$((attempts + 1))
   done
 
-  echo "ERROR: Could not find an on-screen MacWiki window." >&2
+  echo "ERROR: Could not find an on-screen $APP_NAME window." >&2
   exit 1
 }
 
 activate_macwiki() {
-  osascript <<'APPLESCRIPT' >/dev/null 2>&1 || true
-tell application "MacWiki" to activate
+  osascript - "$APP_NAME" <<'APPLESCRIPT' >/dev/null 2>&1 || true
+on run argv
+  tell application (item 1 of argv) to activate
+end run
 APPLESCRIPT
 }
 
@@ -129,7 +138,7 @@ send_page_down() {
 
 capture_window() {
   local path="$1"
-  "$capture_script" "$path" >/dev/null
+  APP_NAME="$APP_NAME" APP_BIN="$APP_BIN" "$capture_script" "$path" >/dev/null
 }
 
 ocr_image_to_file() {
@@ -352,6 +361,7 @@ report_path="$OUTPUT_DIR/report.md"
   echo
   echo "- Captured: $(date)"
   echo "- MacWiki window pid: \`$window_pid\`"
+  echo "- App binary: \`$APP_BIN\`"
   echo "- Window frame: \`x=$window_x y=$window_y w=$window_w h=$window_h\`"
   echo "- Defaults domain: \`$APP_BUNDLE_ID\`"
   echo "- Forced discoverOpenMode: \`$DISCOVER_OPEN_MODE\` (effective: \`${discover_mode_effective:-unknown}\`)"

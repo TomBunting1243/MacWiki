@@ -547,6 +547,7 @@ struct BetaReadinessRegressionTests {
         #expect(qaMatrix.contains("APP_BIN=\"$APP_PATH/Contents/MacOS/MacWiki\" scripts/qa_sidebar_search_width_classes.sh"))
         #expect(qaMatrix.contains("APP_BIN=\"$APP_PATH/Contents/MacOS/MacWiki\" scripts/qa_folder_collapse_selected_list.sh"))
         #expect(qaMatrix.contains("APP_BIN=\"$APP_PATH/Contents/MacOS/MacWiki\" scripts/qa_nested_folder_rename.sh"))
+        #expect(qaMatrix.contains("APP_BIN=\"$APP_PATH/Contents/MacOS/MacWiki\" scripts/qa_discover_scroll_time_machine.sh"))
         #expect(qaMatrix.contains("scripts/qa_settings_popups_smoke.sh"))
         #expect(qaMatrix.contains("APP_BINARY=\"$APP_PATH/Contents/MacOS/MacWiki\" scripts/profile_reader_open.sh --skip-build"))
     }
@@ -579,6 +580,23 @@ struct BetaReadinessRegressionTests {
         #expect(captureSetScript.contains("APP_NAME=\"$APP_NAME\" APP_BIN=\"$APP_BIN\" \"$capture_window_script\""))
         #expect(captureSetScript.contains("App binary: \\`$APP_BIN\\`"))
         #expect(!captureSetScript.contains("app_binary=\"$repo_root/.build/arm64-apple-macosx/debug/MacWiki\""))
+    }
+
+    @Test func discoverQAHarnessCanTargetPackagedCandidate() throws {
+        let discoverScript = try source("scripts/qa_discover_scroll_time_machine.sh")
+
+        #expect(discoverScript.contains("APP_NAME=\"${APP_NAME:-MacWiki}\""))
+        #expect(discoverScript.contains("APP_BIN_DEFAULT=\"$REPO_ROOT/.build/arm64-apple-macosx/debug/MacWiki\""))
+        #expect(discoverScript.contains("APP_BIN=\"${APP_BIN:-$APP_BIN_DEFAULT}\""))
+        #expect(discoverScript.contains("pkill -x \"$APP_NAME\""))
+        #expect(discoverScript.contains("MACWIKI_QA_APP_NAME=\"$APP_NAME\" swift - <<'SWIFT'"))
+        #expect(discoverScript.contains("owner.localizedCaseInsensitiveContains(appName)"))
+        #expect(discoverScript.contains("tell application (item 1 of argv) to activate"))
+        #expect(discoverScript.contains("APP_NAME=\"$APP_NAME\" APP_BIN=\"$APP_BIN\" \"$capture_script\""))
+        #expect(discoverScript.contains("App binary: \\`$APP_BIN\\`"))
+        #expect(!discoverScript.contains("DerivedData/MacWiki-hgaamxiclllsfufsrrsbkmjdjcle"))
+        #expect(!discoverScript.contains("pkill -x MacWiki"))
+        #expect(!discoverScript.contains("tell application \"MacWiki\" to activate"))
     }
 
     private func source(_ relativePath: String) throws -> String {
