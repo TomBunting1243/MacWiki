@@ -536,6 +536,18 @@ struct BetaReadinessRegressionTests {
         #expect(qaMatrix.contains("GitDirty=false"))
     }
 
+    @Test func publicBetaQAMatrixNamesCandidateAndHarnesses() throws {
+        let qaMatrix = try source("PUBLIC_BETA_QA_MATRIX.md")
+
+        #expect(qaMatrix.contains("MacWiki-1.0-build1-20260601-103053.app"))
+        #expect(qaMatrix.contains("APP_PATH="))
+        #expect(qaMatrix.contains("APP_BIN=\"$APP_PATH/Contents/MacOS/MacWiki\" scripts/qa_sidebar_search_width_classes.sh"))
+        #expect(qaMatrix.contains("APP_BIN=\"$APP_PATH/Contents/MacOS/MacWiki\" scripts/qa_folder_collapse_selected_list.sh"))
+        #expect(qaMatrix.contains("APP_BIN=\"$APP_PATH/Contents/MacOS/MacWiki\" scripts/qa_nested_folder_rename.sh"))
+        #expect(qaMatrix.contains("scripts/qa_settings_popups_smoke.sh"))
+        #expect(qaMatrix.contains("scripts/profile_reader_open.sh --skip-build"))
+    }
+
     private func source(_ relativePath: String) throws -> String {
         try String(contentsOf: repositoryRoot().appendingPathComponent(relativePath), encoding: .utf8)
     }

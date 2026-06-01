@@ -2,6 +2,26 @@
 
 Use this matrix as a release gate for every public beta. A public beta is not ready until every item is either marked pass or called out explicitly in release notes as a known caveat.
 
+## Candidate And Harnesses
+
+Start from the exact packaged candidate being released, not a stale debug build. For the current internal candidate:
+
+```bash
+APP_PATH="/Users/tombunting/Developer/MacWiki/dist/MacWiki-1.0-build1-20260601-103053.app"
+/usr/libexec/PlistBuddy -c "Print :GitCommit" "$APP_PATH/Contents/Resources/BuildInfo.plist"
+/usr/libexec/PlistBuddy -c "Print :GitDirty" "$APP_PATH/Contents/Resources/BuildInfo.plist"
+```
+
+Run the helper scripts where they cover a checklist area, then finish the remaining items by hand:
+
+```bash
+APP_BIN="$APP_PATH/Contents/MacOS/MacWiki" scripts/qa_sidebar_search_width_classes.sh
+APP_BIN="$APP_PATH/Contents/MacOS/MacWiki" scripts/qa_folder_collapse_selected_list.sh
+APP_BIN="$APP_PATH/Contents/MacOS/MacWiki" scripts/qa_nested_folder_rename.sh
+scripts/qa_settings_popups_smoke.sh
+scripts/profile_reader_open.sh --skip-build
+```
+
 ## Shell And Reading Lists
 
 - [ ] Collapse an area that currently contains the selected list; selection stays valid and the app does not jump to an unrelated destination.
