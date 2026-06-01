@@ -497,6 +497,15 @@ struct BetaReadinessRegressionTests {
         #expect(!releaseScript.contains("gh release upload \"$VERSION\" \"dist/MacWiki-${PACKAGE_VERSION}-build${BUILD_NUMBER}-\""))
     }
 
+    @Test func settingsPopupQAHonorsConfiguredAppName() throws {
+        let settingsQAScript = try source("scripts/qa_settings_popups_smoke.sh")
+
+        #expect(settingsQAScript.contains("APP_NAME=\"${APP_NAME:-MacWiki}\""))
+        #expect(settingsQAScript.contains("ObjC.import('stdlib')"))
+        #expect(settingsQAScript.contains("ObjC.unwrap($.getenv('APP_NAME')) || 'MacWiki'"))
+        #expect(!settingsQAScript.contains("const appName = 'MacWiki';"))
+    }
+
     private func source(_ relativePath: String) throws -> String {
         try String(contentsOf: repositoryRoot().appendingPathComponent(relativePath), encoding: .utf8)
     }

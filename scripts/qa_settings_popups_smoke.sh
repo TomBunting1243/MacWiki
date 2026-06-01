@@ -7,8 +7,10 @@ APP_NAME="${APP_NAME:-MacWiki}"
 echo "Running Settings popups smoke QA..."
 
 osascript -l JavaScript <<'JXA'
+ObjC.import('stdlib');
+
 const se = Application('System Events');
-const appName = 'MacWiki';
+const appName = ObjC.unwrap($.getenv('APP_NAME')) || 'MacWiki';
 const app = se.processes.byName(appName);
 
 if (!app.exists()) {
