@@ -136,6 +136,10 @@ struct BetaReadinessRegressionTests {
         #expect(appSource.contains("private func hasOnScreenWindow() -> Bool"))
         #expect(appSource.contains("CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID)"))
         #expect(appSource.contains("NSHostingView("))
+        #expect(appSource.contains("private struct MacWikiLaunchIssue: Identifiable"))
+        #expect(appSource.contains("launchIssue: MacWikiLaunchIssue?"))
+        #expect(appSource.contains("presentFallbackLaunchIssueIfNeeded(for: window)"))
+        #expect(appSource.contains("alert.beginSheetModal(for: window)"))
     }
 
     @Test func revisionMetadataUnknownCacheDoesNotBlockHydrationRetry() async {

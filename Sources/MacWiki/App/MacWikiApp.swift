@@ -5,6 +5,12 @@ import os
 
 private let appBootstrapLogger = Logger(subsystem: "com.macwiki", category: "app-bootstrap")
 
+private struct MacWikiLaunchIssue: Identifiable {
+    let id = UUID()
+    let title: String
+    let message: String
+}
+
 @MainActor
 final class MacWikiAppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillFinishLaunching(_ notification: Notification) {
@@ -34,11 +40,18 @@ private final class MacWikiRuntime {
 
     private var appState: AppState?
     private var modelContainer: ModelContainer?
+    private var launchIssue: MacWikiLaunchIssue?
+    private var hasPresentedFallbackLaunchIssue = false
     private var fallbackMainWindow: NSWindow?
 
-    func configure(appState: AppState, modelContainer: ModelContainer) {
+    func configure(
+        appState: AppState,
+        modelContainer: ModelContainer,
+        launchIssue: MacWikiLaunchIssue?
+    ) {
         self.appState = appState
         self.modelContainer = modelContainer
+        self.launchIssue = launchIssue
     }
 
     func presentMainWindowIfNeeded() {
@@ -89,6 +102,7 @@ private final class MacWikiRuntime {
         fallbackMainWindow = window
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+        presentFallbackLaunchIssueIfNeeded(for: window)
     }
 
     private func hasOnScreenWindow() -> Bool {
@@ -107,6 +121,17 @@ private final class MacWikiRuntime {
             return true
         }
     }
+
+    private func presentFallbackLaunchIssueIfNeeded(for window: NSWindow) {
+        guard let launchIssue, !hasPresentedFallbackLaunchIssue else { return }
+        hasPresentedFallbackLaunchIssue = true
+
+        let alert = NSAlert()
+        alert.messageText = launchIssue.title
+        alert.informativeText = launchIssue.message
+        alert.addButton(withTitle: "Continue")
+        alert.beginSheetModal(for: window)
+    }
 }
 
 /// MacWiki - A native macOS Wikipedia client
@@ -115,21 +140,15 @@ private final class MacWikiRuntime {
 /// and initializes global state.
 @main
 struct MacWikiApp: App {
-    private struct LaunchIssue: Identifiable {
-        let id = UUID()
-        let title: String
-        let message: String
-    }
-
     private struct ModelContainerBootstrap {
         let modelContainer: ModelContainer
-        let launchIssue: LaunchIssue?
+        let launchIssue: MacWikiLaunchIssue?
     }
 
     @NSApplicationDelegateAdaptor(MacWikiAppDelegate.self) private var appDelegate
     @Environment(\.scenePhase) private var scenePhase
     @State private var appState: AppState
-    @State private var launchIssue: LaunchIssue?
+    @State private var launchIssue: MacWikiLaunchIssue?
     @State private var hasPresentedLaunchIssue = false
     private let bootstrap: ModelContainerBootstrap
 
@@ -141,7 +160,11 @@ struct MacWikiApp: App {
         self.bootstrap = bootstrap
         _appState = State(initialValue: appState)
         _launchIssue = State(initialValue: nil)
-        MacWikiRuntime.shared.configure(appState: appState, modelContainer: bootstrap.modelContainer)
+        MacWikiRuntime.shared.configure(
+            appState: appState,
+            modelContainer: bootstrap.modelContainer,
+            launchIssue: bootstrap.launchIssue
+        )
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
             MacWikiRuntime.shared.presentMainWindowIfNeeded()
         }
@@ -176,7 +199,7 @@ struct MacWikiApp: App {
                 let config = ModelConfiguration(schema: modelSchema, isStoredInMemoryOnly: true)
                 return ModelContainerBootstrap(
                     modelContainer: try ModelContainer(for: modelSchema, configurations: [config]),
-                    launchIssue: LaunchIssue(
+                    launchIssue: MacWikiLaunchIssue(
                         title: "Storage Recovery Mode",
                         message: "MacWiki could not open its saved library data, so this launch is using a temporary in-memory session. Your saved lists, highlights, and notes were not loaded, and changes made now will not persist after you quit."
                     )
