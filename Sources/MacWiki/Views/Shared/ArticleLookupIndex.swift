@@ -85,14 +85,7 @@ struct ArticleLookupIndex {
 }
 
 @MainActor
-func articleLookupIndexFingerprint(
-    articleStates: [ArticleState],
-    savedArticles: [SavedArticle]
-) -> Int {
-    var hasher = Hasher()
-    hasher.combine(articleStates.count)
-    hasher.combine(savedArticles.count)
-
+private func combineArticleStates(_ articleStates: [ArticleState], into hasher: inout Hasher) {
     for state in articleStates {
         hasher.combine(state.id)
         hasher.combine(state.articleTitle)
@@ -103,14 +96,31 @@ func articleLookupIndexFingerprint(
         hasher.combine(stableTagFingerprint(for: state.tags))
         hasher.combine(state.labelId)
     }
+}
+
+@MainActor
+private func combineSavedArticle(_ article: SavedArticle, into hasher: inout Hasher) {
+    hasher.combine(article.id)
+    hasher.combine(article.title)
+    hasher.combine(article.isRead)
+    hasher.combine(article.wordCount)
+    hasher.combine(article.savedAt.timeIntervalSinceReferenceDate.bitPattern)
+    hasher.combine(article.labelId)
+}
+
+@MainActor
+func articleLookupIndexFingerprint(
+    articleStates: [ArticleState],
+    savedArticles: [SavedArticle]
+) -> Int {
+    var hasher = Hasher()
+    hasher.combine(articleStates.count)
+    hasher.combine(savedArticles.count)
+
+    combineArticleStates(articleStates, into: &hasher)
 
     for article in savedArticles {
-        hasher.combine(article.id)
-        hasher.combine(article.title)
-        hasher.combine(article.isRead)
-        hasher.combine(article.wordCount)
-        hasher.combine(article.savedAt.timeIntervalSinceReferenceDate.bitPattern)
-        hasher.combine(article.labelId)
+        combineSavedArticle(article, into: &hasher)
     }
 
     return hasher.finalize()
@@ -125,27 +135,13 @@ func articleLookupIndexFingerprint(
     hasher.combine(articleStates.count)
     hasher.combine(readingLists.count)
 
-    for state in articleStates {
-        hasher.combine(state.id)
-        hasher.combine(state.articleTitle)
-        hasher.combine(state.articleURLString)
-        hasher.combine(state.isRead)
-        hasher.combine(state.readingProgress?.bitPattern)
-        hasher.combine(state.updatedAt.timeIntervalSinceReferenceDate.bitPattern)
-        hasher.combine(stableTagFingerprint(for: state.tags))
-        hasher.combine(state.labelId)
-    }
+    combineArticleStates(articleStates, into: &hasher)
 
     for list in readingLists {
         hasher.combine(list.id)
         hasher.combine(list.articles.count)
         for article in list.articles {
-            hasher.combine(article.id)
-            hasher.combine(article.title)
-            hasher.combine(article.isRead)
-            hasher.combine(article.wordCount)
-            hasher.combine(article.savedAt.timeIntervalSinceReferenceDate.bitPattern)
-            hasher.combine(article.labelId)
+            combineSavedArticle(article, into: &hasher)
         }
     }
 
