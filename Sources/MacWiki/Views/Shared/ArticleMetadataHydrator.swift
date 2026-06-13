@@ -108,6 +108,14 @@ final class ArticleMetadataHydrator {
         snapshotByTitleKey[Self.titleKey(for: title)]
     }
 
+    func resolvedWordCount(for savedArticle: SavedArticle) -> Int {
+        snapshot(for: savedArticle.title)?.wordCount ?? savedArticle.wordCount ?? savedArticle.approximateLength
+    }
+
+    func resolvedWordCount(for article: Article) -> Int {
+        snapshot(for: article.title)?.wordCount ?? article.wordCount ?? 0
+    }
+
     func queueLoad(
         requests: [ArticleMetadataHydrationRequest],
         appState: AppState,

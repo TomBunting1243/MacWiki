@@ -99,7 +99,7 @@ struct LabelArticlesView: View {
     }
 
     private func resolvedWordCount(for savedArticle: SavedArticle) -> Int {
-        hydratedMetadata(for: savedArticle.title)?.wordCount ?? savedArticle.wordCount ?? savedArticle.approximateLength
+        metadataHydrator.resolvedWordCount(for: savedArticle)
     }
 
     private var currentArticleTitleNormalized: String? {

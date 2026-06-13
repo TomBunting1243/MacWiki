@@ -1278,11 +1278,11 @@ struct DirectoryView: View {
     }
 
     private func resolvedWordCount(for savedArticle: SavedArticle) -> Int {
-        hydratedMetadata(for: savedArticle.title)?.wordCount ?? savedArticle.wordCount ?? savedArticle.approximateLength
+        metadataHydrator.resolvedWordCount(for: savedArticle)
     }
 
     private func resolvedWordCount(for article: Article) -> Int {
-        hydratedMetadata(for: article.title)?.wordCount ?? article.wordCount ?? 0
+        metadataHydrator.resolvedWordCount(for: article)
     }
 
     private func toggleReadStatus(_ article: SavedArticle) {

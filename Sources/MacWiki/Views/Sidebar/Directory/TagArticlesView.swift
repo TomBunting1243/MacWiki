@@ -107,7 +107,7 @@ struct TagArticlesView: View {
     }
 
     private func resolvedWordCount(for article: Article) -> Int {
-        hydratedMetadata(for: article.title)?.wordCount ?? article.wordCount ?? 0
+        metadataHydrator.resolvedWordCount(for: article)
     }
 
     private var currentArticleTitleNormalized: String? {
