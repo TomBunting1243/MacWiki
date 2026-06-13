@@ -1,5 +1,8 @@
+import OSLog
 import SwiftUI
 import SwiftData
+
+private let highlightToolbarLogger = Logger(subsystem: "com.macwiki", category: "highlights")
 
 /// Floating toolbar that appears when text is selected in the article
 struct HighlightToolbar: View {
@@ -278,6 +281,7 @@ struct HighlightToolbar: View {
             }
         } catch {
             // Keep this silent in UI; save failures are non-fatal for interaction flow.
+            highlightToolbarLogger.error("Failed to save highlight: \(error.localizedDescription, privacy: .public)")
         }
 
         onDismiss()

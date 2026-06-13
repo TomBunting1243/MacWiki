@@ -1,5 +1,8 @@
 import Foundation
 import Observation
+import OSLog
+
+private let featuredSummaryLogger = Logger(subsystem: "com.macwiki", category: "discover-featured-summary")
 
 /// Loads a teaser excerpt for Discover's featured article.
 @Observable @MainActor
@@ -69,6 +72,9 @@ final class DiscoverFeaturedSummaryStore {
             teaserByTitleKey[key] = truncatedTeaser(normalized)
         } catch {
             // Keep empty teaser state; caller will render fallback.
+            if !Task.isCancelled {
+                featuredSummaryLogger.debug("Featured teaser load failed for \(title, privacy: .public): \(error.localizedDescription, privacy: .public)")
+            }
         }
     }
 

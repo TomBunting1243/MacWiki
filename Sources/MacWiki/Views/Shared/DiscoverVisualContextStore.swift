@@ -1,5 +1,8 @@
 import Foundation
 import Observation
+import OSLog
+
+private let visualContextLogger = Logger(subsystem: "com.macwiki", category: "discover-visual-context")
 
 /// Loads media-list imagery used by Discover's "Visual Context" strip.
 @Observable @MainActor
@@ -70,6 +73,7 @@ final class DiscoverVisualContextStore {
         } catch {
             guard !Task.isCancelled else { return }
             guard currentTitleKey == key else { return }
+            visualContextLogger.debug("Visual context load failed for \(featuredTitle, privacy: .public): \(error.localizedDescription, privacy: .public)")
             images = []
             isLoading = false
         }

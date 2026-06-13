@@ -506,6 +506,9 @@ extension WikipediaService {
                 perMonthLimit: perMonthLimit
             )
         } catch {
+            if !Task.isCancelled {
+                wikipediaServiceLogger.debug("Monthly top articles fetch failed for \(year)-\(month): \(error.localizedDescription, privacy: .public)")
+            }
             return []
         }
     }

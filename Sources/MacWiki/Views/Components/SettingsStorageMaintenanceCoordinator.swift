@@ -1,4 +1,7 @@
 import Foundation
+import OSLog
+
+private let storageMaintenanceLogger = Logger(subsystem: "com.macwiki", category: "storage-maintenance")
 
 enum SettingsStorageAction: String, Identifiable {
     case clearMemory
@@ -96,6 +99,7 @@ enum SettingsStorageMaintenanceCoordinator {
                 await clearCache()
                 try await resetPersistedData()
             } catch {
+                storageMaintenanceLogger.error("Reset all app data failed: \(error.localizedDescription, privacy: .public)")
                 statusMessage = "Reset failed. Please try again."
             }
         }

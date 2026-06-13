@@ -258,6 +258,7 @@ extension WikipediaService {
         do {
             try encoded.write(to: fileURL, options: .atomic)
         } catch {
+            wikipediaServiceLogger.error("Disk article cache write failed: \(error.localizedDescription, privacy: .public)")
             return
         }
 

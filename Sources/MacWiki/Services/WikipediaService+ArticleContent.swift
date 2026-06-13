@@ -190,6 +190,9 @@ extension WikipediaService {
             let metadata = try await fetchPageMetadata(title)
             return metadata.wordCount > 0 ? metadata.wordCount : fallback
         } catch {
+            if !Task.isCancelled {
+                wikipediaServiceLogger.debug("Word-count hydration fell back for \(title, privacy: .public): \(error.localizedDescription, privacy: .public)")
+            }
             return fallback
         }
     }

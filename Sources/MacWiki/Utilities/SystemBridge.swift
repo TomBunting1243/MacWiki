@@ -1,5 +1,8 @@
 import Foundation
 import CoreGraphics
+import OSLog
+
+private let systemBridgeLogger = Logger(subsystem: "com.macwiki", category: "system-bridge")
 
 enum SystemBridge {
     @discardableResult
@@ -18,6 +21,7 @@ enum SystemBridge {
             process.waitUntilExit()
             return process.terminationStatus == 0
         } catch {
+            systemBridgeLogger.error("pbcopy launch failed: \(error.localizedDescription, privacy: .public)")
             return false
         }
     }
@@ -32,6 +36,7 @@ enum SystemBridge {
             try process.run()
             return true
         } catch {
+            systemBridgeLogger.error("open URL externally failed: \(error.localizedDescription, privacy: .public)")
             return false
         }
     }
