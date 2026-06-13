@@ -247,7 +247,12 @@ actor WikipediaService {
     // MARK: - Configuration
 
     let baseURL = "https://en.wikipedia.org"
-    let userAgent = "MacWiki/1.0 (https://github.com/tombunting/MacWiki)"
+    // Falls back to the current beta version when running as a bare SwiftPM
+    // executable, where Bundle.main carries no Info.plist.
+    let userAgent: String = {
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.5.0"
+        return "MacWiki/\(version) (https://github.com/tombunting/MacWiki)"
+    }()
     let fileManager: FileManager
 
     // MARK: - Caching
