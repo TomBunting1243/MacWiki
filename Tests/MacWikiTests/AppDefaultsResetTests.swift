@@ -33,8 +33,10 @@ struct AppDefaultsResetTests {
             return
         }
 
-        let appDomain = "com.tombunting.MacWiki"
-        let processDomain = "MacWiki"
+        // Persistent domains are global to the user account regardless of suite,
+        // so never touch the real app domains here — use throwaway names.
+        let appDomain = "qa.macwiki.app-domain.\(UUID().uuidString)"
+        let processDomain = "qa.macwiki.process-domain.\(UUID().uuidString)"
         let unrelatedDomain = "qa.unrelated.\(UUID().uuidString)"
 
         defaults.setPersistentDomain(["tabBarLiquidGlass": true], forName: appDomain)
@@ -43,8 +45,10 @@ struct AppDefaultsResetTests {
 
         AppDefaultsReset.clearDomains([appDomain, processDomain], in: defaults)
 
-        #expect(defaults.persistentDomain(forName: appDomain) == nil)
-        #expect(defaults.persistentDomain(forName: processDomain) == nil)
+        // After removal, persistentDomain(forName:) may legitimately report either
+        // nil or an empty dictionary; both mean the domain is cleared.
+        #expect(defaults.persistentDomain(forName: appDomain)?.isEmpty ?? true)
+        #expect(defaults.persistentDomain(forName: processDomain)?.isEmpty ?? true)
         #expect(defaults.persistentDomain(forName: unrelatedDomain)?["keepMe"] as? Int == 1)
 
         defaults.removePersistentDomain(forName: unrelatedDomain)
