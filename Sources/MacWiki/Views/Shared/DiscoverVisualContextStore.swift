@@ -74,11 +74,4 @@ final class DiscoverVisualContextStore {
             isLoading = false
         }
     }
-
-    private func titleMatchKey(_ title: String) -> String {
-        title
-            .lowercased()
-            .replacingOccurrences(of: "_", with: " ")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-    }
 }

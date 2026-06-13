@@ -199,10 +199,7 @@ extension WikipediaService {
     }
 
     func normalizedTitleMatchKey(_ title: String) -> String {
-        title
-            .lowercased()
-            .replacingOccurrences(of: "_", with: " ")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+        titleMatchKey(title)
     }
 
     func stableFallbackPageID(for normalizedTitle: String) -> Int {

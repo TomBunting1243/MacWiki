@@ -116,13 +116,6 @@ final class DiscoverTrendPulseStore {
         return targets
     }
 
-    private func titleMatchKey(_ title: String) -> String {
-        title
-            .lowercased()
-            .replacingOccurrences(of: "_", with: " ")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
     private func referenceDateKey(for referenceDate: Date) -> String {
         let components = Calendar.current.dateComponents([.year, .month, .day], from: referenceDate)
         return String(

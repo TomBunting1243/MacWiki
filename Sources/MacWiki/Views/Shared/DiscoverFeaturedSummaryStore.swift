@@ -89,11 +89,4 @@ final class DiscoverFeaturedSummaryStore {
 
         return capped.trimmingCharacters(in: .whitespacesAndNewlines) + "…"
     }
-
-    private func titleMatchKey(_ title: String) -> String {
-        title
-            .lowercased()
-            .replacingOccurrences(of: "_", with: " ")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-    }
 }
