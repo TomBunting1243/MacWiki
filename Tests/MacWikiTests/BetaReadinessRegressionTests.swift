@@ -542,8 +542,9 @@ struct BetaReadinessRegressionTests {
     @Test func publicBetaQAMatrixNamesCandidateAndHarnesses() throws {
         let qaMatrix = try source("PUBLIC_BETA_QA_MATRIX.md")
 
-        #expect(qaMatrix.contains("ls -1dt /Users/tombunting/Developer/MacWiki/dist/MacWiki-1.0-build1-*.app | head -1"))
+        #expect(qaMatrix.contains("ls -1dt dist/MacWiki-*.app | head -1"))
         #expect(qaMatrix.contains("APP_PATH="))
+        #expect(!qaMatrix.contains("/Users/"))
         #expect(qaMatrix.contains("APP_BIN=\"$APP_PATH/Contents/MacOS/MacWiki\" scripts/qa_sidebar_search_width_classes.sh"))
         #expect(qaMatrix.contains("APP_BIN=\"$APP_PATH/Contents/MacOS/MacWiki\" scripts/qa_folder_collapse_selected_list.sh"))
         #expect(qaMatrix.contains("APP_BIN=\"$APP_PATH/Contents/MacOS/MacWiki\" scripts/qa_nested_folder_rename.sh"))

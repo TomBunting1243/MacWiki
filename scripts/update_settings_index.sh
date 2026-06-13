@@ -2,7 +2,13 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-OUTPUT_PATH="${1:-/Users/tombunting/Library/Mobile Documents/iCloud~md~obsidian/Documents/Jack/Projects/MacWiki/99 Reference/Settings Index.md}"
+
+if [[ $# -lt 1 ]]; then
+  echo "Usage: $0 <output-path>"
+  echo "Example: $0 dist/SettingsIndex.md"
+  exit 1
+fi
+OUTPUT_PATH="$1"
 
 cd "$ROOT_DIR"
 swift run SettingsIndexTool \

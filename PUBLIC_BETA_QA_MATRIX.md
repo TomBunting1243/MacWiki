@@ -7,7 +7,7 @@ Use this matrix as a release gate for every public beta. A public beta is not re
 Start from the exact packaged candidate being released, not a stale debug build. For the current internal candidate, resolve the freshest packaged app and verify its embedded build trace before running any harness:
 
 ```bash
-APP_PATH="$(ls -1dt /Users/tombunting/Developer/MacWiki/dist/MacWiki-1.0-build1-*.app | head -1)"
+APP_PATH="$(ls -1dt dist/MacWiki-*.app | head -1)"
 /usr/libexec/PlistBuddy -c "Print :GitCommit" "$APP_PATH/Contents/Resources/BuildInfo.plist"
 /usr/libexec/PlistBuddy -c "Print :GitDirty" "$APP_PATH/Contents/Resources/BuildInfo.plist"
 ```
