@@ -215,10 +215,18 @@ struct MacWikiApp: App {
         // A larger shared cache avoids repeated downloads when opening new tabs during research bursts.
         let memoryCapacity = 48 * 1024 * 1024
         let diskCapacity = 240 * 1024 * 1024
+        let directory = MacWikiURLCacheStorage.systemDirectoryURL()
+
+        if directory == nil {
+            appBootstrapLogger.error(
+                "Unable to create MacWiki URL cache directory; using the system default cache location"
+            )
+        }
+
         URLCache.shared = URLCache(
             memoryCapacity: memoryCapacity,
             diskCapacity: diskCapacity,
-            diskPath: "MacWikiURLCache"
+            directory: directory
         )
     }
 
