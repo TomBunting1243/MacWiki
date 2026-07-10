@@ -2,6 +2,13 @@ import AppKit
 import Foundation
 import WebKit
 
+enum WebViewContentFailurePolicy {
+    static func shouldReport(_ error: Error) -> Bool {
+        let nsError = error as NSError
+        return !(nsError.domain == NSURLErrorDomain && nsError.code == URLError.cancelled.rawValue)
+    }
+}
+
 extension WebView.Coordinator {
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         if let expectedNavigationToken,
@@ -12,6 +19,7 @@ extension WebView.Coordinator {
         isContentLoadInFlight = false
         expectedNavigationToken = nil
         webContentTerminationCount = 0
+        contentLoadFailed = false
         hasUserDrivenScrollSinceLoad = false
         syncRestoreTelemetryMode(on: webView, force: true)
         self.webView = webView
@@ -105,7 +113,15 @@ extension WebView.Coordinator {
 
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
         webContentTerminationCount += 1
-        guard webContentTerminationCount <= 2 else { return }
+        guard webContentTerminationCount <= 2 else {
+            let error = NSError(
+                domain: WKError.errorDomain,
+                code: WKError.webContentProcessTerminated.rawValue,
+                userInfo: [NSLocalizedDescriptionKey: "The article renderer stopped repeatedly."]
+            )
+            finishContentLoadFailure(on: webView, error: error, shouldReport: true)
+            return
+        }
 
         isContentLoadInFlight = true
         expectedNavigationToken = nil
@@ -126,21 +142,41 @@ extension WebView.Coordinator {
     }
 
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
-        isContentLoadInFlight = false
-        expectedNavigationToken = nil
-        cancelScriptedScrollRestore(on: webView)
-        activeRestoreSessionID = nil
-        pendingPostRevealTasks.removeAll(keepingCapacity: false)
-        syncRestoreTelemetryMode(on: webView, force: true)
+        guard isExpectedNavigation(navigation) else { return }
+        finishContentLoadFailure(
+            on: webView,
+            error: error,
+            shouldReport: WebViewContentFailurePolicy.shouldReport(error)
+        )
     }
 
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        guard isExpectedNavigation(navigation) else { return }
+        finishContentLoadFailure(
+            on: webView,
+            error: error,
+            shouldReport: WebViewContentFailurePolicy.shouldReport(error)
+        )
+    }
+
+    private func isExpectedNavigation(_ navigation: WKNavigation?) -> Bool {
+        guard let expectedNavigationToken, let navigation else { return true }
+        return ObjectIdentifier(navigation) == expectedNavigationToken
+    }
+
+    private func finishContentLoadFailure(on webView: WKWebView, error: Error, shouldReport: Bool) {
         isContentLoadInFlight = false
         expectedNavigationToken = nil
         cancelScriptedScrollRestore(on: webView)
         activeRestoreSessionID = nil
         pendingPostRevealTasks.removeAll(keepingCapacity: false)
         syncRestoreTelemetryMode(on: webView, force: true)
+        guard shouldReport else { return }
+
+        contentLoadFailed = true
+        DispatchQueue.main.async { [weak self] in
+            self?.onContentLoadFailure?(error)
+        }
     }
 
     func applyReaderAppearance(to webView: WKWebView, force: Bool = false, completion: ((Bool) -> Void)? = nil) {
@@ -249,6 +285,7 @@ extension WebView.Coordinator {
         programmaticScrollActiveUntil = 0
         highVelocityUserScrollUntil = 0
         hasReportedContentReveal = false
+        contentLoadFailed = false
         pendingPostRevealTasks.removeAll(keepingCapacity: false)
         inspectorPublisher.resetForContentReload()
     }

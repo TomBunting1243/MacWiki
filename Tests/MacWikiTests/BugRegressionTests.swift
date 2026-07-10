@@ -1,11 +1,22 @@
 import Foundation
 import SwiftData
 import Testing
+import WebKit
 
 @testable import MacWiki
 
 @MainActor
 struct BugRegressionTests {
+    @Test func webViewFailurePolicyIgnoresCancellationButReportsTerminalErrors() {
+        #expect(WebViewContentFailurePolicy.shouldReport(URLError(.cancelled)) == false)
+        #expect(WebViewContentFailurePolicy.shouldReport(URLError(.timedOut)) == true)
+        #expect(
+            WebViewContentFailurePolicy.shouldReport(
+                NSError(domain: WKError.errorDomain, code: WKError.webContentProcessTerminated.rawValue)
+            ) == true
+        )
+    }
+
     @Test func historyScopedScrollWritesDoNotLeakIntoNewArticle() {
         let appState = AppState(persistenceMode: .ephemeral)
         appState.openTabs.removeAll()

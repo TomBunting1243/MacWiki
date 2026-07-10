@@ -67,6 +67,9 @@ struct WebView: NSViewRepresentable {
     /// Callback when the web content is fully revealed to the user.
     var onContentReveal: (() -> Void)?
 
+    /// Callback when WebKit cannot render the current article document.
+    var onContentLoadFailure: ((Error) -> Void)?
+
     /// Callback when the reader should show or hide a floating link-hover preview.
     var onLinkHoverPreviewChange: ((WebViewLinkHoverRequest?) -> Void)?
 
@@ -790,6 +793,7 @@ struct WebView: NSViewRepresentable {
         context.coordinator.onReferencesUpdate = onReferencesUpdate
         context.coordinator.onVisibleSectionChange = onVisibleSectionChange
         context.coordinator.onContentReveal = onContentReveal
+        context.coordinator.onContentLoadFailure = onContentLoadFailure
         context.coordinator.onLinkHoverPreviewChange = onLinkHoverPreviewChange
         context.coordinator.linkPreviewImmediateModifier = linkPreviewImmediateModifier
         context.coordinator.nativeHighlightingMenuEnabled = nativeHighlightingMenuEnabled
@@ -1029,6 +1033,10 @@ struct WebView: NSViewRepresentable {
         coordinator.cleanup()
         // Remove message handlers to break retain cycle between userContentController and coordinator.
         unregisterScriptMessageHandlers(from: nsView)
+        guard !coordinator.contentLoadFailed else {
+            nsView.stopLoading()
+            return
+        }
         WebViewPool.shared.store(
             nsView,
             for: coordinator.tabID,
@@ -1058,6 +1066,7 @@ struct WebView: NSViewRepresentable {
             onReferencesUpdate: onReferencesUpdate,
             onVisibleSectionChange: onVisibleSectionChange,
             onContentReveal: onContentReveal,
+            onContentLoadFailure: onContentLoadFailure,
             onLinkHoverPreviewChange: onLinkHoverPreviewChange,
             linkPreviewImmediateModifier: linkPreviewImmediateModifier,
             nativeHighlightingMenuEnabled: nativeHighlightingMenuEnabled
@@ -1102,6 +1111,7 @@ struct WebView: NSViewRepresentable {
         var onReferencesUpdate: (([ArticleReferenceSection]) -> Void)?
         var onVisibleSectionChange: ((String?) -> Void)?
         var onContentReveal: (() -> Void)?
+        var onContentLoadFailure: ((Error) -> Void)?
         var onLinkHoverPreviewChange: ((WebViewLinkHoverRequest?) -> Void)?
         var linkPreviewImmediateModifier: ReaderLinkPreviewImmediateModifier
         var nativeHighlightingMenuEnabled: Bool
@@ -1132,6 +1142,7 @@ struct WebView: NSViewRepresentable {
         var expectedNavigationToken: ObjectIdentifier?
         var activeRestoreSessionID: UUID?
         var webContentTerminationCount = 0
+        var contentLoadFailed = false
         var hasReportedContentReveal = false
         var pendingPostRevealTasks: [() -> Void] = []
         var lastSaveRequestTimestamp: TimeInterval = 0
@@ -1189,6 +1200,7 @@ struct WebView: NSViewRepresentable {
             onReferencesUpdate: (([ArticleReferenceSection]) -> Void)?,
             onVisibleSectionChange: ((String?) -> Void)?,
             onContentReveal: (() -> Void)?,
+            onContentLoadFailure: ((Error) -> Void)? = nil,
             onLinkHoverPreviewChange: ((WebViewLinkHoverRequest?) -> Void)?,
             linkPreviewImmediateModifier: ReaderLinkPreviewImmediateModifier,
             nativeHighlightingMenuEnabled: Bool
@@ -1212,6 +1224,7 @@ struct WebView: NSViewRepresentable {
             self.onReferencesUpdate = onReferencesUpdate
             self.onVisibleSectionChange = onVisibleSectionChange
             self.onContentReveal = onContentReveal
+            self.onContentLoadFailure = onContentLoadFailure
             self.onLinkHoverPreviewChange = onLinkHoverPreviewChange
             self.linkPreviewImmediateModifier = linkPreviewImmediateModifier
             self.nativeHighlightingMenuEnabled = nativeHighlightingMenuEnabled

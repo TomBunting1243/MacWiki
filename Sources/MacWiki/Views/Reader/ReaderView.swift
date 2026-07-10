@@ -622,6 +622,13 @@ struct ArticleView: View {
                     publishLiveReadingProgressIfNeeded()
                     applyPendingHydratedMetadataIfNeeded()
                 },
+                onContentLoadFailure: { error in
+                    guard appState.currentArticle?.title == article.title else { return }
+                    errorMessage = error.localizedDescription
+                    isLoading = false
+                    isWebContentReady = true
+                    isLoadingSkeletonVisible = false
+                },
                 onLinkHoverPreviewChange: { request in
                     guard appState.currentArticle?.title == article.title || request == nil else { return }
                     updateLinkHoverPreview(request)
@@ -938,11 +945,18 @@ struct ArticleView: View {
     }
     
     private func errorView(_ error: String) -> some View {
-        ContentUnavailableView(
-            "Failed to Load Article",
-            systemImage: "exclamationmark.triangle",
-            description: Text(error)
-        )
+        ContentUnavailableView {
+            SwiftUI.Label("Failed to Load Article", systemImage: "exclamationmark.triangle")
+        } description: {
+            Text(error)
+        } actions: {
+            Button("Try Again", systemImage: "arrow.clockwise") {
+                Task {
+                    await loadArticle(forceRefresh: true)
+                }
+            }
+            .keyboardShortcut(.defaultAction)
+        }
     }
     
     private var placeholderView: some View {
