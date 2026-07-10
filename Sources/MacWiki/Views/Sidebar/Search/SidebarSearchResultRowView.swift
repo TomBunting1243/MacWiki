@@ -79,17 +79,10 @@ struct SidebarSearchResultRowView: View {
                 modelContext: modelContext,
                 appState: appState,
                 onNewLabel: { savedArticle in
-                    NotificationCenter.default.post(
-                        name: .macWikiRequestNewArticleLabel,
-                        object: savedArticle
-                    )
+                    appState.requestNewArticleLabel(for: savedArticle)
                 },
                 onNewTag: { article in
-                    NotificationCenter.default.post(
-                        name: .macWikiRequestNewArticleTag,
-                        object: nil,
-                        userInfo: ["article": article]
-                    )
+                    appState.requestNewArticleTag(for: article)
                 },
                 onOpen: {
                     onOpenRow(row, false)

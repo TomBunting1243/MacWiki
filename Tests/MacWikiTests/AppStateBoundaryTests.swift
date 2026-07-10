@@ -6,6 +6,25 @@ import Testing
 
 @MainActor
 struct AppStateBoundaryTests {
+    @Test func creationRequestsAreTypedSceneScopedAndRepeatable() {
+        let appState = AppState(persistenceMode: .ephemeral)
+        let savedArticle = SavedArticle(title: "Ada Lovelace")
+        let article = Article(id: "swift", title: "Swift")
+
+        appState.requestNewReadingList()
+        let firstListRequest = appState.newReadingListRequestID
+        appState.requestNewReadingList()
+        appState.requestNewFolder()
+        appState.requestNewArticleLabel(for: savedArticle)
+        appState.requestNewArticleTag(for: article)
+
+        #expect(firstListRequest != nil)
+        #expect(appState.newReadingListRequestID != firstListRequest)
+        #expect(appState.newFolderRequestID != nil)
+        #expect(appState.newArticleLabelRequest?.article === savedArticle)
+        #expect(appState.newArticleTagRequest?.article == article)
+    }
+
     @Test func ephemeralStateGraphNeverSchedulesPersistentWrites() {
         let appState = AppState(persistenceMode: .ephemeral)
 

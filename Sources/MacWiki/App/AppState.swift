@@ -176,6 +176,12 @@ final class AppState {
     /// Pending request to save a clicked article link with list/tag/label metadata.
     var optionClickSaveRequest: OptionClickSaveRequest?
 
+    /// Scene-scoped creation requests consumed by the active window's presentation surfaces.
+    var newReadingListRequestID: UUID?
+    var newFolderRequestID: UUID?
+    var newArticleLabelRequest: NewArticleLabelRequest?
+    var newArticleTagRequest: NewArticleTagRequest?
+
     /// Context in which the search was triggered
     var searchContext: SearchContext = .navigation
 
@@ -193,6 +199,24 @@ final class AppState {
     struct OptionClickSaveRequest: Identifiable, Equatable {
         let id: UUID
         let article: Article
+    }
+
+    struct NewArticleLabelRequest: Identifiable, Equatable {
+        let id: UUID
+        let article: SavedArticle
+
+        static func == (lhs: Self, rhs: Self) -> Bool {
+            lhs.id == rhs.id
+        }
+    }
+
+    struct NewArticleTagRequest: Identifiable, Equatable {
+        let id: UUID
+        let article: Article
+
+        static func == (lhs: Self, rhs: Self) -> Bool {
+            lhs.id == rhs.id
+        }
     }
 
     // MARK: - Highlighting
@@ -299,6 +323,22 @@ final class AppState {
     /// The currently displayed article (from active tab)
     var currentArticle: Article? {
         tabSessionStore.currentArticle
+    }
+
+    func requestNewReadingList() {
+        newReadingListRequestID = UUID()
+    }
+
+    func requestNewFolder() {
+        newFolderRequestID = UUID()
+    }
+
+    func requestNewArticleLabel(for article: SavedArticle) {
+        newArticleLabelRequest = NewArticleLabelRequest(id: UUID(), article: article)
+    }
+
+    func requestNewArticleTag(for article: Article) {
+        newArticleTagRequest = NewArticleTagRequest(id: UUID(), article: article)
     }
 
     init(persistenceMode: AppStatePersistenceMode = .shared) {

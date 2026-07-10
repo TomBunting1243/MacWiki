@@ -375,10 +375,12 @@ struct ListsSidebar: View {
         .onDisappear {
             flushScheduledModelContextSave()
         }
-        .onReceive(NotificationCenter.default.publisher(for: .macWikiRequestNewReadingList)) { _ in
+        .onChange(of: appState.newReadingListRequestID) { _, requestID in
+            guard requestID != nil else { return }
             showNewListSheet = true
         }
-        .onReceive(NotificationCenter.default.publisher(for: .macWikiRequestNewFolder)) { _ in
+        .onChange(of: appState.newFolderRequestID) { _, requestID in
+            guard requestID != nil else { return }
             showNewAreaSheet = true
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)

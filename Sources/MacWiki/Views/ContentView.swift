@@ -81,14 +81,14 @@ struct ContentView: View {
         .onChange(of: wikiHopPostV1Enabled) { _, _ in
             enforceWikiHopAvailabilityIfNeeded()
         }
-        .onReceive(NotificationCenter.default.publisher(for: .macWikiRequestNewArticleLabel)) { notification in
-            guard let article = notification.object as? SavedArticle else { return }
-            articleForNewLabel = article
+        .onChange(of: appState.newArticleLabelRequest) { _, request in
+            guard let request else { return }
+            articleForNewLabel = request.article
             showNewLabelSheet = true
         }
-        .onReceive(NotificationCenter.default.publisher(for: .macWikiRequestNewArticleTag)) { notification in
-            guard let article = notification.userInfo?["article"] as? Article else { return }
-            articleForNewTag = article
+        .onChange(of: appState.newArticleTagRequest) { _, request in
+            guard let request else { return }
+            articleForNewTag = request.article
             showNewTagSheet = true
         }
         .onChange(of: appState.isWikiHopNavigationLocked) { _, _ in

@@ -4,6 +4,7 @@ import SwiftData
 /// Unified context menu content for articles across all views.
 /// Ensures exact parity for Tags, Labels, Regular Lists, Tab History, and Recents.
 struct ArticleContextMenuContent: View {
+    @Environment(AppState.self) private var appState
     @Environment(\.openWindow) private var openWindow
 
     // Article info
@@ -36,9 +37,7 @@ struct ArticleContextMenuContent: View {
     var onShowPageViews: (() -> Void)? = nil
     let onMoveToList: ((ReadingList) -> Void)?
     let onAddToList: ((ReadingList) -> Void)?
-    var onNewList: (() -> Void)? = {
-        NotificationCenter.default.post(name: .macWikiRequestNewReadingList, object: nil)
-    }
+    var onNewList: (() -> Void)? = nil
     let onRemove: (() -> Void)?
     let onCopyTitle: () -> Void
     let onCopyLink: () -> Void
@@ -65,10 +64,6 @@ struct ArticleContextMenuContent: View {
         savedArticle == nil && currentList == nil ? "bookmark" : "plus"
     }
 
-    private var showsAddToListMenu: Bool {
-        onAddToList != nil || onNewList != nil
-    }
-    
     var body: some View {
         Button {
             onToggleRead()
@@ -199,32 +194,30 @@ struct ArticleContextMenuContent: View {
             }
         }
 
-        if showsAddToListMenu {
-            Menu {
-                if let onAdd = onAddToList, !allLists.isEmpty {
-                    ForEach(allLists) { list in
-                        Button {
-                            onAdd(list)
-                        } label: {
-                            SwiftUI.Label(list.name, systemImage: list.icon)
-                        }
-                    }
-
-                    if onNewList != nil {
-                        Divider()
+        Menu {
+            if let onAdd = onAddToList, !allLists.isEmpty {
+                ForEach(allLists) { list in
+                    Button {
+                        onAdd(list)
+                    } label: {
+                        SwiftUI.Label(list.name, systemImage: list.icon)
                     }
                 }
 
+                Divider()
+            }
+
+            Button {
                 if let onNewList {
-                    Button {
-                        onNewList()
-                    } label: {
-                        SwiftUI.Label("New List…", systemImage: "plus")
-                    }
+                    onNewList()
+                } else {
+                    appState.requestNewReadingList()
                 }
             } label: {
-                SwiftUI.Label(addToListMenuTitle, systemImage: addToListMenuSymbol)
+                SwiftUI.Label("New List…", systemImage: "plus")
             }
+        } label: {
+            SwiftUI.Label(addToListMenuTitle, systemImage: addToListMenuSymbol)
         }
         
         if let onRemove = onRemove {

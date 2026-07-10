@@ -50,12 +50,12 @@ struct MacWikiCommands: Commands {
 
         CommandGroup(after: .newItem) {
             Button("New Reading List") {
-                NotificationCenter.default.post(name: .macWikiRequestNewReadingList, object: nil)
+                appState.requestNewReadingList()
             }
             .keyboardShortcut("n", modifiers: [.command, .option, .shift])
 
             Button("New Folder") {
-                NotificationCenter.default.post(name: .macWikiRequestNewFolder, object: nil)
+                appState.requestNewFolder()
             }
             .keyboardShortcut("n", modifiers: [.command, .shift])
 
