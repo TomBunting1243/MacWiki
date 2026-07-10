@@ -93,6 +93,8 @@ if [[ ! "$XCODE_VERSION" =~ ^27\. || ! "$SDK_VERSION" =~ ^27\. ]]; then
   echo "Internal-beta preflight requires Xcode 27 and macOS SDK 27; found Xcode $XCODE_VERSION / SDK $SDK_VERSION." >&2
   exit 1
 fi
+source "$ROOT_DIR/scripts/lib/release_build.sh"
+macwiki_release_build_args "26.0"
 swift package clean
 
 echo "[2/9] Debug build"
@@ -102,8 +104,8 @@ echo "[3/9] Complete automated suite"
 swift test 2>&1 | tee "$ARTIFACT_DIR/swift-test.log"
 
 echo "[4/9] Release build"
-swift build -c release 2>&1 | tee "$ARTIFACT_DIR/swift-build-release.log"
-BIN_DIR="$(swift build -c release --show-bin-path)"
+swift build -c release "${MACWIKI_RELEASE_BUILD_ARGS[@]}" 2>&1 | tee "$ARTIFACT_DIR/swift-build-release.log"
+BIN_DIR="$(swift build -c release "${MACWIKI_RELEASE_BUILD_ARGS[@]}" --show-bin-path)"
 EXECUTABLE_PATH="$BIN_DIR/MacWiki"
 EXECUTABLE_SHA256="$(shasum -a 256 "$EXECUTABLE_PATH" | awk '{print $1}')"
 BUILD_VERSION_METADATA="$(otool -l "$EXECUTABLE_PATH" | awk '

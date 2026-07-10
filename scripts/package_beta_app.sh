@@ -15,6 +15,7 @@ AD_HOC_SIGN=0
 NOTARY_PROFILE=""
 EXPECTED_EXECUTABLE_SHA256=""
 RESULT_FILE=""
+MACWIKI_RELEASE_BUILD_ARGS=()
 
 plist_add_string() {
   local plist_path="$1"
@@ -230,7 +231,9 @@ if [[ -n "$NOTARY_PROFILE" ]]; then
 fi
 
 if [[ "$SKIP_BUILD" -eq 0 ]]; then
-  swift build -c release
+  source "$ROOT_DIR/scripts/lib/release_build.sh"
+  macwiki_release_build_args "$(plist_value "$INFO_PLIST_SOURCE" "LSMinimumSystemVersion")"
+  swift build -c release "${MACWIKI_RELEASE_BUILD_ARGS[@]}"
 fi
 
 if [[ "$(git -C "$ROOT_DIR" rev-parse HEAD)" != "$SOURCE_COMMIT" ]]; then
@@ -239,7 +242,7 @@ if [[ "$(git -C "$ROOT_DIR" rev-parse HEAD)" != "$SOURCE_COMMIT" ]]; then
 fi
 require_clean_git_tree
 
-BIN_DIR="$(swift build -c release --show-bin-path)"
+BIN_DIR="$(swift build -c release "${MACWIKI_RELEASE_BUILD_ARGS[@]}" --show-bin-path)"
 EXECUTABLE_PATH="$BIN_DIR/MacWiki"
 RESOURCE_BUNDLE_PATH="$BIN_DIR/MacWiki_MacWiki.bundle"
 

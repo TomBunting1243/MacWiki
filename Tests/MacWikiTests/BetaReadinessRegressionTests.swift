@@ -573,6 +573,21 @@ struct BetaReadinessRegressionTests {
         #expect(preflight.contains(#"^1\.0(-internal\.[0-9]+)?$"#))
     }
 
+    @Test func releaseBuildsEmbedTheSelectedSDKWithoutRaisingTheDeploymentFloor() throws {
+        let helper = try source("scripts/lib/release_build.sh")
+        let preflight = try source("scripts/internal_beta_preflight.sh")
+        let packager = try source("scripts/package_beta_app.sh")
+
+        #expect(helper.contains("xcrun --sdk macosx --show-sdk-version"))
+        #expect(helper.contains("-Xlinker=-platform_version"))
+        #expect(helper.contains("-Xlinker=\"$minimum_macos\""))
+        #expect(helper.contains("-Xlinker=\"$sdk_version\""))
+        #expect(preflight.contains("macwiki_release_build_args \"26.0\""))
+        #expect(preflight.contains("swift build -c release \"${MACWIKI_RELEASE_BUILD_ARGS[@]}\""))
+        #expect(packager.contains("LSMinimumSystemVersion"))
+        #expect(packager.contains("macwiki_release_build_args"))
+    }
+
     @Test func aboutPanelLetsAppKitRenderTheBuildNumberOnce() throws {
         let appSource = try source("Sources/MacWiki/App/MacWikiApp.swift")
 
