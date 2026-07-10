@@ -1,5 +1,10 @@
 # MacWiki Beta Release Checklist
 
+> **RETIRED — historical reference only.** Public release and notarization are
+> outside the current internal-beta scope. The active readiness contract is
+> `INTERNAL_BETA_QUALITY_PROGRAM.md`; use `scripts/internal_beta_preflight.sh`
+> for CLI fallback evidence.
+
 Use this checklist every time you publish a beta to GitHub.
 
 ## 0) Fast Path

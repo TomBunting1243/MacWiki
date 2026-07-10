@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+echo "RETIRED: public-beta preflight is not an active MacWiki quality gate." >&2
+echo "Use scripts/internal_beta_preflight.sh and INTERNAL_BETA_QUALITY_PROGRAM.md." >&2
+exit 2
+
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT_DIR"
 
@@ -11,7 +15,6 @@ PACKAGE_BUILD=""
 SIGN_IDENTITY=""
 NOTARY_PROFILE=""
 AD_HOC_SIGN=0
-ALLOW_DIRTY=0
 
 usage() {
   cat <<'EOF'
@@ -27,7 +30,6 @@ Options:
   --notary-profile <name>
                       `notarytool` keychain profile used for notarization
   --ad-hoc-sign       Explicitly allow ad-hoc signing for local/internal packaging
-  --allow-dirty       Skip the clean-git-tree enforcement (unsafe for public release)
   --version <tag>     Version passed to packaging (example: v0.5.0-beta.1)
   --build <number>    Build number passed to packaging (example: 1)
   --help              Show this help
@@ -97,10 +99,6 @@ while [[ $# -gt 0 ]]; do
       AD_HOC_SIGN=1
       shift
       ;;
-    --allow-dirty)
-      ALLOW_DIRTY=1
-      shift
-      ;;
     --version)
       PACKAGE_VERSION="${2:-}"
       shift 2
@@ -124,6 +122,7 @@ done
 require_tool swift
 require_tool rg
 require_tool otool
+require_tool shasum
 
 INFO_PLIST_PATH="Sources/MacWiki/Info.plist"
 PLIST_MIN_OS="$(plist_value "$INFO_PLIST_PATH" "LSMinimumSystemVersion")"
@@ -180,18 +179,14 @@ for entry in ".agent/" "AGENTS.md" "CLAUDE.md" "GEMINI.md" "ANTIGRAVITY.md" "MOD
     exit 1
   fi
 done
-if [[ "$ALLOW_DIRTY" -eq 0 ]]; then
-  ensure_clean_git_tree
-else
-  echo "Dirty-tree check skipped via --allow-dirty."
-fi
+ensure_clean_git_tree
 
 if [[ "$SKIP_SECRET_SCAN" -eq 0 ]]; then
   echo "[3/9] Running secret-pattern scan..."
   SECRET_PATTERN='(?i)(api[_-]?key|client[_-]?secret|bearer\s+[A-Za-z0-9._-]{16,}|(access|refresh|auth)[_-]?token\s*[:=]\s*["'\''][^"'\'']{8,}|password\s*[:=]\s*["'\''][^"'\'']+)'
-  if rg -n "$SECRET_PATTERN" Sources Tests scripts README.md Package.swift >/tmp/macwiki-secret-scan.txt; then
-    echo "Potential secret-like strings detected:"
-    cat /tmp/macwiki-secret-scan.txt
+  if rg -l "$SECRET_PATTERN" Sources Tests scripts README.md Package.swift >/tmp/macwiki-secret-scan-files.txt; then
+    echo "Potential secret-like strings detected in these files (values redacted):"
+    sed 's/^/  - /' /tmp/macwiki-secret-scan-files.txt
     exit 1
   fi
 else
@@ -212,6 +207,7 @@ if [[ ! -x "$EXECUTABLE_PATH" ]]; then
   echo "Missing release executable at $EXECUTABLE_PATH"
   exit 1
 fi
+EXECUTABLE_SHA256="$(shasum -a 256 "$EXECUTABLE_PATH" | awk '{print $1}')"
 EXECUTABLE_MIN_OS="$(binary_min_os "$EXECUTABLE_PATH")"
 if [[ "$EXECUTABLE_MIN_OS" != "$PLIST_MIN_OS" ]]; then
   echo "Built executable minimum macOS mismatch: Info.plist advertises $PLIST_MIN_OS but the binary requires $EXECUTABLE_MIN_OS"
@@ -223,16 +219,33 @@ echo "[7/9] Running maintainability check (advisory unless placeholder residue f
 
 if [[ "$RUN_PACKAGING" -eq 1 ]]; then
   echo "[8/9] Packaging beta .app artifact..."
-  PACKAGE_ARGS=(--skip-build --version "$EFFECTIVE_VERSION" --build "$EFFECTIVE_BUILD")
+  PACKAGE_RESULT_FILE="$(mktemp /tmp/macwiki-package-result.XXXXXX)"
+  PACKAGE_ARGS=(
+    --skip-build
+    --expected-executable-sha256 "$EXECUTABLE_SHA256"
+    --result-file "$PACKAGE_RESULT_FILE"
+    --version "$EFFECTIVE_VERSION"
+    --build "$EFFECTIVE_BUILD"
+  )
   if [[ "$AD_HOC_SIGN" -eq 1 ]]; then
     PACKAGE_ARGS+=(--ad-hoc-sign)
   else
     PACKAGE_ARGS+=(--identity "$SIGN_IDENTITY" --notary-profile "$NOTARY_PROFILE")
   fi
   ./scripts/package_beta_app.sh "${PACKAGE_ARGS[@]}"
-  APP_PATH="$(ls -td "dist/MacWiki-${EFFECTIVE_VERSION}-build${EFFECTIVE_BUILD}-"*.app 2>/dev/null | head -n 1 || true)"
+  APP_PATH="$(sed -n 's/^APP_PATH=//p' "$PACKAGE_RESULT_FILE")"
+  MANIFEST_PATH="$(sed -n 's/^MANIFEST_PATH=//p' "$PACKAGE_RESULT_FILE")"
+  rm -f "$PACKAGE_RESULT_FILE"
   if [[ -z "$APP_PATH" ]]; then
-    echo "Failed to locate packaged app in dist/."
+    echo "Packaging did not return an exact app path."
+    exit 1
+  fi
+  if [[ ! -f "$MANIFEST_PATH" ]]; then
+    echo "Packaging manifest missing: $MANIFEST_PATH"
+    exit 1
+  fi
+  if [[ "$(sed -n 's/^SourceCommit=//p' "$MANIFEST_PATH")" != "$(git rev-parse HEAD)" ]]; then
+    echo "Packaging manifest source commit does not match HEAD."
     exit 1
   fi
   APP_MIN_OS="$(plist_value "$APP_PATH/Contents/Info.plist" "LSMinimumSystemVersion")"

@@ -482,19 +482,12 @@ struct BetaReadinessRegressionTests {
         #expect(contextMenuSource.contains("openLinkFromContextMenuInNewWindow"))
     }
 
-    @Test func releaseFlowPackagesFreshArtifactWhenPreflightIsSkipped() throws {
+    @Test func formerPublicReleaseFlowIsExplicitlyRetired() throws {
         let releaseScript = try source("scripts/release_beta.sh")
-        let skippedPreflightBlock = sourceSection(
-            releaseScript,
-            startingAt: "else\n  echo \"Preflight skipped; packaging a fresh signed/notarized artifact before release.\"",
-            endingBefore: "ZIP_PATH=\"${ZIP_PATH:-$(latest_zip_path)}\""
-        )
 
-        #expect(releaseScript.contains("latest_zip_path()"))
-        #expect(releaseScript.contains("package_release_artifact()"))
-        #expect(skippedPreflightBlock.contains("package_release_artifact"))
-        #expect(releaseScript.contains("ZIP_PATH=\"dist/MacWiki-${PACKAGE_VERSION}-build${BUILD_NUMBER}-DRY-RUN.zip\""))
-        #expect(!releaseScript.contains("gh release upload \"$VERSION\" \"dist/MacWiki-${PACKAGE_VERSION}-build${BUILD_NUMBER}-\""))
+        #expect(releaseScript.contains("RETIRED: automated public release"))
+        #expect(releaseScript.contains("INTERNAL_BETA_QUALITY_PROGRAM.md"))
+        #expect(releaseScript.range(of: "exit 2")!.lowerBound < releaseScript.range(of: "ROOT_DIR=")!.lowerBound)
     }
 
     @Test func settingsPopupQAHonorsConfiguredAppName() throws {
@@ -503,9 +496,13 @@ struct BetaReadinessRegressionTests {
         #expect(settingsQAScript.contains("APP_NAME=\"${APP_NAME:-MacWiki}\""))
         #expect(settingsQAScript.contains("ObjC.import('stdlib')"))
         #expect(settingsQAScript.contains("ObjC.unwrap($.getenv('APP_NAME')) || 'MacWiki'"))
+        #expect(settingsQAScript.contains("ObjC.unwrap($.getenv('APP_PID'))"))
+        #expect(settingsQAScript.contains("se.processes.whose({ unixId: appPid })()"))
+        #expect(settingsQAScript.contains("qa_launch_exact"))
         #expect(settingsQAScript.contains("popups.forEach((popup, index) =>"))
         #expect(settingsQAScript.contains("expected >=2 visible popup controls"))
         #expect(!settingsQAScript.contains("const appName = 'MacWiki';"))
+        #expect(!settingsQAScript.contains("se.processes.byName(appName)"))
         #expect(!settingsQAScript.contains("Search Presentation"))
     }
 
@@ -519,38 +516,41 @@ struct BetaReadinessRegressionTests {
         #expect(packageScript.contains("xcodebuild -version"))
         #expect(packageScript.contains("swift --version 2>&1 | head -n 1"))
         #expect(packageScript.contains("PackageTimestampUTC"))
-        #expect(packageScript.contains("plist_add_string \"$BUILD_INFO_PATH\" \"GitCommit\" \"$GIT_COMMIT\""))
-        #expect(packageScript.contains("plist_add_string \"$BUILD_INFO_PATH\" \"GitDirty\" \"$GIT_DIRTY\""))
+        #expect(packageScript.contains("plist_add_string \"$BUILD_INFO_PATH\" \"GitCommit\" \"$SOURCE_COMMIT\""))
+        #expect(packageScript.contains("plist_add_string \"$BUILD_INFO_PATH\" \"GitDirty\" \"false\""))
+        #expect(packageScript.contains("SourceExecutableSHA256"))
+        #expect(packageScript.contains("PackagedExecutableSHA256"))
+        #expect(packageScript.contains("AppTreeSHA256"))
+        #expect(packageScript.contains("ZipSHA256"))
+        #expect(packageScript.contains("--expected-executable-sha256"))
+        #expect(packageScript.contains("require_clean_git_tree"))
+        #expect(packageScript.contains("rm -f \"$ZIP_PATH\""))
     }
 
-    @Test func publicBetaDocsRequireTraceablePackageAndStorageRecoveryQA() throws {
+    @Test func legacyPublicBetaDocsAreExplicitlyRetired() throws {
         let releaseChecklist = try source("RELEASE_BETA_CHECKLIST.md")
         let qaMatrix = try source("PUBLIC_BETA_QA_MATRIX.md")
 
-        #expect(releaseChecklist.contains("BuildInfo.plist"))
-        #expect(releaseChecklist.contains("GitDirty=false"))
-        #expect(releaseChecklist.contains("Print :GitCommit"))
-        #expect(releaseChecklist.contains("Print :GitDirty"))
-
-        #expect(qaMatrix.contains("Settings Reading sliders expose one useful VoiceOver control each"))
-        #expect(qaMatrix.contains("visible main window on cold launch and after Dock reopen"))
-        #expect(qaMatrix.contains("Storage Recovery Mode"))
-        #expect(qaMatrix.contains("BuildInfo.plist"))
-        #expect(qaMatrix.contains("GitDirty=false"))
+        #expect(releaseChecklist.contains("RETIRED — historical reference only"))
+        #expect(qaMatrix.contains("RETIRED — historical reference only"))
+        #expect(releaseChecklist.contains("INTERNAL_BETA_QUALITY_PROGRAM.md"))
+        #expect(qaMatrix.contains("scripts/internal_beta_preflight.sh"))
     }
 
-    @Test func publicBetaQAMatrixNamesCandidateAndHarnesses() throws {
-        let qaMatrix = try source("PUBLIC_BETA_QA_MATRIX.md")
+    @Test func internalBetaPreflightIsTheOnlyActiveReleaseGate() throws {
+        let readme = try source("README.md")
+        let preflight = try source("scripts/internal_beta_preflight.sh")
+        let retiredPreflight = try source("scripts/preflight_beta_release.sh")
 
-        #expect(qaMatrix.contains("ls -1dt dist/MacWiki-*.app | head -1"))
-        #expect(qaMatrix.contains("APP_PATH="))
-        #expect(!qaMatrix.contains("/Users/"))
-        #expect(qaMatrix.contains("APP_BIN=\"$APP_PATH/Contents/MacOS/MacWiki\" scripts/qa_sidebar_search_width_classes.sh"))
-        #expect(qaMatrix.contains("APP_BIN=\"$APP_PATH/Contents/MacOS/MacWiki\" scripts/qa_folder_collapse_selected_list.sh"))
-        #expect(qaMatrix.contains("APP_BIN=\"$APP_PATH/Contents/MacOS/MacWiki\" scripts/qa_nested_folder_rename.sh"))
-        #expect(qaMatrix.contains("APP_BIN=\"$APP_PATH/Contents/MacOS/MacWiki\" scripts/qa_discover_scroll_time_machine.sh"))
-        #expect(qaMatrix.contains("scripts/qa_settings_popups_smoke.sh"))
-        #expect(qaMatrix.contains("APP_BINARY=\"$APP_PATH/Contents/MacOS/MacWiki\" scripts/profile_reader_open.sh --skip-build"))
+        #expect(readme.contains("INTERNAL_BETA_QUALITY_PROGRAM.md"))
+        #expect(readme.contains("./scripts/internal_beta_preflight.sh"))
+        #expect(!readme.contains("./scripts/preflight_beta_release.sh"))
+        #expect(!readme.contains("./scripts/release_beta.sh"))
+        #expect(preflight.contains("Internal-beta preflight requires a clean committed worktree"))
+        #expect(preflight.contains("--expected-executable-sha256"))
+        #expect(preflight.contains("--result-file"))
+        #expect(preflight.contains("--ad-hoc-sign"))
+        #expect(retiredPreflight.contains("RETIRED: public-beta preflight"))
     }
 
     @Test func readerOpenProfileHarnessCanTargetPackagedCandidate() throws {
@@ -630,6 +630,7 @@ struct BetaReadinessRegressionTests {
             "scripts/qa_nested_folder_rename.sh",
             "scripts/qa_discover_scroll_time_machine.sh",
             "scripts/qa_sidebar_search_width_classes.sh",
+            "scripts/qa_settings_popups_smoke.sh",
             "scripts/capture_macwiki_audit_set.sh"
         ]
 

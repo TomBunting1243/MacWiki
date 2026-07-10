@@ -1,5 +1,9 @@
 # MacWiki Public Beta QA Matrix
 
+> **RETIRED — historical reference only.** This file is not an active quality
+> gate and must not be used to select or validate a candidate. Use
+> `INTERNAL_BETA_QUALITY_PROGRAM.md` and `scripts/internal_beta_preflight.sh`.
+
 Use this matrix as a release gate for every public beta. A public beta is not ready until every item is either marked pass or called out explicitly in release notes as a known caveat.
 
 ## Candidate And Harnesses

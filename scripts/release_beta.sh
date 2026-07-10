@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+echo "RETIRED: automated public release is outside the current internal-beta program." >&2
+echo "Use INTERNAL_BETA_QUALITY_PROGRAM.md for the active readiness process." >&2
+exit 2
+
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT_DIR"
 

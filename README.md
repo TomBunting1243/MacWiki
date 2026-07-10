@@ -13,9 +13,8 @@ MacWiki reimagines Wikipedia reading on macOS with:
 ## Requirements
 
 - macOS 26.0+
-- Xcode 26+ (optional, for debugging)
+- Xcode 27 (for the official Xcode Tools MCP sign-off and IDE diagnostics)
 - Swift 6.2+
-- Apple Developer account with a Developer ID certificate (for signed public beta distribution)
 
 MacWiki intentionally targets macOS 26 and newer so the app can lean on the current SwiftUI, AppKit, and Liquid Glass system behavior without carrying older-system compatibility branches.
 
@@ -32,30 +31,22 @@ swift build
 .build/debug/MacWiki
 ```
 
-## Public Beta Release
+## Internal Beta Quality Program
 
-For public beta work, the minimum bar is:
+The active readiness contract is `INTERNAL_BETA_QUALITY_PROGRAM.md`. It requires
+traceable clean candidates, exhaustive interface and journey evidence, isolated
+test data, accessibility and Liquid Glass review, and final official Xcode 27 MCP
+verification.
 
-- a clean git tree,
-- successful `swift build`, `swift test`, and `swift build -c release`,
-- a completed manual QA pass from `PUBLIC_BETA_QA_MATRIX.md`,
-- a Developer ID signed and notarized artifact.
-
-Fast preflight:
+Run the CLI-backed gates and create a traceable ad-hoc package with:
 
 ```bash
-./scripts/preflight_beta_release.sh \
-  --identity "Developer ID Application: YOUR NAME (TEAMID)" \
-  --notary-profile "macwiki-notary"
+./scripts/internal_beta_preflight.sh
 ```
 
-Guided GitHub prerelease flow:
-
-```bash
-./scripts/release_beta.sh \
-  --identity "Developer ID Application: YOUR NAME (TEAMID)" \
-  --notary-profile "macwiki-notary"
-```
+This command is a documented fallback, not a substitute for the official Xcode
+27 MCP evidence required by the quality program. The former public-beta matrix,
+checklist, and release automation are retained only as explicitly retired history.
 
 ## Project Structure
 

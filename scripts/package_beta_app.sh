@@ -13,6 +13,8 @@ ZIP_ENABLED=1
 SKIP_BUILD=0
 AD_HOC_SIGN=0
 NOTARY_PROFILE=""
+EXPECTED_EXECUTABLE_SHA256=""
+RESULT_FILE=""
 
 plist_add_string() {
   local plist_path="$1"
@@ -38,6 +40,9 @@ Options:
   --no-sign                   Skip codesign step
   --no-zip                    Skip zip archive creation
   --skip-build                Skip `swift build -c release`
+  --expected-executable-sha256 <hash>
+                              Required with --skip-build; proves the prebuilt executable
+  --result-file <path>        Write exact APP_PATH/ZIP_PATH/MANIFEST_PATH outputs
   --help                      Show this help
 EOF
 }
@@ -58,6 +63,27 @@ binary_min_os() {
     $1 == "cmd" && $2 == "LC_BUILD_VERSION" { in_block = 1; next }
     in_block && $1 == "minos" { print $2; exit }
   '
+}
+
+sha256_file() {
+  shasum -a 256 "$1" | awk '{print $1}'
+}
+
+app_tree_sha256() {
+  local app_path="$1"
+  find -s "$app_path" -type f | while IFS= read -r file_path; do
+    printf '%s\t%s\n' "${file_path#"$app_path"/}" "$(sha256_file "$file_path")"
+  done | shasum -a 256 | awk '{print $1}'
+}
+
+require_clean_git_tree() {
+  local status_output
+  status_output="$(git -C "$ROOT_DIR" status --porcelain --untracked-files=all)"
+  if [[ -n "$status_output" ]]; then
+    echo "Packaging requires a clean, committed source tree:" >&2
+    echo "$status_output" >&2
+    exit 1
+  fi
 }
 
 verify_minimum_os_match() {
@@ -119,6 +145,14 @@ while [[ $# -gt 0 ]]; do
       SKIP_BUILD=1
       shift
       ;;
+    --expected-executable-sha256)
+      EXPECTED_EXECUTABLE_SHA256="${2:-}"
+      shift 2
+      ;;
+    --result-file)
+      RESULT_FILE="${2:-}"
+      shift 2
+      ;;
     --help)
       usage
       exit 0
@@ -138,6 +172,23 @@ fi
 
 require_tool swift
 require_tool otool
+require_tool shasum
+
+if ! git -C "$ROOT_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  echo "Packaging requires a Git worktree for source provenance."
+  exit 1
+fi
+require_clean_git_tree
+SOURCE_COMMIT="$(git -C "$ROOT_DIR" rev-parse HEAD)"
+SOURCE_BRANCH="$(git -C "$ROOT_DIR" branch --show-current)"
+if [[ -z "$SOURCE_BRANCH" ]]; then
+  SOURCE_BRANCH="detached"
+fi
+
+if [[ "$SKIP_BUILD" -eq 1 && ! "$EXPECTED_EXECUTABLE_SHA256" =~ ^[0-9a-fA-F]{64}$ ]]; then
+  echo "--skip-build requires --expected-executable-sha256 with a 64-character SHA-256."
+  exit 1
+fi
 
 if [[ "$SIGN_ENABLED" -eq 0 ]]; then
   if [[ "$AD_HOC_SIGN" -eq 1 || -n "$SIGN_IDENTITY" || -n "$NOTARY_PROFILE" ]]; then
@@ -182,6 +233,12 @@ if [[ "$SKIP_BUILD" -eq 0 ]]; then
   swift build -c release
 fi
 
+if [[ "$(git -C "$ROOT_DIR" rev-parse HEAD)" != "$SOURCE_COMMIT" ]]; then
+  echo "Source commit changed during packaging."
+  exit 1
+fi
+require_clean_git_tree
+
 BIN_DIR="$(swift build -c release --show-bin-path)"
 EXECUTABLE_PATH="$BIN_DIR/MacWiki"
 RESOURCE_BUNDLE_PATH="$BIN_DIR/MacWiki_MacWiki.bundle"
@@ -193,6 +250,15 @@ fi
 
 if [[ ! -d "$RESOURCE_BUNDLE_PATH" ]]; then
   echo "Missing SwiftPM resource bundle at $RESOURCE_BUNDLE_PATH"
+  exit 1
+fi
+
+SOURCE_EXECUTABLE_SHA256="$(sha256_file "$EXECUTABLE_PATH")"
+EXPECTED_EXECUTABLE_SHA256_LOWER="$(printf '%s' "$EXPECTED_EXECUTABLE_SHA256" | tr '[:upper:]' '[:lower:]')"
+if [[ "$SKIP_BUILD" -eq 1 && "$EXPECTED_EXECUTABLE_SHA256_LOWER" != "$SOURCE_EXECUTABLE_SHA256" ]]; then
+  echo "Prebuilt executable hash mismatch."
+  echo "  Expected: $EXPECTED_EXECUTABLE_SHA256_LOWER"
+  echo "  Actual:   $SOURCE_EXECUTABLE_SHA256"
   exit 1
 fi
 
@@ -212,6 +278,7 @@ APP_BASENAME="MacWiki-${VERSION}-build${BUILD_NUMBER}-${STAMP}"
 APP_PATH="$OUTPUT_DIR/$APP_BASENAME.app"
 ZIP_PATH="$OUTPUT_DIR/$APP_BASENAME.zip"
 BUILD_INFO_PATH="$APP_PATH/Contents/Resources/BuildInfo.plist"
+MANIFEST_PATH="$OUTPUT_DIR/$APP_BASENAME.manifest.txt"
 
 mkdir -p "$APP_PATH/Contents/MacOS" "$APP_PATH/Contents/Resources"
 cp "$EXECUTABLE_PATH" "$APP_PATH/Contents/MacOS/MacWiki"
@@ -231,21 +298,6 @@ fi
 /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" "$APP_PATH/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUMBER" "$APP_PATH/Contents/Info.plist"
 
-GIT_COMMIT="unknown"
-GIT_BRANCH="unknown"
-GIT_DIRTY="unknown"
-if git -C "$ROOT_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  GIT_COMMIT="$(git -C "$ROOT_DIR" rev-parse HEAD)"
-  GIT_BRANCH="$(git -C "$ROOT_DIR" branch --show-current)"
-  if [[ -z "$GIT_BRANCH" ]]; then
-    GIT_BRANCH="detached"
-  fi
-  if [[ -n "$(git -C "$ROOT_DIR" status --porcelain --untracked-files=all)" ]]; then
-    GIT_DIRTY="true"
-  else
-    GIT_DIRTY="false"
-  fi
-fi
 XCODE_VERSION="unavailable"
 if command -v xcodebuild >/dev/null 2>&1; then
   XCODE_VERSION="$(xcodebuild -version | tr '\n' ' ' | sed -E 's/[[:space:]]+$//')"
@@ -257,9 +309,10 @@ plist_add_string "$BUILD_INFO_PATH" "AppName" "MacWiki"
 plist_add_string "$BUILD_INFO_PATH" "Version" "$VERSION"
 plist_add_string "$BUILD_INFO_PATH" "BuildNumber" "$BUILD_NUMBER"
 plist_add_string "$BUILD_INFO_PATH" "PackageTimestampUTC" "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-plist_add_string "$BUILD_INFO_PATH" "GitCommit" "$GIT_COMMIT"
-plist_add_string "$BUILD_INFO_PATH" "GitBranch" "$GIT_BRANCH"
-plist_add_string "$BUILD_INFO_PATH" "GitDirty" "$GIT_DIRTY"
+plist_add_string "$BUILD_INFO_PATH" "GitCommit" "$SOURCE_COMMIT"
+plist_add_string "$BUILD_INFO_PATH" "GitBranch" "$SOURCE_BRANCH"
+plist_add_string "$BUILD_INFO_PATH" "GitDirty" "false"
+plist_add_string "$BUILD_INFO_PATH" "SourceExecutableSHA256" "$SOURCE_EXECUTABLE_SHA256"
 plist_add_string "$BUILD_INFO_PATH" "XcodeVersion" "$XCODE_VERSION"
 plist_add_string "$BUILD_INFO_PATH" "SwiftVersion" "$SWIFT_VERSION"
 
@@ -284,19 +337,54 @@ else
   SIGN_SUMMARY="disabled"
 fi
 
-if [[ "$ZIP_ENABLED" -eq 1 ]]; then
-  ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" "$ZIP_PATH"
-fi
-
 if [[ -n "$NOTARY_PROFILE" ]]; then
+  ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" "$ZIP_PATH"
   xcrun notarytool submit "$ZIP_PATH" --keychain-profile "$NOTARY_PROFILE" --wait
   xcrun stapler staple "$APP_PATH"
   xcrun stapler validate "$APP_PATH"
   spctl --assess --type execute -vv "$APP_PATH"
+  rm -f "$ZIP_PATH"
+fi
+
+PACKAGED_EXECUTABLE_SHA256="$(sha256_file "$APP_PATH/Contents/MacOS/MacWiki")"
+APP_TREE_SHA256="$(app_tree_sha256 "$APP_PATH")"
+
+if [[ "$ZIP_ENABLED" -eq 1 ]]; then
+  ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" "$ZIP_PATH"
+  ZIP_SHA256="$(sha256_file "$ZIP_PATH")"
+else
+  ZIP_SHA256="disabled"
+fi
+
+{
+  printf 'SourceCommit=%s\n' "$SOURCE_COMMIT"
+  printf 'SourceBranch=%s\n' "$SOURCE_BRANCH"
+  printf 'SourceDirty=false\n'
+  printf 'SourceExecutableSHA256=%s\n' "$SOURCE_EXECUTABLE_SHA256"
+  printf 'PackagedExecutableSHA256=%s\n' "$PACKAGED_EXECUTABLE_SHA256"
+  printf 'AppTreeSHA256=%s\n' "$APP_TREE_SHA256"
+  printf 'ZipSHA256=%s\n' "$ZIP_SHA256"
+  printf 'AppPath=%s\n' "$APP_PATH"
+  printf 'ZipPath=%s\n' "$([[ "$ZIP_ENABLED" -eq 1 ]] && printf '%s' "$ZIP_PATH" || printf 'disabled')"
+  printf 'Signing=%s\n' "$SIGN_SUMMARY"
+  printf 'NotaryProfile=%s\n' "${NOTARY_PROFILE:-disabled}"
+} >"$MANIFEST_PATH"
+
+if [[ -n "$RESULT_FILE" ]]; then
+  mkdir -p "$(dirname "$RESULT_FILE")"
+  {
+    printf 'APP_PATH=%s\n' "$APP_PATH"
+    printf 'ZIP_PATH=%s\n' "$([[ "$ZIP_ENABLED" -eq 1 ]] && printf '%s' "$ZIP_PATH" || printf '')"
+    printf 'MANIFEST_PATH=%s\n' "$MANIFEST_PATH"
+    printf 'SOURCE_COMMIT=%s\n' "$SOURCE_COMMIT"
+    printf 'APP_TREE_SHA256=%s\n' "$APP_TREE_SHA256"
+    printf 'ZIP_SHA256=%s\n' "$ZIP_SHA256"
+  } >"$RESULT_FILE"
 fi
 
 echo "Packaged app:"
 echo "  App: $APP_PATH"
+echo "  Manifest: $MANIFEST_PATH"
 if [[ "$ZIP_ENABLED" -eq 1 ]]; then
   echo "  Zip: $ZIP_PATH"
 fi
@@ -311,6 +399,7 @@ else
   echo "  Notarization: skipped"
 fi
 echo "APP_PATH=$APP_PATH"
+echo "MANIFEST_PATH=$MANIFEST_PATH"
 if [[ "$ZIP_ENABLED" -eq 1 ]]; then
   echo "ZIP_PATH=$ZIP_PATH"
 fi

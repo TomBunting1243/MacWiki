@@ -3,20 +3,45 @@
 set -euo pipefail
 
 APP_NAME="${APP_NAME:-MacWiki}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+source "$SCRIPT_DIR/lib/qa_process_safety.sh"
+APP_BIN_DEFAULT="$REPO_ROOT/.build/arm64-apple-macosx/debug/MacWiki"
+APP_BIN_FALLBACK="$REPO_ROOT/.build/debug/MacWiki"
+APP_BIN="${APP_BIN:-$APP_BIN_DEFAULT}"
+QA_HOME="${QA_HOME:-/tmp/macwiki-qa/settings-popups-home-$(date +%Y%m%d_%H%M%S)-$RANDOM}"
+
+if [[ ! -x "$APP_BIN" && -x "$APP_BIN_FALLBACK" ]]; then
+  APP_BIN="$APP_BIN_FALLBACK"
+fi
+if [[ ! -x "$APP_BIN" ]]; then
+  echo "ERROR: App binary not found: $APP_BIN" >&2
+  exit 1
+fi
+
+qa_prepare_isolated_home
+cleanup() {
+  qa_stop_exact
+  qa_remove_isolated_home
+}
+trap cleanup EXIT INT TERM
+qa_launch_exact "/tmp/macwiki-qa-settings-popups-launch.log"
 
 echo "Running Settings popups smoke QA..."
 
-osascript -l JavaScript <<'JXA'
+APP_PID="$QA_APP_PID" osascript -l JavaScript <<'JXA'
 ObjC.import('stdlib');
 
 const se = Application('System Events');
 const appName = ObjC.unwrap($.getenv('APP_NAME')) || 'MacWiki';
-const app = se.processes.byName(appName);
+const appPid = Number(ObjC.unwrap($.getenv('APP_PID')) || '0');
+const matchingProcesses = se.processes.whose({ unixId: appPid })();
 
-if (!app.exists()) {
-  console.log('ERROR: app process not found: ' + appName);
+if (matchingProcesses.length !== 1) {
+  console.log('ERROR: verified app PID not found: ' + appPid + ' (' + appName + ')');
   throw new Error('app process missing');
 }
+const app = matchingProcesses[0];
 
 function settingsWindow() {
   for (const w of app.windows()) {
