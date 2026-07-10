@@ -684,6 +684,9 @@ struct BetaReadinessRegressionTests {
         #expect(readerSource.contains("screenModel.selectedDiscoverDate = appState.selectedDiscoverDate"))
         #expect(readerSource.contains(".onChange(of: appState.selectedDiscoverDate)"))
         #expect(readerSource.contains("appState.selectedDiscoverDate = newDate"))
+        #expect(readerSource.components(separatedBy: "await Task.yield()").count == 3)
+        #expect(readerSource.contains("guard screenModel.selectedDiscoverDate == newDate else { return }"))
+        #expect(readerSource.contains("guard appState.selectedDiscoverDate == newDate else { return }"))
     }
 
     @Test func discoverDirectoryDefersDateReloadBeyondTheTableDelegateAction() throws {

@@ -181,14 +181,22 @@ struct DiscoverNewTabPageView: View {
             updateTimeTravelSkeletonVisibility()
         }
         .onChange(of: screenModel.selectedDiscoverDate) { _, newDate in
-            if appState.selectedDiscoverDate != newDate {
-                appState.selectedDiscoverDate = newDate
-            }
             screenModel.handleSelectedDateChange(isSearchActive: searchCoordinator.hasQuery)
+            Task { @MainActor in
+                await Task.yield()
+                guard screenModel.selectedDiscoverDate == newDate else { return }
+                if appState.selectedDiscoverDate != newDate {
+                    appState.selectedDiscoverDate = newDate
+                }
+            }
         }
         .onChange(of: appState.selectedDiscoverDate) { _, newDate in
-            if screenModel.selectedDiscoverDate != newDate {
-                screenModel.selectedDiscoverDate = newDate
+            Task { @MainActor in
+                await Task.yield()
+                guard appState.selectedDiscoverDate == newDate else { return }
+                if screenModel.selectedDiscoverDate != newDate {
+                    screenModel.selectedDiscoverDate = newDate
+                }
             }
         }
         .task {
