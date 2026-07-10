@@ -58,7 +58,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-for tool in git rg swift shasum otool; do
+for tool in git rg swift shasum otool xcodebuild xcrun; do
   if ! command -v "$tool" >/dev/null 2>&1; then
     echo "Missing required tool: $tool" >&2
     exit 1
@@ -86,27 +86,47 @@ SOURCE_COMMIT="$(git rev-parse HEAD)"
 ARTIFACT_DIR="${CODEX_HOME:-$HOME/.codex}/artifacts/macwiki-internal-beta/$SOURCE_COMMIT"
 mkdir -p "$ARTIFACT_DIR"
 
-echo "[1/8] Debug build"
+echo "[1/9] Xcode 27 toolchain and clean build state"
+XCODE_VERSION="$(xcodebuild -version | awk 'NR == 1 { print $2 }')"
+SDK_VERSION="$(xcrun --sdk macosx --show-sdk-version)"
+if [[ ! "$XCODE_VERSION" =~ ^27\. || ! "$SDK_VERSION" =~ ^27\. ]]; then
+  echo "Internal-beta preflight requires Xcode 27 and macOS SDK 27; found Xcode $XCODE_VERSION / SDK $SDK_VERSION." >&2
+  exit 1
+fi
+swift package clean
+
+echo "[2/9] Debug build"
 swift build 2>&1 | tee "$ARTIFACT_DIR/swift-build.log"
 
-echo "[2/8] Complete automated suite"
+echo "[3/9] Complete automated suite"
 swift test 2>&1 | tee "$ARTIFACT_DIR/swift-test.log"
 
-echo "[3/8] Release build"
+echo "[4/9] Release build"
 swift build -c release 2>&1 | tee "$ARTIFACT_DIR/swift-build-release.log"
 BIN_DIR="$(swift build -c release --show-bin-path)"
 EXECUTABLE_PATH="$BIN_DIR/MacWiki"
 EXECUTABLE_SHA256="$(shasum -a 256 "$EXECUTABLE_PATH" | awk '{print $1}')"
+BUILD_VERSION_METADATA="$(otool -l "$EXECUTABLE_PATH" | awk '
+  /cmd LC_BUILD_VERSION/ { in_build_version = 1; next }
+  in_build_version && $1 == "minos" { print "MINOS=" $2 }
+  in_build_version && $1 == "sdk" { print "SDK=" $2; exit }
+')"
+BINARY_MIN_OS="$(printf '%s\n' "$BUILD_VERSION_METADATA" | awk -F= '$1 == "MINOS" { print $2 }')"
+BINARY_SDK="$(printf '%s\n' "$BUILD_VERSION_METADATA" | awk -F= '$1 == "SDK" { print $2 }')"
+if [[ "$BINARY_MIN_OS" != "26.0" || ! "$BINARY_SDK" =~ ^27\. ]]; then
+  echo "Release binary must declare minimum macOS 26.0 and SDK 27; found minos=$BINARY_MIN_OS sdk=$BINARY_SDK." >&2
+  exit 1
+fi
 
-echo "[4/8] Maintainability"
+echo "[5/9] Maintainability"
 ./scripts/check_maintainability.sh 2>&1 | tee "$ARTIFACT_DIR/maintainability.log"
 
-echo "[5/8] Shell syntax"
+echo "[6/9] Shell syntax"
 for script in scripts/*.sh scripts/lib/*.sh; do
   bash -n "$script"
 done
 
-echo "[6/8] Redacted secret-pattern scan"
+echo "[7/9] Redacted secret-pattern scan"
 SECRET_PATTERN='(?i)(api[_-]?key|client[_-]?secret|bearer\s+[A-Za-z0-9._-]{16,}|(access|refresh|auth)[_-]?token\s*[:=]\s*["'\''][^"'\'']{8,}|password\s*[:=]\s*["'\''][^"'\'']+)'
 if rg -l "$SECRET_PATTERN" Sources Tests scripts README.md Package.swift >"$ARTIFACT_DIR/secret-scan-files.log"; then
   echo "Potential secret-like values found; only filenames were recorded:" >&2
@@ -114,15 +134,16 @@ if rg -l "$SECRET_PATTERN" Sources Tests scripts README.md Package.swift >"$ARTI
   exit 1
 fi
 
-echo "[7/8] Provenance"
+echo "[8/9] Provenance"
 if [[ "$(git rev-parse HEAD)" != "$SOURCE_COMMIT" || -n "$(git status --porcelain --untracked-files=all)" ]]; then
   echo "Source changed while preflight was running." >&2
   exit 1
 fi
-printf 'SourceCommit=%s\nExecutableSHA256=%s\n' "$SOURCE_COMMIT" "$EXECUTABLE_SHA256" \
+printf 'SourceCommit=%s\nXcodeVersion=%s\nSDKVersion=%s\nBinaryMinimumOS=%s\nBinarySDK=%s\nExecutableSHA256=%s\n' \
+  "$SOURCE_COMMIT" "$XCODE_VERSION" "$SDK_VERSION" "$BINARY_MIN_OS" "$BINARY_SDK" "$EXECUTABLE_SHA256" \
   >"$ARTIFACT_DIR/preflight-provenance.txt"
 
-echo "[8/8] Ad-hoc internal package"
+echo "[9/9] Ad-hoc internal package"
 if [[ "$RUN_PACKAGE" -eq 1 ]]; then
   RESULT_FILE="$(mktemp /tmp/macwiki-internal-package-result.XXXXXX)"
   PACKAGE_ARGS=(
