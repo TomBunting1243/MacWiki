@@ -597,6 +597,10 @@ struct BetaReadinessRegressionTests {
         #expect(captureScript.contains("APP_PID=\"${APP_PID:-}\""))
         #expect(captureScript.contains("APP_PID is required for a targeted capture"))
         #expect(captureScript.contains("actual_binary=\"$(ps -p \"$APP_PID\" -o comm="))
+        #expect(captureScript.contains("kCGWindowOwnerPID"))
+        #expect(captureScript.contains("optionOnScreenOnly"))
+        #expect(captureScript.contains("/^[0-9]+$/"))
+        #expect(!captureScript.contains("screencapture -x -R"))
         #expect(captureScript.contains("mkdir -p /tmp/macwiki-audit"))
         #expect(!captureScript.contains("pgrep -x"))
 

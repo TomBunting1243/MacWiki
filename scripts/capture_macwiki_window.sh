@@ -90,36 +90,9 @@ if let chosen = candidates.max(by: { $0.area < $1.area }) {
 SWIFT
 )"
 
-window_number="$(echo "$window_number" | tr -cd '0-9')"
+window_number="$(printf '%s\n' "$window_number" | awk '/^[0-9]+$/ { value = $0 } END { print value }')"
 if [[ -z "$window_number" ]]; then
-  if [[ -n "${macwiki_pid:-}" ]]; then
-    window_bounds="$(
-      osascript <<APPLESCRIPT 2>/dev/null || true
-tell application "System Events"
-  if not (exists (first process whose unix id is $macwiki_pid)) then
-    return ""
-  end if
-  tell first process whose unix id is $macwiki_pid
-    if (count of windows) is 0 then
-      return ""
-    end if
-    set win to front window
-    set {xPos, yPos} to position of win
-    set {w, h} to size of win
-    return (xPos as text) & "," & (yPos as text) & "," & (w as text) & "," & (h as text)
-  end tell
-end tell
-APPLESCRIPT
-    )"
-
-    if [[ "$window_bounds" =~ ^-?[0-9]+,-?[0-9]+,[0-9]+,[0-9]+$ ]]; then
-      screencapture -x -R "$window_bounds" "$output_path"
-      echo "$output_path"
-      exit 0
-    fi
-  fi
-
-  echo "Failed to resolve a visible $APP_NAME window id for targeted capture." >&2
+  echo "Failed to resolve a visible layer-zero $APP_NAME window owned by PID $APP_PID." >&2
   exit 1
 fi
 
