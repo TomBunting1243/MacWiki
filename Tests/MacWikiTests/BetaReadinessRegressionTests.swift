@@ -726,6 +726,18 @@ struct BetaReadinessRegressionTests {
         #expect(!source.contains("Binding(\n"))
     }
 
+    @Test func optionClickSaveUsesNativeMacOSFormControls() throws {
+        let source = try source("Sources/MacWiki/Views/Components/OptionClickSaveSheet.swift")
+
+        #expect(source.contains("Form {"))
+        #expect(source.contains(".formStyle(.grouped)"))
+        #expect(source.contains("Picker(\"List\""))
+        #expect(source.contains("Picker(\"Label\""))
+        #expect(source.contains("Picker(\"Tag\""))
+        #expect(!source.contains("selectorButton("))
+        #expect(!source.contains("tagRowBackground("))
+    }
+
     @Test func qaHarnessesAvoidMachineSpecificRepositoryPaths() throws {
         let scriptNames = [
             "scripts/qa_context_menu_ocr.sh",
