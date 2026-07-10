@@ -35,7 +35,7 @@ struct ReferenceListHelpersTests {
         var openedURL: URL?
 
         ReferenceListHelpers.openFirstLink(
-            appState: AppState(),
+            appState: AppState(persistenceMode: .ephemeral),
             item: item
         ) { url in
             openedURL = url
@@ -82,7 +82,7 @@ struct ReferenceListHelpersTests {
         var openedURL: URL?
 
         ReferenceListHelpers.openFirstLink(
-            appState: AppState(),
+            appState: AppState(persistenceMode: .ephemeral),
             item: item
         ) { url in
             openedURL = url

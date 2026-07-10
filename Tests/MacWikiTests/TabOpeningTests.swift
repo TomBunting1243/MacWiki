@@ -5,7 +5,7 @@ import Testing
 @MainActor
 struct TabOpeningTests {
     @Test func openInNewTabCanPreserveActiveTabWhenOpenedInBackground() {
-        let appState = AppState()
+        let appState = AppState(persistenceMode: .ephemeral)
         let first = ArticleTab(article: Article(id: "a", title: "A"))
         appState.openTabs = [first]
         appState.activeTabId = first.id
@@ -18,7 +18,7 @@ struct TabOpeningTests {
     }
 
     @Test func openInNewTabStillActivatesByDefault() {
-        let appState = AppState()
+        let appState = AppState(persistenceMode: .ephemeral)
         let first = ArticleTab(article: Article(id: "a", title: "A"))
         appState.openTabs = [first]
         appState.activeTabId = first.id
@@ -30,7 +30,7 @@ struct TabOpeningTests {
     }
 
     @Test func backgroundNewTabFallsBackToActiveWhenNoTabIsSelected() {
-        let appState = AppState()
+        let appState = AppState(persistenceMode: .ephemeral)
         appState.openTabs = []
         appState.activeTabId = nil
 
@@ -40,4 +40,3 @@ struct TabOpeningTests {
         #expect(appState.activeTabId == appState.openTabs.first?.id)
     }
 }
-

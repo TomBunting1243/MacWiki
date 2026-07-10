@@ -74,7 +74,7 @@ private enum SettingsTab: String, Hashable {
 
 #Preview {
     SettingsView()
-        .environment(AppState())
+        .environment(AppState(persistenceMode: .ephemeral))
         .modelContainer(
             for: [
                 ReadingList.self,

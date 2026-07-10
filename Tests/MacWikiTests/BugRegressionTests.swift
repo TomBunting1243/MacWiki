@@ -7,7 +7,7 @@ import Testing
 @MainActor
 struct BugRegressionTests {
     @Test func historyScopedScrollWritesDoNotLeakIntoNewArticle() {
-        let appState = AppState()
+        let appState = AppState(persistenceMode: .ephemeral)
         appState.openTabs.removeAll()
         appState.activeTabId = nil
 
@@ -39,7 +39,7 @@ struct BugRegressionTests {
     }
 
     @Test func rapidArticleOpensPreserveRecentEntries() async {
-        let appState = AppState()
+        let appState = AppState(persistenceMode: .ephemeral)
         appState.openTabs.removeAll()
         appState.activeTabId = nil
         appState.recentArticles.removeAll()
@@ -56,7 +56,7 @@ struct BugRegressionTests {
     }
 
     @Test func batchMetadataUpdateTouchesOnlyRequestedArticles() {
-        let appState = AppState()
+        let appState = AppState(persistenceMode: .ephemeral)
         appState.openTabs = [
             ArticleTab(article: Article(id: "history-1", title: "History One")),
             ArticleTab(article: Article(id: "history-2", title: "History Two"))

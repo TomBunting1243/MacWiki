@@ -6,7 +6,7 @@ import Testing
 @MainActor
 struct TabSessionStoreTests {
     @Test func placeholderTabConvertsToArticleHistory() {
-        let store = TabSessionStore(loadPersistedState: false)
+        let store = TabSessionStore(persistenceMode: .ephemeral)
         store.createNewTab()
 
         let article = Article(id: "swift", title: "Swift")
@@ -21,7 +21,7 @@ struct TabSessionStoreTests {
     }
 
     @Test func openingAfterBackTruncatesForwardHistory() {
-        let store = TabSessionStore(loadPersistedState: false)
+        let store = TabSessionStore(persistenceMode: .ephemeral)
         _ = store.openArticle(Article(id: "a", title: "A"))
         _ = store.openArticle(Article(id: "b", title: "B"))
 
@@ -34,7 +34,7 @@ struct TabSessionStoreTests {
     }
 
     @Test func reopenClosedTabPreservesFullHistoryAndCurrentIndex() {
-        let store = TabSessionStore(loadPersistedState: false)
+        let store = TabSessionStore(persistenceMode: .ephemeral)
         _ = store.openArticle(Article(id: "a", title: "A"))
         _ = store.openArticle(Article(id: "b", title: "B"))
         _ = store.openArticle(Article(id: "c", title: "C"))
@@ -55,7 +55,7 @@ struct TabSessionStoreTests {
     }
 
     @Test func duplicateTabPreservesHistoryAndSelection() {
-        let store = TabSessionStore(loadPersistedState: false)
+        let store = TabSessionStore(persistenceMode: .ephemeral)
         _ = store.openArticle(Article(id: "a", title: "A"))
         _ = store.openArticle(Article(id: "b", title: "B"))
         store.goBack()
@@ -76,7 +76,7 @@ struct TabSessionStoreTests {
     }
 
     @Test func closingActiveTabFallsBackToNeighborAtSameIndex() {
-        let store = TabSessionStore(loadPersistedState: false)
+        let store = TabSessionStore(persistenceMode: .ephemeral)
         _ = store.openArticle(Article(id: "a", title: "A"), inNewTab: true)
         _ = store.openArticle(Article(id: "b", title: "B"), inNewTab: true)
         _ = store.openArticle(Article(id: "c", title: "C"), inNewTab: true)
@@ -123,7 +123,7 @@ struct TabSessionStoreTests {
     }
 
     @Test func readStateMutationQueuesTabSessionSave() {
-        let store = TabSessionStore(loadPersistedState: false)
+        let store = TabSessionStore(persistenceMode: .ephemeral)
         let tab = ArticleTab(
             content: .history(
                 items: [
@@ -146,7 +146,7 @@ struct TabSessionStoreTests {
     }
 
     @Test func articleMetadataMutationQueuesTabSessionSave() {
-        let store = TabSessionStore(loadPersistedState: false)
+        let store = TabSessionStore(persistenceMode: .ephemeral)
         let tab = ArticleTab(
             content: .history(
                 items: [

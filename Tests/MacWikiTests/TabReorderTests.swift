@@ -5,7 +5,7 @@ import Testing
 @MainActor
 struct TabReorderTests {
     @Test func moveTabLeftToRightAdjacent() {
-        let appState = AppState()
+        let appState = AppState(persistenceMode: .ephemeral)
         appState.openTabs = [
             ArticleTab(article: Article(id: "a", title: "A")),
             ArticleTab(article: Article(id: "b", title: "B")),
@@ -18,7 +18,7 @@ struct TabReorderTests {
     }
 
     @Test func moveTabLeftToRightAcrossMultipleTabs() {
-        let appState = AppState()
+        let appState = AppState(persistenceMode: .ephemeral)
         appState.openTabs = [
             ArticleTab(article: Article(id: "a", title: "A")),
             ArticleTab(article: Article(id: "b", title: "B")),
@@ -32,7 +32,7 @@ struct TabReorderTests {
     }
 
     @Test func moveTabRightToLeftAdjacent() {
-        let appState = AppState()
+        let appState = AppState(persistenceMode: .ephemeral)
         appState.openTabs = [
             ArticleTab(article: Article(id: "a", title: "A")),
             ArticleTab(article: Article(id: "b", title: "B")),

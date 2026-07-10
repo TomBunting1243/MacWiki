@@ -2387,5 +2387,5 @@ extension DirectoryView {
 
 #Preview {
     ContentView()
-        .environment(AppState())
+        .environment(AppState(persistenceMode: .ephemeral))
 }

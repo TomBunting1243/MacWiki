@@ -4,6 +4,19 @@ import os
 
 let appStateLogger = Logger(subsystem: "com.macwiki", category: "appstate")
 
+/// Controls whether an app-state graph participates in the user's shared on-disk session.
+///
+/// Secondary article windows, previews, and tests use `.ephemeral` so their local
+/// navigation mutations can never overwrite the primary window's persisted state.
+enum AppStatePersistenceMode: Equatable, Sendable {
+    case shared
+    case ephemeral
+
+    var isEnabled: Bool {
+        self == .shared
+    }
+}
+
 /// Global application state container
 /// 
 /// Manages all shared state across the application including:
@@ -14,6 +27,9 @@ let appStateLogger = Logger(subsystem: "com.macwiki", category: "appstate")
 @Observable @MainActor
 final class AppState {
     let tabSessionStore: TabSessionStore
+
+    @ObservationIgnored
+    let persistenceMode: AppStatePersistenceMode
 
     @ObservationIgnored
     let webViewPoolOwnerID = UUID()
@@ -281,13 +297,14 @@ final class AppState {
         tabSessionStore.currentArticle
     }
 
-    init(loadPersistedState: Bool = true) {
-        self.tabSessionStore = TabSessionStore(loadPersistedState: loadPersistedState)
+    init(persistenceMode: AppStatePersistenceMode = .shared) {
+        self.persistenceMode = persistenceMode
+        self.tabSessionStore = TabSessionStore(persistenceMode: persistenceMode)
         persistenceQueue.setSpecific(key: persistenceQueueKey, value: ())
-        if loadPersistedState {
+        if persistenceMode.isEnabled {
             load()
+            deduplicateRecents()
         }
-        deduplicateRecents()
         synchronizeExperimentStateFromDefaults()
     }
 

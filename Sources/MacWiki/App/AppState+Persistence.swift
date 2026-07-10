@@ -3,6 +3,7 @@ import Foundation
 extension AppState {
     /// Request a state save (debounced).
     func requestSave() {
+        guard persistenceMode.isEnabled else { return }
         saveTask?.cancel()
         saveTask = Task { [weak self] in
             try? await Task.sleep(for: .milliseconds(650))
@@ -13,6 +14,7 @@ extension AppState {
 
     /// Flush pending state to disk immediately, used for lifecycle transitions.
     func flushSaveNow() {
+        guard persistenceMode.isEnabled else { return }
         saveTask?.cancel()
         tabSessionStore.flushSaveNow()
         performSave(sync: true)
@@ -33,6 +35,7 @@ extension AppState {
     }
 
     func save(sync: Bool) {
+        guard persistenceMode.isEnabled else { return }
         let state = SavedState(
             recentArticles: recentArticles,
             wikiHopSession: wikiHopSession
@@ -56,6 +59,7 @@ extension AppState {
     }
 
     func load() {
+        guard persistenceMode.isEnabled else { return }
         guard let url = persistenceURL else { return }
         let loadStartedAt = CFAbsoluteTimeGetCurrent()
 
@@ -103,6 +107,7 @@ extension AppState {
     }
 
     func migrateLegacyStateIfNeeded() {
+        guard persistenceMode.isEnabled else { return }
         guard let legacyURL = legacyStateURL else { return }
 
         let loadResult: SavedStateLoadResult
@@ -155,16 +160,19 @@ extension AppState {
         resetHighlightWorkflowState()
         resetReaderCacheState()
 
-        if let url = persistenceURL {
+        if persistenceMode.isEnabled, let url = persistenceURL {
             try? FileManager.default.removeItem(at: url)
             let backup = url.deletingPathExtension().appendingPathExtension("corrupted.json")
             try? FileManager.default.removeItem(at: backup)
         }
 
-        performSave(sync: true)
+        if persistenceMode.isEnabled {
+            performSave(sync: true)
+        }
     }
 
     private var persistenceURL: URL? {
+        guard persistenceMode.isEnabled else { return nil }
         guard let supportDir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else { return nil }
         let appDir = supportDir.appendingPathComponent("MacWiki")
 
@@ -176,6 +184,7 @@ extension AppState {
     }
 
     private var legacyStateURL: URL? {
+        guard persistenceMode.isEnabled else { return nil }
         guard let supportDir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else { return nil }
         return supportDir.appendingPathComponent("MacWiki").appendingPathComponent("state.json")
     }

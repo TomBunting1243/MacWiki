@@ -5,7 +5,7 @@ import Testing
 @MainActor
 struct InspectorToggleStateTests {
     @Test func repeatedInspectorTogglesRemainDeterministic() {
-        let appState = AppState()
+        let appState = AppState(persistenceMode: .ephemeral)
         openSampleArticle(in: appState)
 
         #expect(appState.inspectorVisible == true)

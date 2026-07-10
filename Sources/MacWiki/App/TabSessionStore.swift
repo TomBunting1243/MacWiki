@@ -109,6 +109,8 @@ final class TabSessionStore {
     private let persistenceQueue = DispatchQueue(label: "MacWiki.TabSession.Persistence", qos: .utility)
     @ObservationIgnored
     private let persistenceQueueKey = DispatchSpecificKey<Void>()
+    @ObservationIgnored
+    let persistenceMode: AppStatePersistenceMode
 #if DEBUG
     @ObservationIgnored
     private(set) var saveRequestGeneration = 0
@@ -118,9 +120,10 @@ final class TabSessionStore {
     var activeTabId: UUID?
     var recentlyClosedTabs: [ArticleTab] = []
 
-    init(loadPersistedState: Bool = true) {
+    init(persistenceMode: AppStatePersistenceMode = .shared) {
+        self.persistenceMode = persistenceMode
         persistenceQueue.setSpecific(key: persistenceQueueKey, value: ())
-        if loadPersistedState {
+        if persistenceMode.isEnabled {
             load()
         }
     }
@@ -358,6 +361,7 @@ final class TabSessionStore {
 #if DEBUG
         saveRequestGeneration += 1
 #endif
+        guard persistenceMode.isEnabled else { return }
         saveTask?.cancel()
         saveTask = Task { [weak self] in
             try? await Task.sleep(for: .milliseconds(650))
@@ -367,11 +371,16 @@ final class TabSessionStore {
     }
 
     func flushSaveNow() {
+        guard persistenceMode.isEnabled else { return }
         saveTask?.cancel()
         performSave(sync: true)
     }
 
 #if DEBUG
+    var hasPendingSaveForTesting: Bool {
+        saveTask != nil
+    }
+
     func cancelPendingSaveForTesting() {
         saveTask?.cancel()
         saveTask = nil
@@ -385,7 +394,7 @@ final class TabSessionStore {
         activeTabId = nil
         recentlyClosedTabs.removeAll()
 
-        if let url = persistenceURL {
+        if persistenceMode.isEnabled, let url = persistenceURL {
             try? FileManager.default.removeItem(at: url)
             let backup = url.deletingPathExtension().appendingPathExtension("corrupted.json")
             try? FileManager.default.removeItem(at: backup)
@@ -405,6 +414,7 @@ final class TabSessionStore {
 
     @MainActor
     private func performSave(sync: Bool) {
+        guard persistenceMode.isEnabled else { return }
         let snapshot = TabSessionSnapshot(
             openTabs: openTabs,
             activeTabId: activeTabId,
@@ -428,6 +438,7 @@ final class TabSessionStore {
     }
 
     private func load() {
+        guard persistenceMode.isEnabled else { return }
         if let snapshotURL = persistenceURL {
             let loadResult = readSnapshot(from: snapshotURL)
             switch loadResult {
@@ -530,11 +541,13 @@ final class TabSessionStore {
     }
 
     private var persistenceURL: URL? {
-        Self.applicationSupportDirectory?.appendingPathComponent("tab-session.json")
+        guard persistenceMode.isEnabled else { return nil }
+        return Self.applicationSupportDirectory?.appendingPathComponent("tab-session.json")
     }
 
     private var legacyStateURL: URL? {
-        Self.applicationSupportDirectory?.appendingPathComponent("state.json")
+        guard persistenceMode.isEnabled else { return nil }
+        return Self.applicationSupportDirectory?.appendingPathComponent("state.json")
     }
 
     private static var applicationSupportDirectory: URL? {

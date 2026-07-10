@@ -35,7 +35,7 @@ struct ReaderStateTests {
     }
 
     @Test func progressCoordinatorSuppressesEarlyTopRegression() throws {
-        let appState = AppState()
+        let appState = AppState(persistenceMode: .ephemeral)
         let modelContext = try makeInMemoryModelContext()
         let article = Article(id: "Swift", title: "Swift")
         var coordinator = ReaderProgressCoordinator()
@@ -55,7 +55,7 @@ struct ReaderStateTests {
     }
 
     @Test func progressCoordinatorPersistsMeaningfulDeltas() throws {
-        let appState = AppState()
+        let appState = AppState(persistenceMode: .ephemeral)
         let modelContext = try makeInMemoryModelContext()
         let article = Article(id: "Swift", title: "Swift")
         var coordinator = ReaderProgressCoordinator()
@@ -73,7 +73,7 @@ struct ReaderStateTests {
     }
 
     @Test func progressCoordinatorCanDeferLivePublicationUntilReveal() throws {
-        let appState = AppState()
+        let appState = AppState(persistenceMode: .ephemeral)
         let modelContext = try makeInMemoryModelContext()
         let article = Article(id: "Grace", title: "Grace Hopper")
         var coordinator = ReaderProgressCoordinator()
@@ -110,7 +110,7 @@ struct ReaderStateTests {
     }
 
     @Test func markAsCompletedSetsReadStateAndFullProgress() throws {
-        let appState = AppState()
+        let appState = AppState(persistenceMode: .ephemeral)
         let modelContext = try makeInMemoryModelContext()
         let article = Article(id: "Turing", title: "Alan Turing")
         var coordinator = ReaderProgressCoordinator()

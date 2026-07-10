@@ -250,7 +250,7 @@ struct SidebarSearchSurfaceModelTests {
     @Test func selectionReconcilesAcrossReorderDisappearAndSourceSwitch() {
         let coordinator = SearchCoordinator(debounceMilliseconds: 10_000, supportsTrending: true)
         let model = SidebarSearchSurfaceModel(searchCoordinator: coordinator)
-        let appState = AppState()
+        let appState = AppState(persistenceMode: .ephemeral)
         defer { model.cancel() }
 
         coordinator.trendingArticles = [
@@ -295,7 +295,7 @@ struct SidebarSearchSurfaceModelTests {
     @Test func moveSelectionStepsThroughVisibleRows() {
         let coordinator = SearchCoordinator(debounceMilliseconds: 10_000, supportsTrending: true)
         let model = SidebarSearchSurfaceModel(searchCoordinator: coordinator)
-        let appState = AppState()
+        let appState = AppState(persistenceMode: .ephemeral)
         defer { model.cancel() }
 
         coordinator.trendingArticles = [
@@ -318,7 +318,7 @@ struct SidebarSearchSurfaceModelTests {
     @Test func moveSelectionUpStartsAtLastVisibleRowWhenSelectionIsEmpty() {
         let coordinator = SearchCoordinator(debounceMilliseconds: 10_000, supportsTrending: true)
         let model = SidebarSearchSurfaceModel(searchCoordinator: coordinator)
-        let appState = AppState()
+        let appState = AppState(persistenceMode: .ephemeral)
         defer { model.cancel() }
 
         coordinator.trendingArticles = [
@@ -335,7 +335,7 @@ struct SidebarSearchSurfaceModelTests {
     @Test func displayStateDistinguishesScopeFilterEmptyStates() {
         let coordinator = SearchCoordinator(debounceMilliseconds: 10_000, supportsTrending: true)
         let model = SidebarSearchSurfaceModel(searchCoordinator: coordinator)
-        let appState = AppState()
+        let appState = AppState(persistenceMode: .ephemeral)
         let label = Label(name: "Research", color: .blue)
         defer { model.cancel() }
 

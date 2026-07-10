@@ -5,7 +5,7 @@ import Testing
 @MainActor
 struct OptionClickSavePromptTests {
     @Test func presentOptionClickSavePromptStoresRequestedArticle() {
-        let appState = AppState()
+        let appState = AppState(persistenceMode: .ephemeral)
         let article = Article(id: "Swift_(programming_language)", title: "Swift (programming language)")
 
         appState.presentOptionClickSavePrompt(for: article)
@@ -14,7 +14,7 @@ struct OptionClickSavePromptTests {
     }
 
     @Test func dismissOptionClickSavePromptClearsPendingRequest() {
-        let appState = AppState()
+        let appState = AppState(persistenceMode: .ephemeral)
         let article = Article(id: "Swift_(programming_language)", title: "Swift (programming language)")
         appState.presentOptionClickSavePrompt(for: article)
 

@@ -13,7 +13,7 @@ struct ArticleWindowRootView: View {
 
     init(initialArticle: Article) {
         self.initialArticle = initialArticle
-        _appState = State(initialValue: AppState(loadPersistedState: false))
+        _appState = State(initialValue: AppState(persistenceMode: .ephemeral))
     }
 
     var body: some View {

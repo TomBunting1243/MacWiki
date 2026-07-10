@@ -6,8 +6,25 @@ import Testing
 
 @MainActor
 struct AppStateBoundaryTests {
+    @Test func ephemeralStateGraphNeverSchedulesPersistentWrites() {
+        let appState = AppState(persistenceMode: .ephemeral)
+
+        appState.requestSave()
+        appState.tabSessionStore.requestSave()
+
+        #expect(appState.persistenceMode == .ephemeral)
+        #expect(appState.tabSessionStore.persistenceMode == .ephemeral)
+        #expect(appState.saveTask == nil)
+        #expect(appState.tabSessionStore.hasPendingSaveForTesting == false)
+
+        appState.flushSaveNow()
+
+        #expect(appState.saveTask == nil)
+        #expect(appState.tabSessionStore.hasPendingSaveForTesting == false)
+    }
+
     @Test func listContentsTogglePreservesListsSidebarVisibility() {
-        let appState = AppState(loadPersistedState: false)
+        let appState = AppState(persistenceMode: .ephemeral)
         appState.navigationSplitViewVisibility = .all
         appState.listContentsColumnVisible = true
 
@@ -27,7 +44,7 @@ struct AppStateBoundaryTests {
     }
 
     @Test func navigationColumnsToggleHidesAndRestoresListsAndDirectoryColumns() {
-        let appState = AppState(loadPersistedState: false)
+        let appState = AppState(persistenceMode: .ephemeral)
         appState.navigationSplitViewVisibility = .all
         appState.listContentsColumnVisible = true
 
@@ -47,7 +64,7 @@ struct AppStateBoundaryTests {
     }
 
     @Test func dismissFindOnPageInvalidatesQueryResultsAndQueuesLegacyClearRequest() {
-        let appState = AppState(loadPersistedState: false)
+        let appState = AppState(persistenceMode: .ephemeral)
         let tabID = UUID()
         let staleRequest = AppState.FindOnPageRequest(
             requestID: UUID(),
@@ -74,7 +91,7 @@ struct AppStateBoundaryTests {
     }
 
     @Test func resetHighlightWorkflowClearsPendingTransitions() {
-        let appState = AppState(loadPersistedState: false)
+        let appState = AppState(persistenceMode: .ephemeral)
         let highlightID = UUID()
         let requestID = UUID()
         appState.pendingHighlightText = "important"
@@ -169,7 +186,7 @@ struct AppStateBoundaryTests {
         defaults.set(false, forKey: AppStorageKey.Features.wikiHopPostV1Enabled)
         defaults.set(true, forKey: ExperimentFlag.wikiHopPOCEnabled.key)
 
-        let appState = AppState(loadPersistedState: false)
+        let appState = AppState(persistenceMode: .ephemeral)
         appState.startWikiHop(
             mode: .chill,
             start: Article(id: "start", title: "Start"),
@@ -185,7 +202,7 @@ struct AppStateBoundaryTests {
     }
 
     @Test func appStateReadStateUpdatesRecentsAndQueuesTabSessionSave() {
-        let appState = AppState(loadPersistedState: false)
+        let appState = AppState(persistenceMode: .ephemeral)
         appState.recentArticles = [
             Article(id: "ada", title: "Ada Lovelace"),
             Article(id: "swift", title: "Swift")

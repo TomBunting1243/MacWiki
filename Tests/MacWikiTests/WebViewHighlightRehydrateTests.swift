@@ -55,7 +55,7 @@ struct WebViewHighlightRehydrateTests {
         let originalUpdatedAt = highlight.updatedAt
         modelContext.insert(highlight)
 
-        let appState = AppState(loadPersistedState: false)
+        let appState = AppState(persistenceMode: .ephemeral)
         let pending = AppState.HighlightRehydrateRequest(highlight: highlight)
         appState.pendingHighlightRehydrate = pending
         appState.isHighlightRehydrateInProgress = true
@@ -94,7 +94,7 @@ struct WebViewHighlightRehydrateTests {
         let originalUpdatedAt = highlight.updatedAt
         modelContext.insert(highlight)
 
-        let appState = AppState(loadPersistedState: false)
+        let appState = AppState(persistenceMode: .ephemeral)
         let pending = AppState.HighlightRehydrateRequest(highlight: highlight)
         appState.pendingHighlightRehydrate = pending
         appState.isHighlightRehydrateInProgress = true
