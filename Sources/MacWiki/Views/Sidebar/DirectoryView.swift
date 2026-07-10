@@ -1433,7 +1433,7 @@ extension DirectoryView {
 
     private func queueDiscoverLoadDebounced(
         forceRefresh: Bool = false,
-        delayNanoseconds: UInt64 = 0
+        delayNanoseconds: UInt64 = 170_000_000
     ) {
         discoverDateLoadTask?.cancel()
         let targetReferenceDate = discoverReferenceDate

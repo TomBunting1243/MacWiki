@@ -686,6 +686,19 @@ struct BetaReadinessRegressionTests {
         #expect(readerSource.contains("appState.selectedDiscoverDate = newDate"))
     }
 
+    @Test func discoverDirectoryDefersDateReloadBeyondTheTableDelegateAction() throws {
+        let source = try source("Sources/MacWiki/Views/Sidebar/DirectoryView.swift")
+        let reload = sourceSection(
+            source,
+            startingAt: "private func queueDiscoverLoadDebounced(",
+            endingBefore: "private func shiftDiscoverDate(days:"
+        )
+
+        #expect(reload.contains("delayNanoseconds: UInt64 = 170_000_000"))
+        #expect(reload.contains("try? await Task.sleep(nanoseconds: delayNanoseconds)"))
+        #expect(reload.contains("guard !Task.isCancelled else { return }"))
+    }
+
     private func source(_ relativePath: String) throws -> String {
         try String(contentsOf: repositoryRoot().appendingPathComponent(relativePath), encoding: .utf8)
     }
