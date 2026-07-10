@@ -149,6 +149,7 @@ struct DiscoverNewTabPageView: View {
         }
         .background(DiscoverEditionBackground().ignoresSafeArea())
         .onAppear {
+            screenModel.selectedDiscoverDate = appState.selectedDiscoverDate
             refreshArticleLookupSnapshot()
             if reduceMotion {
                 isAppeared = true
@@ -179,8 +180,16 @@ struct DiscoverNewTabPageView: View {
             }
             updateTimeTravelSkeletonVisibility()
         }
-        .onChange(of: screenModel.selectedDiscoverDate) { _, _ in
+        .onChange(of: screenModel.selectedDiscoverDate) { _, newDate in
+            if appState.selectedDiscoverDate != newDate {
+                appState.selectedDiscoverDate = newDate
+            }
             screenModel.handleSelectedDateChange(isSearchActive: searchCoordinator.hasQuery)
+        }
+        .onChange(of: appState.selectedDiscoverDate) { _, newDate in
+            if screenModel.selectedDiscoverDate != newDate {
+                screenModel.selectedDiscoverDate = newDate
+            }
         }
         .task {
             screenModel.queueInitialLoad()

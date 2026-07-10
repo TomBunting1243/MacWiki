@@ -132,6 +132,10 @@ final class AppState {
     /// Current inspector view mode
     var inspectorMode: InspectorMode = .info
 
+    /// Shared Discover edition date for the directory and reader surfaces.
+    /// This is session UI state and is intentionally not persisted to disk.
+    var selectedDiscoverDate = Date()
+
     /// Table of contents entries for the currently displayed article
     var currentArticleTableOfContents: [ArticleTableOfContentsItem] = []
 

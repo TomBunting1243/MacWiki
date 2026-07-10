@@ -29,7 +29,6 @@ struct DirectoryView: View {
     @State private var discoverFeedStore = DiscoverFeedStore()
     @State private var discoverTrendPulseStore = DiscoverTrendPulseStore()
     @State private var metadataHydrator = ArticleMetadataHydrator()
-    @State private var selectedDiscoverDate = Date()
     @State private var supplementalReadFilter: DirectoryReadFilter = .all
     @State private var supplementalSortMode: DirectorySupplementalSortMode = .recent
     @State private var selectedSavedArticleIDs: Set<UUID> = []
@@ -49,6 +48,18 @@ struct DirectoryView: View {
     @State private var topObscuredHeight: CGFloat = 38
 
     private let wikipediaService = WikipediaService.shared
+
+    private var selectedDiscoverDate: Date {
+        get { appState.selectedDiscoverDate }
+        nonmutating set { appState.selectedDiscoverDate = newValue }
+    }
+
+    private var selectedDiscoverDateBinding: Binding<Date> {
+        Binding(
+            get: { appState.selectedDiscoverDate },
+            set: { appState.selectedDiscoverDate = $0 }
+        )
+    }
 
     private var isWikiHopAvailable: Bool {
         wikiHopPostV1Enabled && wikiHopPOCEnabled
@@ -1595,7 +1606,7 @@ extension DirectoryView {
             VStack(alignment: .leading, spacing: 8) {
                 DatePicker(
                     "Jump to date",
-                    selection: $selectedDiscoverDate,
+                    selection: selectedDiscoverDateBinding,
                     in: ...Date(),
                     displayedComponents: [.date]
                 )

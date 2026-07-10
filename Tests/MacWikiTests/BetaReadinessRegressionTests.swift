@@ -672,6 +672,20 @@ struct BetaReadinessRegressionTests {
         #expect(!source.contains("more..."))
     }
 
+    @Test func discoverDirectoryAndReaderShareOneSessionDate() throws {
+        let appStateSource = try source("Sources/MacWiki/App/AppState.swift")
+        let directorySource = try source("Sources/MacWiki/Views/Sidebar/DirectoryView.swift")
+        let readerSource = try source("Sources/MacWiki/Views/Home/DiscoverNewTabPageView.swift")
+
+        #expect(appStateSource.contains("var selectedDiscoverDate = Date()"))
+        #expect(!directorySource.contains("@State private var selectedDiscoverDate"))
+        #expect(directorySource.contains("get { appState.selectedDiscoverDate }"))
+        #expect(directorySource.contains("selection: selectedDiscoverDateBinding"))
+        #expect(readerSource.contains("screenModel.selectedDiscoverDate = appState.selectedDiscoverDate"))
+        #expect(readerSource.contains(".onChange(of: appState.selectedDiscoverDate)"))
+        #expect(readerSource.contains("appState.selectedDiscoverDate = newDate"))
+    }
+
     private func source(_ relativePath: String) throws -> String {
         try String(contentsOf: repositoryRoot().appendingPathComponent(relativePath), encoding: .utf8)
     }
