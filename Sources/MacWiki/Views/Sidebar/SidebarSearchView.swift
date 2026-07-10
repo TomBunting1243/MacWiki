@@ -89,6 +89,7 @@ struct SidebarSearchView: View {
                 onToggleRead: toggleReadState(for:)
             )
         }
+        .safeAreaPadding(.top)
         .background(Color(nsColor: .textBackgroundColor))
         .onAppear {
             refreshSearchState()

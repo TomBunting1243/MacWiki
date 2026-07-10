@@ -71,7 +71,7 @@ qa_launch_exact() {
   qa_assert_isolated_path "$QA_HOME" "$QA_HOME"
   qa_assert_no_conflicting_processes
 
-  CFFIXED_USER_HOME="$QA_HOME" "$APP_BIN" >"$log_path" 2>&1 &
+  HOME="$QA_HOME" CFFIXED_USER_HOME="$QA_HOME" "$APP_BIN" >"$log_path" 2>&1 &
   QA_APP_PID=$!
   export QA_APP_PID
 

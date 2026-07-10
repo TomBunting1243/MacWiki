@@ -16,10 +16,11 @@ if [[ ! -x "$APP_BIN" && -x "$APP_BIN_FALLBACK" ]]; then
 fi
 
 OUTPUT_DIR="${1:-/tmp/macwiki-qa/sidebar-search-widths-$(date +%Y%m%d_%H%M%S)}"
-WIDTH_PRESETS_CSV="${WIDTH_PRESETS_CSV:-236,288,360}"
+WIDTH_PRESETS_CSV="${WIDTH_PRESETS_CSV:-1040,1400,1760}"
 WINDOW_HEIGHT="${WINDOW_HEIGHT:-980}"
-WINDOW_POS_X="${WINDOW_POS_X:-90}"
+WINDOW_POS_X="${WINDOW_POS_X:-20}"
 WINDOW_POS_Y="${WINDOW_POS_Y:-70}"
+WINDOW_WIDTH_TOLERANCE="${WINDOW_WIDTH_TOLERANCE:-24}"
 SEARCH_QUERY="${SEARCH_QUERY:-Albert Einstein}"
 LISTS_SIDEBAR_WIDTH="${LISTS_SIDEBAR_WIDTH:-180}"
 STRICT_OCR="${STRICT_OCR:-0}"
@@ -102,8 +103,8 @@ run_osascript_with_timeout() {
 }
 
 prepare_deterministic_defaults() {
-  CFFIXED_USER_HOME="$QA_HOME" defaults delete "$APP_BUNDLE_ID" searchPresentationMode >/dev/null 2>&1 || true
-  CFFIXED_USER_HOME="$QA_HOME" defaults write "$APP_BUNDLE_ID" mainWindow.sidebarWidth -float "$LISTS_SIDEBAR_WIDTH" >/dev/null 2>&1 || true
+  HOME="$QA_HOME" CFFIXED_USER_HOME="$QA_HOME" defaults delete "$APP_BUNDLE_ID" searchPresentationMode >/dev/null 2>&1 || true
+  HOME="$QA_HOME" CFFIXED_USER_HOME="$QA_HOME" defaults write "$APP_BUNDLE_ID" mainWindow.sidebarWidth -float "$LISTS_SIDEBAR_WIDTH" >/dev/null 2>&1 || true
 }
 
 set_launch_sidebar_search_defaults() {
@@ -111,17 +112,17 @@ set_launch_sidebar_search_defaults() {
   local query_text="$2"
 
   if [[ "$should_open" == "1" ]]; then
-    CFFIXED_USER_HOME="$QA_HOME" defaults write "$APP_BUNDLE_ID" "$LAUNCH_OPEN_SEARCH_KEY" -bool true >/dev/null 2>&1 || true
+    HOME="$QA_HOME" CFFIXED_USER_HOME="$QA_HOME" defaults write "$APP_BUNDLE_ID" "$LAUNCH_OPEN_SEARCH_KEY" -bool true >/dev/null 2>&1 || true
   else
-    CFFIXED_USER_HOME="$QA_HOME" defaults delete "$APP_BUNDLE_ID" "$LAUNCH_OPEN_SEARCH_KEY" >/dev/null 2>&1 || true
+    HOME="$QA_HOME" CFFIXED_USER_HOME="$QA_HOME" defaults delete "$APP_BUNDLE_ID" "$LAUNCH_OPEN_SEARCH_KEY" >/dev/null 2>&1 || true
   fi
 
-  CFFIXED_USER_HOME="$QA_HOME" defaults write "$APP_BUNDLE_ID" "$LAUNCH_SEARCH_QUERY_KEY" -string "$query_text" >/dev/null 2>&1 || true
+  HOME="$QA_HOME" CFFIXED_USER_HOME="$QA_HOME" defaults write "$APP_BUNDLE_ID" "$LAUNCH_SEARCH_QUERY_KEY" -string "$query_text" >/dev/null 2>&1 || true
 }
 
 clear_launch_sidebar_search_defaults() {
-  CFFIXED_USER_HOME="$QA_HOME" defaults delete "$APP_BUNDLE_ID" "$LAUNCH_OPEN_SEARCH_KEY" >/dev/null 2>&1 || true
-  CFFIXED_USER_HOME="$QA_HOME" defaults delete "$APP_BUNDLE_ID" "$LAUNCH_SEARCH_QUERY_KEY" >/dev/null 2>&1 || true
+  HOME="$QA_HOME" CFFIXED_USER_HOME="$QA_HOME" defaults delete "$APP_BUNDLE_ID" "$LAUNCH_OPEN_SEARCH_KEY" >/dev/null 2>&1 || true
+  HOME="$QA_HOME" CFFIXED_USER_HOME="$QA_HOME" defaults delete "$APP_BUNDLE_ID" "$LAUNCH_SEARCH_QUERY_KEY" >/dev/null 2>&1 || true
 }
 
 relaunch_app() {
@@ -230,8 +231,9 @@ set_window_geometry() {
   local height="$2"
   local x="$3"
   local y="$4"
+  local actual_width
 
-  if ! run_osascript_with_timeout 10 "$APP_NAME" "$width" "$height" "$x" "$y" >/dev/null 2>&1 <<'APPLESCRIPT'
+  if ! actual_width="$(run_osascript_with_timeout 10 "$APP_NAME" "$width" "$height" "$x" "$y" 2>/dev/null <<'APPLESCRIPT'
 using terms from application "System Events"
 on contentWindowIndex(appName)
     tell application "System Events"
@@ -270,15 +272,33 @@ on run argv
             try
                 perform action "AXRaise" of window windowIndex
             end try
+            delay 0.35
+            set actualSize to size of window windowIndex
+            return item 1 of actualSize
         end tell
     end tell
 end run
 end using terms from
 APPLESCRIPT
-  then
+  )"; then
     echo "WARN: Failed to set window geometry to ${width}x${height} at ${x},${y}" >&2
     return 1
   fi
+
+  actual_width="$(printf '%s\n' "$actual_width" | awk '/^[0-9]+$/ { value = $0 } END { print value }')"
+  if [[ -z "$actual_width" ]]; then
+    echo "WARN: Window geometry did not report an actual width for target ${width}px." >&2
+    return 1
+  fi
+
+  local delta=$((actual_width - width))
+  (( delta < 0 )) && delta=$((-delta))
+  if (( delta > WINDOW_WIDTH_TOLERANCE )); then
+    echo "WARN: Window width clamped to ${actual_width}px for target ${width}px." >&2
+    return 1
+  fi
+
+  ACTUAL_WINDOW_WIDTH="$actual_width"
   return 0
 }
 
@@ -422,10 +442,10 @@ assert_contains_text() {
 
 layout_label_for_width() {
   local width="$1"
-  if (( width < 252 )); then
-    echo "compact"
-  elif (( width < 320 )); then
-    echo "regular"
+  if (( width < 1200 )); then
+    echo "narrow"
+  elif (( width < 1600 )); then
+    echo "standard"
   else
     echo "wide"
   fi
@@ -457,13 +477,13 @@ echo "Harness target widths: $WIDTH_PRESETS_CSV"
 echo "Search query: $SEARCH_QUERY"
 
 {
-  echo "# Sidebar Search Width-Class QA Report"
+  echo "# MacWiki Window Width-Class QA Report"
   echo
   echo "- Captured: $(date)"
   echo "- Output directory: \`$OUTPUT_DIR\`"
   echo "- App binary: \`$APP_BIN\`"
-  echo "- Sidebar width seed: \`${LISTS_SIDEBAR_WIDTH}px\`"
-  echo "- Width presets: \`$WIDTH_PRESETS_CSV\`"
+  echo "- Lists sidebar width seed: \`${LISTS_SIDEBAR_WIDTH}px\`"
+  echo "- Practical whole-window width presets: \`$WIDTH_PRESETS_CSV\`"
   echo "- Search query: \`$SEARCH_QUERY\`"
   echo "- Strict OCR checks: \`$STRICT_OCR\`"
   echo
@@ -483,9 +503,13 @@ for raw_width in "${widths[@]}"; do
 
   echo "Running width case $index: ${width}px ($class_label)"
 
+  ACTUAL_WINDOW_WIDTH=""
   if ! set_window_geometry "$width" "$WINDOW_HEIGHT" "$WINDOW_POS_X" "$WINDOW_POS_Y"; then
-    note_warn "Window resize automation unavailable for target width ${width}px; proceeding with current window frame."
+    note_fail "Could not establish and verify target window width ${width}px."
+    index=$((index + 1))
+    continue
   fi
+  note_pass "Window width reached ${ACTUAL_WINDOW_WIDTH}px for target ${width}px."
   sleep "$INTERACTION_SETTLE_SECONDS"
   activate_macwiki
 
@@ -530,22 +554,13 @@ for raw_width in "${widths[@]}"; do
   {
     echo "## Width $width ($class_label)"
     echo
+    echo "- Verified actual window width: \`${ACTUAL_WINDOW_WIDTH}px\`"
     echo "- Query capture: \`$query_shot\`"
     echo "- OCR: \`$query_ocr\`"
   } >>"$REPORT_PATH"
 
   assert_contains_text "$query_ocr" "Search" "Search header visible at $width px" 1
   assert_contains_text "$query_ocr" "result|results|searching" "Results metadata visible at $width px" "$STRICT_OCR"
-
-  if [[ "$class_label" == "compact" ]]; then
-    if rg -qi "esc" "$query_ocr"; then
-      note_warn "Compact width unexpectedly surfaced the esc badge in OCR ($width px)."
-    else
-      note_pass "Compact width omits esc badge (or OCR did not detect it) at $width px."
-    fi
-  else
-    assert_contains_text "$query_ocr" "esc" "Non-compact width shows esc badge at $width px" "$STRICT_OCR"
-  fi
 
   if set_search_query ""; then
     sleep 0.7
@@ -580,4 +595,4 @@ if (( hard_fail_count > 0 )); then
   exit 1
 fi
 
-echo "Sidebar search width-class QA complete. Report: $REPORT_PATH"
+echo "MacWiki window width-class QA complete. Report: $REPORT_PATH"

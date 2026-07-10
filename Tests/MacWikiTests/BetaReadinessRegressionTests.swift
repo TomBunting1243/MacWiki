@@ -682,7 +682,7 @@ struct BetaReadinessRegressionTests {
             "scripts/capture_macwiki_audit_set.sh"
         ]
 
-        #expect(safetyLibrary.contains("CFFIXED_USER_HOME=\"$QA_HOME\" \"$APP_BIN\""))
+        #expect(safetyLibrary.contains("HOME=\"$QA_HOME\" CFFIXED_USER_HOME=\"$QA_HOME\" \"$APP_BIN\""))
         #expect(safetyLibrary.contains("ps -p \"$QA_APP_PID\" -o comm="))
         #expect(safetyLibrary.contains("Refusing to run while $APP_NAME PID"))
 
@@ -693,6 +693,23 @@ struct BetaReadinessRegressionTests {
             #expect(!script.contains("open -n \"$APP_BIN\""))
             #expect(!script.contains("$HOME/Library/Application Support/default.store"))
         }
+    }
+
+    @Test func widthClassHarnessUsesReachableVerifiedWindowSizes() throws {
+        let script = try source("scripts/qa_sidebar_search_width_classes.sh")
+
+        #expect(script.contains("WIDTH_PRESETS_CSV=\"${WIDTH_PRESETS_CSV:-1040,1400,1760}\""))
+        #expect(script.contains("Verified actual window width"))
+        #expect(script.contains("Could not establish and verify target window width"))
+        #expect(!script.contains("236,288,360"))
+        #expect(!script.contains("esc badge"))
+    }
+
+    @Test func sidebarSearchOwnsItsNativeTopSafeArea() throws {
+        let source = try source("Sources/MacWiki/Views/Sidebar/SidebarSearchView.swift")
+
+        #expect(source.contains(".safeAreaPadding(.top)"))
+        #expect(!source.contains("topObscuredHeight"))
     }
 
     @Test func qaHarnessesAvoidMachineSpecificRepositoryPaths() throws {
