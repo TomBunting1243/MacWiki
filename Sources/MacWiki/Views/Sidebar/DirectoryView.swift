@@ -625,9 +625,7 @@ struct DirectoryView: View {
 
     private var directoryList: some View {
         ZStack(alignment: .top) {
-            List {
-                directoryContent
-            }
+            directoryScrollSurface
             .contentMargins(
                 .top,
                 shouldShowTopDirectoryChrome ? pinnedDirectoryHeaderHeight : plainDirectoryTopInset,
@@ -679,6 +677,22 @@ struct DirectoryView: View {
                 appState: appState,
                 modelContext: modelContext
             )
+        }
+    }
+
+    @ViewBuilder
+    private var directoryScrollSurface: some View {
+        if rootSelection == .discover {
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 0) {
+                    discoverSections()
+                }
+            }
+            .scrollIndicators(.visible)
+        } else {
+            List {
+                directoryContent
+            }
         }
     }
 

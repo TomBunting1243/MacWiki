@@ -702,6 +702,21 @@ struct BetaReadinessRegressionTests {
         #expect(reload.contains("guard !Task.isCancelled else { return }"))
     }
 
+    @Test func discoverDirectoryAvoidsTheNSTableViewBackedListDuringFeedReplacement() throws {
+        let source = try source("Sources/MacWiki/Views/Sidebar/DirectoryView.swift")
+        let surface = sourceSection(
+            source,
+            startingAt: "private var directoryScrollSurface",
+            endingBefore: "private static let discoverFeedDateFormatter"
+        )
+
+        #expect(surface.contains("if rootSelection == .discover"))
+        #expect(surface.contains("ScrollView"))
+        #expect(surface.contains("LazyVStack"))
+        #expect(surface.contains("discoverSections()"))
+        #expect(surface.contains("else {\n            List {"))
+    }
+
     private func source(_ relativePath: String) throws -> String {
         try String(contentsOf: repositoryRoot().appendingPathComponent(relativePath), encoding: .utf8)
     }
