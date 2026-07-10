@@ -697,12 +697,15 @@ struct BetaReadinessRegressionTests {
 
     @Test func widthClassHarnessUsesReachableVerifiedWindowSizes() throws {
         let script = try source("scripts/qa_sidebar_search_width_classes.sh")
+        let captureScript = try source("scripts/capture_macwiki_window.sh")
 
         #expect(script.contains("WIDTH_PRESETS_CSV=\"${WIDTH_PRESETS_CSV:-1040,1400,1760}\""))
         #expect(script.contains("Verified actual window width"))
         #expect(script.contains("Could not establish and verify target window width"))
         #expect(!script.contains("236,288,360"))
         #expect(!script.contains("esc badge"))
+        #expect(captureScript.contains("for attempt in 1 2 3"))
+        #expect(captureScript.contains("after 3 attempts"))
     }
 
     @Test func sidebarSearchOwnsItsNativeTopSafeArea() throws {

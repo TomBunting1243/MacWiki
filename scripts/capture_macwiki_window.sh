@@ -96,5 +96,18 @@ if [[ -z "$window_number" ]]; then
   exit 1
 fi
 
-screencapture -x -l "$window_number" "$output_path"
+capture_succeeded=0
+for attempt in 1 2 3; do
+  if screencapture -x -l "$window_number" "$output_path"; then
+    capture_succeeded=1
+    break
+  fi
+  sleep 0.4
+done
+
+if [[ "$capture_succeeded" != "1" ]]; then
+  echo "Failed to capture $APP_NAME window $window_number after 3 attempts." >&2
+  exit 1
+fi
+
 echo "$output_path"
