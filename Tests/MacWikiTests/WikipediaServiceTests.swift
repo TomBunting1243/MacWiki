@@ -3,8 +3,60 @@ import Testing
 
 @testable import MacWiki
 
-/// Tests for WikipediaService
-/// Note: These tests make real network requests to Wikipedia API
+private actor ScriptedWikipediaTransport {
+    enum Step: Sendable {
+        case response(statusCode: Int, data: Data)
+        case urlError(URLError.Code)
+        case cancellation
+    }
+
+    private var steps: [Step]
+    private let cancelsDuringSleep: Bool
+    private(set) var requestCount = 0
+    private(set) var sleepCount = 0
+
+    init(steps: [Step], cancelsDuringSleep: Bool = false) {
+        self.steps = steps
+        self.cancelsDuringSleep = cancelsDuringSleep
+    }
+
+    func load(_ request: URLRequest) throws -> (Data, URLResponse) {
+        requestCount += 1
+        guard !steps.isEmpty else { throw URLError(.badServerResponse) }
+
+        switch steps.removeFirst() {
+        case .response(let statusCode, let data):
+            guard let response = HTTPURLResponse(
+                url: request.url!,
+                statusCode: statusCode,
+                httpVersion: "HTTP/1.1",
+                headerFields: nil
+            ) else {
+                throw URLError(.badServerResponse)
+            }
+            return (data, response)
+        case .urlError(let code):
+            throw URLError(code)
+        case .cancellation:
+            throw CancellationError()
+        }
+    }
+
+    func sleep(_ duration: Duration) throws {
+        _ = duration
+        sleepCount += 1
+        if cancelsDuringSleep {
+            throw CancellationError()
+        }
+    }
+
+    func counts() -> (requests: Int, sleeps: Int) {
+        (requestCount, sleepCount)
+    }
+}
+
+/// Tests for WikipediaService. Transport-policy tests use deterministic scripted
+/// responses; API integration coverage below still exercises public Wikipedia.
 struct WikipediaServiceTests {
     
     let service = WikipediaService()
@@ -26,6 +78,90 @@ struct WikipediaServiceTests {
         let results = try await service.search("")
         
         #expect(results.isEmpty, "Empty query should return no results")
+    }
+
+    @Test func requestRetriesRateLimitThenReturnsSuccessfulPayload() async throws {
+        let expected = Data("ok".utf8)
+        let transport = ScriptedWikipediaTransport(steps: [
+            .response(statusCode: 429, data: Data()),
+            .response(statusCode: 200, data: expected)
+        ])
+        let isolated = WikipediaService(
+            requestLoader: { try await transport.load($0) },
+            retrySleeper: { try await transport.sleep($0) }
+        )
+
+        let result = try await isolated.performRequest(url: URL(string: "https://example.test/article")!)
+        let counts = await transport.counts()
+
+        #expect(result == expected)
+        #expect(counts.requests == 2)
+        #expect(counts.sleeps == 1)
+    }
+
+    @Test func requestRetriesServerFailureAndTransientURLError() async throws {
+        let expected = Data("recovered".utf8)
+        let serverTransport = ScriptedWikipediaTransport(steps: [
+            .response(statusCode: 503, data: Data()),
+            .response(statusCode: 200, data: expected)
+        ])
+        let serverService = WikipediaService(
+            requestLoader: { try await serverTransport.load($0) },
+            retrySleeper: { try await serverTransport.sleep($0) }
+        )
+        let timeoutTransport = ScriptedWikipediaTransport(steps: [
+            .urlError(.timedOut),
+            .response(statusCode: 200, data: expected)
+        ])
+        let timeoutService = WikipediaService(
+            requestLoader: { try await timeoutTransport.load($0) },
+            retrySleeper: { try await timeoutTransport.sleep($0) }
+        )
+        let url = URL(string: "https://example.test/article")!
+
+        #expect(try await serverService.performRequest(url: url) == expected)
+        #expect(try await timeoutService.performRequest(url: url) == expected)
+        #expect(await serverTransport.counts().requests == 2)
+        #expect(await timeoutTransport.counts().requests == 2)
+    }
+
+    @Test func requestPreservesCancellationFromTransport() async {
+        let transport = ScriptedWikipediaTransport(steps: [.cancellation])
+        let isolated = WikipediaService(
+            requestLoader: { try await transport.load($0) },
+            retrySleeper: { try await transport.sleep($0) }
+        )
+
+        do {
+            _ = try await isolated.performRequest(url: URL(string: "https://example.test/article")!)
+            Issue.record("Expected CancellationError")
+        } catch is CancellationError {
+            // Expected: cancellation is control flow, not a user-facing network error.
+        } catch {
+            Issue.record("Expected CancellationError, received \(error)")
+        }
+    }
+
+    @Test func requestPreservesCancellationDuringRetryBackoff() async {
+        let transport = ScriptedWikipediaTransport(
+            steps: [.response(statusCode: 429, data: Data())],
+            cancelsDuringSleep: true
+        )
+        let isolated = WikipediaService(
+            requestLoader: { try await transport.load($0) },
+            retrySleeper: { try await transport.sleep($0) }
+        )
+
+        do {
+            _ = try await isolated.performRequest(url: URL(string: "https://example.test/article")!)
+            Issue.record("Expected CancellationError")
+        } catch is CancellationError {
+            let counts = await transport.counts()
+            #expect(counts.requests == 1)
+            #expect(counts.sleeps == 1)
+        } catch {
+            Issue.record("Expected CancellationError, received \(error)")
+        }
     }
 
     @Test func pageviewsWindowStartClampsToArticleCreationDay() {

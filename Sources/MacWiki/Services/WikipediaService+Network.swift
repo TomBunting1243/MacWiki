@@ -17,7 +17,7 @@ extension WikipediaService {
             )
 
             do {
-                let (data, response) = try await urlSession.data(for: request)
+                let (data, response) = try await requestLoader(request)
 
                 if let httpResponse = response as? HTTPURLResponse {
                     switch httpResponse.statusCode {
@@ -25,13 +25,13 @@ extension WikipediaService {
                         return data
                     case 429:
                         if attempt < maxAttempts - 1 {
-                            try? await Task.sleep(nanoseconds: 350_000_000)
+                            try await retrySleeper(.milliseconds(350))
                             continue
                         }
                         throw WikipediaError.rateLimited
                     case 500..<600:
                         if attempt < maxAttempts - 1 {
-                            try? await Task.sleep(nanoseconds: 260_000_000)
+                            try await retrySleeper(.milliseconds(260))
                             continue
                         }
                         throw WikipediaError.networkError(
@@ -45,15 +45,21 @@ extension WikipediaService {
                 }
 
                 return data
+            } catch is CancellationError {
+                throw CancellationError()
             } catch let error as WikipediaError {
                 throw error
             } catch let error as URLError {
+                guard !Task.isCancelled, error.code != .cancelled else {
+                    throw CancellationError()
+                }
                 if attempt < maxAttempts - 1 && shouldRetryNetworkError(error) {
-                    try? await Task.sleep(nanoseconds: 220_000_000)
+                    try await retrySleeper(.milliseconds(220))
                     continue
                 }
                 throw WikipediaError.networkError(error)
             } catch {
+                guard !Task.isCancelled else { throw CancellationError() }
                 throw WikipediaError.networkError(error)
             }
         }

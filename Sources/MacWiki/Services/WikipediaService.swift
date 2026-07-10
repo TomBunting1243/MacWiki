@@ -10,6 +10,9 @@ let wikipediaServiceLogger = Logger(subsystem: "com.macwiki", category: "wikiped
 actor WikipediaService {
     static let shared = WikipediaService()
 
+    typealias RequestLoader = @Sendable (URLRequest) async throws -> (Data, URLResponse)
+    typealias RetrySleeper = @Sendable (Duration) async throws -> Void
+
     // MARK: - Types
 
     struct DiskArticlePayload: Codable {
@@ -184,9 +187,23 @@ actor WikipediaService {
 
     init(
         cacheDirectoryURL: URL? = nil,
-        fileManager: FileManager = .default
+        fileManager: FileManager = .default,
+        requestLoader: RequestLoader? = nil,
+        retrySleeper: RetrySleeper? = nil
     ) {
         self.fileManager = fileManager
+
+        if let requestLoader {
+            self.requestLoader = requestLoader
+        } else {
+            let session = Self.makeDefaultURLSession()
+            self.requestLoader = { request in
+                try await session.data(for: request)
+            }
+        }
+        self.retrySleeper = retrySleeper ?? { duration in
+            try await Task.sleep(for: duration)
+        }
 
         let baseCacheDirectory = cacheDirectoryURL ?? fileManager
             .urls(for: .cachesDirectory, in: .userDomainMask)
@@ -206,6 +223,15 @@ actor WikipediaService {
             self.diskArticleCacheDirectoryURL = nil
             self.diskArticleCacheIndexURL = nil
         }
+    }
+
+    private static func makeDefaultURLSession() -> URLSession {
+        let configuration = URLSessionConfiguration.default
+        configuration.requestCachePolicy = .returnCacheDataElseLoad
+        configuration.timeoutIntervalForRequest = 18
+        configuration.timeoutIntervalForResource = 24
+        configuration.waitsForConnectivity = false
+        return URLSession(configuration: configuration)
     }
     // MARK: - Article Content
 
@@ -254,6 +280,8 @@ actor WikipediaService {
         return "MacWiki/\(version) (https://github.com/tombunting/MacWiki)"
     }()
     let fileManager: FileManager
+    let requestLoader: RequestLoader
+    let retrySleeper: RetrySleeper
 
     // MARK: - Caching
 
@@ -377,15 +405,6 @@ actor WikipediaService {
         formatter.timeStyle = .none
         formatter.dateStyle = .long
         return formatter
-    }()
-
-    lazy var urlSession: URLSession = {
-        let configuration = URLSessionConfiguration.default
-        configuration.requestCachePolicy = .returnCacheDataElseLoad
-        configuration.timeoutIntervalForRequest = 18
-        configuration.timeoutIntervalForResource = 24
-        configuration.waitsForConnectivity = false
-        return URLSession(configuration: configuration)
     }()
 
     // MARK: - Search
