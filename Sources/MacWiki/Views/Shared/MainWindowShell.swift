@@ -4,8 +4,6 @@ import SwiftUI
 struct MainWindowShell: View {
     @Environment(AppState.self) private var appState
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @AppStorage(AppStorageKey.MainWindow.sidebarWidth) private var sidebarWidth = AppStorageKey.MainWindow.sidebarWidthDefault
-    @AppStorage(AppStorageKey.MainWindow.inspectorWidth) private var inspectorWidth = AppStorageKey.MainWindow.inspectorWidthDefault
     @State private var sidebarSearchModel = SidebarSearchSurfaceModel()
 
     @Binding var selectedList: ReadingList?
@@ -20,27 +18,40 @@ struct MainWindowShell: View {
     let onNewLabelWithArticle: (SavedArticle) -> Void
     let onNewTagWithArticle: (Article) -> Void
 
-    private var inspectorPresented: Binding<Bool> {
-        Binding(
-            get: { appState.inspectorVisible },
-            set: { appState.inspectorVisible = $0 }
-        )
-    }
-
     var body: some View {
         @Bindable var appState = appState
 
         ZStack {
             if appState.directoryColumnVisible {
-                navigationShell(columnVisibility: $appState.navigationSplitViewVisibility)
+                MainNavigationShell(
+                    columnVisibility: $appState.navigationSplitViewVisibility,
+                    selectedList: $selectedList,
+                    selectedLabel: $selectedLabel,
+                    selectedTag: $selectedTag,
+                    rootSelection: $rootSelection,
+                    sidebarSearchModel: sidebarSearchModel,
+                    onEditLabel: onEditLabel,
+                    onAddNewLabel: onAddNewLabel,
+                    onNewLabelWithArticle: onNewLabelWithArticle,
+                    onNewTagWithArticle: onNewTagWithArticle
+                )
                     .transition(shellTransition)
                     .zIndex(1)
             } else if appState.listsSidebarVisible {
-                sidebarReaderShell
+                MainSidebarReaderShell(
+                    selectedList: $selectedList,
+                    selectedLabel: $selectedLabel,
+                    selectedTag: $selectedTag,
+                    rootSelection: $rootSelection,
+                    sidebarSearchModel: sidebarSearchModel,
+                    onEditLabel: onEditLabel,
+                    onAddNewLabel: onAddNewLabel,
+                    onNewLabelWithArticle: onNewLabelWithArticle
+                )
                     .transition(shellTransition)
                     .zIndex(2)
             } else {
-                readerOnlyShell
+                MainReaderOnlyShell(onNewLabelWithArticle: onNewLabelWithArticle)
                     .transition(shellTransition)
                     .zIndex(3)
             }
@@ -48,8 +59,11 @@ struct MainWindowShell: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .animation(shellAnimation, value: appState.directoryColumnVisible)
         .animation(shellAnimation, value: appState.listsSidebarVisible)
-        .inspector(isPresented: inspectorPresented) {
-            inspectorColumn
+        .inspector(isPresented: $appState.inspectorVisible) {
+            MainInspectorColumn(
+                showNewLabelSheet: $showNewLabelSheet,
+                articleForNewLabel: $articleForNewLabel
+            )
         }
     }
 
@@ -67,9 +81,23 @@ struct MainWindowShell: View {
             removal: .opacity.combined(with: .scale(scale: 1.002, anchor: .center))
         )
     }
+}
 
-    private func navigationShell(columnVisibility: Binding<NavigationSplitViewVisibility>) -> some View {
-        NavigationSplitView(columnVisibility: columnVisibility) {
+private struct MainNavigationShell: View {
+    @Binding var columnVisibility: NavigationSplitViewVisibility
+    @Binding var selectedList: ReadingList?
+    @Binding var selectedLabel: Label?
+    @Binding var selectedTag: Tag?
+    @Binding var rootSelection: SidebarRootSelection
+
+    let sidebarSearchModel: SidebarSearchSurfaceModel
+    let onEditLabel: (Label) -> Void
+    let onAddNewLabel: () -> Void
+    let onNewLabelWithArticle: (SavedArticle) -> Void
+    let onNewTagWithArticle: (Article) -> Void
+
+    var body: some View {
+        NavigationSplitView(columnVisibility: $columnVisibility) {
             ListsColumnView(
                 selectedList: $selectedList,
                 selectedLabel: $selectedLabel,
@@ -96,8 +124,22 @@ struct MainWindowShell: View {
             .environment(\.readerChromeMetrics, .hidden)
         }
     }
+}
 
-    private var sidebarReaderShell: some View {
+private struct MainSidebarReaderShell: View {
+    @AppStorage(AppStorageKey.MainWindow.sidebarWidth) private var sidebarWidth = AppStorageKey.MainWindow.sidebarWidthDefault
+
+    @Binding var selectedList: ReadingList?
+    @Binding var selectedLabel: Label?
+    @Binding var selectedTag: Tag?
+    @Binding var rootSelection: SidebarRootSelection
+
+    let sidebarSearchModel: SidebarSearchSurfaceModel
+    let onEditLabel: (Label) -> Void
+    let onAddNewLabel: () -> Void
+    let onNewLabelWithArticle: (SavedArticle) -> Void
+
+    var body: some View {
         HStack(spacing: 0) {
             ListsColumnView(
                 selectedList: $selectedList,
@@ -123,16 +165,27 @@ struct MainWindowShell: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
+}
 
-    private var readerOnlyShell: some View {
+private struct MainReaderOnlyShell: View {
+    let onNewLabelWithArticle: (SavedArticle) -> Void
+
+    var body: some View {
         ReaderColumnView(
             onNewLabelWithArticle: onNewLabelWithArticle
         )
         .environment(\.readerChromeMetrics, .hidden)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
+}
 
-    private var inspectorColumn: some View {
+private struct MainInspectorColumn: View {
+    @AppStorage(AppStorageKey.MainWindow.inspectorWidth) private var inspectorWidth = AppStorageKey.MainWindow.inspectorWidthDefault
+
+    @Binding var showNewLabelSheet: Bool
+    @Binding var articleForNewLabel: SavedArticle?
+
+    var body: some View {
         InspectorColumnView(
             showNewLabelSheet: $showNewLabelSheet,
             articleForNewLabel: $articleForNewLabel

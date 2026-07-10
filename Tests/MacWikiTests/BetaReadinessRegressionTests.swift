@@ -716,6 +716,16 @@ struct BetaReadinessRegressionTests {
         #expect(!source.contains("topObscuredHeight"))
     }
 
+    @Test func mainWindowShellScopesAlternateLayoutsAndUsesKeyPathBindings() throws {
+        let source = try source("Sources/MacWiki/Views/Shared/MainWindowShell.swift")
+
+        #expect(source.contains("private struct MainNavigationShell: View"))
+        #expect(source.contains("private struct MainSidebarReaderShell: View"))
+        #expect(source.contains("private struct MainReaderOnlyShell: View"))
+        #expect(source.contains(".inspector(isPresented: $appState.inspectorVisible)"))
+        #expect(!source.contains("Binding(\n"))
+    }
+
     @Test func qaHarnessesAvoidMachineSpecificRepositoryPaths() throws {
         let scriptNames = [
             "scripts/qa_context_menu_ocr.sh",
