@@ -44,43 +44,42 @@ struct SaveToListPopover: View {
                     isNewListFocused = true
                 }
             } else {
-                // List of existing lists
-                ForEach(lists.prefix(6)) { list in
-                    let isSaved = isArticleSaved(in: list)
-                    Button {
-                        toggleSave(in: list)
-                    } label: {
-                        HStack(spacing: 8) {
-                            Image(systemName: list.icon)
-                                .foregroundStyle(.secondary)
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        ForEach(lists) { list in
+                            let isSaved = isArticleSaved(in: list)
+                            Button {
+                                toggleSave(in: list)
+                            } label: {
+                                HStack(spacing: 8) {
+                                    Image(systemName: list.icon)
+                                        .foregroundStyle(.secondary)
 
-                            Text(list.name)
-                                .lineLimit(1)
+                                    Text(list.name)
+                                        .lineLimit(1)
 
-                            Spacer()
+                                    Spacer()
 
-                            if list.articles.count > 0 {
-                                Text("\(list.articles.count)")
-                                    .foregroundStyle(.tertiary)
-                                    .monospacedDigit()
+                                    if !list.articles.isEmpty {
+                                        Text("\(list.articles.count)")
+                                            .foregroundStyle(.tertiary)
+                                            .monospacedDigit()
+                                    }
+
+                                    Image(systemName: isSaved ? "checkmark.circle.fill" : "circle")
+                                        .foregroundStyle(isSaved ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.tertiary))
+                                        .font(.system(size: 12, weight: .medium))
+                                }
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 8)
+                                .contentShape(Rectangle())
                             }
-
-                            Image(systemName: isSaved ? "checkmark.circle.fill" : "circle")
-                                .foregroundStyle(isSaved ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.tertiary))
-                                .font(.system(size: 12, weight: .medium))
+                            .buttonStyle(.plain)
                         }
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 8)
-                        .contentShape(Rectangle())
                     }
-                    .buttonStyle(.plain)
                 }
-                
-                if lists.count > 6 {
-                    Text("\(lists.count - 6) more...")
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
-                }
+                .scrollIndicators(.automatic)
+                .frame(maxHeight: 280)
                 
                 Divider()
                 
@@ -116,7 +115,7 @@ struct SaveToListPopover: View {
             }
         }
         .padding(12)
-        .frame(width: 180)
+        .frame(width: 240)
     }
     
     private func toggleSave(in list: ReadingList) {

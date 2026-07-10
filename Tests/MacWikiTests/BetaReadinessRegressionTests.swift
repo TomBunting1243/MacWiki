@@ -662,6 +662,16 @@ struct BetaReadinessRegressionTests {
         }
     }
 
+    @Test func saveToListPopoverExposesEveryListInScrollableContent() throws {
+        let source = try source("Sources/MacWiki/Views/Components/SaveToListPopover.swift")
+
+        #expect(source.contains("ScrollView"))
+        #expect(source.contains("ForEach(lists)"))
+        #expect(source.contains(".frame(maxHeight: 280)"))
+        #expect(!source.contains("lists.prefix"))
+        #expect(!source.contains("more..."))
+    }
+
     private func source(_ relativePath: String) throws -> String {
         try String(contentsOf: repositoryRoot().appendingPathComponent(relativePath), encoding: .utf8)
     }
