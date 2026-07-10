@@ -586,6 +586,8 @@ struct BetaReadinessRegressionTests {
         #expect(preflight.contains("swift build -c release \"${MACWIKI_RELEASE_BUILD_ARGS[@]}\""))
         #expect(packager.contains("LSMinimumSystemVersion"))
         #expect(packager.contains("macwiki_release_build_args"))
+        #expect(packager.contains("if [[ \"$SKIP_BUILD\" -eq 1 ]]"))
+        #expect(packager.contains("BIN_DIR=\"$(swift build -c release --show-bin-path)\""))
     }
 
     @Test func aboutPanelLetsAppKitRenderTheBuildNumberOnce() throws {

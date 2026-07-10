@@ -242,7 +242,11 @@ if [[ "$(git -C "$ROOT_DIR" rev-parse HEAD)" != "$SOURCE_COMMIT" ]]; then
 fi
 require_clean_git_tree
 
-BIN_DIR="$(swift build -c release "${MACWIKI_RELEASE_BUILD_ARGS[@]}" --show-bin-path)"
+if [[ "$SKIP_BUILD" -eq 1 ]]; then
+  BIN_DIR="$(swift build -c release --show-bin-path)"
+else
+  BIN_DIR="$(swift build -c release "${MACWIKI_RELEASE_BUILD_ARGS[@]}" --show-bin-path)"
+fi
 EXECUTABLE_PATH="$BIN_DIR/MacWiki"
 RESOURCE_BUNDLE_PATH="$BIN_DIR/MacWiki_MacWiki.bundle"
 
