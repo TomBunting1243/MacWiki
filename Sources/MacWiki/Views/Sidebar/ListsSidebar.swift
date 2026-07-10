@@ -78,10 +78,6 @@ struct ListsSidebar: View {
     let onEditLabel: (Label) -> Void
     let onAddNewLabel: () -> Void
 
-    private var trimmedEditingName: String {
-        editingName.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
     private var trimmedEditingAreaName: String {
         editingAreaName.trimmingCharacters(in: .whitespacesAndNewlines)
     }
@@ -261,8 +257,9 @@ struct ListsSidebar: View {
             TextField("Name", text: $editingName)
             Button("Cancel", role: .cancel) { }
             Button("Save") {
-                if let list = editingList, !trimmedEditingName.isEmpty {
-                    list.name = trimmedEditingName
+                if let list = editingList,
+                   let normalizedName = ReadingListNamePolicy.normalized(editingName) {
+                    list.name = normalizedName
                     list.updatedAt = Date()
                     modelContext.saveReportingFailure(operation: #function)
                 }

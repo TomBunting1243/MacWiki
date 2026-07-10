@@ -73,9 +73,9 @@ struct NewListSheet: View {
     }
     
     private func createList() {
-        guard !trimmedName.isEmpty else { return }
+        guard let normalizedName = ReadingListNamePolicy.normalized(name) else { return }
         
-        let list = ReadingList(name: trimmedName, icon: selectedIcon)
+        let list = ReadingList(name: normalizedName, icon: selectedIcon)
         list.sortOrder = SortOrderAllocator.next(for: lists.map(\.sortOrder))
         modelContext.insert(list)
         modelContext.saveReportingFailure(operation: #function)

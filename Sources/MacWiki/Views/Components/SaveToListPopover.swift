@@ -162,9 +162,9 @@ struct SaveToListPopover: View {
     }
     
     private func createAndSaveToList() {
-        guard !trimmedNewListName.isEmpty else { return }
+        guard let normalizedName = ReadingListNamePolicy.normalized(newListName) else { return }
         
-        let newList = ReadingList(name: trimmedNewListName)
+        let newList = ReadingList(name: normalizedName)
         newList.sortOrder = SortOrderAllocator.next(for: lists.map(\.sortOrder))
         modelContext.insert(newList)
         

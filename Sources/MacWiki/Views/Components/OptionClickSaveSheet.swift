@@ -541,8 +541,7 @@ struct OptionClickSaveSheet: View {
         if !isCreatingNewList, let selectedList {
             targetList = selectedList
         } else {
-            let name = trimmedNewListName
-            guard !name.isEmpty else {
+            guard let name = ReadingListNamePolicy.normalized(newListName) else {
                 isSaving = false
                 return
             }

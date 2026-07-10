@@ -3,6 +3,11 @@ import Testing
 
 @testable import MacWiki
 
+@Test func readingListNamePolicyTrimsNamesAndRejectsWhitespaceOnlyInput() {
+    #expect(ReadingListNamePolicy.normalized("  Research Queue\n") == "Research Queue")
+    #expect(ReadingListNamePolicy.normalized(" \t\n ") == nil)
+}
+
 @Test func articleCreation() {
     let article = Article(
         id: "12345",
