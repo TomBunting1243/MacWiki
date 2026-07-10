@@ -78,7 +78,7 @@ struct NewListSheet: View {
         let list = ReadingList(name: trimmedName, icon: selectedIcon)
         list.sortOrder = SortOrderAllocator.next(for: lists.map(\.sortOrder))
         modelContext.insert(list)
-        try? modelContext.save()
+        modelContext.saveReportingFailure(operation: #function)
         
         isPresented = false
     }

@@ -732,7 +732,7 @@ struct InspectorPanel: View {
             currentArticleState = existing
             ReadStateSync.syncSavedArticles(title: article.title, isRead: existing.isRead, in: modelContext)
             appState.updateReadState(forTitle: article.title, isRead: existing.isRead)
-            try? modelContext.save()
+            modelContext.saveReportingFailure(operation: #function)
             return
         }
 
@@ -747,7 +747,7 @@ struct InspectorPanel: View {
             isRead: resolvedReadState
         )
         modelContext.insert(newState)
-        try? modelContext.save()
+        modelContext.saveReportingFailure(operation: #function)
         currentArticleState = newState
         appState.updateReadState(forTitle: article.title, isRead: resolvedReadState)
     }

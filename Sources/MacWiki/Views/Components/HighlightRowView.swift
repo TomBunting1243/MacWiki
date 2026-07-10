@@ -233,7 +233,7 @@ struct HighlightRowView: View {
                     withAnimation(.easeOut(duration: 0.2)) {
                         highlight.color = color
                         highlight.updatedAt = Date()
-                        try? modelContext.save()
+                        modelContext.saveReportingFailure(operation: #function)
                         appState.pendingHighlightColorChange = AppState.HighlightColorChangeRequest(
                             id: highlight.id,
                             cssColor: color.cssColor
@@ -450,7 +450,7 @@ struct HighlightRowView: View {
                 Button("Save") {
                     highlight.note = editedNote.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : editedNote
                     highlight.updatedAt = Date()
-                    try? modelContext.save()
+                    modelContext.saveReportingFailure(operation: #function)
                     withAnimation(.easeInOut(duration: 0.15)) {
                         isEditing = false
                     }
@@ -464,7 +464,7 @@ struct HighlightRowView: View {
     private func restoreHighlight() {
         highlight.isArchived = false
         highlight.updatedAt = Date()
-        try? modelContext.save()
+        modelContext.saveReportingFailure(operation: #function)
     }
 
     private func requestHighlightRehydrate() {

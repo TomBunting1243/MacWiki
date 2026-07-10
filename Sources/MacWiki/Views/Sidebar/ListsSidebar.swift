@@ -225,20 +225,20 @@ struct ListsSidebar: View {
 
     private func saveModelContextNow() {
         guard modelContext.hasChanges else { return }
-        try? modelContext.save()
+        modelContext.saveReportingFailure(operation: #function)
     }
 
     private func requestModelContextSave() {
         saveScheduler.schedule { [modelContext] in
             guard modelContext.hasChanges else { return }
-            try? modelContext.save()
+            modelContext.saveReportingFailure(operation: #function)
         }
     }
 
     private func flushScheduledModelContextSave() {
         saveScheduler.flush { [modelContext] in
             guard modelContext.hasChanges else { return }
-            try? modelContext.save()
+            modelContext.saveReportingFailure(operation: #function)
         }
     }
 
@@ -264,7 +264,7 @@ struct ListsSidebar: View {
                 if let list = editingList, !trimmedEditingName.isEmpty {
                     list.name = trimmedEditingName
                     list.updatedAt = Date()
-                    try? modelContext.save()
+                    modelContext.saveReportingFailure(operation: #function)
                 }
             }
         }
@@ -274,7 +274,7 @@ struct ListsSidebar: View {
             Button("Save") {
                 if let area = editingArea, !trimmedEditingAreaName.isEmpty {
                     area.name = trimmedEditingAreaName
-                    try? modelContext.save()
+                    modelContext.saveReportingFailure(operation: #function)
                 }
             }
         }

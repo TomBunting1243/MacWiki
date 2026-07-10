@@ -999,14 +999,14 @@ private struct DraggableTabItemView: View {
     private func requestModelContextSave() {
         saveScheduler.schedule { [modelContext] in
             guard modelContext.hasChanges else { return }
-            try? modelContext.save()
+            modelContext.saveReportingFailure(operation: #function)
         }
     }
 
     private func flushScheduledModelContextSave() {
         saveScheduler.flush { [modelContext] in
             guard modelContext.hasChanges else { return }
-            try? modelContext.save()
+            modelContext.saveReportingFailure(operation: #function)
         }
     }
     
@@ -1636,7 +1636,7 @@ private struct DraggableTabItemView: View {
         list.articles.append(article)
         list.updatedAt = Date()
         
-        try? modelContext.save()
+        modelContext.saveReportingFailure(operation: #function)
         SavedArticleSummaryBackfill.enqueueIfNeeded(article, modelContext: modelContext)
     }
     

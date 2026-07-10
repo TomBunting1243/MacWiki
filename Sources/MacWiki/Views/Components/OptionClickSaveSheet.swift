@@ -591,7 +591,7 @@ struct OptionClickSaveSheet: View {
         targetList.updatedAt = Date()
         defaultListID = targetList.id.uuidString
 
-        try? modelContext.save()
+        modelContext.saveReportingFailure(operation: #function)
 
         if createdNewArticle {
             SavedArticleSummaryBackfill.enqueueIfNeeded(savedArticle, modelContext: modelContext)

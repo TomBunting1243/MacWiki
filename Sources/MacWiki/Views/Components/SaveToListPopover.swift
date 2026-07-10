@@ -125,7 +125,7 @@ struct SaveToListPopover: View {
                 ReadStateSync.normalizedTitle($0.title) == normalizedArticleTitle
             }
             list.updatedAt = Date()
-            try? modelContext.save()
+            modelContext.saveReportingFailure(operation: #function)
             dismiss()
             return
         }
@@ -151,7 +151,7 @@ struct SaveToListPopover: View {
         list.articles.append(article)
         list.updatedAt = Date()
         
-        try? modelContext.save()
+        modelContext.saveReportingFailure(operation: #function)
         SavedArticleSummaryBackfill.enqueueIfNeeded(article, modelContext: modelContext)
         dismiss()
     }

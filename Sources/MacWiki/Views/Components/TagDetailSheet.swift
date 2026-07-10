@@ -65,7 +65,7 @@ struct TagDetailSheet: View {
             modelContext.insert(tag)
             onSave?(tag)
         }
-        try? modelContext.save()
+        modelContext.saveReportingFailure(operation: #function)
         isPresented = false
     }
 }

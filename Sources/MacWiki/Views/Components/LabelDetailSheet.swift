@@ -117,14 +117,14 @@ struct LabelDetailSheet: View {
             label.name = trimmedName
             label.color = selectedColor
             isPresented = false
-            try? modelContext.save()
+            modelContext.saveReportingFailure(operation: #function)
             onSave?(label)
         } else {
             let label = Label(name: trimmedName, color: selectedColor)
             label.sortOrder = SortOrderAllocator.next(for: labels.map(\.sortOrder))
             modelContext.insert(label)
             isPresented = false
-            try? modelContext.save()
+            modelContext.saveReportingFailure(operation: #function)
             onSave?(label)
         }
     }

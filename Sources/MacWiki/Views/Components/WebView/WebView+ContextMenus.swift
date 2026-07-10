@@ -347,7 +347,7 @@ extension WebView.Coordinator {
         saved.isRead = ReadStateSync.resolveReadState(for: title, in: modelContext)
         list.articles.append(saved)
         list.updatedAt = Date()
-        try? modelContext.save()
+        modelContext.saveReportingFailure(operation: #function)
         SavedArticleSummaryBackfill.enqueueIfNeeded(saved, modelContext: modelContext)
         appState?.requestSave()
     }
@@ -453,7 +453,7 @@ extension WebView.Coordinator {
 
         highlight.color = color
         highlight.updatedAt = Date()
-        try? modelContext.save()
+        modelContext.saveReportingFailure(operation: #function)
         appState?.pendingHighlightColorChange = AppState.HighlightColorChangeRequest(
             id: highlightID,
             cssColor: color.cssColor
@@ -464,6 +464,6 @@ extension WebView.Coordinator {
         guard let modelContext else { return }
         guard let highlight = highlights.first(where: { $0.id == highlightID }) else { return }
         modelContext.delete(highlight)
-        try? modelContext.save()
+        modelContext.saveReportingFailure(operation: #function)
     }
 }

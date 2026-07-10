@@ -54,7 +54,7 @@ struct ContentSheetsModifier: ViewModifier {
                         if let article = articleForNewLabel {
                             article.labelId = newLabel.id
                             attachPendingLabelArticleIfNeeded(article)
-                            try? modelContext.save()
+                            modelContext.saveReportingFailure(operation: #function)
                             articleForNewLabel = nil
                         }
                     }
@@ -91,7 +91,7 @@ struct ContentSheetsModifier: ViewModifier {
                             modelContext.insert(newState)
                         }
 
-                        try? modelContext.save()
+                        modelContext.saveReportingFailure(operation: #function)
                         articleForNewTag = nil
                     }
                 )
@@ -131,6 +131,6 @@ struct ContentSheetsModifier: ViewModifier {
 
         guard article.readingList == nil, article.labelId == nil else { return }
         modelContext.delete(article)
-        try? modelContext.save()
+        modelContext.saveReportingFailure(operation: #function)
     }
 }

@@ -16,7 +16,7 @@ enum ArticleLibraryActions {
         }
 
         touchedList?.updatedAt = Date()
-        try? modelContext.save()
+        modelContext.saveReportingFailure(operation: #function)
     }
 
     static func toggleReadStatus(
@@ -60,7 +60,7 @@ enum ArticleLibraryActions {
             article.readingList?.updatedAt = Date()
         }
 
-        try? modelContext.save()
+        modelContext.saveReportingFailure(operation: #function)
     }
 
     @discardableResult
@@ -78,13 +78,12 @@ enum ArticleLibraryActions {
             guard savedArticle.readingList?.id != targetList.id else { return false }
             guard !containsArticle(withTitle: savedArticle.title, in: targetList) else { return false }
 
-            moveArticle(
+            return moveArticle(
                 savedArticle,
                 from: savedArticle.readingList,
                 to: targetList,
                 modelContext: modelContext
             )
-            return true
         }
 
         guard let title = payload.title else { return false }
@@ -146,8 +145,7 @@ enum ArticleLibraryActions {
 
         state.tags.append(tag)
         state.updatedAt = Date()
-        try? modelContext.save()
-        return true
+        return modelContext.saveReportingFailure(operation: #function)
     }
 
     static func addTag(
@@ -165,7 +163,7 @@ enum ArticleLibraryActions {
             state.updatedAt = Date()
         }
 
-        try? modelContext.save()
+        modelContext.saveReportingFailure(operation: #function)
     }
 
     static func removeTag(
@@ -181,7 +179,7 @@ enum ArticleLibraryActions {
             state.updatedAt = Date()
         }
 
-        try? modelContext.save()
+        modelContext.saveReportingFailure(operation: #function)
     }
 
     static func toggleTag(
@@ -202,7 +200,7 @@ enum ArticleLibraryActions {
             modelContext.insert(newState)
         }
 
-        try? modelContext.save()
+        modelContext.saveReportingFailure(operation: #function)
     }
 
     static func saveToList(
@@ -223,7 +221,7 @@ enum ArticleLibraryActions {
         saved.isRead = ReadStateSync.resolveReadState(for: article, in: modelContext)
         list.articles.append(saved)
         list.updatedAt = Date()
-        try? modelContext.save()
+        modelContext.saveReportingFailure(operation: #function)
         SavedArticleSummaryBackfill.enqueueIfNeeded(saved, modelContext: modelContext)
     }
 
@@ -269,7 +267,7 @@ enum ArticleLibraryActions {
 
         guard didAdd else { return }
         targetList.updatedAt = Date()
-        try? modelContext.save()
+        modelContext.saveReportingFailure(operation: #function)
     }
 
     static func addSavedArticle(
@@ -288,7 +286,7 @@ enum ArticleLibraryActions {
             targetList.articles.append(savedArticle)
         }
         targetList.updatedAt = Date()
-        try? modelContext.save()
+        modelContext.saveReportingFailure(operation: #function)
     }
 
     static func removeFromList(
@@ -299,7 +297,7 @@ enum ArticleLibraryActions {
         guard let index = list.articles.firstIndex(where: { $0.id == article.id }) else { return }
         list.articles.remove(at: index)
         list.updatedAt = Date()
-        try? modelContext.save()
+        modelContext.saveReportingFailure(operation: #function)
     }
 
     static func removeSavedArticle(
@@ -310,7 +308,7 @@ enum ArticleLibraryActions {
             removeFromList(article, list: list, modelContext: modelContext)
         } else {
             modelContext.delete(article)
-            try? modelContext.save()
+            modelContext.saveReportingFailure(operation: #function)
         }
     }
 
@@ -329,17 +327,18 @@ enum ArticleLibraryActions {
             }
         }
 
-        try? modelContext.save()
+        modelContext.saveReportingFailure(operation: #function)
     }
 
+    @discardableResult
     static func moveArticle(
         _ article: SavedArticle,
         from source: ReadingList?,
         to target: ReadingList,
         modelContext: ModelContext
-    ) {
-        guard source?.id != target.id else { return }
-        guard !containsArticle(withTitle: article.title, in: target) else { return }
+    ) -> Bool {
+        guard source?.id != target.id else { return false }
+        guard !containsArticle(withTitle: article.title, in: target) else { return false }
 
         let movedArticle = SavedArticle(
             title: article.title,
@@ -361,7 +360,7 @@ enum ArticleLibraryActions {
 
         modelContext.delete(article)
 
-        try? modelContext.save()
+        return modelContext.saveReportingFailure(operation: #function)
     }
 
     static func containsArticle(withTitle title: String, in list: ReadingList) -> Bool {
@@ -430,7 +429,7 @@ enum ArticleLibraryActions {
             modelContext.insert(saved)
         }
 
-        try? modelContext.save()
+        guard modelContext.saveReportingFailure(operation: #function) else { return nil }
         SavedArticleSummaryBackfill.enqueueIfNeeded(saved, modelContext: modelContext)
         return saved
     }

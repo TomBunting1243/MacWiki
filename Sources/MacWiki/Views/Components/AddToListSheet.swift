@@ -143,7 +143,7 @@ struct AddToListSheet: View {
         saved.isRead = ReadStateSync.resolveReadState(for: article, in: modelContext)
         list.articles.append(saved)
         list.updatedAt = Date()
-        try? modelContext.save()
+        modelContext.saveReportingFailure(operation: #function)
         SavedArticleSummaryBackfill.enqueueIfNeeded(saved, modelContext: modelContext)
         
         dismiss()

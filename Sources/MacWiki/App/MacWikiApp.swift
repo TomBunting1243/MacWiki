@@ -382,6 +382,7 @@ struct MacWikiApp: App {
     var body: some Scene {
         Window("MacWiki", id: "main") {
             ContentView()
+                .persistenceIssueAlert()
                 .focusedSceneValue(\.macWikiCommandAppState, appState)
                 .toolbar(removing: .title)
                 .toolbar(removing: .sidebarToggle)
@@ -428,6 +429,7 @@ struct MacWikiApp: App {
         WindowGroup("Article", for: Article.self) { $article in
             if let article = article {
                 ArticleWindowRootView(initialArticle: article)
+                    .persistenceIssueAlert()
             } else {
                 ContentUnavailableView(
                     "No Article Selected",
@@ -447,6 +449,7 @@ struct MacWikiApp: App {
         
         Settings {
             SettingsView()
+                .persistenceIssueAlert()
                 .environment(appState)
         }
         .modelContainer(bootstrap.modelContainer)

@@ -924,7 +924,7 @@ struct ArticleView: View {
             let existingProgress = existing.readingProgress ?? 0
             progressCoordinator.bootstrapFromPersisted(existingProgress, articleTitle: article.title, appState: appState, now: now)
             ReadStateSync.syncSavedArticles(title: article.title, isRead: existing.isRead, in: modelContext)
-            try? modelContext.save()
+            modelContext.saveReportingFailure(operation: #function)
         } else {
             progressCoordinator.bootstrapWithoutPersistedState(articleTitle: article.title, appState: appState, now: now)
         }

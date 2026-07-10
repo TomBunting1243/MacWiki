@@ -77,7 +77,7 @@ struct NewAreaSheet: View {
         let area = Area(name: trimmedName, icon: selectedIcon)
         area.sortOrder = SortOrderAllocator.next(for: areas.map(\.sortOrder))
         modelContext.insert(area)
-        try? modelContext.save()
+        modelContext.saveReportingFailure(operation: #function)
         
         isPresented = false
     }

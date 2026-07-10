@@ -244,7 +244,7 @@ struct HighlightListView: View {
 
     private func deleteHighlight(_ highlight: Highlight) {
         modelContext.delete(highlight)
-        try? modelContext.save()
+        modelContext.saveReportingFailure(operation: #function)
     }
 
     private func requestArticleRefresh() {
@@ -267,6 +267,6 @@ struct HighlightListView: View {
             highlight.isArchived = true
             highlight.updatedAt = Date()
         }
-        try? modelContext.save()
+        modelContext.saveReportingFailure(operation: #function)
     }
 }

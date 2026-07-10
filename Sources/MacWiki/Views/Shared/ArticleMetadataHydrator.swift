@@ -137,7 +137,7 @@ final class ArticleMetadataHydrator {
             ) || didMutateModel
         }
         if didMutateModel {
-            try? modelContext.save()
+            modelContext.saveReportingFailure(operation: #function)
         }
 
         let loadRequests = merged.values.compactMap { request -> LoadRequest? in
@@ -239,7 +239,7 @@ final class ArticleMetadataHydrator {
             }
 
             if didMutateModel {
-                try? modelContext.save()
+                modelContext.saveReportingFailure(operation: #function)
             }
 
             batchStart = batchEnd

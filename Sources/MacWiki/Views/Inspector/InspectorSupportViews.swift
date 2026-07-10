@@ -195,7 +195,7 @@ struct InspectorLabelSection: View {
             SavedArticleSummaryBackfill.enqueueIfNeeded(saved, modelContext: modelContext)
         }
 
-        try? modelContext.save()
+        modelContext.saveReportingFailure(operation: #function)
     }
 
     private func fetchSavedArticlesMatchingActiveTitle() -> [SavedArticle] {
@@ -564,7 +564,7 @@ struct InspectorTagStatusBox: View {
         if state.tags.contains(where: { $0.id == tag.id }) { return }
         state.tags.append(tag)
         state.updatedAt = Date()
-        try? modelContext.save()
+        modelContext.saveReportingFailure(operation: #function)
     }
 
     private func removeTag(_ tag: Tag) {
@@ -581,7 +581,7 @@ struct InspectorTagStatusBox: View {
             appState.highlightTagFilterId = nil
         }
 
-        try? modelContext.save()
+        modelContext.saveReportingFailure(operation: #function)
     }
 
     private func ensureArticleState() -> ArticleState? {

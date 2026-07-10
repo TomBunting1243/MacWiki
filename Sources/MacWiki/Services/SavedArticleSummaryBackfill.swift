@@ -38,7 +38,7 @@ enum SavedArticleSummaryBackfill {
                 }
 
                 if didMutate {
-                    try? modelContext.save()
+                    modelContext.saveReportingFailure(operation: #function)
                 }
             }
         }

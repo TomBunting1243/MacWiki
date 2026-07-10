@@ -322,12 +322,12 @@ extension ArticleContextMenuContent {
 
             if let existing = existingSavedArticle() {
                 existing.labelId = labelId
-                try? modelContext.save()
+                modelContext.saveReportingFailure(operation: #function)
                 return
             }
 
             guard let labelId else {
-                try? modelContext.save()
+                modelContext.saveReportingFailure(operation: #function)
                 return
             }
 
@@ -344,7 +344,7 @@ extension ArticleContextMenuContent {
             } else {
                 modelContext.insert(saved)
             }
-            try? modelContext.save()
+            modelContext.saveReportingFailure(operation: #function)
             SavedArticleSummaryBackfill.enqueueIfNeeded(saved, modelContext: modelContext)
         }
         
@@ -386,7 +386,7 @@ extension ArticleContextMenuContent {
                 state.tags.append(tag)
             }
             state.updatedAt = Date()
-            try? modelContext.save()
+            modelContext.saveReportingFailure(operation: #function)
         }
         
         self.onNewTag = {
