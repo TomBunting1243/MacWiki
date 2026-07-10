@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Testing
 
@@ -32,6 +33,16 @@ struct SettingsCatalogTests {
         #expect(markdown.contains("# MacWiki Settings Index"))
         #expect(markdown.contains("scripts/update_settings_index.sh"))
         #expect(markdown.contains("| Setting | Storage key | Default | Control | Values | Visible | Notes |"))
+    }
+
+    @Test func everySettingsSectionUsesAnAvailableSystemSymbol() {
+        let unavailable = SettingsCatalog.sections.compactMap { section in
+            NSImage(systemSymbolName: section.systemImage, accessibilityDescription: nil) == nil
+                ? "\(section.id.rawValue): \(section.systemImage)"
+                : nil
+        }
+
+        #expect(unavailable.isEmpty, "Unavailable settings symbols: \(unavailable)")
     }
 
     private func repositoryRoot() -> URL {

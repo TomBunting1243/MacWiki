@@ -330,7 +330,7 @@ public enum SettingsCatalog {
             id: .advanced,
             title: "Advanced",
             summary: "Experimental features, cache maintenance, local resets, and performance samples.",
-            systemImage: "externaldrive.badge.gearshape",
+            systemImage: "gearshape.2",
             options: [
                 option(
                     id: "advanced.wikiHopExperiment",
