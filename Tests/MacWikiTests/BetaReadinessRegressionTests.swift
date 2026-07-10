@@ -568,6 +568,13 @@ struct BetaReadinessRegressionTests {
         #expect(preflight.contains(#"^1\.0(-internal\.[0-9]+)?$"#))
     }
 
+    @Test func aboutPanelLetsAppKitRenderTheBuildNumberOnce() throws {
+        let appSource = try source("Sources/MacWiki/App/MacWikiApp.swift")
+
+        #expect(appSource.contains(".applicationVersion: shortVersion"))
+        #expect(!appSource.contains(#".applicationVersion: "Version"#))
+    }
+
     @Test func readerOpenProfileHarnessCanTargetPackagedCandidate() throws {
         let profileScript = try source("scripts/profile_reader_open.sh")
 

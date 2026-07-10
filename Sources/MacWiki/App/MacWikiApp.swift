@@ -322,7 +322,6 @@ struct MacWikiApp: App {
 
     private func showAboutPanel() {
         let shortVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0"
-        let buildNumber = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "1"
 
         let bodyAttributes: [NSAttributedString.Key: Any] = [
             .font: NSFont.systemFont(ofSize: 12),
@@ -359,7 +358,8 @@ struct MacWikiApp: App {
         ))
 
         NSApp.orderFrontStandardAboutPanel(options: [
-            .applicationVersion: "Version \(shortVersion) (\(buildNumber))",
+            // AppKit supplies the localized "Version" label and bundle build number.
+            .applicationVersion: shortVersion,
             .credits: credits
         ])
         NSApp.activate(ignoringOtherApps: true)
