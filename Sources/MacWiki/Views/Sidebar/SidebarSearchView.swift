@@ -90,6 +90,7 @@ struct SidebarSearchView: View {
             )
         }
         .safeAreaPadding(.top)
+        .padding(.top, TabBarChromeStyle.strip.height)
         .background(Color(nsColor: .textBackgroundColor))
         .onAppear {
             refreshSearchState()

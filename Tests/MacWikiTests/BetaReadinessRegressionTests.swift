@@ -709,6 +709,7 @@ struct BetaReadinessRegressionTests {
         let source = try source("Sources/MacWiki/Views/Sidebar/SidebarSearchView.swift")
 
         #expect(source.contains(".safeAreaPadding(.top)"))
+        #expect(source.contains(".padding(.top, TabBarChromeStyle.strip.height)"))
         #expect(!source.contains("topObscuredHeight"))
     }
 
