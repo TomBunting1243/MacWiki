@@ -392,13 +392,17 @@ extension WikipediaService {
 
     func setArticlePinned(_ title: String, pinned: Bool) {
         let key = normalizedArticleTitle(title)
+        // Load persisted pins before applying the requested mutation. Loading after
+        // this point replaces `pinnedArticleTitles` and can silently discard the
+        // first pin change made during a service lifetime.
+        ensureDiskArticleCacheIndexLoaded()
+
         if pinned {
             pinnedArticleTitles.insert(key)
         } else {
             pinnedArticleTitles.remove(key)
         }
 
-        ensureDiskArticleCacheIndexLoaded()
         if var entry = diskArticleCacheIndex[key] {
             entry.isPinned = pinned
             diskArticleCacheIndex[key] = entry

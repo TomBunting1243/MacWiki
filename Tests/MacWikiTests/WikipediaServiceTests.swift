@@ -131,6 +131,21 @@ struct WikipediaServiceTests {
         #expect(unpinned.pinnedArticleEntries == 0, "Pinned entry count should clear when no titles are pinned")
     }
 
+    @Test func firstPinMutationSurvivesLazyDiskIndexLoad() async {
+        let tempRoot = FileManager.default.temporaryDirectory
+            .appendingPathComponent("MacWikiTests-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: tempRoot) }
+
+        let isolated = WikipediaService(cacheDirectoryURL: tempRoot)
+        let title = "Ada Lovelace"
+
+        await isolated.setArticlePinned(title, pinned: true)
+
+        let normalizedTitle = await isolated.normalizedArticleTitle(title)
+        let pinnedTitles = await isolated.pinnedArticleTitles
+        #expect(pinnedTitles.contains(normalizedTitle))
+    }
+
     @Test func clearTemporaryDiskCachePreservesPinnedArticles() async throws {
         let tempRoot = FileManager.default.temporaryDirectory
             .appendingPathComponent("MacWikiTests-\(UUID().uuidString)", isDirectory: true)
