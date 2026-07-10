@@ -72,6 +72,16 @@ if [[ -n "$STATUS_OUTPUT" ]]; then
   exit 1
 fi
 
+CANONICAL_VERSION="$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" Sources/MacWiki/Info.plist)"
+if [[ "$CANONICAL_VERSION" != "1.0" ]]; then
+  echo "Internal-beta preflight requires canonical MacWiki version 1.0, found: $CANONICAL_VERSION" >&2
+  exit 1
+fi
+if [[ -n "$VERSION" && ! "$VERSION" =~ ^1\.0(-internal\.[0-9]+)?$ ]]; then
+  echo "Internal-beta version must stay on the 1.0 line (1.0 or 1.0-internal.N): $VERSION" >&2
+  exit 1
+fi
+
 SOURCE_COMMIT="$(git rev-parse HEAD)"
 ARTIFACT_DIR="${CODEX_HOME:-$HOME/.codex}/artifacts/macwiki-internal-beta/$SOURCE_COMMIT"
 mkdir -p "$ARTIFACT_DIR"

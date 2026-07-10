@@ -553,6 +553,21 @@ struct BetaReadinessRegressionTests {
         #expect(retiredPreflight.contains("RETIRED: public-beta preflight"))
     }
 
+    @Test func canonicalAndInternalCandidateVersionsStayOnTheOnePointZeroLine() throws {
+        let infoPlist = repositoryRoot().appendingPathComponent("Sources/MacWiki/Info.plist")
+        let info = try #require(NSDictionary(contentsOf: infoPlist) as? [String: Any])
+        let service = try source("Sources/MacWiki/Services/WikipediaService.swift")
+        let discoverHarness = try source("scripts/qa_discover_scroll_time_machine.sh")
+        let preflight = try source("scripts/internal_beta_preflight.sh")
+
+        #expect(info["CFBundleShortVersionString"] as? String == "1.0")
+        #expect(service.contains(#"?? "1.0""#))
+        #expect(!service.contains(#"?? "0.5.0""#))
+        #expect(discoverHarness.contains("MacWiki/1.0"))
+        #expect(preflight.contains(#"CANONICAL_VERSION"#))
+        #expect(preflight.contains(#"^1\.0(-internal\.[0-9]+)?$"#))
+    }
+
     @Test func readerOpenProfileHarnessCanTargetPackagedCandidate() throws {
         let profileScript = try source("scripts/profile_reader_open.sh")
 

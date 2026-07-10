@@ -276,7 +276,7 @@ actor WikipediaService {
     // Falls back to the current beta version when running as a bare SwiftPM
     // executable, where Bundle.main carries no Info.plist.
     let userAgent: String = {
-        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.5.0"
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0"
         return "MacWiki/\(version) (https://github.com/tombunting/MacWiki)"
     }()
     let fileManager: FileManager

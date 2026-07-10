@@ -16,7 +16,7 @@ if [[ ! -x "$APP_BIN" && -x "$APP_BIN_FALLBACK" ]]; then
 fi
 OUTPUT_DIR="${1:-/tmp/macwiki-qa/discover-$(date +%Y%m%d_%H%M%S)}"
 DATE_LIST_CSV="${DATE_LIST_CSV:-2026-02-24,2025-12-25,2025-07-04,2024-02-29}"
-USER_AGENT="${USER_AGENT:-MacWiki/0.5.0 (https://github.com/tombunting/MacWiki)}"
+USER_AGENT="${USER_AGENT:-MacWiki/1.0 (https://github.com/tombunting/MacWiki)}"
 APP_BUNDLE_ID="${APP_BUNDLE_ID:-com.tombunting.MacWiki}"
 DISCOVER_OPEN_MODE="${DISCOVER_OPEN_MODE:-Sidebar}"
 FORCE_FRESH_LAUNCH="${FORCE_FRESH_LAUNCH:-1}"
