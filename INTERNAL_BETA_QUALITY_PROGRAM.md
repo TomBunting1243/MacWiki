@@ -104,13 +104,18 @@ Baseline records below were consolidated at `2026-07-10T01:32:43Z` by the Codex 
 | UI-007 | 2026-07-10T18:56:00Z / Codex Goal | Computer Use About panel against `1.0-internal.3` at `9b7fe61` | About rendered `Version 1.0-internal.3 (3) (3)`, duplicating the build number; project/license/trademark links rendered | FAIL; opened IB-018. Evidence: `/Users/tombunting/.codex/artifacts/macwiki-internal-beta/9b7fe61483da1d912578ebd7fd412826748807c3/ui/candidate-1.0-internal.3-about.png`. |
 | UI-008 | 2026-07-10T18:59:32Z / Codex Goal | Computer Use About panel against PKG-003, exact PID 45432, isolated `/private/tmp/macwiki-qa/candidate-8e6c439-about` | About renders `Version 1.0-internal.4 (4)` exactly once plus project/license/trademark links; exact candidate quit cleanly. Direct launch-only control produced empty stderr; Computer Use About/quit produced AppKit `Window move completed without beginning` diagnostics, dispositioned as automation/standard-panel-specific pending official MCP console confirmation | PASS IB-018 functional verification with named console limitation. Evidence: `/Users/tombunting/.codex/artifacts/macwiki-internal-beta/8e6c439fbb62ac593ebbb5c46a9bb67575b1e50b/ui/candidate-1.0-internal.4-about-version-fixed.png`. |
 | ENV-011 | 2026-07-10T19:00:00Z / Codex Goal | Final official MCP resource probe; `/Applications/ChatGPT.app/Contents/Resources/codex mcp list` | Official `xcode` remains enabled as `xcrun mcpbridge` but startup still times out awaiting `tools/list` after 30 seconds; `XcodeBuildMCP` remains disabled | **BLOCKED:** confirms IB-001 persists and no third-party Xcode integration was used. |
+| CLI-003 | 2026-07-10T19:10:46Z / Codex Goal | `./scripts/internal_beta_preflight.sh --version 1.0-internal.5 --build 5` at clean `d63d5ab273b8d4015e11b25ef38d400255659cd0` | Debug build, 262 tests, release build, maintainability, shell syntax, redacted secret scan, provenance, packaging, and strict codesign passed | PASS current CLI fallback. Official Xcode MCP build/test/diagnostic gates remain blocked. Evidence root: `/Users/tombunting/.codex/artifacts/macwiki-internal-beta/d63d5ab273b8d4015e11b25ef38d400255659cd0`. |
+| PKG-004 | 2026-07-10T19:10:46Z / Codex Goal | CLI-003 manifest, packaged Info.plist, and strict codesign | Clean `d63d5ab273b8d4015e11b25ef38d400255659cd0`; app `dist/MacWiki-1.0-internal.5-build5-20260710-121046.app`; version `1.0-internal.5` build `5`; dirty=false; minimum OS 26.0; source executable `2101a8...5752`; packaged executable `a19678...2333`; app tree `33b35f...f32b`; ZIP `f3974f...908c`; ad-hoc signature valid | PASS current package milestone; notarization intentionally skipped. |
+| TEST-004 | 2026-07-10T19:09:37Z / Codex Goal | CLI-003 `swift test` at clean `d63d5ab273b8d4015e11b25ef38d400255659cd0` | 256 Swift Testing tests in 47 suites plus 6 XCTest tests passed; 262 total, zero failures | PASS CLI fallback; official Xcode full-test record remains BLOCKED. |
+| MAINT-003 | 2026-07-10T19:10:46Z / Codex Goal | CLI-003 maintainability stage at clean `d63d5ab` | PASS, 0 errors, 13 known oversized-view advisories | Current package source; advisories remain explicit architecture debt, not errors. |
+| UI-009 | 2026-07-10T19:12:00Z / Codex Goal | Computer Use against PKG-004, exact PID 51441, isolated `/private/tmp/macwiki-qa/candidate-d63d5ab-list-name` | New Reading List kept Create disabled for whitespace-only input; input `  QA Trimmed List  ` persisted as `QA Trimmed List`; exact process quit and stderr was empty | PASS IB-007 runtime verification. Evidence: `/Users/tombunting/.codex/artifacts/macwiki-internal-beta/d63d5ab273b8d4015e11b25ef38d400255659cd0/ui/candidate-1.0-internal.5-reading-list-name-normalized.png`. |
 
 ## 3. Environment inventory
 
 | Item | Current value | Status |
 |---|---|---|
 | Goal worktree / active Xcode workspace | `/Users/tombunting/.codex/worktrees/internal-beta-xcode27/MacWiki` | PASS current boundary — WORK-001 |
-| Goal branch / latest code milestone | `codex/internal-beta-xcode27` / `8e6c439...` | PASS traceable milestone — WORK-001/PKG-003/TEST-003 |
+| Goal branch / latest code milestone | `codex/internal-beta-xcode27` / `d63d5ab...` | PASS traceable milestone — WORK-001/PKG-004/TEST-004 |
 | Original worktree | `/Users/tombunting/Developer/MacWiki`; pre-existing release-doc edits preserved and excluded | PASS boundary — ENV-001 |
 | Xcode / SDK / Swift | Xcode 27.0 (27A5218g), macOS SDK 27.0, Swift 6.4 | PASS inventory — ENV-003/ENV-004 |
 | Official MCP configuration | `[mcp_servers.xcode] command = "xcrun"; args = ["mcpbridge"]` | PASS configuration — ENV-008 |
@@ -328,8 +333,8 @@ The architecture note is a dated map, not proof of current source. Official Xcod
 | WebKit bridge | Lifecycle, script routing, state publication, scroll/restore, context menus, task cancellation | PARTIAL — terminal render failure/process crash now surfaces retry (`9790984`); full bridge audit pending |
 | Large-file hotspots | Current line counts and responsibilities; extraction decision before extension | PASS CLI inventory — 13 advisory files dispositioned as existing hotspots; zero maintainability errors in CLI-001 |
 | Typed settings | No new raw keys; ownership and defaults verified | PARTIAL — catalog coverage passes; every settings section symbol resolves at `7dc8b98` |
-| Characterization coverage | Tests before risky behavior-preserving refactors | PASS for all material fixes through TEST-003; broader legacy behavior remains PARTIAL |
-| Maintainability checks | Repository checker and release-relevant advisories for exact candidate | PASS at `8e6c439` — MAINT-002 |
+| Characterization coverage | Tests before risky behavior-preserving refactors | PASS for all material fixes through TEST-004; broader legacy behavior remains PARTIAL |
+| Maintainability checks | Repository checker and release-relevant advisories for exact candidate | PASS at `d63d5ab` — MAINT-003 |
 
 Broad rewrites are forbidden. Prefer characterization tests and small boundary extractions where a current defect or required change demonstrates the need.
 
@@ -338,12 +343,12 @@ Broad rewrites are forbidden. Prefer characterization tests and small boundary e
 | Gate | Required evidence | Status |
 |---|---|---|
 | Official Xcode clean build | Exact target/scheme, commit, output, and zero unresolved severe diagnostics | BLOCKED |
-| Focused tests per fix | Exact official Xcode result and regression coverage | PASS CLI fallback for commits through `8e6c439`; official Xcode record BLOCKED |
-| Complete automated suite | Exact official Xcode full-test result for candidate commit | PASS CLI fallback — TEST-003 (261 total); official Xcode record BLOCKED |
+| Focused tests per fix | Exact official Xcode result and regression coverage | PASS CLI fallback for commits through `d63d5ab`; official Xcode record BLOCKED |
+| Complete automated suite | Exact official Xcode full-test result for candidate commit | PASS CLI fallback — TEST-004 (262 total); official Xcode record BLOCKED |
 | Static analysis / compiler diagnostics | Official Xcode results and dispositions | BLOCKED |
 | UI/integration harness | Safe isolated state; positive app/PID/path identity; reproducible results | PARTIAL — harness isolation fixed by `9083256`; current exact-package UI-004/UI-005 passed |
 | Launch/article/scroll performance | Instrumented scenarios on long image-heavy content; compare current baseline | PENDING |
-| Computer Use QA | Fresh packaged candidate, screenshot + AX evidence, cleanup after each group | PARTIAL — current 1.0 UI-004 through UI-008 cover Discover, Settings, search/reader/inspector/save, and About; exhaustive matrix pending |
+| Computer Use QA | Fresh packaged candidate, screenshot + AX evidence, cleanup after each group | PARTIAL — current 1.0 UI-004 through UI-009 cover Discover, Settings, search/reader/inspector/save, About, and list-name validation; exhaustive matrix pending |
 | macOS 26 compatibility | Availability review, deployment compilation/tests, real-OS limitation recorded | PARTIAL — declaration/package floor 26.0 confirmed; real macOS 26 execution absent |
 
 ## 10. Accessibility, resilience, privacy, and data integrity
@@ -357,7 +362,7 @@ Broad rewrites are forbidden. Prefer characterization tests and small boundary e
 | Networking/offline/retry | Deterministic transport or safe network control, cache fallback, recovery copy | PARTIAL — deterministic retry/cancellation tests pass; full offline UI path pending |
 | Persistence/data integrity | Isolated create/edit/move/delete/relaunch/recovery; no live user data | PARTIAL — isolated state and rollback/reporting regressions pass; full mutation matrix pending |
 | Cache safety | Cold/warm/hot, clear temporary/offline cache, no cross-state corruption | PARTIAL — first-pin regression and cache suite pass; full UI clear/offline matrix pending |
-| Secrets/privacy | Redacted secret scan; no values printed; account-free fixtures only | PASS current candidate scan and isolated state — CLI-002/UI-006/UI-008 |
+| Secrets/privacy | Redacted secret scan; no values printed; account-free fixtures only | PASS current candidate scan and isolated state — CLI-003/UI-009 |
 | Security settings | Read-only audit and user-approved plan before any build-setting/entitlement change | PARTIAL — SEC-001; App Sandbox remains disabled and no setting was changed |
 
 ## 11. Candidate provenance, packaging, signing, and process discipline
@@ -377,12 +382,12 @@ Before every Computer Use session:
 
 | Packaging gate | Status |
 |---|---|
-| Clean committed source boundary | PASS — PKG-003 |
-| BuildInfo provenance and hashes | PASS — PKG-003 |
-| Ad-hoc signing and strict verification | PASS — PKG-003 |
-| Fresh launch/install verification | PASS — PKG-003/UI-008; broader journeys also passed on current 1.0 line in UI-004 through UI-006 |
-| Exact PID/test-state record | PASS — UI-004/UI-005/UI-008 |
-| End-of-scenario cleanup | PASS — exact PIDs 31412, 41523, and 45432 exited; no matching package process remained after their groups |
+| Clean committed source boundary | PASS — PKG-004 |
+| BuildInfo provenance and hashes | PASS — PKG-004 |
+| Ad-hoc signing and strict verification | PASS — PKG-004 |
+| Fresh launch/install verification | PASS — PKG-004/UI-009; broader journeys also passed on current 1.0 line in UI-004 through UI-008 |
+| Exact PID/test-state record | PASS — UI-004/UI-005/UI-008/UI-009 |
+| End-of-scenario cleanup | PASS — exact PIDs 31412, 41523, 45432, and 51441 exited; no matching package process remained after their groups |
 
 ## 12. Defect ledger
 
@@ -394,7 +399,7 @@ Before every Computer Use session:
 | IB-004 | High (truth) | Current Jack documentation corpus | Product Vision/Roadmap/Readwise spec/Architecture disagree about Readwise implementation and completion | Documentation status/checkmark drift | Goal / OPEN | — | Source-of-truth validation and release-doc regression searches | — | Keep Readwise deferred; correct only current source-backed claims at commit-ready milestones. |
 | IB-005 | Medium (operations) | Current Jack/Indy documentation corpus | Jack dashboard read returns file-not-found; `Project Indy` returns vault-not-found while `Indy` succeeds | Vault migration and bootstrap-link drift | Goal / OPEN | — | CLI read of every corrected bootstrap target plus link/routing searches | — | Repair current routing/bootstrap docs without rewriting history. |
 | IB-006 | High (compatibility) | Baseline docs; PKG-003 | Architecture/history disagree on macOS 15 vs 26 | Deployment-floor documentation drift | Goal / PARTIALLY RESOLVED | — | Package manifest, Package.swift, Info.plist, availability review, real macOS 26 run | SEC-001/PKG-003 prove declarations/package floor 26.0 | Real macOS 26 execution and official build-setting evidence remain open. |
-| IB-007 | Medium, unverified | Current Reading Lists documentation; source/build unknown | Feature note is Complete but retains open whitespace-only naming and duplicate-save normalization defects | Unknown until current source/runtime reproduction | Goal / PENDING reproduction | — | Focused persistence/input regressions plus isolated runtime scenarios | — | Reproduce against current source; fix or close with current evidence. |
+| IB-007 | Medium (input/data integrity) | Current Reading Lists documentation; source through PKG-003 | Feature note was Complete but retained open whitespace-only naming and duplicate-save normalization concerns | List-name trimming was duplicated across UI entry points; normalized article-title deduplication already existed with direct tests | Goal / FIXED | `d63d5ab` | `readingListNamePolicyTrimsNamesAndRejectsWhitespaceOnlyInput`; `saveSearchResultToListDeduplicatesAndResolvesReadState`; `saveAllSearchResultsToListDeduplicatesAndResolvesReadState`; TEST-004 | UI-009: whitespace-only disabled, padded valid name persisted trimmed, clean stderr | Closed. All list create/rename mutations use one normalization policy; normalized article duplicates remain one saved article. |
 | IB-008 | Blocker (data integrity) | Baseline before `eb29364` | Secondary article windows/previews/tests constructed shared AppState graphs that could load and overwrite the main session files | Persistence ownership was implicit and global | Goal / FIXED | `eb29364` | `ephemeralStateGraphNeverSchedulesPersistentWrites` plus all AppState/TabSessionStore test fixtures use `.ephemeral` | TEST-003 | Closed. |
 | IB-009 | High (data integrity) | Baseline before `3e2ae69` | First article pin mutation could run before the disk cache index loaded, then be lost when the index replaced memory state | Lazy index load raced the first mutation | Goal / FIXED | `3e2ae69` | `firstPinMutationSurvivesLazyDiskIndexLoad` | TEST-003 | Closed. |
 | IB-010 | High (core journey) | Baseline before `9790984` | Terminal WKWebView navigation/process failures could leave a blank reader with no recovery path; failed views could return to the pool | Failure events were not promoted into reader state and pool eligibility | Goal / FIXED | `9790984` | Cancellation-versus-terminal policy regression; failed views excluded from reuse | TEST-003 | Closed; full offline UI scenario remains pending. |
@@ -415,7 +420,7 @@ No item below can pass by inference.
 
 | Release-blocking gate | Exact pass criterion | Required evidence IDs/paths | Status / disposition |
 |---|---|---|---|
-| Clean traceable commit and provenance | Candidate `HEAD` equals BuildInfo commit; porcelain is empty; dirty is false; current build/package timestamps, app/binary paths, and hashes are recorded | WORK-001, PKG-003 | PASS at candidate milestone `8e6c439`; this program update is documentation-only and must be committed before final handoff |
+| Clean traceable commit and provenance | Candidate `HEAD` equals BuildInfo commit; porcelain is empty; dirty is false; current build/package timestamps, app/binary paths, and hashes are recorded | WORK-001, PKG-004 | PASS at candidate milestone `d63d5ab`; this program update is documentation-only and must be committed before final handoff |
 | Official Xcode 27 MCP program | Official results exist for project/scheme/settings inspection, clean build, run, focused/full tests, analysis, issues, debugger/console, entitlements, and Info.plist; required tests all pass; zero unresolved errors, crashes, data-loss risks, or severe diagnostics | ENV-007 | BLOCKED |
 | No third-party Xcode integration | `XcodeBuildMCP` remains disabled and the evidence ledger contains no invocation or configuration change; every Xcode-specific claim cites official `xcode` MCP | ENV-008, ENV-011 | PASS final recheck; official bridge remains independently blocked |
 | macOS 26 compatibility | Deployment floor is exactly macOS 26; every macOS 27 API has deliberate availability behavior; deployment build/tests and code review pass; real macOS 26 run passes or is named as an unpassed limitation | SEC-001 | PARTIAL — exact floor proven; availability audit and real macOS 26 runtime incomplete |
@@ -423,13 +428,13 @@ No item below can pass by inference.
 | Exhaustive interface inventory | Every reachable screen, pane, toolbar, sidebar, tab, reader/discover/settings state, sheet, popover, menu, context menu, empty/loading/error/offline/first-run state has a stable ID and rendered evidence |  | PENDING |
 | Native Liquid Glass quality | Every interface ID passes active Design Guide/User Preferences/HIG criteria on macOS 27 and intentional macOS 26 behavior; all material defects are fixed and reverified |  | PENDING |
 | Accessibility and layout | All applicable interface IDs pass keyboard/focus, VoiceOver/accessibility audit, contrast, Reduce Motion, Reduce Transparency, Show Borders where available, localization/long text, narrow/wide/fullscreen/inactive-window scenarios; zero unresolved major accessibility defects |  | PENDING |
-| Functional/resilience/data integrity | Every functional, persistence, networking, offline/retry, cache, recovery, and isolated-data scenario passes; zero crashes, data loss/corruption, account access, or unsafe live-data mutation | IB-003, IB-008 through IB-015, TEST-003 | PARTIAL — material boundaries fixed; exhaustive offline/recovery/mutation UI matrix incomplete |
-| Architecture and maintainability | Dependency/state/persistence/concurrency/error/test-seam audit is complete; all release-blocking debt is fixed with characterization/regression tests; maintainability errors are zero and every advisory is dispositioned | MAINT-002, TEST-003 | PARTIAL — zero checker errors and focused debt repairs; official inventory and advisory review incomplete |
+| Functional/resilience/data integrity | Every functional, persistence, networking, offline/retry, cache, recovery, and isolated-data scenario passes; zero crashes, data loss/corruption, account access, or unsafe live-data mutation | IB-003, IB-007 through IB-015, TEST-004 | PARTIAL — material boundaries fixed; exhaustive offline/recovery/mutation UI matrix incomplete |
+| Architecture and maintainability | Dependency/state/persistence/concurrency/error/test-seam audit is complete; all release-blocking debt is fixed with characterization/regression tests; maintainability errors are zero and every advisory is dispositioned | MAINT-003, TEST-004 | PARTIAL — zero checker errors and focused debt repairs; official inventory and advisory review incomplete |
 | Performance | Every required launch/open/tab/search/resize/scroll scenario has a sourced budget or committed baseline and current result at or below it; no reproducible hitch, state-update warning, hang, or unbounded task remains |  | PENDING |
-| Security/privacy/test-data safety | Approved security-audit plan is applied or explicitly deferred with rationale; redacted secret scan has zero unresolved hits; no sensitive value is printed; external accounts are untouched; isolated fixtures/state are proven | CLI-002, SEC-001 | PARTIAL — current scan/isolation pass; sandbox posture and final audit disposition remain open |
-| Defect closure | Every blocker/high defect has fix commit, regression, and final verification; accepted lower-severity limitations are explicit and do not violate the beta definition | Defect ledger | PARTIAL — IB-003 and IB-008 through IB-018 closed; IB-001/004/005/006/007 remain open or partial |
-| Legacy QA retirement | Repo-wide search and regression tests prove all active docs, scripts, and tests use only `INTERNAL_BETA_QUALITY_PROGRAM.md`; legacy references remain solely in content explicitly marked RETIRED/historical | TEST-003 | PASS |
-| Fresh ad-hoc package and Computer Use | Strict ad-hoc codesign passes; exact candidate path/binary/PID/state are recorded; every Computer Use scenario group passes against that candidate with fresh UI evidence | PKG-003, UI-004 through UI-008 | PARTIAL — current 1.0 package and major journeys verified; exhaustive scenario matrix pending |
+| Security/privacy/test-data safety | Approved security-audit plan is applied or explicitly deferred with rationale; redacted secret scan has zero unresolved hits; no sensitive value is printed; external accounts are untouched; isolated fixtures/state are proven | CLI-003, SEC-001 | PARTIAL — current scan/isolation pass; sandbox posture and final audit disposition remain open |
+| Defect closure | Every blocker/high defect has fix commit, regression, and final verification; accepted lower-severity limitations are explicit and do not violate the beta definition | Defect ledger | PARTIAL — IB-003 and IB-007 through IB-018 closed; IB-001/004/005/006 remain open or partial |
+| Legacy QA retirement | Repo-wide search and regression tests prove all active docs, scripts, and tests use only `INTERNAL_BETA_QUALITY_PROGRAM.md`; legacy references remain solely in content explicitly marked RETIRED/historical | TEST-004 | PASS |
+| Fresh ad-hoc package and Computer Use | Strict ad-hoc codesign passes; exact candidate path/binary/PID/state are recorded; every Computer Use scenario group passes against that candidate with fresh UI evidence | PKG-004, UI-004 through UI-009 | PARTIAL — current 1.0 package and major journeys verified; exhaustive scenario matrix pending |
 | Candidate cleanup | Graceful quit succeeds after every group or exact-PID fallback is recorded; final process/window check finds no agent-launched candidate; Xcode remains open |  | PENDING |
 | Final readiness decision | Every row above is PASS with current candidate evidence and every known limitation/unverified area is explicit |  | PENDING |
 
