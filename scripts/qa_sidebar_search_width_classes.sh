@@ -3,6 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+source "$SCRIPT_DIR/lib/qa_process_safety.sh"
 
 APP_NAME="${APP_NAME:-MacWiki}"
 APP_BUNDLE_ID="${APP_BUNDLE_ID:-com.tombunting.MacWiki}"
@@ -21,13 +22,13 @@ WINDOW_POS_X="${WINDOW_POS_X:-90}"
 WINDOW_POS_Y="${WINDOW_POS_Y:-70}"
 SEARCH_QUERY="${SEARCH_QUERY:-Albert Einstein}"
 LISTS_SIDEBAR_WIDTH="${LISTS_SIDEBAR_WIDTH:-180}"
-RESTART_APP="${RESTART_APP:-1}"
 STRICT_OCR="${STRICT_OCR:-0}"
 INTERACTION_SETTLE_SECONDS="${INTERACTION_SETTLE_SECONDS:-0.8}"
 RESULT_LOAD_SECONDS="${RESULT_LOAD_SECONDS:-2.3}"
 HARNESS_DRIVER="${HARNESS_DRIVER:-app}"
 LAUNCH_OPEN_SEARCH_KEY="${LAUNCH_OPEN_SEARCH_KEY:-qa.sidebarSearch.openOnLaunch}"
 LAUNCH_SEARCH_QUERY_KEY="${LAUNCH_SEARCH_QUERY_KEY:-qa.sidebarSearch.queryOnLaunch}"
+QA_HOME="${QA_HOME:-/tmp/macwiki-qa/sidebar-search-home-$(date +%Y%m%d_%H%M%S)-$RANDOM}"
 
 CAPTURE_SCRIPT="$SCRIPT_DIR/capture_macwiki_window.sh"
 OCR_SCRIPT="$SCRIPT_DIR/ocr_text.swift"
@@ -48,6 +49,7 @@ if [[ ! -x "$APP_BIN" ]]; then
 fi
 
 mkdir -p "$OUTPUT_DIR"
+qa_prepare_isolated_home
 REPORT_PATH="$OUTPUT_DIR/report.md"
 
 warn_count=0
@@ -100,8 +102,8 @@ run_osascript_with_timeout() {
 }
 
 prepare_deterministic_defaults() {
-  defaults delete "$APP_BUNDLE_ID" searchPresentationMode >/dev/null 2>&1 || true
-  defaults write "$APP_BUNDLE_ID" mainWindow.sidebarWidth -float "$LISTS_SIDEBAR_WIDTH" >/dev/null 2>&1 || true
+  CFFIXED_USER_HOME="$QA_HOME" defaults delete "$APP_BUNDLE_ID" searchPresentationMode >/dev/null 2>&1 || true
+  CFFIXED_USER_HOME="$QA_HOME" defaults write "$APP_BUNDLE_ID" mainWindow.sidebarWidth -float "$LISTS_SIDEBAR_WIDTH" >/dev/null 2>&1 || true
 }
 
 set_launch_sidebar_search_defaults() {
@@ -109,23 +111,23 @@ set_launch_sidebar_search_defaults() {
   local query_text="$2"
 
   if [[ "$should_open" == "1" ]]; then
-    defaults write "$APP_BUNDLE_ID" "$LAUNCH_OPEN_SEARCH_KEY" -bool true >/dev/null 2>&1 || true
+    CFFIXED_USER_HOME="$QA_HOME" defaults write "$APP_BUNDLE_ID" "$LAUNCH_OPEN_SEARCH_KEY" -bool true >/dev/null 2>&1 || true
   else
-    defaults delete "$APP_BUNDLE_ID" "$LAUNCH_OPEN_SEARCH_KEY" >/dev/null 2>&1 || true
+    CFFIXED_USER_HOME="$QA_HOME" defaults delete "$APP_BUNDLE_ID" "$LAUNCH_OPEN_SEARCH_KEY" >/dev/null 2>&1 || true
   fi
 
-  defaults write "$APP_BUNDLE_ID" "$LAUNCH_SEARCH_QUERY_KEY" -string "$query_text" >/dev/null 2>&1 || true
+  CFFIXED_USER_HOME="$QA_HOME" defaults write "$APP_BUNDLE_ID" "$LAUNCH_SEARCH_QUERY_KEY" -string "$query_text" >/dev/null 2>&1 || true
 }
 
 clear_launch_sidebar_search_defaults() {
-  defaults delete "$APP_BUNDLE_ID" "$LAUNCH_OPEN_SEARCH_KEY" >/dev/null 2>&1 || true
-  defaults delete "$APP_BUNDLE_ID" "$LAUNCH_SEARCH_QUERY_KEY" >/dev/null 2>&1 || true
+  CFFIXED_USER_HOME="$QA_HOME" defaults delete "$APP_BUNDLE_ID" "$LAUNCH_OPEN_SEARCH_KEY" >/dev/null 2>&1 || true
+  CFFIXED_USER_HOME="$QA_HOME" defaults delete "$APP_BUNDLE_ID" "$LAUNCH_SEARCH_QUERY_KEY" >/dev/null 2>&1 || true
 }
 
 relaunch_app() {
-  pkill -x "$APP_NAME" >/dev/null 2>&1 || true
+  qa_stop_exact
   sleep 0.7
-  open -n "$APP_BIN" >/tmp/macwiki-qa-sidebar-search-launch.log 2>&1 || true
+  qa_launch_exact "/tmp/macwiki-qa-sidebar-search-launch.log"
 
   if ! wait_for_content_window; then
     echo "ERROR: Timed out waiting for MacWiki content window." >&2
@@ -214,14 +216,8 @@ APPLESCRIPT
 }
 
 launch_app_if_needed() {
-  if [[ "$RESTART_APP" == "1" ]]; then
-    pkill -x "$APP_NAME" >/dev/null 2>&1 || true
-    sleep 0.7
-  fi
-
-  if ! pgrep -x "$APP_NAME" >/dev/null 2>&1; then
-    open -n "$APP_BIN" >/tmp/macwiki-qa-sidebar-search-launch.log 2>&1 || true
-  fi
+  qa_stop_exact
+  qa_launch_exact "/tmp/macwiki-qa-sidebar-search-launch.log"
 
   if ! wait_for_content_window; then
     echo "ERROR: Timed out waiting for MacWiki content window." >&2
@@ -404,7 +400,7 @@ APPLESCRIPT
 capture_and_ocr() {
   local capture_path="$1"
   local ocr_path="$2"
-  "$CAPTURE_SCRIPT" "$capture_path" >/dev/null
+  APP_NAME="$APP_NAME" APP_BIN="$APP_BIN" APP_PID="$QA_APP_PID" "$CAPTURE_SCRIPT" "$capture_path" >/dev/null
   "$OCR_SCRIPT" "$capture_path" >"$ocr_path" 2>/dev/null || true
 }
 
@@ -440,15 +436,21 @@ if [[ "$HARNESS_DRIVER" != "app" && "$HARNESS_DRIVER" != "ax" ]]; then
   exit 1
 fi
 
-trap clear_launch_sidebar_search_defaults EXIT
+cleanup() {
+  clear_launch_sidebar_search_defaults
+  qa_stop_exact
+  qa_remove_isolated_home
+}
+trap cleanup EXIT INT TERM
 
 prepare_deterministic_defaults
-if [[ "$HARNESS_DRIVER" == "ax" ]]; then
-  require_accessibility_permissions
-  launch_app_if_needed
-  activate_macwiki
-  sleep "$INTERACTION_SETTLE_SECONDS"
+require_accessibility_permissions
+if [[ "$HARNESS_DRIVER" == "app" ]]; then
+  set_launch_sidebar_search_defaults 1 "$SEARCH_QUERY"
 fi
+launch_app_if_needed
+activate_macwiki
+sleep "$INTERACTION_SETTLE_SECONDS"
 
 echo "Output directory: $OUTPUT_DIR"
 echo "Harness target widths: $WIDTH_PRESETS_CSV"

@@ -25,20 +25,22 @@ Options:
   --scroll-start-delay S      Delay before key presses start (default: 6)
   --skip-build                Skip `swift build`
   --no-trace                  Skip Time Profiler capture
-  --keep-seeded-state         Do not restore original state.json on exit
+  --keep-seeded-state         Preserve the isolated QA home on exit for inspection
   --help                      Show this message
 EOF
 }
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+source "$SCRIPT_DIR/lib/qa_process_safety.sh"
 APP_NAME="${APP_NAME:-MacWiki}"
 APP_BINARY="${APP_BINARY:-$REPO_ROOT/.build/debug/MacWiki}"
-STATE_FILE="$HOME/Library/Application Support/MacWiki/state.json"
+APP_BIN="$APP_BINARY"
+QA_HOME="${QA_HOME:-/tmp/macwiki-qa/profile-reader-$(date +%Y%m%d_%H%M%S)-$RANDOM}"
+STATE_FILE="$QA_HOME/Library/Application Support/MacWiki/state.json"
 STATE_DIR="$(dirname "$STATE_FILE")"
-CACHE_ROOT="$HOME/Library/Caches/MacWiki"
-URLCACHE_REPO="$REPO_ROOT/MacWikiURLCache"
-URLCACHE_HOME="$HOME/Library/Caches/MacWikiURLCache"
+CACHE_ROOT="$QA_HOME/Library/Caches/MacWiki"
+URLCACHE_HOME="$QA_HOME/Library/Caches/MacWikiURLCache"
 
 article_title="Nintendo Wii"
 article_id="Nintendo Wii"
@@ -129,6 +131,8 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+APP_BIN="$APP_BINARY"
+
 if [[ -z "$output_dir" ]]; then
   output_dir="/tmp/macwiki_profiles/bench_$(date +%Y%m%d_%H%M%S)"
 fi
@@ -148,7 +152,8 @@ state_had_original=0
 echo -e "label\tmode\tlog_line" >"$raw_runs_tsv"
 
 kill_macwiki() {
-  pkill -x "$APP_NAME" >/dev/null 2>&1 || true
+  qa_stop_exact
+  qa_stop_matching_exact
   sleep 0.6
 }
 
@@ -166,8 +171,16 @@ restore_state() {
 cleanup() {
   kill_macwiki
   restore_state
+  if [[ "$keep_seeded_state" -eq 0 ]]; then
+    qa_remove_isolated_home
+  else
+    echo "Preserved isolated QA home: $QA_HOME"
+  fi
 }
 trap cleanup EXIT INT TERM
+
+qa_prepare_isolated_home
+qa_assert_no_conflicting_processes
 
 if [[ -f "$STATE_FILE" ]]; then
   cp "$STATE_FILE" "$state_backup"
@@ -237,9 +250,10 @@ seed_state() {
 }
 
 clear_caches_for_cold() {
+  qa_assert_isolated_path "$CACHE_ROOT" "$QA_HOME"
+  qa_assert_isolated_path "$URLCACHE_HOME" "$QA_HOME"
   rm -rf "$CACHE_ROOT"
   rm -rf "$URLCACHE_HOME"
-  rm -rf "$URLCACHE_REPO"
 }
 
 start_article_open_stream() {
@@ -287,8 +301,8 @@ run_direct_open() {
   fi
 
   stream_pid="$(start_article_open_stream "$stream_log")"
-  "$APP_BINARY" >"$stdout_log" 2>&1 &
-  local app_pid=$!
+  qa_launch_exact "$stdout_log"
+  local app_pid="$QA_APP_PID"
 
   if line="$(wait_for_article_open "$stream_log" "$timeout_seconds")"; then
     :
@@ -298,7 +312,7 @@ run_direct_open() {
 
   kill "$stream_pid" >/dev/null 2>&1 || true
   wait "$stream_pid" 2>/dev/null || true
-  kill "$app_pid" >/dev/null 2>&1 || true
+  qa_stop_exact
   kill_macwiki
 
   printf '%s\t%s\t%s\n' "$label" "$mode" "$line" >>"$raw_runs_tsv"
@@ -349,7 +363,7 @@ run_trace_capture() {
     --template 'Time Profiler' \
     --time-limit "${trace_seconds}s" \
     --output "$trace_path" \
-    --launch -- "$APP_BINARY" >"$trace_log" 2>&1
+    --launch -- /usr/bin/env "CFFIXED_USER_HOME=$QA_HOME" "$APP_BINARY" >"$trace_log" 2>&1
   local trace_status=$?
   set -e
   if [[ "$trace_status" -ne 0 && ! -d "$trace_path" ]]; then

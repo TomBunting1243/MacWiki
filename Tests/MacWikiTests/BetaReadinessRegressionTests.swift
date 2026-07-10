@@ -560,7 +560,9 @@ struct BetaReadinessRegressionTests {
         #expect(profileScript.contains("APP_BINARY=\"${APP_BINARY:-$REPO_ROOT/.build/debug/MacWiki}\""))
         #expect(profileScript.contains("--app-binary)"))
         #expect(profileScript.contains("APP_BINARY=\"$2\""))
-        #expect(profileScript.contains("pkill -x \"$APP_NAME\""))
+        #expect(profileScript.contains("source \"$SCRIPT_DIR/lib/qa_process_safety.sh\""))
+        #expect(profileScript.contains("CFFIXED_USER_HOME=$QA_HOME"))
+        #expect(!profileScript.contains("pkill -x"))
         #expect(!profileScript.contains("APP_BINARY=\"$REPO_ROOT/.build/debug/MacWiki\""))
     }
 
@@ -570,15 +572,16 @@ struct BetaReadinessRegressionTests {
 
         #expect(captureScript.contains("APP_NAME=\"${APP_NAME:-MacWiki}\""))
         #expect(captureScript.contains("app_binary=\"${APP_BIN:-$app_binary_default}\""))
-        #expect(captureScript.contains("pgrep -x \"$APP_NAME\""))
-        #expect(captureScript.contains("{ pgrep -x \"$APP_NAME\" || true; }"))
-        #expect(captureScript.contains("MACWIKI_CAPTURE_APP_NAME=\"$APP_NAME\""))
+        #expect(captureScript.contains("APP_PID=\"${APP_PID:-}\""))
+        #expect(captureScript.contains("APP_PID is required for a targeted capture"))
+        #expect(captureScript.contains("actual_binary=\"$(ps -p \"$APP_PID\" -o comm="))
         #expect(captureScript.contains("mkdir -p /tmp/macwiki-audit"))
-        #expect(!captureScript.contains("pgrep -x MacWiki"))
+        #expect(!captureScript.contains("pgrep -x"))
 
         #expect(captureSetScript.contains("APP_NAME=\"${APP_NAME:-MacWiki}\""))
         #expect(captureSetScript.contains("APP_BIN=\"${APP_BIN:-$app_binary_default}\""))
-        #expect(captureSetScript.contains("APP_NAME=\"$APP_NAME\" APP_BIN=\"$APP_BIN\" \"$capture_window_script\""))
+        #expect(captureSetScript.contains("APP_PID=\"$QA_APP_PID\" \"$capture_window_script\""))
+        #expect(captureSetScript.contains("qa_launch_exact"))
         #expect(captureSetScript.contains("App binary: \\`$APP_BIN\\`"))
         #expect(!captureSetScript.contains("app_binary=\"$repo_root/.build/arm64-apple-macosx/debug/MacWiki\""))
     }
@@ -589,11 +592,11 @@ struct BetaReadinessRegressionTests {
         #expect(discoverScript.contains("APP_NAME=\"${APP_NAME:-MacWiki}\""))
         #expect(discoverScript.contains("APP_BIN_DEFAULT=\"$REPO_ROOT/.build/arm64-apple-macosx/debug/MacWiki\""))
         #expect(discoverScript.contains("APP_BIN=\"${APP_BIN:-$APP_BIN_DEFAULT}\""))
-        #expect(discoverScript.contains("pkill -x \"$APP_NAME\""))
-        #expect(discoverScript.contains("MACWIKI_QA_APP_NAME=\"$APP_NAME\" swift - <<'SWIFT'"))
-        #expect(discoverScript.contains("owner.localizedCaseInsensitiveContains(appName)"))
+        #expect(!discoverScript.contains("pkill -x"))
+        #expect(discoverScript.contains("MACWIKI_QA_PID=\"${QA_APP_PID:-}\" swift - <<'SWIFT'"))
+        #expect(discoverScript.contains("== targetPid"))
         #expect(discoverScript.contains("tell application (item 1 of argv) to activate"))
-        #expect(discoverScript.contains("APP_NAME=\"$APP_NAME\" APP_BIN=\"$APP_BIN\" \"$capture_script\""))
+        #expect(discoverScript.contains("APP_PID=\"$QA_APP_PID\" \"$capture_script\""))
         #expect(discoverScript.contains("App binary: \\`$APP_BIN\\`"))
         #expect(!discoverScript.contains("DerivedData/MacWiki-hgaamxiclllsfufsrrsbkmjdjcle"))
         #expect(!discoverScript.contains("pkill -x MacWiki"))
@@ -610,8 +613,36 @@ struct BetaReadinessRegressionTests {
             #expect(script.contains("APP_BIN_FALLBACK=\"$REPO_ROOT/.build/debug/MacWiki\""))
             #expect(script.contains("APP_BIN=\"${APP_BIN:-$APP_BIN_DEFAULT}\""))
             #expect(script.contains("if [[ ! -x \"$APP_BIN\" && -x \"$APP_BIN_FALLBACK\" ]]; then"))
+            #expect(script.contains("source \"$SCRIPT_DIR/lib/qa_process_safety.sh\""))
+            #expect(script.contains("qa_launch_exact"))
+            #expect(!script.contains("pkill -x"))
             #expect(!script.contains("WORKDIR=\"/Users/tombunting/Developer/MacWiki\""))
             #expect(!script.contains("APP_BIN=\"${APP_BIN:-$WORKDIR/.build/debug/MacWiki}\""))
+        }
+    }
+
+    @Test func mutatingQAHarnessesRequireIsolatedStateAndExactProcessIdentity() throws {
+        let safetyLibrary = try source("scripts/lib/qa_process_safety.sh")
+        let scriptNames = [
+            "scripts/profile_reader_open.sh",
+            "scripts/qa_context_menu_ocr.sh",
+            "scripts/qa_folder_collapse_selected_list.sh",
+            "scripts/qa_nested_folder_rename.sh",
+            "scripts/qa_discover_scroll_time_machine.sh",
+            "scripts/qa_sidebar_search_width_classes.sh",
+            "scripts/capture_macwiki_audit_set.sh"
+        ]
+
+        #expect(safetyLibrary.contains("CFFIXED_USER_HOME=\"$QA_HOME\" \"$APP_BIN\""))
+        #expect(safetyLibrary.contains("ps -p \"$QA_APP_PID\" -o comm="))
+        #expect(safetyLibrary.contains("Refusing to run while $APP_NAME PID"))
+
+        for scriptName in scriptNames {
+            let script = try source(scriptName)
+            #expect(script.contains("qa_process_safety.sh"))
+            #expect(!script.contains("pkill -x"))
+            #expect(!script.contains("open -n \"$APP_BIN\""))
+            #expect(!script.contains("$HOME/Library/Application Support/default.store"))
         }
     }
 

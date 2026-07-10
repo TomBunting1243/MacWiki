@@ -4,10 +4,13 @@ set -euo pipefail
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 capture_window_script="$script_dir/capture_macwiki_window.sh"
 repo_root="$(cd "$script_dir/.." && pwd)"
+REPO_ROOT="$repo_root"
+source "$script_dir/lib/qa_process_safety.sh"
 APP_NAME="${APP_NAME:-MacWiki}"
 app_binary_default="$repo_root/.build/arm64-apple-macosx/debug/MacWiki"
 app_binary_fallback="$repo_root/.build/debug/MacWiki"
 APP_BIN="${APP_BIN:-$app_binary_default}"
+QA_HOME="${QA_HOME:-/tmp/macwiki-qa/audit-capture-home-$(date +%Y%m%d_%H%M%S)-$RANDOM}"
 
 if [[ ! -x "$APP_BIN" && -x "$app_binary_fallback" ]]; then
   APP_BIN="$app_binary_fallback"
@@ -18,85 +21,33 @@ if [[ ! -x "$capture_window_script" ]]; then
   exit 1
 fi
 
-launch_macwiki_if_needed() {
-  if pgrep -x "$APP_NAME" >/dev/null 2>&1; then
-    return
-  fi
-
-  if [[ -x "$APP_BIN" ]]; then
-    "$APP_BIN" >/tmp/macwiki-audit/macwiki-audit-launch.log 2>&1 &
-    sleep 1.2
-  fi
-}
-
 raise_macwiki_window() {
-  osascript - "$APP_NAME" <<'APPLESCRIPT' >/dev/null 2>&1 || true
+  osascript - "$QA_APP_PID" <<'APPLESCRIPT' >/dev/null 2>&1 || true
 on run argv
-  set appName to item 1 of argv
+  set appPid to item 1 of argv as integer
 tell application "System Events"
-  if exists (first process whose name is appName) then
-    set frontmost of first process whose name is appName to true
+  if exists (first process whose unix id is appPid) then
+    set frontmost of first process whose unix id is appPid to true
   end if
 end tell
 end run
 APPLESCRIPT
 }
 
-capture_frontmost_window() {
-  local destination="$1"
-  local frontmost_bounds
-
-  frontmost_bounds="$(
-    osascript <<'APPLESCRIPT' 2>/dev/null || true
-tell application "System Events"
-  set frontProcess to first process whose frontmost is true
-  if not (exists frontProcess) then return ""
-  tell frontProcess
-    if (count of windows) is 0 then return ""
-    set win to front window
-    set {xPos, yPos} to position of win
-    set {w, h} to size of win
-    return (xPos as text) & "," & (yPos as text) & "," & (w as text) & "," & (h as text)
-  end tell
-end tell
-APPLESCRIPT
-  )"
-
-  if [[ "$frontmost_bounds" =~ ^-?[0-9]+,-?[0-9]+,[0-9]+,[0-9]+$ ]] \
-    && screencapture -x -R "$frontmost_bounds" "$destination" >/dev/null 2>&1; then
-    echo "Warning: fell back to frontmost-window capture for $destination" >&2
-    return 0
-  fi
-
-  return 1
-}
-
 capture_with_retry() {
   local destination="$1"
 
-  if APP_NAME="$APP_NAME" APP_BIN="$APP_BIN" "$capture_window_script" "$destination" >/dev/null 2>&1; then
+  if APP_NAME="$APP_NAME" APP_BIN="$APP_BIN" APP_PID="$QA_APP_PID" "$capture_window_script" "$destination" >/dev/null 2>&1; then
     return 0
   fi
 
-  launch_macwiki_if_needed
   raise_macwiki_window
   sleep 1
 
-  if APP_NAME="$APP_NAME" APP_BIN="$APP_BIN" "$capture_window_script" "$destination" >/dev/null 2>&1; then
+  if APP_NAME="$APP_NAME" APP_BIN="$APP_BIN" APP_PID="$QA_APP_PID" "$capture_window_script" "$destination" >/dev/null 2>&1; then
     return 0
   fi
-
-  if capture_frontmost_window "$destination"; then
-    return 0
-  fi
-
-  # Last-resort fallback so the audit run still completes even when
-  # Accessibility/window-query APIs cannot resolve a specific MacWiki window.
-  if screencapture -x "$destination" >/dev/null 2>&1; then
-    echo "Warning: fell back to full-screen capture for $destination" >&2
-    return 0
-  fi
-
+  echo "ERROR: Failed to capture the verified MacWiki PID $QA_APP_PID." >&2
   return 1
 }
 
@@ -106,6 +57,14 @@ states_csv="${MACWIKI_AUDIT_STATES:-home,discover,article,article_inspector,focu
 
 mkdir -p "$output_dir"
 mkdir -p /tmp/macwiki-audit
+qa_prepare_isolated_home
+cleanup() {
+  qa_stop_exact
+  qa_remove_isolated_home
+}
+trap cleanup EXIT INT TERM
+qa_launch_exact "/tmp/macwiki-audit/macwiki-audit-launch.log"
+sleep 1.2
 manifest_path="$output_dir/manifest.md"
 
 IFS=',' read -r -a states <<< "$states_csv"

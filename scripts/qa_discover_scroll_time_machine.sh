@@ -4,6 +4,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+source "$SCRIPT_DIR/lib/qa_process_safety.sh"
 
 APP_NAME="${APP_NAME:-MacWiki}"
 APP_BIN_DEFAULT="$REPO_ROOT/.build/arm64-apple-macosx/debug/MacWiki"
@@ -19,8 +20,15 @@ USER_AGENT="${USER_AGENT:-MacWiki/0.5.0 (https://github.com/tombunting/MacWiki)}
 APP_BUNDLE_ID="${APP_BUNDLE_ID:-com.tombunting.MacWiki}"
 DISCOVER_OPEN_MODE="${DISCOVER_OPEN_MODE:-Sidebar}"
 FORCE_FRESH_LAUNCH="${FORCE_FRESH_LAUNCH:-1}"
+QA_HOME="${QA_HOME:-/tmp/macwiki-qa/discover-home-$(date +%Y%m%d_%H%M%S)-$RANDOM}"
 
 mkdir -p "$OUTPUT_DIR"
+qa_prepare_isolated_home
+cleanup() {
+  qa_stop_exact
+  qa_remove_isolated_home
+}
+trap cleanup EXIT INT TERM
 
 capture_script="$SCRIPT_DIR/capture_macwiki_window.sh"
 click_script="$SCRIPT_DIR/cg_click.swift"
@@ -49,20 +57,17 @@ fi
 echo "Output: $OUTPUT_DIR"
 
 prepare_deterministic_launch() {
-  defaults write "$APP_BUNDLE_ID" discoverOpenMode -string "$DISCOVER_OPEN_MODE" >/dev/null 2>&1 || true
-  if [[ "$FORCE_FRESH_LAUNCH" == "1" ]]; then
-    pkill -x "$APP_NAME" >/dev/null 2>&1 || true
-    sleep 0.6
-  fi
+  CFFIXED_USER_HOME="$QA_HOME" defaults write "$APP_BUNDLE_ID" discoverOpenMode -string "$DISCOVER_OPEN_MODE" >/dev/null 2>&1 || true
+  qa_assert_no_conflicting_processes
 }
 
 find_macwiki_window_bounds() {
-  MACWIKI_QA_APP_NAME="$APP_NAME" swift - <<'SWIFT'
+  MACWIKI_QA_PID="${QA_APP_PID:-}" swift - <<'SWIFT'
 import CoreGraphics
 import Foundation
 
 let windows = (CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID) as? [[String: Any]]) ?? []
-let appName = ProcessInfo.processInfo.environment["MACWIKI_QA_APP_NAME"] ?? "MacWiki"
+let targetPid = Int(ProcessInfo.processInfo.environment["MACWIKI_QA_PID"] ?? "") ?? -1
 let ownerKey = kCGWindowOwnerName as String
 let pidKey = kCGWindowOwnerPID as String
 let layerKey = kCGWindowLayer as String
@@ -73,8 +78,7 @@ var bestArea = -1.0
 var bestBounds: [String: Double] = [:]
 
 for w in windows {
-    let owner = (w[ownerKey] as? String) ?? ""
-    guard owner.localizedCaseInsensitiveContains(appName) else { continue }
+    guard ((w[pidKey] as? Int) ?? -1) == targetPid else { continue }
     guard ((w[layerKey] as? Int) ?? 1) == 0 else { continue }
     let boundsAny = (w[boundsKey] as? [String: Any]) ?? [:]
     let x = (boundsAny["X"] as? Double) ?? 0
@@ -108,8 +112,8 @@ ensure_macwiki_window() {
 
     if (( attempts == 0 )); then
       if [[ -x "$APP_BIN" ]]; then
-        echo "Launching $APP_NAME from $APP_BIN" >&2
-        open -n "$APP_BIN" >/tmp/macwiki-qa-discover-launch.log 2>&1 || true
+        echo "Launching isolated $APP_NAME from $APP_BIN" >&2
+        qa_launch_exact "/tmp/macwiki-qa-discover-launch.log"
       else
         echo "ERROR: App binary not found: $APP_BIN" >&2
         exit 1
@@ -138,7 +142,7 @@ send_page_down() {
 
 capture_window() {
   local path="$1"
-  APP_NAME="$APP_NAME" APP_BIN="$APP_BIN" "$capture_script" "$path" >/dev/null
+  APP_NAME="$APP_NAME" APP_BIN="$APP_BIN" APP_PID="$QA_APP_PID" "$capture_script" "$path" >/dev/null
 }
 
 ocr_image_to_file() {

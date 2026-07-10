@@ -4,6 +4,15 @@ set -euo pipefail
 
 APP_NAME="${APP_NAME:-MacWiki}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+source "$SCRIPT_DIR/lib/qa_process_safety.sh"
+APP_BIN_DEFAULT="$REPO_ROOT/.build/arm64-apple-macosx/debug/MacWiki"
+APP_BIN_FALLBACK="$REPO_ROOT/.build/debug/MacWiki"
+APP_BIN="${APP_BIN:-$APP_BIN_DEFAULT}"
+
+if [[ ! -x "$APP_BIN" && -x "$APP_BIN_FALLBACK" ]]; then
+  APP_BIN="$APP_BIN_FALLBACK"
+fi
 
 stamp="$(date +%Y%m%d_%H%M%S)"
 suffix="$(printf '%04d' "$((RANDOM % 10000))")"
@@ -11,12 +20,21 @@ AREA_NAME="QA_CTX_AREA_${stamp}_${suffix}"
 LIST_NAME="QA_CTX_LIST_${stamp}_${suffix}"
 AREA_ROW_ID="area-row-${AREA_NAME}"
 out_dir="/tmp/macwiki-qa/context-menu-ocr-${stamp}-${suffix}"
+QA_HOME="${QA_HOME:-/tmp/macwiki-qa/context-menu-home-${stamp}-${suffix}}"
 mkdir -p "$out_dir"
 
-if ! pgrep -x "$APP_NAME" >/dev/null 2>&1; then
-  echo "ERROR: $APP_NAME is not running. Start the app first."
+if [[ ! -x "$APP_BIN" ]]; then
+  echo "ERROR: App binary not found: $APP_BIN"
   exit 1
 fi
+
+qa_prepare_isolated_home
+cleanup() {
+  qa_stop_exact
+  qa_remove_isolated_home
+}
+trap cleanup EXIT INT TERM
+qa_launch_exact "/tmp/macwiki-qa-context-menu-launch.log"
 
 echo "Running context-menu OCR smoke..."
 echo "Area: $AREA_NAME"

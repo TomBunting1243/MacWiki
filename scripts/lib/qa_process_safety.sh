@@ -1,0 +1,124 @@
+#!/usr/bin/env bash
+
+# Shared safety boundary for UI/benchmark harnesses.
+# The caller must set APP_BIN, APP_NAME, and QA_HOME before launching MacWiki.
+
+qa_canonical_path() {
+  local path="$1"
+  local directory
+  directory="$(cd "$(dirname "$path")" && pwd -P)"
+  printf '%s/%s\n' "$directory" "$(basename "$path")"
+}
+
+qa_assert_isolated_path() {
+  local candidate="$1"
+  local root="$2"
+  local canonical_candidate
+  local canonical_root
+
+  mkdir -p "$root"
+  canonical_root="$(qa_canonical_path "$root")"
+  canonical_candidate="$(qa_canonical_path "$candidate")"
+
+  case "$canonical_root" in
+    /tmp/macwiki-qa/*|/private/tmp/macwiki-qa/*|"${REPO_ROOT:?}"/.qa/*)
+      ;;
+    *)
+      echo "ERROR: QA_HOME must be under /tmp/macwiki-qa or $REPO_ROOT/.qa: $canonical_root" >&2
+      return 1
+      ;;
+  esac
+
+  case "$canonical_candidate" in
+    "$canonical_root"|"$canonical_root"/*)
+      ;;
+    *)
+      echo "ERROR: Refusing path outside isolated QA_HOME: $canonical_candidate" >&2
+      return 1
+      ;;
+  esac
+}
+
+qa_prepare_isolated_home() {
+  qa_assert_isolated_path "$QA_HOME" "$QA_HOME"
+  mkdir -p "$QA_HOME/Library/Application Support" "$QA_HOME/Library/Caches"
+}
+
+qa_exact_binary_pids() {
+  [[ -x "$APP_BIN" ]] || return 0
+  local canonical_binary
+  canonical_binary="$(qa_canonical_path "$APP_BIN")"
+  ps -axo pid=,comm= | awk -v binary="$canonical_binary" '$2 == binary { print $1 }'
+}
+
+qa_assert_no_conflicting_processes() {
+  local pid
+  local command_path
+  local found=0
+
+  while IFS= read -r pid; do
+    [[ -n "$pid" ]] || continue
+    found=1
+    command_path="$(ps -p "$pid" -o comm= | sed 's/^[[:space:]]*//')"
+    echo "ERROR: Refusing to run while $APP_NAME PID $pid is active ($command_path)." >&2
+  done < <(pgrep -x "$APP_NAME" 2>/dev/null || true)
+
+  [[ "$found" -eq 0 ]]
+}
+
+qa_launch_exact() {
+  local log_path="$1"
+  qa_assert_isolated_path "$QA_HOME" "$QA_HOME"
+  qa_assert_no_conflicting_processes
+
+  CFFIXED_USER_HOME="$QA_HOME" "$APP_BIN" >"$log_path" 2>&1 &
+  QA_APP_PID=$!
+  export QA_APP_PID
+
+  local expected
+  local actual
+  expected="$(qa_canonical_path "$APP_BIN")"
+  for _ in $(seq 1 50); do
+    if kill -0 "$QA_APP_PID" 2>/dev/null; then
+      actual="$(ps -p "$QA_APP_PID" -o comm= | sed 's/^[[:space:]]*//')"
+      if [[ "$actual" == "$expected" ]]; then
+        return 0
+      fi
+    fi
+    sleep 0.1
+  done
+
+  echo "ERROR: Launched PID $QA_APP_PID did not resolve to $expected." >&2
+  qa_stop_exact
+  return 1
+}
+
+qa_stop_exact() {
+  local pid="${QA_APP_PID:-}"
+  [[ -n "$pid" ]] || return 0
+
+  local expected
+  local actual
+  expected="$(qa_canonical_path "$APP_BIN")"
+  actual="$(ps -p "$pid" -o comm= 2>/dev/null | sed 's/^[[:space:]]*//' || true)"
+  if [[ -n "$actual" && "$actual" == "$expected" ]]; then
+    kill "$pid" 2>/dev/null || true
+    wait "$pid" 2>/dev/null || true
+  fi
+  QA_APP_PID=""
+  export QA_APP_PID
+}
+
+qa_stop_matching_exact() {
+  local pid
+  while IFS= read -r pid; do
+    [[ -n "$pid" ]] || continue
+    kill "$pid" 2>/dev/null || true
+  done < <(qa_exact_binary_pids)
+}
+
+qa_remove_isolated_home() {
+  [[ -n "${QA_HOME:-}" ]] || return 0
+  qa_assert_isolated_path "$QA_HOME" "$QA_HOME"
+  rm -rf "$QA_HOME"
+}

@@ -5,10 +5,10 @@ set -euo pipefail
 APP_NAME="${APP_NAME:-MacWiki}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+source "$SCRIPT_DIR/lib/qa_process_safety.sh"
 APP_BIN_DEFAULT="$REPO_ROOT/.build/arm64-apple-macosx/debug/MacWiki"
 APP_BIN_FALLBACK="$REPO_ROOT/.build/debug/MacWiki"
 APP_BIN="${APP_BIN:-$APP_BIN_DEFAULT}"
-RESTART_APP="${RESTART_APP:-1}"
 
 if [[ ! -x "$APP_BIN" && -x "$APP_BIN_FALLBACK" ]]; then
   APP_BIN="$APP_BIN_FALLBACK"
@@ -16,6 +16,7 @@ fi
 
 timestamp="$(date +%Y%m%d_%H%M%S)"
 suffix="$(printf '%04d' "$((RANDOM % 10000))")"
+QA_HOME="${QA_HOME:-/tmp/macwiki-qa/folder-collapse-${timestamp}-${suffix}}"
 FOLDER_NAME="QA_COLLAPSE_FOLDER_${timestamp}_${suffix}"
 LIST_NAME="QA_COLLAPSE_LIST_${timestamp}_${suffix}"
 FOLDER_ROW_ID="area-row-${FOLDER_NAME}"
@@ -29,6 +30,13 @@ if [[ ! -x "$APP_BIN" ]]; then
   echo "Run: swift build"
   exit 1
 fi
+
+qa_prepare_isolated_home
+cleanup() {
+  qa_stop_exact
+  qa_remove_isolated_home
+}
+trap cleanup EXIT INT TERM
 
 activate_app() {
   osascript - "$APP_NAME" <<'APPLESCRIPT' >/dev/null
@@ -66,15 +74,8 @@ end using terms from
 APPLESCRIPT
 }
 
-if [[ "$RESTART_APP" == "1" ]]; then
-  pkill -x "$APP_NAME" >/dev/null 2>&1 || true
-  sleep 1
-  echo "Launching $APP_NAME..."
-  open -n "$APP_BIN" >/tmp/macwiki_qa_folder_collapse_selected_list.log 2>&1
-elif ! pgrep -x "$APP_NAME" >/dev/null 2>&1; then
-  echo "Launching $APP_NAME..."
-  open -n "$APP_BIN" >/tmp/macwiki_qa_folder_collapse_selected_list.log 2>&1
-fi
+echo "Launching isolated $APP_NAME from $APP_BIN..."
+qa_launch_exact "/tmp/macwiki_qa_folder_collapse_selected_list.log"
 
 echo "Waiting for $APP_NAME process and content window..."
 content_window_ready=0
