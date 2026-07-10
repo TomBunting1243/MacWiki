@@ -1,44 +1,16 @@
-import Foundation
-import CoreGraphics
-import OSLog
-
-private let systemBridgeLogger = Logger(subsystem: "com.macwiki", category: "system-bridge")
+import AppKit
 
 enum SystemBridge {
     @discardableResult
     static func copyText(_ text: String) -> Bool {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/pbcopy")
-        let stdinPipe = Pipe()
-        process.standardInput = stdinPipe
-
-        do {
-            try process.run()
-            if let data = text.data(using: .utf8) {
-                stdinPipe.fileHandleForWriting.write(data)
-            }
-            stdinPipe.fileHandleForWriting.closeFile()
-            process.waitUntilExit()
-            return process.terminationStatus == 0
-        } catch {
-            systemBridgeLogger.error("pbcopy launch failed: \(error.localizedDescription, privacy: .public)")
-            return false
-        }
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        return pasteboard.setString(text, forType: .string)
     }
 
     @discardableResult
     static func openURLExternally(_ url: URL) -> Bool {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/open")
-        process.arguments = [url.absoluteString]
-
-        do {
-            try process.run()
-            return true
-        } catch {
-            systemBridgeLogger.error("open URL externally failed: \(error.localizedDescription, privacy: .public)")
-            return false
-        }
+        NSWorkspace.shared.open(url)
     }
 
     static var isCommandPressed: Bool {

@@ -1315,12 +1315,6 @@ struct WebView: NSViewRepresentable {
                 return
             }
 
-            // Allow invalid schemes to fail gracefully or be handled by system
-            if url.scheme == "about" || url.scheme == "data" {
-                decisionHandler(.allow)
-                return
-            }
-
             // 1. Detect internal Wikipedia article targets.
             if let target = wikipediaLinkTarget(from: url) {
                 let isUserInitiatedLink =
@@ -1363,23 +1357,21 @@ struct WebView: NSViewRepresentable {
                 return
             }
 
-            // 2. Handle External Links (http/https) that are NOT wiki links
-            // If we got here, it's not a /wiki/ link.
-            if url.scheme == "http" || url.scheme == "https" {
-                // Determine if it's the initial page load or a user click
-                // Initial load: navigationType is .other and request matches main frame
-                // User click: .linkActivated
-
-                if navigationAction.navigationType == .linkActivated || navigationAction.targetFrame == nil {
-                    // It's a user action -> Open in Browser
-                    _ = SystemBridge.openURLExternally(url)
-                    decisionHandler(.cancel)
-                    return
-                }
+            // 2. Apply a deny-by-default scheme policy to non-Wikipedia navigation.
+            // Fetched article HTML is untrusted input; it must not be able to navigate the
+            // reader to javascript:, file:, or arbitrary custom schemes.
+            let isUserInitiated =
+                navigationAction.navigationType == .linkActivated ||
+                navigationAction.targetFrame == nil
+            switch WebViewNavigationPolicy.disposition(for: url, isUserInitiated: isUserInitiated) {
+            case .allowInWebView:
+                decisionHandler(.allow)
+            case .openExternally:
+                _ = SystemBridge.openURLExternally(url)
+                decisionHandler(.cancel)
+            case .cancel:
+                decisionHandler(.cancel)
             }
-
-            // 3. Allow everything else
-            decisionHandler(.allow)
         }
 
         func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration, for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
