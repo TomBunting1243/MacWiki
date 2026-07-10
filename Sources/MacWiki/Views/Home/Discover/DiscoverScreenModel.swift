@@ -81,10 +81,11 @@ final class DiscoverScreenModel {
         Self.timeMachineCompactDateFormatter.string(from: discoverReferenceDate)
     }
 
-    func handleSelectedDateChange(isSearchActive: Bool) {
-        guard !isSearchActive else { return }
+    @discardableResult
+    func handleSelectedDateChange(isSearchActive: Bool) -> Task<Void, Never>? {
+        guard !isSearchActive else { return nil }
         dismissSearchResultPageViewsPopover()
-        queueDiscoverLoadDebounced()
+        return queueDiscoverLoadDebounced()
     }
 
     func queueInitialLoad() {
@@ -96,24 +97,28 @@ final class DiscoverScreenModel {
         discoverRefreshGeneration += 1
     }
 
+    @discardableResult
     func queueDiscoverLoadDebounced(
         forceRefresh: Bool = false,
         delay: Duration? = nil
-    ) {
+    ) -> Task<Void, Never>? {
         discoverDateLoadTask?.cancel()
         let effectiveDelay = delay ?? loadDebounceDelay
         if forceRefresh || effectiveDelay <= .zero {
             queueLoadAction(discoverReferenceDate, forceRefresh)
-            return
+            return nil
         }
-        discoverDateLoadTask = Task { @MainActor in
+        let task = Task { @MainActor in
             await sleep(effectiveDelay)
             guard !Task.isCancelled else { return }
             queueLoadAction(discoverReferenceDate, forceRefresh)
         }
+        discoverDateLoadTask = task
+        return task
     }
 
-    func updateTimeTravelSkeletonVisibility(reduceMotion: Bool) {
+    @discardableResult
+    func updateTimeTravelSkeletonVisibility(reduceMotion: Bool) -> Task<Void, Never>? {
         timeTravelSkeletonDelayTask?.cancel()
         timeTravelSkeletonDelayTask = nil
 
@@ -125,17 +130,17 @@ final class DiscoverScreenModel {
             } else {
                 shouldShowDelayedTimeTravelSkeleton = false
             }
-            return
+            return nil
         }
 
-        guard !shouldShowDelayedTimeTravelSkeleton else { return }
+        guard !shouldShowDelayedTimeTravelSkeleton else { return nil }
         if timeTravelSkeletonDelay <= .zero {
             withAnimation(reduceMotion ? nil : .easeOut(duration: 0.16)) {
                 shouldShowDelayedTimeTravelSkeleton = true
             }
-            return
+            return nil
         }
-        timeTravelSkeletonDelayTask = Task { @MainActor in
+        let task = Task { @MainActor in
             await sleep(timeTravelSkeletonDelay)
             guard !Task.isCancelled else { return }
             guard shouldQueueTimeTravelSkeleton else { return }
@@ -143,6 +148,8 @@ final class DiscoverScreenModel {
                 shouldShowDelayedTimeTravelSkeleton = true
             }
         }
+        timeTravelSkeletonDelayTask = task
+        return task
     }
 
     func handleDisappear() {

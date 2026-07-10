@@ -27,9 +27,8 @@ struct DiscoverScreenModelTests {
         model.selectedDiscoverDate = calendar.date(from: DateComponents(year: 2026, month: 4, day: 3, hour: 19))!
         model.presentSearchResultPageViewsPopover(rowKey: "search:1", title: "Ada Lovelace")
 
-        model.handleSelectedDateChange(isSearchActive: false)
-
-        await Task.yield()
+        let loadTask = model.handleSelectedDateChange(isSearchActive: false)
+        await loadTask?.value
 
         #expect(queuedLoads.count == 1)
         #expect(queuedLoads.first?.forceRefresh == false)
@@ -82,12 +81,11 @@ struct DiscoverScreenModelTests {
         )
 
         model.selectedDiscoverDate = calendar.date(from: DateComponents(year: 2026, month: 4, day: 9, hour: 8))!
-        model.updateTimeTravelSkeletonVisibility(reduceMotion: true)
+        let skeletonTask = model.updateTimeTravelSkeletonVisibility(reduceMotion: true)
 
         #expect(model.shouldShowDelayedTimeTravelSkeleton == false)
 
-        await Task.yield()
-        await Task.yield()
+        await skeletonTask?.value
 
         #expect(model.shouldShowDelayedTimeTravelSkeleton == true)
         #expect(model.showsTimeTravelSkeleton == true)
