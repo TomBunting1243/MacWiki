@@ -93,6 +93,50 @@ qa_launch_exact() {
   return 1
 }
 
+qa_launch_exact_bundle() {
+  local log_path="$1"
+  local bundle_path="${APP_BUNDLE_PATH:-${APP_BIN%/Contents/MacOS/*}}"
+  local expected_binary
+
+  qa_assert_isolated_path "$QA_HOME" "$QA_HOME"
+  qa_assert_no_conflicting_processes
+
+  expected_binary="$(qa_canonical_path "$APP_BIN")"
+  if [[ "$bundle_path" == "$APP_BIN" || ! -d "$bundle_path/Contents/MacOS" ]]; then
+    echo "ERROR: APP_BIN is not inside an app bundle: $APP_BIN" >&2
+    return 1
+  fi
+
+  open -n \
+    --stdout "$log_path" \
+    --stderr "$log_path" \
+    --env "HOME=$QA_HOME" \
+    --env "CFFIXED_USER_HOME=$QA_HOME" \
+    -a "$bundle_path"
+
+  for _ in $(seq 1 50); do
+    local matching_pids=()
+    while IFS= read -r pid; do
+      [[ -n "$pid" ]] && matching_pids+=("$pid")
+    done < <(qa_exact_binary_pids)
+
+    if [[ "${#matching_pids[@]}" -eq 1 ]]; then
+      QA_APP_PID="${matching_pids[0]}"
+      export QA_APP_PID
+      local actual
+      actual="$(ps -p "$QA_APP_PID" -o comm= | sed 's/^[[:space:]]*//')"
+      if [[ "$actual" == "$expected_binary" ]]; then
+        return 0
+      fi
+    fi
+    sleep 0.1
+  done
+
+  echo "ERROR: App bundle launch did not resolve to exactly one $expected_binary process." >&2
+  qa_stop_matching_exact
+  return 1
+}
+
 qa_stop_exact() {
   local pid="${QA_APP_PID:-}"
   [[ -n "$pid" ]] || return 0

@@ -25,11 +25,11 @@ cleanup() {
   qa_remove_isolated_home
 }
 trap cleanup EXIT INT TERM
-qa_launch_exact "/tmp/macwiki-qa-settings-popups-launch.log"
+qa_launch_exact_bundle "/tmp/macwiki-qa-settings-popups-launch.log"
 
 echo "Running Settings popups smoke QA..."
 
-APP_PID="$QA_APP_PID" osascript -l JavaScript <<'JXA'
+APP_NAME="$APP_NAME" APP_PID="$QA_APP_PID" osascript -l JavaScript <<'JXA'
 ObjC.import('stdlib');
 
 const se = Application('System Events');
@@ -44,12 +44,23 @@ if (matchingProcesses.length !== 1) {
 const app = matchingProcesses[0];
 
 function settingsWindow() {
-  for (const w of app.windows()) {
+  const windows = app.windows();
+  for (const w of windows) {
     let name = '';
     try { name = w.name(); } catch (e) {}
     if (String(name).toLowerCase().includes('settings')) {
       return w;
     }
+  }
+  if (windows.length > 1) {
+    for (const w of windows) {
+      let name = '';
+      try { name = String(w.name()); } catch (e) {}
+      if (name !== 'MacWiki') {
+        return w;
+      }
+    }
+    return windows[0];
   }
   return null;
 }
@@ -67,23 +78,59 @@ function popupValue(popup) {
   try { return String(popup.value()); } catch (e) { return ''; }
 }
 
-function togglePopupDownUp(popup) {
+function togglePopupAndRestore(popup, popupIndex) {
   const before = popupValue(popup);
   popup.actions.byName('AXPress').perform();
   delay(0.15);
-  se.keyCode(125); // down arrow
-  delay(0.05);
-  se.keyCode(36); // return
+  let changedByName = false;
+  try {
+    const menus = popup.menus();
+    if (menus.length > 0) {
+      for (const item of menus[0].menuItems()) {
+        let itemName = '';
+        try { itemName = String(item.name()); } catch (e) {}
+        if (itemName.length > 0 && itemName !== before) {
+          item.actions.byName('AXPress').perform();
+          changedByName = true;
+          break;
+        }
+      }
+    }
+  } catch (e) {}
+  if (!changedByName) {
+    se.keyCode(53); // escape when no alternate item is available
+  }
   delay(0.20);
   const changed = popupValue(popup);
 
-  popup.actions.byName('AXPress').perform();
+  const refreshedPopups = [];
+  collectPopups(settingsWindow(), refreshedPopups);
+  const restorePopup = refreshedPopups[popupIndex] || popup;
+  restorePopup.actions.byName('AXPress').perform();
   delay(0.15);
-  se.keyCode(126); // up arrow
-  delay(0.05);
-  se.keyCode(36); // return
+  let restoredByName = false;
+  const restoreCandidates = [];
+  try {
+    const menus = restorePopup.menus();
+    if (menus.length > 0) {
+      for (const item of menus[0].menuItems()) {
+        let itemName = '';
+        try { itemName = String(item.name()); } catch (e) {}
+        restoreCandidates.push(itemName);
+        if (itemName === before) {
+          item.actions.byName('AXPress').perform();
+          restoredByName = true;
+          break;
+        }
+      }
+    }
+  } catch (e) {}
+  if (!restoredByName) {
+    console.log(`Restore candidates for '${before}': ${restoreCandidates.join(' | ')}`);
+    se.keyCode(53); // escape without committing another value
+  }
   delay(0.20);
-  const after = popupValue(popup);
+  const after = popupValue(restorePopup);
 
   return { before, changed, after };
 }
@@ -92,16 +139,26 @@ app.frontmost = true;
 let win = settingsWindow();
 if (!win) {
   se.keystroke(',', { using: 'command down' });
-  delay(0.45);
-  win = settingsWindow();
+  for (let attempt = 0; attempt < 12 && !win; attempt += 1) {
+    delay(0.25);
+    win = settingsWindow();
+  }
 }
 if (!win) {
+  const observedNames = app.windows().map(w => {
+    try { return String(w.name()); } catch (e) { return '<unknown>'; }
+  });
+  console.log('Observed windows after Settings command: ' + observedNames.join(', '));
   console.log('ERROR: settings window not found');
   throw new Error('settings window missing');
 }
 
 const popups = [];
-for (const g of win.groups()) collectPopups(g, popups);
+for (let attempt = 0; attempt < 12 && popups.length < 2; attempt += 1) {
+  popups.length = 0;
+  collectPopups(win, popups);
+  if (popups.length < 2) delay(0.25);
+}
 if (popups.length < 2) {
   console.log('ERROR: expected >=2 visible popup controls, found ' + popups.length);
   throw new Error('insufficient popup controls');
@@ -115,8 +172,11 @@ function popupName(popup, index) {
     () => popupValue(popup)
   ]) {
     try {
-      const value = String(read());
-      if (value.length > 0) return value;
+      const rawValue = read();
+      if (rawValue !== null && rawValue !== undefined) {
+        const value = String(rawValue);
+        if (value.length > 0) return value;
+      }
     } catch (e) {}
   }
   return `Popup ${index + 1}`;
@@ -139,7 +199,7 @@ function validate(name, result) {
 
 let ok = true;
 popups.forEach((popup, index) => {
-  ok = validate(popupName(popup, index), togglePopupDownUp(popup)) && ok;
+  ok = validate(popupName(popup, index), togglePopupAndRestore(popup, index)) && ok;
 });
 
 if (!ok) {

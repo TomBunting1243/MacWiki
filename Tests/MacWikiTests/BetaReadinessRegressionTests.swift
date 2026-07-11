@@ -498,8 +498,9 @@ struct BetaReadinessRegressionTests {
         #expect(settingsQAScript.contains("ObjC.import('stdlib')"))
         #expect(settingsQAScript.contains("ObjC.unwrap($.getenv('APP_NAME')) || 'MacWiki'"))
         #expect(settingsQAScript.contains("ObjC.unwrap($.getenv('APP_PID'))"))
+        #expect(settingsQAScript.contains("APP_NAME=\"$APP_NAME\" APP_PID=\"$QA_APP_PID\" osascript"))
         #expect(settingsQAScript.contains("se.processes.whose({ unixId: appPid })()"))
-        #expect(settingsQAScript.contains("qa_launch_exact"))
+        #expect(settingsQAScript.contains("qa_launch_exact_bundle"))
         #expect(settingsQAScript.contains("popups.forEach((popup, index) =>"))
         #expect(settingsQAScript.contains("expected >=2 visible popup controls"))
         #expect(!settingsQAScript.contains("const appName = 'MacWiki';"))
@@ -684,6 +685,9 @@ struct BetaReadinessRegressionTests {
         ]
 
         #expect(safetyLibrary.contains("HOME=\"$QA_HOME\" CFFIXED_USER_HOME=\"$QA_HOME\" \"$APP_BIN\""))
+        #expect(safetyLibrary.contains("qa_launch_exact_bundle()"))
+        #expect(safetyLibrary.contains("--env \"HOME=$QA_HOME\""))
+        #expect(safetyLibrary.contains("--env \"CFFIXED_USER_HOME=$QA_HOME\""))
         #expect(safetyLibrary.contains("ps -p \"$QA_APP_PID\" -o comm="))
         #expect(safetyLibrary.contains("Refusing to run while $APP_NAME PID"))
 
