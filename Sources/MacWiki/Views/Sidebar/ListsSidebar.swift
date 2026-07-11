@@ -612,6 +612,17 @@ struct ListsSidebar: View {
                 onRequestDelete: { areaIDs in
                     requestAreaDeletion(for: areaIDs)
                 },
+                onExpansionChange: { areaToUpdate, isExpanded in
+                    if !isExpanded,
+                       SidebarCollapseSelectionGuard.collapseWouldHideSelectedList(
+                           selectedAreaID: selectedList?.areaId,
+                           collapsingAreaID: areaToUpdate.id,
+                           parentAreaByID: collectionsSnapshot.parentAreaByID
+                       ) {
+                        setRecentsSelection()
+                    }
+                    setAreaExpanded(areaToUpdate.id, isExpanded)
+                },
                 onPersistChange: requestModelContextSave,
                 isSelected: selectedAreaIDs.contains(area.id)
             )
@@ -1572,6 +1583,7 @@ private struct AreaRowView<ListRow: View>: View {
     let childAreasOf: (Area) -> [Area]
     let onRename: (Area) -> Void
     let onRequestDelete: (Set<UUID>) -> Void
+    let onExpansionChange: (Area, Bool) -> Void
     let onPersistChange: () -> Void
     let isSelected: Bool
 
@@ -1610,13 +1622,12 @@ private struct AreaRowView<ListRow: View>: View {
             get: { area.isExpanded },
             set: { newValue in
                 if reduceMotion {
-                    area.isExpanded = newValue
+                    onExpansionChange(area, newValue)
                 } else {
                     withAnimation(.easeOut(duration: 0.18)) {
-                        area.isExpanded = newValue
+                        onExpansionChange(area, newValue)
                     }
                 }
-                onPersistChange()
             }
         )) {
             // Nested child areas first
@@ -1632,6 +1643,7 @@ private struct AreaRowView<ListRow: View>: View {
                     childAreasOf: childAreasOf,
                     onRename: onRename,
                     onRequestDelete: onRequestDelete,
+                    onExpansionChange: onExpansionChange,
                     onPersistChange: onPersistChange,
                     isSelected: selectedAreaIDs.contains(childArea.id)
                 )
@@ -1779,13 +1791,12 @@ private struct AreaRowView<ListRow: View>: View {
             guard isArticleDropTargeted, !area.isExpanded else { return }
 
             if reduceMotion {
-                area.isExpanded = true
+                onExpansionChange(area, true)
             } else {
                 withAnimation(.easeOut(duration: 0.18)) {
-                    area.isExpanded = true
+                    onExpansionChange(area, true)
                 }
             }
-            onPersistChange()
         }
     }
 }

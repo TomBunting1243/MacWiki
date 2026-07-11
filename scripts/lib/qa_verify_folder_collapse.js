@@ -71,10 +71,23 @@ function listIdentifier(row) {
 }
 
 function performPress(element) {
-    const action = safe(() => element.actions.byName("AXPress"));
-    if (action && safe(() => action.exists(), false)) {
-        action.perform();
+    try {
+        element.actions.byName("AXPress").perform();
         return;
+    } catch (_) {
+        // JXA action proxies do not reliably implement exists(); invoke first.
+    }
+    try {
+        element.click();
+        return;
+    } catch (_) {
+        // SwiftUI-hosted elements may expose click only through System Events.
+    }
+    try {
+        Application("System Events").click(element);
+        return;
+    } catch (_) {
+        // Fall through to an evidence-rich error.
     }
     throw new Error(`Element has no AXPress action: ${safe(() => element.role(), "unknown role")}`);
 }
@@ -129,9 +142,11 @@ function rowIsSelected(row) {
 
 function rowDiagnostics(process) {
     return rows(process).map((row, index) => {
-        const roles = [row, ...descendants(row, 4)].map(element => safe(() => element.role(), "")).filter(Boolean);
-        const identifiers = [row, ...descendants(row, 4)].map(identifier).filter(Boolean);
-        return `${index}:${roles.join("|")}:${identifiers.join("|")}`;
+        const elements = [row, ...descendants(row, 4)];
+        const roles = elements.map(element => safe(() => element.role(), "")).filter(Boolean);
+        const identifiers = elements.map(identifier).filter(Boolean);
+        const values = elements.map(element => attribute(element, "AXValue", "")).filter(value => value !== "");
+        return `${index}:${roles.join("|")}:${identifiers.join("|")}:selected=${attribute(row, "AXSelected", false)}:values=${values.join("|")}`;
     }).join(", ");
 }
 
@@ -166,10 +181,14 @@ function run(argv) {
 
     ensureExpanded(process, folderIdentifier, false, "Could not collapse folder");
     waitUntil(() => !findListRow(process, runtimeListIdentifier), 5, "Selected child list stayed visible after folder collapse");
-    waitUntil(() => {
-        const recentsRow = rows(process).find(row => rowContainsIdentifier(row, value => value === "sidebar-row-root-recents"));
-        return recentsRow && rowIsSelected(recentsRow);
-    }, 5, "Selection did not fall back to Recents after folder collapse");
+    try {
+        waitUntil(() => {
+            const recentsRow = rows(process).find(row => rowContainsIdentifier(row, value => value === "sidebar-row-root-recents"));
+            return recentsRow && rowIsSelected(recentsRow);
+        }, 5, "Selection did not fall back to Recents after folder collapse");
+    } catch (error) {
+        throw new Error(`${error.message}; rows=${rowDiagnostics(process)}`);
+    }
 
     ensureExpanded(process, folderIdentifier, true, "Could not re-expand folder");
     waitUntil(() => findListRow(process, runtimeListIdentifier), 5, "Child list did not return after re-expanding folder");

@@ -93,6 +93,10 @@ struct BetaReadinessRegressionTests {
 
         #expect(disclosureLabel.contains(".accessibilityIdentifier(SidebarSelectionID.area(area.id).accessibilityIdentifier)"))
         #expect(!areaRow.contains(#".accessibilityIdentifier("area-row-\(area.name)")"#))
+        #expect(sidebarSource.contains("SidebarCollapseSelectionGuard.collapseWouldHideSelectedList("))
+        #expect(sidebarSource.contains("setRecentsSelection()"))
+        #expect(areaRow.contains("onExpansionChange(area, newValue)"))
+        #expect(!areaRow.contains("area.isExpanded = newValue"))
     }
 
     @Test func settingsSlidersExposeSingleAccessibleControlLabel() throws {

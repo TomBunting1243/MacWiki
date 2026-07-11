@@ -75,7 +75,7 @@ APPLESCRIPT
 }
 
 echo "Launching isolated $APP_NAME from $APP_BIN..."
-qa_launch_exact "/tmp/macwiki_qa_folder_collapse_selected_list.log"
+qa_launch_exact_bundle "/tmp/macwiki_qa_folder_collapse_selected_list.log"
 
 echo "Waiting for $APP_NAME process and content window..."
 content_window_ready=0

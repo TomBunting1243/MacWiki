@@ -80,7 +80,7 @@ APPLESCRIPT
 }
 
 echo "Launching isolated $APP_NAME from $APP_BIN..."
-qa_launch_exact "/tmp/macwiki_qa_nested_folder_rename.log"
+qa_launch_exact_bundle "/tmp/macwiki_qa_nested_folder_rename.log"
 
 echo "Waiting for $APP_NAME process and content window..."
 for _ in $(seq 1 60); do
