@@ -727,15 +727,19 @@ struct BetaReadinessRegressionTests {
     }
 
     @Test func optionClickSaveUsesNativeMacOSFormControls() throws {
-        let source = try source("Sources/MacWiki/Views/Components/OptionClickSaveSheet.swift")
+        let sheetSource = try source("Sources/MacWiki/Views/Components/OptionClickSaveSheet.swift")
+        let commandsSource = try source("Sources/MacWiki/App/MacWikiCommands.swift")
 
-        #expect(source.contains("Form {"))
-        #expect(source.contains(".formStyle(.grouped)"))
-        #expect(source.contains("Picker(\"List\""))
-        #expect(source.contains("Picker(\"Label\""))
-        #expect(source.contains("Picker(\"Tag\""))
-        #expect(!source.contains("selectorButton("))
-        #expect(!source.contains("tagRowBackground("))
+        #expect(sheetSource.contains("Form {"))
+        #expect(sheetSource.contains(".formStyle(.grouped)"))
+        #expect(sheetSource.contains("Picker(\"List\""))
+        #expect(sheetSource.contains("Picker(\"Label\""))
+        #expect(sheetSource.contains("Picker(\"Tag\""))
+        #expect(!sheetSource.contains("selectorButton("))
+        #expect(!sheetSource.contains("tagRowBackground("))
+        #expect(commandsSource.contains("CommandGroup(after: .newItem)"))
+        #expect(commandsSource.contains("Button(\"Save Article...\")"))
+        #expect(!commandsSource.contains("CommandGroup(replacing: .saveItem)"))
     }
 
     @Test func qaHarnessesAvoidMachineSpecificRepositoryPaths() throws {

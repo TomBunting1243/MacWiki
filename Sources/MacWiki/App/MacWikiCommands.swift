@@ -78,9 +78,9 @@ struct MacWikiCommands: Commands {
             }
             .keyboardShortcut("t", modifiers: [.command, .shift])
             .disabled(appState.recentlyClosedTabs.isEmpty || appState.isWikiHopNavigationLocked)
-        }
 
-        CommandGroup(replacing: .saveItem) {
+            Divider()
+
             Button("Save Article...") {
                 appState.presentOptionClickSavePromptForCurrentArticle()
             }
