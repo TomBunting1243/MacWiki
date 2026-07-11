@@ -230,18 +230,18 @@ struct BetaReadinessRegressionTests {
     @Test func articleNewWindowUsesDedicatedReaderInspectorShell() throws {
         let articleWindowSource = try source("Sources/MacWiki/Views/Shared/ArticleWindowRootView.swift")
         let appSource = try source("Sources/MacWiki/App/MacWikiApp.swift")
-        let windowChromeSource = try source("Sources/MacWiki/Views/Shared/WindowChromeConfigurator.swift")
 
         #expect(articleWindowSource.contains("HSplitView"))
         #expect(articleWindowSource.contains("ReaderView()"))
         #expect(articleWindowSource.contains("InspectorColumnView("))
         #expect(articleWindowSource.contains(".toolbarBackgroundVisibility(.hidden, for: .windowToolbar)"))
         #expect(articleWindowSource.contains(".toolbar(removing: .sidebarToggle)"))
-        #expect(articleWindowSource.contains(".configuredMacWikiWindowChrome()"))
         #expect(appSource.contains(".toolbar(removing: .sidebarToggle)"))
-        #expect(appSource.contains(".configuredMacWikiWindowChrome()"))
-        #expect(windowChromeSource.contains("navigationSplitView.toggleSidebar"))
-        #expect(windowChromeSource.contains("SwiftUI.splitViewSeparator"))
+        #expect(!FileManager.default.fileExists(
+            atPath: repositoryRoot()
+                .appendingPathComponent("Sources/MacWiki/Views/Shared/WindowChromeConfigurator.swift")
+                .path
+        ))
         #expect(!articleWindowSource.contains("NavigationSplitView"))
         #expect(!articleWindowSource.contains("MainWindowShell"))
         #expect(!articleWindowSource.contains("ListsColumnView"))
