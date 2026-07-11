@@ -524,8 +524,14 @@ def percentile(values, pct):
     frac = rank - low
     return values[low] + (values[high] - values[low]) * frac
 
-def summarize_mode(mode_name):
-    selected = [r for r in rows if r["mode"] == mode_name and r["reveal_ms"] is not None]
+def summarize_observed_cohort(cohort_name):
+    if cohort_name == "cold":
+        selected = [r for r in rows if r["kind"] == "cold" and r["reveal_ms"] is not None]
+    else:
+        selected = [
+            r for r in rows
+            if r["mode"] == "warm" and r["kind"] != "cold" and r["reveal_ms"] is not None
+        ]
     reveal = [r["reveal_ms"] for r in selected if r["reveal_ms"] is not None]
     did_finish = [r["didFinish_ms"] for r in selected if r["didFinish_ms"] is not None]
     return {
@@ -536,8 +542,8 @@ def summarize_mode(mode_name):
         "did_finish_p95": percentile(did_finish, 95),
     }
 
-cold_summary = summarize_mode("cold")
-warm_summary = summarize_mode("warm")
+cold_summary = summarize_observed_cohort("cold")
+warm_summary = summarize_observed_cohort("warm")
 
 trace_markers = None
 trace_row = next((r for r in rows if r["mode"].startswith("trace") and r["reveal_ms"] is not None), None)
@@ -621,8 +627,8 @@ with open(report_md, "w", encoding="utf-8") as out:
     sample_title = next((r["title"] for r in rows if r["title"]), "n/a")
     out.write(f"- Article: `{sample_title}`\n")
     out.write(f"- Total runs captured: `{len(rows)}`\n")
-    out.write(f"- Cold runs captured: `{cold_summary['n']}`\n")
-    out.write(f"- Warm runs captured: `{warm_summary['n']}`\n\n")
+    out.write(f"- Observed cold runs: `{cold_summary['n']}`\n")
+    out.write(f"- Observed warm-disk runs: `{warm_summary['n']}`\n\n")
 
     out.write("## Per-Run Timings\n\n")
     out.write("| Run | Mode | Kind | Fetch (ms) | didFinish (ms) | Reveal (ms) |\n")
@@ -642,7 +648,7 @@ with open(report_md, "w", encoding="utf-8") as out:
         f"{fmt_ms(cold_summary['did_finish_p50'])} | {fmt_ms(cold_summary['did_finish_p95'])} |\n"
     )
     out.write(
-        f"| warm | {warm_summary['n']} | {fmt_ms(warm_summary['reveal_p50'])} | {fmt_ms(warm_summary['reveal_p95'])} | "
+        f"| warm-disk | {warm_summary['n']} | {fmt_ms(warm_summary['reveal_p50'])} | {fmt_ms(warm_summary['reveal_p95'])} | "
         f"{fmt_ms(warm_summary['did_finish_p50'])} | {fmt_ms(warm_summary['did_finish_p95'])} |\n"
     )
     out.write("\n")

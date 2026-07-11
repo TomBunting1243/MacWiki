@@ -607,6 +607,9 @@ struct BetaReadinessRegressionTests {
         #expect(profileScript.contains("APP_BINARY=\"$2\""))
         #expect(profileScript.contains("source \"$SCRIPT_DIR/lib/qa_process_safety.sh\""))
         #expect(profileScript.contains("CFFIXED_USER_HOME=$QA_HOME"))
+        #expect(profileScript.contains("def summarize_observed_cohort(cohort_name):"))
+        #expect(profileScript.contains("r[\"kind\"] == \"cold\""))
+        #expect(profileScript.contains("r[\"mode\"] == \"warm\" and r[\"kind\"] != \"cold\""))
         #expect(!profileScript.contains("pkill -x"))
         #expect(!profileScript.contains("APP_BINARY=\"$REPO_ROOT/.build/debug/MacWiki\""))
     }
