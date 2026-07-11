@@ -93,7 +93,6 @@ private final class MacWikiRuntime {
             rootView: ContentView()
                 .focusedSceneValue(\.macWikiCommandAppState, appState)
                 .toolbar(removing: .title)
-                .toolbar(removing: .sidebarToggle)
                 .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
                 .environment(appState)
                 .modelContainer(modelContainer)
@@ -384,7 +383,6 @@ struct MacWikiApp: App {
                 .persistenceIssueAlert()
                 .focusedSceneValue(\.macWikiCommandAppState, appState)
                 .toolbar(removing: .title)
-                .toolbar(removing: .sidebarToggle)
                 .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
                 .alert(item: $launchIssue) { issue in
                     Alert(

@@ -180,7 +180,7 @@ struct ReaderArticleToolbar: View {
                 .padding(.leading, leadingPadding(density: density, proxy: proxy))
                 .padding(.trailing, density.horizontalPadding)
                 .padding(.top, Metrics.toolbarTopPadding)
-                .animation(reduceMotion ? nil : ColumnMotion.readerOnlyVisibility, value: appState.sidebarVisible)
+                .animation(reduceMotion ? nil : ColumnMotion.readerOnlyVisibility, value: appState.directoryColumnVisible)
         }
         .frame(height: Metrics.toolbarHeight)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -235,8 +235,8 @@ struct ReaderArticleToolbar: View {
         toolbarPill(density: density) {
             toolbarIconButton(
                 .listContents,
-                title: appState.sidebarVisible ? "Hide Sidebar and List Contents" : "Show Sidebar and List Contents",
-                systemImage: "sidebar.leading",
+                title: appState.directoryColumnVisible ? "Hide List Contents" : "Show List Contents",
+                systemImage: "sidebar.squares.leading",
                 isEnabled: !appState.isWikiHopNavigationLocked,
                 density: density
             ) {
@@ -747,10 +747,10 @@ struct ReaderArticleToolbar: View {
 
     private func toggleListContentsVisibility() {
         if reduceMotion {
-            appState.toggleNavigationColumnsVisibility()
+            appState.toggleDirectoryColumnVisibility()
         } else {
             withAnimation(ColumnMotion.readerOnlyVisibility) {
-                appState.toggleNavigationColumnsVisibility()
+                appState.toggleDirectoryColumnVisibility()
             }
         }
     }
