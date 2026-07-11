@@ -22,8 +22,31 @@ PARENT_NAME="QA_PARENT_${timestamp}_${suffix}"
 CHILD_NAME="QA_CHILD_${timestamp}_${suffix}"
 RENAMED_CHILD_NAME="QA_CHILD_RENAMED_${timestamp}_${suffix}"
 
-PARENT_ROW_ID="area-row-${PARENT_NAME}"
-CHILD_ROW_ID="area-row-${CHILD_NAME}"
+uuid_from_hex() {
+  local hex="$1"
+  if [[ ! "$hex" =~ ^[0-9a-f]{32}$ ]]; then
+    return 1
+  fi
+  printf '%s-%s-%s-%s-%s\n' \
+    "${hex:0:8}" "${hex:8:4}" "${hex:12:4}" "${hex:16:4}" "${hex:20:12}" | tr '[:lower:]' '[:upper:]'
+}
+
+wait_for_area_hex_id() {
+  local area_name="$1"
+  local hex=""
+  for _ in $(seq 1 100); do
+    if [[ -f "$STORE_PATH" ]]; then
+      hex="$(sqlite3 "$STORE_PATH" "SELECT lower(hex(ZID)) FROM ZAREA WHERE ZNAME='${area_name}' ORDER BY Z_PK DESC LIMIT 1;" 2>/dev/null || true)"
+      if [[ "$hex" =~ ^[0-9a-f]{32}$ ]]; then
+        printf '%s\n' "$hex"
+        return 0
+      fi
+    fi
+    sleep 0.1
+  done
+  echo "ERROR: Timed out resolving SwiftData ID for $area_name" >&2
+  return 1
+}
 
 echo "Starting nested-folder rename QA harness..."
 echo "Parent folder:  ${PARENT_NAME}"
@@ -261,191 +284,13 @@ end run
 end using terms from
 APPLESCRIPT
 
+parent_id_hex="$(wait_for_area_hex_id "$PARENT_NAME")"
+child_id_hex="$(wait_for_area_hex_id "$CHILD_NAME")"
+PARENT_ROW_ID="sidebar-row-area-$(uuid_from_hex "$parent_id_hex")"
+CHILD_ROW_ID="sidebar-row-area-$(uuid_from_hex "$child_id_hex")"
+
 echo "Resolving folder row coordinates..."
-coords="$(
-osascript - "$APP_NAME" "$CHILD_ROW_ID" "$PARENT_ROW_ID" <<'APPLESCRIPT'
-using terms from application "System Events"
-on contentWindowIndex(appName)
-    tell application "System Events"
-        if not (exists process appName) then return 0
-        tell process appName
-            set windowCount to count of windows
-            repeat with idx from 1 to windowCount
-                try
-                    if exists outline 1 of scroll area 1 of group 1 of splitter group 1 of group 1 of splitter group 1 of group 1 of window idx then return idx as integer
-                end try
-            end repeat
-        end tell
-    end tell
-    return 0
-end contentWindowIndex
-
-on waitForContentWindowIndex(appName, timeoutSeconds)
-    set deadline to (current date) + timeoutSeconds
-    repeat while (current date) < deadline
-        set idx to my contentWindowIndex(appName)
-        if idx is not 0 then return idx
-        delay 0.1
-    end repeat
-    error "Timed out waiting for content window"
-end waitForContentWindowIndex
-
-on rowMatchesIdentifier(rowElement, targetIdentifier)
-    try
-        if value of attribute "AXIdentifier" of rowElement is targetIdentifier then return true
-    end try
-
-    set rowElements to entire contents of rowElement
-    repeat with e in rowElements
-        try
-            if value of attribute "AXIdentifier" of e is targetIdentifier then return true
-        end try
-    end repeat
-
-    return false
-end rowMatchesIdentifier
-
-on findRowByIdentifier(appName, targetIdentifier)
-    set windowIndex to my waitForContentWindowIndex(appName, 4)
-    tell application "System Events"
-        tell process appName
-            set outlineElement to outline 1 of scroll area 1 of group 1 of splitter group 1 of group 1 of splitter group 1 of group 1 of window windowIndex
-            repeat with r in rows of outlineElement
-                try
-                    if my rowMatchesIdentifier(r, targetIdentifier) then return r
-                end try
-            end repeat
-        end tell
-    end tell
-    return missing value
-end findRowByIdentifier
-
-on waitForRowByIdentifier(appName, targetIdentifier, timeoutSeconds)
-    set deadline to (current date) + timeoutSeconds
-    repeat while (current date) < deadline
-        set matchRow to my findRowByIdentifier(appName, targetIdentifier)
-        if matchRow is not missing value then return matchRow
-        delay 0.1
-    end repeat
-    error "Timed out waiting for row: " & targetIdentifier
-end waitForRowByIdentifier
-
-on elementSupportsAction(elementRef, actionName)
-    try
-        repeat with actionRef in actions of elementRef
-            try
-                if (name of actionRef as text) is actionName then return true
-            end try
-        end repeat
-    end try
-    return false
-end elementSupportsAction
-
-on rowElementForContextMenu(rowElement)
-    if my elementSupportsAction(rowElement, "AXShowMenu") then return rowElement
-    set rowElements to entire contents of rowElement
-    repeat with e in rowElements
-        if my elementSupportsAction(e, "AXShowMenu") then return e
-    end repeat
-    return missing value
-end rowElementForContextMenu
-
-on disclosureToggleInRow(rowElement)
-    set rowElements to entire contents of rowElement
-    repeat with e in rowElements
-        try
-            if value of attribute "AXRole" of e is "AXDisclosureTriangle" then return e
-        end try
-    end repeat
-    return missing value
-end disclosureToggleInRow
-
-on rowExpandedState(rowElement)
-    set rawValue to missing value
-    try
-        set rawValue to value of attribute "AXExpanded" of rowElement
-    end try
-    if rawValue is missing value then
-        set toggleElement to my disclosureToggleInRow(rowElement)
-        if toggleElement is not missing value then
-            try
-                set rawValue to value of attribute "AXValue" of toggleElement
-            end try
-        end if
-    end if
-
-    if rawValue is missing value then return missing value
-    if class of rawValue is integer then
-        return rawValue is not 0
-    end if
-    if class of rawValue is real then
-        return rawValue is not 0
-    end if
-    if class of rawValue is text then
-        try
-            return (rawValue as integer) is not 0
-        end try
-    end if
-    return rawValue
-end rowExpandedState
-
-on nudgeRowExpandedState(rowElement, desiredState)
-    try
-        set value of attribute "AXExpanded" of rowElement to desiredState
-        return true
-    end try
-
-    set toggleElement to my disclosureToggleInRow(rowElement)
-    if toggleElement is missing value then return false
-
-    try
-        perform action "AXPress" of toggleElement
-        return true
-    end try
-    try
-        click toggleElement
-        return true
-    end try
-    return false
-end nudgeRowExpandedState
-
-on ensureRowExpandedState(appName, rowIdentifier, desiredState, timeoutSeconds, failureMessage)
-    set deadline to (current date) + timeoutSeconds
-    repeat while (current date) < deadline
-        set rowElement to my findRowByIdentifier(appName, rowIdentifier)
-        if rowElement is not missing value then
-            set expandedState to my rowExpandedState(rowElement)
-            if expandedState is desiredState then return true
-            if my nudgeRowExpandedState(rowElement, desiredState) then delay 0.12
-        end if
-        delay 0.08
-    end repeat
-    error failureMessage
-end ensureRowExpandedState
-
-on run argv
-    set appName to item 1 of argv
-    set sourceID to item 2 of argv
-    set targetID to item 3 of argv
-
-    set sourceRow to my waitForRowByIdentifier(appName, sourceID, 20)
-    set targetRow to my waitForRowByIdentifier(appName, targetID, 20)
-
-    set sourcePos to position of sourceRow
-    set sourceSize to size of sourceRow
-    set targetPos to position of targetRow
-    set targetSize to size of targetRow
-
-    set sourceCenterX to (item 1 of sourcePos) + ((item 1 of sourceSize) / 2)
-    set sourceCenterY to (item 2 of sourcePos) + ((item 2 of sourceSize) / 2)
-    set targetCenterX to (item 1 of targetPos) + ((item 1 of targetSize) / 2)
-    set targetCenterY to (item 2 of targetPos) + ((item 2 of targetSize) / 2)
-
-    return (sourceCenterX as text) & " " & (sourceCenterY as text) & " " & (targetCenterX as text) & " " & (targetCenterY as text)
-end run
-end using terms from
-APPLESCRIPT
-)"
+coords="$(osascript -l JavaScript "$SCRIPT_DIR/lib/qa_area_row_centers.js" pair "$APP_NAME" "$CHILD_ROW_ID" "$PARENT_ROW_ID")"
 
 read -r source_x source_y target_x target_y <<<"$coords"
 
@@ -466,107 +311,7 @@ swift "$SCRIPT_DIR/cg_drag.swift" \
   --duration 0.42
 
 echo "Resolving nested child folder coordinate for rename..."
-rename_coords="$(
-osascript - "$APP_NAME" "$PARENT_NAME" "$CHILD_NAME" <<'APPLESCRIPT'
-using terms from application "System Events"
-on contentWindowIndex(appName)
-    tell application "System Events"
-        if not (exists process appName) then return 0
-        tell process appName
-            set windowCount to count of windows
-            repeat with idx from 1 to windowCount
-                try
-                    if exists outline 1 of scroll area 1 of group 1 of splitter group 1 of group 1 of splitter group 1 of group 1 of window idx then return idx as integer
-                end try
-            end repeat
-        end tell
-    end tell
-    return 0
-end contentWindowIndex
-
-on waitForContentWindowIndex(appName, timeoutSeconds)
-    set deadline to (current date) + timeoutSeconds
-    repeat while (current date) < deadline
-        set idx to my contentWindowIndex(appName)
-        if idx is not 0 then return idx
-        delay 0.1
-    end repeat
-    error "Timed out waiting for content window"
-end waitForContentWindowIndex
-
-on rowMatchesIdentifier(rowElement, targetIdentifier)
-    try
-        if value of attribute "AXIdentifier" of rowElement is targetIdentifier then return true
-    end try
-
-    set rowElements to entire contents of rowElement
-    repeat with e in rowElements
-        try
-            if value of attribute "AXIdentifier" of e is targetIdentifier then return true
-        end try
-    end repeat
-
-    return false
-end rowMatchesIdentifier
-
-on findRowByIdentifier(appName, targetIdentifier)
-    set windowIndex to my waitForContentWindowIndex(appName, 4)
-    tell application "System Events"
-        tell process appName
-            set outlineElement to outline 1 of scroll area 1 of group 1 of splitter group 1 of group 1 of splitter group 1 of group 1 of window windowIndex
-            repeat with r in rows of outlineElement
-                try
-                    if my rowMatchesIdentifier(r, targetIdentifier) then return r
-                end try
-            end repeat
-        end tell
-    end tell
-    return missing value
-end findRowByIdentifier
-
-on waitForRowByIdentifier(appName, targetIdentifier, timeoutSeconds)
-    set deadline to (current date) + timeoutSeconds
-    repeat while (current date) < deadline
-        set matchRow to my findRowByIdentifier(appName, targetIdentifier)
-        if matchRow is not missing value then return matchRow
-        delay 0.1
-    end repeat
-    error "Timed out waiting for row: " & targetIdentifier
-end waitForRowByIdentifier
-
-on run argv
-    set appName to item 1 of argv
-    set parentName to item 2 of argv
-    set childName to item 3 of argv
-    set parentRowID to "area-row-" & parentName
-    set childRowID to "area-row-" & childName
-
-    set windowIndex to my waitForContentWindowIndex(appName, 20)
-    tell application "System Events"
-        tell process appName
-            set frontmost to true
-            try
-                perform action "AXRaise" of window windowIndex
-            end try
-        end tell
-    end tell
-
-    set parentRow to my waitForRowByIdentifier(appName, parentRowID, 14)
-    try
-        set value of attribute "AXExpanded" of parentRow to true
-    end try
-
-    set childRow to my waitForRowByIdentifier(appName, childRowID, 14)
-    set childPos to position of childRow
-    set childSize to size of childRow
-    set childCenterX to (item 1 of childPos) + ((item 1 of childSize) / 2)
-    set childCenterY to (item 2 of childPos) + ((item 2 of childSize) / 2)
-
-    return (childCenterX as text) & " " & (childCenterY as text)
-end run
-end using terms from
-APPLESCRIPT
-)"
+rename_coords="$(osascript -l JavaScript "$SCRIPT_DIR/lib/qa_area_row_centers.js" nested "$APP_NAME" "$PARENT_ROW_ID" "$CHILD_ROW_ID")"
 
 read -r rename_x rename_y <<<"$rename_coords"
 
@@ -576,141 +321,8 @@ if [[ -z "${rename_x:-}" || -z "${rename_y:-}" ]]; then
   exit 1
 fi
 
-echo "Opening context menu on nested child folder..."
-activate_app
-sleep 0.15
-swift "$SCRIPT_DIR/cg_right_click.swift" \
-  --x "$rename_x" \
-  --y "$rename_y"
-
 echo "Renaming nested child folder via context menu..."
-osascript - "$APP_NAME" "$RENAMED_CHILD_NAME" "$CHILD_NAME" <<'APPLESCRIPT'
-using terms from application "System Events"
-on contentWindowIndex(appName)
-    tell application "System Events"
-        if not (exists process appName) then return 0
-        tell process appName
-            set windowCount to count of windows
-            repeat with idx from 1 to windowCount
-                try
-                    if exists outline 1 of scroll area 1 of group 1 of splitter group 1 of group 1 of splitter group 1 of group 1 of window idx then return idx as integer
-                end try
-            end repeat
-        end tell
-    end tell
-    return 0
-end contentWindowIndex
-
-on waitForContentWindowIndex(appName, timeoutSeconds)
-    set deadline to (current date) + timeoutSeconds
-    repeat while (current date) < deadline
-        set idx to my contentWindowIndex(appName)
-        if idx is not 0 then return idx
-        delay 0.1
-    end repeat
-    error "Timed out waiting for content window"
-end waitForContentWindowIndex
-
-on firstTextFieldIn(containerElement)
-    set allElements to entire contents of containerElement
-    repeat with e in allElements
-        try
-            if class of e is text field then return e
-        end try
-    end repeat
-    return missing value
-end firstTextFieldIn
-
-on rowMatchesIdentifier(rowElement, targetIdentifier)
-    try
-        if value of attribute "AXIdentifier" of rowElement is targetIdentifier then return true
-    end try
-
-    set rowElements to entire contents of rowElement
-    repeat with e in rowElements
-        try
-            if value of attribute "AXIdentifier" of e is targetIdentifier then return true
-        end try
-    end repeat
-    return false
-end rowMatchesIdentifier
-
-on findRowByIdentifier(appName, targetIdentifier)
-    set windowIndex to my waitForContentWindowIndex(appName, 4)
-    tell application "System Events"
-        tell process appName
-            set outlineElement to outline 1 of scroll area 1 of group 1 of splitter group 1 of group 1 of splitter group 1 of group 1 of window windowIndex
-            repeat with r in rows of outlineElement
-                try
-                    if my rowMatchesIdentifier(r, targetIdentifier) then return r
-                end try
-            end repeat
-        end tell
-    end tell
-    return missing value
-end findRowByIdentifier
-
-on waitForRowByIdentifier(appName, targetIdentifier, timeoutSeconds)
-    set deadline to (current date) + timeoutSeconds
-    repeat while (current date) < deadline
-        set matchRow to my findRowByIdentifier(appName, targetIdentifier)
-        if matchRow is not missing value then return matchRow
-        delay 0.1
-    end repeat
-    error "Timed out waiting for row: " & targetIdentifier
-end waitForRowByIdentifier
-
-on run argv
-    set appName to item 1 of argv
-    set renamedName to item 2 of argv
-    set childName to item 3 of argv
-    set childRowID to "area-row-" & childName
-
-    set windowIndex to my waitForContentWindowIndex(appName, 20)
-
-    tell application "System Events"
-        tell process appName
-            set frontmost to true
-            try
-                perform action "AXRaise" of window windowIndex
-            end try
-
-            set childRow to my waitForRowByIdentifier(appName, childRowID, 10)
-            try
-                perform action "AXShowMenu" of UI element 1 of UI element 1 of childRow
-            on error
-                try
-                    perform action "AXShowMenu" of childRow
-                on error
-                    try
-                        perform action "AXShowAlternateUI" of childRow
-                    end try
-                end try
-            end try
-
-            delay 0.12
-            tell application "System Events" to key code 36
-
-            set deadline to (current date) + 8
-            repeat while (current date) < deadline
-                if exists sheet 1 of window windowIndex then
-                    set renameSheet to sheet 1 of window windowIndex
-                    set nameField to my firstTextFieldIn(renameSheet)
-                    if nameField is not missing value then
-                        set value of nameField to renamedName
-                        tell application "System Events" to key code 36
-                        return true
-                    end if
-                end if
-                delay 0.05
-            end repeat
-        end tell
-    end tell
-
-    error "Rename sheet did not appear"
-end run
-end using terms from
-APPLESCRIPT
+osascript -l JavaScript "$SCRIPT_DIR/lib/qa_rename_area.js" "$APP_NAME" "$CHILD_ROW_ID" "$RENAMED_CHILD_NAME"
 
 sleep 0.8
 

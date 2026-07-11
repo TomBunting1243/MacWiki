@@ -691,11 +691,31 @@ struct BetaReadinessRegressionTests {
             #expect(script.contains("APP_BIN=\"${APP_BIN:-$APP_BIN_DEFAULT}\""))
             #expect(script.contains("if [[ ! -x \"$APP_BIN\" && -x \"$APP_BIN_FALLBACK\" ]]; then"))
             #expect(script.contains("source \"$SCRIPT_DIR/lib/qa_process_safety.sh\""))
-            #expect(script.contains("qa_launch_exact"))
+            #expect(script.contains("qa_launch_exact_bundle"))
             #expect(!script.contains("pkill -x"))
             #expect(!script.contains("WORKDIR=\"/Users/tombunting/Developer/MacWiki\""))
             #expect(!script.contains("APP_BIN=\"${APP_BIN:-$WORKDIR/.build/debug/MacWiki}\""))
         }
+
+        let sidebarCenters = try source("scripts/lib/qa_sidebar_row_centers.js")
+        let folderVerifier = try source("scripts/lib/qa_verify_folder_collapse.js")
+        let areaCenters = try source("scripts/lib/qa_area_row_centers.js")
+        let areaRenamer = try source("scripts/lib/qa_rename_area.js")
+
+        #expect(folderCollapseScript.contains("qa_sidebar_row_centers.js"))
+        #expect(folderCollapseScript.contains("qa_verify_folder_collapse.js"))
+        #expect(sidebarCenters.contains("sidebar-row-list-"))
+        #expect(folderVerifier.contains("Selection did not fall back to Recents after folder collapse"))
+
+        #expect(nestedRenameScript.contains("qa_area_row_centers.js"))
+        #expect(nestedRenameScript.contains("qa_rename_area.js"))
+        #expect(nestedRenameScript.contains("sidebar-row-area-"))
+        #expect(!nestedRenameScript.contains("cg_right_click.swift"))
+        #expect(!nestedRenameScript.contains("findRowByIdentifier"))
+        #expect(!nestedRenameScript.contains("${1,,}"))
+        #expect(areaCenters.contains("rowContainsIdentifier"))
+        #expect(areaRenamer.contains("AXShowMenu"))
+        #expect(areaRenamer.contains("AXMenuItem"))
     }
 
     @Test func mutatingQAHarnessesRequireIsolatedStateAndExactProcessIdentity() throws {
