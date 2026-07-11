@@ -35,7 +35,7 @@ struct SettingsCatalogTests {
         #expect(markdown.contains("| Setting | Storage key | Default | Control | Values | Visible | Notes |"))
     }
 
-    @Test func everySettingsSectionUsesAnAvailableSystemSymbol() {
+    @Test @MainActor func everySettingsSectionUsesAnAvailableSystemSymbol() {
         let unavailable = SettingsCatalog.sections.compactMap { section in
             NSImage(systemSymbolName: section.systemImage, accessibilityDescription: nil) == nil
                 ? "\(section.id.rawValue): \(section.systemImage)"
