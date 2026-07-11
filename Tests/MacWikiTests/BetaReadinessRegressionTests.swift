@@ -78,6 +78,23 @@ struct BetaReadinessRegressionTests {
         #expect(source.contains("sidebarSectionHeader(\"Explore\")"))
     }
 
+    @Test func folderAccessibilityIdentityDoesNotOverrideNestedListIdentity() throws {
+        let sidebarSource = try source("Sources/MacWiki/Views/Sidebar/ListsSidebar.swift")
+        let areaRow = sourceSection(
+            sidebarSource,
+            startingAt: "private struct AreaRowView",
+            endingBefore: "/// Label row for sidebar"
+        )
+        let disclosureLabel = sourceSection(
+            areaRow,
+            startingAt: "} label: {",
+            endingBefore: ".tag(SidebarSelectionID.area(area.id))"
+        )
+
+        #expect(disclosureLabel.contains(".accessibilityIdentifier(SidebarSelectionID.area(area.id).accessibilityIdentifier)"))
+        #expect(!areaRow.contains(#".accessibilityIdentifier("area-row-\(area.name)")"#))
+    }
+
     @Test func settingsSlidersExposeSingleAccessibleControlLabel() throws {
         let settingsControlsSource = try source("Sources/MacWiki/Views/Components/SettingsControls.swift")
         let sliderRow = sourceSection(

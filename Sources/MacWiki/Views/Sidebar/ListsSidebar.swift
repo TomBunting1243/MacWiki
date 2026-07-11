@@ -1670,6 +1670,11 @@ private struct AreaRowView<ListRow: View>: View {
             }
             .sidebarDropTargetStyle(isTargeted: isDropTargeted)
             .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: isDropTargeted)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(area.name)
+            .accessibilityValue(totalListCount > 0 ? "\(totalListCount) lists" : "Empty folder")
+            .accessibilityHint("Open or collapse this folder. Drag lists or folders here to move them inside.")
+            .accessibilityIdentifier(SidebarSelectionID.area(area.id).accessibilityIdentifier)
             .contextMenu {
                 Button {
                     onRename(area)
@@ -1690,10 +1695,6 @@ private struct AreaRowView<ListRow: View>: View {
         .listRowInsets(EdgeInsets())
         .listRowSeparator(.hidden)
         .listRowBackground(Color.clear)
-        .accessibilityLabel(area.name)
-        .accessibilityValue(totalListCount > 0 ? "\(totalListCount) lists" : "Empty folder")
-        .accessibilityHint("Open or collapse this folder. Drag lists or folders here to move them inside.")
-        .accessibilityIdentifier("area-row-\(area.name)")
         .help("Drop lists or folders here to move them into \(area.name)")
         .draggable(area.id.uuidString) {
             SwiftUI.Label(area.name, systemImage: area.icon)

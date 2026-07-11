@@ -53,7 +53,7 @@ on contentWindowIndex(appName)
             set windowCount to count of windows
             repeat with idx from 1 to windowCount
                 try
-                    if exists splitter group 1 of group 1 of window idx then return idx
+                    if exists outline 1 of scroll area 1 of group 1 of splitter group 1 of group 1 of splitter group 1 of group 1 of window idx then return idx as integer
                 end try
             end repeat
         end tell
@@ -93,7 +93,7 @@ on contentWindowIndex(appName)
             set windowCount to count of windows
             repeat with idx from 1 to windowCount
                 try
-                    if exists splitter group 1 of group 1 of window idx then return idx
+                    if exists outline 1 of scroll area 1 of group 1 of splitter group 1 of group 1 of splitter group 1 of group 1 of window idx then return idx as integer
                 end try
             end repeat
         end tell
@@ -123,7 +123,7 @@ on contentWindowIndex(appName)
             set windowCount to count of windows
             repeat with idx from 1 to windowCount
                 try
-                    if exists splitter group 1 of group 1 of window idx then return idx
+                    if exists outline 1 of scroll area 1 of group 1 of splitter group 1 of group 1 of splitter group 1 of group 1 of window idx then return idx as integer
                 end try
             end repeat
         end tell
@@ -151,19 +151,27 @@ on firstTextFieldIn(containerElement)
     return missing value
 end firstTextFieldIn
 
+on elementMatchesLabel(elementValue, targetLabel)
+    try
+        if (description of elementValue as text) is targetLabel then return true
+    end try
+    try
+        if (value of elementValue as text) is targetLabel then return true
+    end try
+    try
+        if (name of elementValue as text) is targetLabel then return true
+    end try
+    try
+        if (title of elementValue as text) is targetLabel then return true
+    end try
+    return false
+end elementMatchesLabel
+
 on rowContainsLabel(rowElement, targetLabel)
+    if my elementMatchesLabel(rowElement, targetLabel) then return true
     set rowElements to entire contents of rowElement
     repeat with e in rowElements
-        try
-            if class of e is static text then
-                try
-                    if (value of e as text) is targetLabel then return true
-                end try
-                try
-                    if (name of e as text) is targetLabel then return true
-                end try
-            end if
-        end try
+        if my elementMatchesLabel(e, targetLabel) then return true
     end repeat
     return false
 end rowContainsLabel
@@ -171,7 +179,7 @@ end rowContainsLabel
 on findRowByLabel(appName, windowIndex, targetLabel)
     tell application "System Events"
         tell process appName
-            set outlineElement to outline 1 of scroll area 1 of group 1 of splitter group 1 of group 1 of window windowIndex
+            set outlineElement to outline 1 of scroll area 1 of group 1 of splitter group 1 of group 1 of splitter group 1 of group 1 of window windowIndex
             repeat with r in rows of outlineElement
                 try
                     if my rowContainsLabel(r, targetLabel) then return r
@@ -264,7 +272,7 @@ on contentWindowIndex(appName)
             set windowCount to count of windows
             repeat with idx from 1 to windowCount
                 try
-                    if exists splitter group 1 of group 1 of window idx then return idx
+                    if exists outline 1 of scroll area 1 of group 1 of splitter group 1 of group 1 of splitter group 1 of group 1 of window idx then return idx as integer
                 end try
             end repeat
         end tell
@@ -301,7 +309,7 @@ on findRowByIdentifier(appName, targetIdentifier)
     set windowIndex to my waitForContentWindowIndex(appName, 4)
     tell application "System Events"
         tell process appName
-            set outlineElement to outline 1 of scroll area 1 of group 1 of splitter group 1 of group 1 of window windowIndex
+            set outlineElement to outline 1 of scroll area 1 of group 1 of splitter group 1 of group 1 of splitter group 1 of group 1 of window windowIndex
             repeat with r in rows of outlineElement
                 try
                     if my rowMatchesIdentifier(r, targetIdentifier) then return r
@@ -468,7 +476,7 @@ on contentWindowIndex(appName)
             set windowCount to count of windows
             repeat with idx from 1 to windowCount
                 try
-                    if exists splitter group 1 of group 1 of window idx then return idx
+                    if exists outline 1 of scroll area 1 of group 1 of splitter group 1 of group 1 of splitter group 1 of group 1 of window idx then return idx as integer
                 end try
             end repeat
         end tell
@@ -505,7 +513,7 @@ on findRowByIdentifier(appName, targetIdentifier)
     set windowIndex to my waitForContentWindowIndex(appName, 4)
     tell application "System Events"
         tell process appName
-            set outlineElement to outline 1 of scroll area 1 of group 1 of splitter group 1 of group 1 of window windowIndex
+            set outlineElement to outline 1 of scroll area 1 of group 1 of splitter group 1 of group 1 of splitter group 1 of group 1 of window windowIndex
             repeat with r in rows of outlineElement
                 try
                     if my rowMatchesIdentifier(r, targetIdentifier) then return r
@@ -585,7 +593,7 @@ on contentWindowIndex(appName)
             set windowCount to count of windows
             repeat with idx from 1 to windowCount
                 try
-                    if exists splitter group 1 of group 1 of window idx then return idx
+                    if exists outline 1 of scroll area 1 of group 1 of splitter group 1 of group 1 of splitter group 1 of group 1 of window idx then return idx as integer
                 end try
             end repeat
         end tell
@@ -631,7 +639,7 @@ on findRowByIdentifier(appName, targetIdentifier)
     set windowIndex to my waitForContentWindowIndex(appName, 4)
     tell application "System Events"
         tell process appName
-            set outlineElement to outline 1 of scroll area 1 of group 1 of splitter group 1 of group 1 of window windowIndex
+            set outlineElement to outline 1 of scroll area 1 of group 1 of splitter group 1 of group 1 of splitter group 1 of group 1 of window windowIndex
             repeat with r in rows of outlineElement
                 try
                     if my rowMatchesIdentifier(r, targetIdentifier) then return r
