@@ -698,6 +698,18 @@ struct BetaReadinessRegressionTests {
             #expect(!script.contains("open -n \"$APP_BIN\""))
             #expect(!script.contains("$HOME/Library/Application Support/default.store"))
         }
+
+        let discoverScript = try source("scripts/qa_discover_scroll_time_machine.sh")
+        let launchRange = try #require(discoverScript.range(of: "qa_launch_exact \"/tmp/macwiki-qa-discover-launch.log\""))
+        let boundsRange = try #require(discoverScript.range(of: "window_info=\"$(ensure_macwiki_window)\""))
+        #expect(launchRange.lowerBound < boundsRange.lowerBound)
+        #expect(!discoverScript.contains("--flip-y"))
+        #expect(discoverScript.contains("if [[ \"$qa_status\" != \"PASS\" ]]"))
+        #expect(discoverScript.contains("did not reach and verify both Discover and Time Machine UI"))
+        let folderCollapseScript = try source("scripts/qa_folder_collapse_selected_list.sh")
+        let nestedRenameScript = try source("scripts/qa_nested_folder_rename.sh")
+        #expect(!folderCollapseScript.contains("--flip-y"))
+        #expect(!nestedRenameScript.contains("--flip-y"))
     }
 
     @Test func widthClassHarnessUsesReachableVerifiedWindowSizes() throws {

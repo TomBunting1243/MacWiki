@@ -429,8 +429,7 @@ swift "$SCRIPT_DIR/cg_drag.swift" \
   --start-y "$list_y" \
   --end-x "$folder_x" \
   --end-y "$folder_y" \
-  --duration 0.42 \
-  --flip-y
+  --duration 0.42
 
 echo "Verifying collapse fallback and folder responsiveness..."
 osascript - "$APP_NAME" "$FOLDER_ROW_ID" "$LIST_NAME" <<'APPLESCRIPT'

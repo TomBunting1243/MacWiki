@@ -110,16 +110,6 @@ ensure_macwiki_window() {
       return 0
     fi
 
-    if (( attempts == 0 )); then
-      if [[ -x "$APP_BIN" ]]; then
-        echo "Launching isolated $APP_NAME from $APP_BIN" >&2
-        qa_launch_exact "/tmp/macwiki-qa-discover-launch.log"
-      else
-        echo "ERROR: App binary not found: $APP_BIN" >&2
-        exit 1
-      fi
-    fi
-
     sleep 1
     attempts=$((attempts + 1))
   done
@@ -134,6 +124,97 @@ on run argv
   tell application (item 1 of argv) to activate
 end run
 APPLESCRIPT
+}
+
+select_discover_via_accessibility() {
+  APP_PID="$QA_APP_PID" osascript -l JavaScript <<'JXA'
+ObjC.import('stdlib');
+const se = Application('System Events');
+const appPid = Number(ObjC.unwrap($.getenv('APP_PID')) || '0');
+const matches = se.processes.whose({ unixId: appPid })();
+if (matches.length !== 1) throw new Error('verified app process missing');
+const observedRows = [];
+const observedRowElements = [];
+
+function labelText(element) {
+  const values = [];
+  for (const read of [
+    () => element.name(),
+    () => element.description(),
+    () => element.title(),
+    () => element.value()
+  ]) {
+    try {
+      const value = read();
+      if (value !== null && value !== undefined) values.push(String(value));
+    } catch (error) {}
+  }
+  return values.join(' ');
+}
+
+function subtreeText(element, depth) {
+  const values = [labelText(element)];
+  if (depth <= 0) return values.join(' ');
+  let children = [];
+  try { children = element.uiElements(); } catch (error) {}
+  for (const child of children) values.push(subtreeText(child, depth - 1));
+  return values.join(' ');
+}
+
+function pressFirstButton(element, depth) {
+  if (depth > 5) return false;
+  let role = '';
+  try { role = String(element.role()); } catch (error) {}
+  if (role === 'AXButton' || role.toLowerCase() === 'button') {
+    element.actions.byName('AXPress').perform();
+    return true;
+  }
+  let children = [];
+  try { children = element.uiElements(); } catch (error) {}
+  for (const child of children) {
+    if (pressFirstButton(child, depth + 1)) return true;
+  }
+  return false;
+}
+
+function pressDiscover(element, depth) {
+  if (depth > 14) return false;
+  let role = '';
+  try { role = String(element.role()); } catch (error) {}
+  const label = role.toLowerCase().includes('row') ? subtreeText(element, 3) : labelText(element);
+  if (role.toLowerCase().includes('row')) {
+    observedRows.push(`${role}: ${label}`);
+    observedRowElements.push(element);
+  }
+  if ((role === 'AXRow' || role.toLowerCase() === 'row') && /(^|\s)Discover($|\s)/i.test(label)) {
+    if (!pressFirstButton(element, 0)) element.actions.byName('AXPress').perform();
+    return true;
+  }
+  let children = [];
+  try { children = element.uiElements(); } catch (error) {}
+  for (const child of children) {
+    if (pressDiscover(child, depth + 1)) return true;
+  }
+  return false;
+}
+
+const app = matches[0];
+for (const window of app.windows()) {
+  if (pressDiscover(window, 0)) {
+    console.log('DISCOVER_AX_OK');
+    $.exit(0);
+  }
+}
+const selectedRowIndex = observedRows.findIndex(row => /\bSelected\b/i.test(row));
+if (selectedRowIndex > 0) {
+  const discoverRow = observedRowElements[selectedRowIndex - 1];
+  if (!pressFirstButton(discoverRow, 0)) discoverRow.actions.byName('AXPress').perform();
+  console.log('DISCOVER_AX_OK_PRECEDING_SELECTED_ROW');
+  $.exit(0);
+}
+console.log('DISCOVER_AX_NOT_FOUND\n' + observedRows.join('\n'));
+$.exit(1);
+JXA
 }
 
 send_page_down() {
@@ -193,6 +274,12 @@ map_image_point_to_window_point() {
 prepare_deterministic_launch
 discover_mode_effective="$(defaults read "$APP_BUNDLE_ID" discoverOpenMode 2>/dev/null || true)"
 
+if [[ ! -x "$APP_BIN" ]]; then
+  echo "ERROR: App binary not found: $APP_BIN" >&2
+  exit 1
+fi
+echo "Launching isolated $APP_NAME from $APP_BIN" >&2
+qa_launch_exact "/tmp/macwiki-qa-discover-launch.log"
 window_info="$(ensure_macwiki_window)"
 if [[ ! "$window_info" =~ ^-?[0-9]+,-?[0-9]+,[0-9]+,[0-9]+,[0-9]+$ ]]; then
   echo "ERROR: Unexpected window bounds payload: $window_info" >&2
@@ -220,7 +307,23 @@ discover_selected="false"
 discover_click_shot=""
 discover_centers="$("$ocr_centers_script" "$top_shot" "Discover" 2>/dev/null || true)"
 
-if [[ -n "$discover_centers" ]]; then
+ax_selection_output=""
+if ax_selection_output="$(select_discover_via_accessibility 2>&1)"; then
+  printf '%s\n' "$ax_selection_output" >"$OUTPUT_DIR/02-ax-selection.txt"
+  sleep 1.0
+  shot="$OUTPUT_DIR/02-after-click-ax.png"
+  capture_window "$shot"
+  ocr_file="$OUTPUT_DIR/02-after-click-ax.ocr.txt"
+  ocr_image_to_file "$shot" "$ocr_file"
+  if rg -qi "Time Machine|Current events and historical anniversaries|Discover date|Loading discover feed|Discover unavailable|Featured Article|News Briefing|In the News|Most Read|This Day in History" "$ocr_file"; then
+    discover_selected="true"
+    discover_click_shot="$shot"
+  fi
+else
+  printf '%s\n' "$ax_selection_output" >"$OUTPUT_DIR/02-ax-selection.txt"
+fi
+
+if [[ "$discover_selected" != "true" && -n "$discover_centers" ]]; then
   discover_click_index=0
   while IFS=',' read -r center_x center_y center_text; do
     [[ -z "${center_x:-}" || -z "${center_y:-}" ]] && continue
@@ -232,7 +335,7 @@ if [[ -n "$discover_centers" ]]; then
       click_x=$((window_x + center_x))
       click_y=$((window_y + center_y))
     fi
-    "$click_script" --x "$click_x" --y "$click_y" --flip-y >/dev/null || true
+    "$click_script" --x "$click_x" --y "$click_y" >/dev/null || true
     sleep 1.0
 
     shot="$OUTPUT_DIR/02-after-click-ocr-${discover_click_index}.png"
@@ -257,7 +360,7 @@ if [[ "$discover_selected" != "true" ]]; then
   for y_offset in 132 160 188 216 244; do
     click_x=$((window_x + 110))
     click_y=$((window_y + y_offset))
-    "$click_script" --x "$click_x" --y "$click_y" --flip-y >/dev/null || true
+    "$click_script" --x "$click_x" --y "$click_y" >/dev/null || true
     sleep 0.9
 
     shot="$OUTPUT_DIR/02-after-click-y${y_offset}.png"
@@ -297,14 +400,23 @@ time_machine_found="false"
 time_machine_shot=""
 latest_scroll_shot=""
 
+if [[ -n "$discover_click_shot" ]]; then
+  discover_click_ocr="${discover_click_shot%.png}.ocr.txt"
+  if rg -qi "Time Machine|Born on This Day|Died on This Day|Holidays & Observances" "$discover_click_ocr"; then
+    time_machine_found="true"
+    time_machine_shot="$discover_click_shot"
+  fi
+fi
+
 for pass in 1 2 3 4 5 6 7 8 9 10 11 12; do
+  [[ "$time_machine_found" == "true" ]] && break
   if [[ "$scroll_mode" == "reader_page" ]]; then
-    "$click_script" --x "$scroll_anchor_x" --y "$scroll_anchor_y" --flip-y >/dev/null || true
+    "$click_script" --x "$scroll_anchor_x" --y "$scroll_anchor_y" >/dev/null || true
     sleep 0.2
     send_page_down
   else
     # Negative delta scrolls down in this harness.
-    "$scroll_script" --x "$scroll_anchor_x" --y "$scroll_anchor_y" --delta-y -8 --steps 36 --interval-ms 15 --flip-y >/dev/null || true
+    "$scroll_script" --x "$scroll_anchor_x" --y "$scroll_anchor_y" --delta-y -8 --steps 36 --interval-ms 15 >/dev/null || true
   fi
   sleep 0.7
 
@@ -359,10 +471,16 @@ coverage_csv="$OUTPUT_DIR/time_machine_date_coverage.csv"
   done
 } >"$coverage_csv"
 
+qa_status="PASS"
+if [[ "$discover_selected" != "true" || "$time_machine_found" != "true" ]]; then
+  qa_status="FAIL"
+fi
+
 report_path="$OUTPUT_DIR/report.md"
 {
   echo "# Discover QA Report"
   echo
+  echo "- Status: **$qa_status**"
   echo "- Captured: $(date)"
   echo "- MacWiki window pid: \`$window_pid\`"
   echo "- App binary: \`$APP_BIN\`"
@@ -408,3 +526,7 @@ report_path="$OUTPUT_DIR/report.md"
 
 echo "QA report: $report_path"
 echo "$report_path"
+if [[ "$qa_status" != "PASS" ]]; then
+  echo "ERROR: Discover QA did not reach and verify both Discover and Time Machine UI." >&2
+  exit 1
+fi

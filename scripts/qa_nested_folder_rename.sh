@@ -455,8 +455,7 @@ swift "$SCRIPT_DIR/cg_drag.swift" \
   --start-y "$source_y" \
   --end-x "$target_x" \
   --end-y "$target_y" \
-  --duration 0.42 \
-  --flip-y
+  --duration 0.42
 
 echo "Resolving nested child folder coordinate for rename..."
 rename_coords="$(
@@ -574,8 +573,7 @@ activate_app
 sleep 0.15
 swift "$SCRIPT_DIR/cg_right_click.swift" \
   --x "$rename_x" \
-  --y "$rename_y" \
-  --flip-y
+  --y "$rename_y"
 
 echo "Renaming nested child folder via context menu..."
 osascript - "$APP_NAME" "$RENAMED_CHILD_NAME" "$CHILD_NAME" <<'APPLESCRIPT'
