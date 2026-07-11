@@ -74,6 +74,15 @@ function collectPopups(el, out) {
   for (const child of children) collectPopups(child, out);
 }
 
+function collectSliders(el, out) {
+  let role = '';
+  try { role = el.role(); } catch (e) {}
+  if (role === 'AXSlider') out.push(el);
+  let children = [];
+  try { children = el.uiElements(); } catch (e) { children = []; }
+  for (const child of children) collectSliders(child, out);
+}
+
 function popupValue(popup) {
   try { return String(popup.value()); } catch (e) { return ''; }
 }
@@ -164,6 +173,32 @@ if (popups.length < 2) {
   throw new Error('insufficient popup controls');
 }
 
+const sliders = [];
+collectSliders(win, sliders);
+if (sliders.length < 6) {
+  console.log('ERROR: expected >=6 visible native slider controls, found ' + sliders.length);
+  throw new Error('insufficient slider controls');
+}
+
+for (const [index, slider] of sliders.entries()) {
+  let label = '';
+  let value = '';
+  for (const read of [() => slider.description(), () => slider.title(), () => slider.name()]) {
+    try {
+      const candidate = read();
+      if (candidate !== null && candidate !== undefined && String(candidate).length > 0) {
+        label = String(candidate);
+        break;
+      }
+    } catch (e) {}
+  }
+  try { value = String(slider.value()); } catch (e) {}
+  console.log(`Slider ${index + 1}: label='${label}' value='${value}'`);
+  if (label.length === 0 || label.toLowerCase() === 'slider' || value.length === 0) {
+    throw new Error(`slider ${index + 1} is missing accessible label or value`);
+  }
+}
+
 function popupName(popup, index) {
   for (const read of [
     () => popup.name(),
@@ -206,5 +241,5 @@ if (!ok) {
   throw new Error('settings popup smoke failed');
 }
 
-console.log(`PASS: ${popups.length} Settings popup controls changed and restored successfully.`);
+console.log(`PASS: ${sliders.length} native sliders exposed labels/values and ${popups.length} popup controls changed/restored.`);
 JXA

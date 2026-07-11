@@ -87,11 +87,12 @@ struct BetaReadinessRegressionTests {
         )
 
         #expect(sliderRow.contains(".accessibilityHidden(true)"))
-        #expect(sliderRow.contains("Slider(value: $value, in: range, step: step)"))
-        #expect(sliderRow.contains(".accessibilityLabel(title)"))
-        #expect(sliderRow.contains(".accessibilityValue(valueText)"))
-        #expect(!settingsControlsSource.contains("NSViewRepresentable"))
-        #expect(!settingsControlsSource.contains("NSSlider"))
+        #expect(sliderRow.contains("AccessibleSettingsSlider("))
+        #expect(settingsControlsSource.contains("private struct AccessibleSettingsSlider: NSViewRepresentable"))
+        #expect(settingsControlsSource.contains("slider.setAccessibilityTitle(title)"))
+        #expect(settingsControlsSource.contains("slider.setAccessibilityLabel(title)"))
+        #expect(settingsControlsSource.contains("slider.setAccessibilityValue(valueText)"))
+        #expect(settingsControlsSource.contains("slider.setAccessibilityValueDescription(valueText)"))
         #expect(!sliderRow.contains(".accessibilityElement(children: .ignore)"))
     }
 
@@ -502,6 +503,9 @@ struct BetaReadinessRegressionTests {
         #expect(settingsQAScript.contains("qa_launch_exact_bundle"))
         #expect(settingsQAScript.contains("popups.forEach((popup, index) =>"))
         #expect(settingsQAScript.contains("expected >=2 visible popup controls"))
+        #expect(settingsQAScript.contains("role === 'AXSlider'"))
+        #expect(settingsQAScript.contains("expected >=6 visible native slider controls"))
+        #expect(settingsQAScript.contains("is missing accessible label or value"))
         #expect(!settingsQAScript.contains("const appName = 'MacWiki';"))
         #expect(!settingsQAScript.contains("se.processes.byName(appName)"))
         #expect(!settingsQAScript.contains("Search Presentation"))
