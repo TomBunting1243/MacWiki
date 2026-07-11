@@ -48,7 +48,8 @@ function settingsWindow() {
   for (const w of windows) {
     let name = '';
     try { name = w.name(); } catch (e) {}
-    if (String(name).toLowerCase().includes('settings')) {
+    const normalizedName = String(name).toLowerCase();
+    if (normalizedName.includes('settings') || ['reading', 'library', 'navigation', 'chrome', 'advanced'].includes(normalizedName)) {
       return w;
     }
   }
