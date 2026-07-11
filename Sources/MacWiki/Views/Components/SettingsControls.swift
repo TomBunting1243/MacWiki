@@ -1,4 +1,3 @@
-import AppKit
 import SwiftUI
 
 struct SettingsPaneContainer<Content: View>: View {
@@ -125,81 +124,9 @@ struct SettingsSliderRow: View {
             }
             .accessibilityHidden(true)
 
-            AccessibleSettingsSlider(
-                title: title,
-                value: $value,
-                range: range,
-                step: step,
-                valueText: valueText
-            )
-        }
-    }
-}
-
-private struct AccessibleSettingsSlider: NSViewRepresentable {
-    let title: String
-    @Binding var value: Double
-    let range: ClosedRange<Double>
-    let step: Double
-    let valueText: String
-
-    func makeCoordinator() -> Coordinator {
-        Coordinator(value: $value, step: step, range: range)
-    }
-
-    func makeNSView(context: Context) -> NSSlider {
-        let slider = NSSlider(
-            value: value,
-            minValue: range.lowerBound,
-            maxValue: range.upperBound,
-            target: context.coordinator,
-            action: #selector(Coordinator.valueChanged(_:))
-        )
-        slider.isContinuous = true
-        slider.altIncrementValue = step
-        applyAccessibility(to: slider)
-        return slider
-    }
-
-    func updateNSView(_ slider: NSSlider, context: Context) {
-        context.coordinator.value = $value
-        context.coordinator.step = step
-        context.coordinator.range = range
-        slider.minValue = range.lowerBound
-        slider.maxValue = range.upperBound
-        slider.altIncrementValue = step
-        if slider.doubleValue != value {
-            slider.doubleValue = value
-        }
-        applyAccessibility(to: slider)
-    }
-
-    private func applyAccessibility(to slider: NSSlider) {
-        slider.setAccessibilityTitle(title)
-        slider.setAccessibilityLabel(title)
-        slider.setAccessibilityValue(valueText)
-        slider.setAccessibilityValueDescription(valueText)
-    }
-
-    @MainActor
-    final class Coordinator: NSObject {
-        var value: Binding<Double>
-        var step: Double
-        var range: ClosedRange<Double>
-
-        init(value: Binding<Double>, step: Double, range: ClosedRange<Double>) {
-            self.value = value
-            self.step = step
-            self.range = range
-        }
-
-        @objc func valueChanged(_ sender: NSSlider) {
-            let steppedValue = (sender.doubleValue / step).rounded() * step
-            let clampedValue = min(max(steppedValue, range.lowerBound), range.upperBound)
-            value.wrappedValue = clampedValue
-            if sender.doubleValue != clampedValue {
-                sender.doubleValue = clampedValue
-            }
+            Slider(value: $value, in: range, step: step)
+                .accessibilityLabel(title)
+                .accessibilityValue(valueText)
         }
     }
 }
