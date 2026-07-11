@@ -7,12 +7,6 @@ extension AppState {
         navigationSplitViewVisibility = isVisible ? .all : .detailOnly
     }
 
-    func toggleNavigationColumnsVisibility() {
-        guard !isWikiHopNavigationLocked else { return }
-
-        setNavigationColumnsVisible(!(listsSidebarVisible || directoryColumnVisible))
-    }
-
     func toggleListsSidebarVisibility() {
         guard !isWikiHopNavigationLocked else { return }
 

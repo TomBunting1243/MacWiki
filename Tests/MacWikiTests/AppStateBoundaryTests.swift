@@ -62,26 +62,6 @@ struct AppStateBoundaryTests {
         #expect(appState.navigationSplitViewVisibility == .all)
     }
 
-    @Test func navigationColumnsToggleHidesAndRestoresListsAndDirectoryColumns() {
-        let appState = AppState(persistenceMode: .ephemeral)
-        appState.navigationSplitViewVisibility = .all
-        appState.listContentsColumnVisible = true
-
-        appState.toggleNavigationColumnsVisibility()
-
-        #expect(appState.listsSidebarVisible == false)
-        #expect(appState.directoryColumnVisible == false)
-        #expect(appState.listContentsColumnVisible == false)
-        #expect(appState.navigationSplitViewVisibility == .detailOnly)
-
-        appState.toggleNavigationColumnsVisibility()
-
-        #expect(appState.listsSidebarVisible == true)
-        #expect(appState.directoryColumnVisible == true)
-        #expect(appState.listContentsColumnVisible == true)
-        #expect(appState.navigationSplitViewVisibility == .all)
-    }
-
     @Test func dismissFindOnPageInvalidatesQueryResultsAndQueuesLegacyClearRequest() {
         let appState = AppState(persistenceMode: .ephemeral)
         let tabID = UUID()

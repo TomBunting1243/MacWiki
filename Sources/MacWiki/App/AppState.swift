@@ -116,16 +116,6 @@ final class AppState {
         }
     }
 
-    /// Legacy combined navigation visibility used by existing call sites.
-    /// Setting this keeps the first two columns in sync, while reads treat either
-    /// visible navigation column as "sidebar visible".
-    var sidebarVisible: Bool {
-        get { listsSidebarVisible || directoryColumnVisible }
-        set {
-            setNavigationColumnsVisible(newValue)
-        }
-    }
-
     /// Whether the inspector panel is visible
     var inspectorVisible: Bool = true
     

@@ -350,7 +350,7 @@ struct BetaReadinessRegressionTests {
         #expect(toolbarSource.contains("trafficLightReservedWidth"))
         #expect(navigationSource.contains("listContentsColumnVisible = false"))
         #expect(navigationSource.contains("listContentsColumnVisible = true"))
-        #expect(navigationSource.contains("func toggleNavigationColumnsVisibility()"))
+        #expect(!navigationSource.contains("func toggleNavigationColumnsVisibility()"))
         #expect(toolbarSource.contains("withAnimation(ColumnMotion.readerOnlyVisibility)"))
         #expect(toolbarSource.contains("var buttonSize: CGFloat"))
         #expect(toolbarSource.contains("var dividerHeight: CGFloat"))
