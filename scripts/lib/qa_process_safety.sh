@@ -10,6 +10,23 @@ qa_canonical_path() {
   printf '%s/%s\n' "$directory" "$(basename "$path")"
 }
 
+qa_defaults_suite_name() {
+  if [[ -n "${QA_DEFAULTS_SUITE:-}" ]]; then
+    if [[ ! "$QA_DEFAULTS_SUITE" =~ ^com\.tombunting\.MacWiki\.qa\.[A-Za-z0-9.-]+$ ]]; then
+      echo "Refusing untrusted QA defaults suite: $QA_DEFAULTS_SUITE" >&2
+      return 1
+    fi
+    printf '%s\n' "$QA_DEFAULTS_SUITE"
+    return 0
+  fi
+
+  local canonical_root
+  local digest
+  canonical_root="$(qa_canonical_path "${QA_HOME:?}")"
+  digest="$(printf '%s' "$canonical_root" | shasum -a 256 | awk '{ print substr($1, 1, 16) }')"
+  printf 'com.tombunting.MacWiki.qa.%s\n' "$digest"
+}
+
 qa_assert_isolated_path() {
   local candidate="$1"
   local root="$2"
@@ -42,6 +59,9 @@ qa_assert_isolated_path() {
 qa_prepare_isolated_home() {
   qa_assert_isolated_path "$QA_HOME" "$QA_HOME"
   mkdir -p "$QA_HOME/Library/Application Support" "$QA_HOME/Library/Caches"
+  QA_DEFAULTS_SUITE="$(qa_defaults_suite_name)"
+  export QA_DEFAULTS_SUITE
+  /usr/bin/defaults delete "$QA_DEFAULTS_SUITE" >/dev/null 2>&1 || true
 }
 
 qa_exact_binary_pids() {
@@ -71,7 +91,10 @@ qa_launch_exact() {
   qa_assert_isolated_path "$QA_HOME" "$QA_HOME"
   qa_assert_no_conflicting_processes
 
-  HOME="$QA_HOME" CFFIXED_USER_HOME="$QA_HOME" "$APP_BIN" >"$log_path" 2>&1 &
+  HOME="$QA_HOME" \
+    CFFIXED_USER_HOME="$QA_HOME" \
+    MACWIKI_QA_DEFAULTS_SUITE="${QA_DEFAULTS_SUITE:?}" \
+    "$APP_BIN" >"$log_path" 2>&1 &
   QA_APP_PID=$!
   export QA_APP_PID
 
@@ -112,6 +135,7 @@ qa_launch_exact_bundle() {
     --stderr "$log_path" \
     --env "HOME=$QA_HOME" \
     --env "CFFIXED_USER_HOME=$QA_HOME" \
+    --env "MACWIKI_QA_DEFAULTS_SUITE=${QA_DEFAULTS_SUITE:?}" \
     -a "$bundle_path"
 
   for _ in $(seq 1 50); do
@@ -164,5 +188,10 @@ qa_stop_matching_exact() {
 qa_remove_isolated_home() {
   [[ -n "${QA_HOME:-}" ]] || return 0
   qa_assert_isolated_path "$QA_HOME" "$QA_HOME"
+  if [[ "${QA_DEFAULTS_SUITE:-}" == com.tombunting.MacWiki.qa.* ]]; then
+    /usr/bin/defaults delete "$QA_DEFAULTS_SUITE" >/dev/null 2>&1 || true
+  fi
+  QA_DEFAULTS_SUITE=""
+  export QA_DEFAULTS_SUITE
   rm -rf "$QA_HOME"
 }

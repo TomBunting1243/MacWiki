@@ -161,6 +161,8 @@ struct BetaReadinessRegressionTests {
         #expect(appSource.contains("launchIssue: MacWikiLaunchIssue?"))
         #expect(appSource.contains("presentFallbackLaunchIssueIfNeeded(for: window)"))
         #expect(appSource.contains("alert.beginSheetModal(for: window)"))
+        #expect(appSource.components(separatedBy: ".defaultAppStorage(MacWikiDefaults.current)").count - 1 == 3)
+        #expect(!appSource.contains("UserDefaults.standard"))
     }
 
     @Test func revisionMetadataUnknownCacheDoesNotBlockHydrationRetry() async {
@@ -519,7 +521,7 @@ struct BetaReadinessRegressionTests {
         #expect(settingsQAScript.contains("ObjC.import('stdlib')"))
         #expect(settingsQAScript.contains("ObjC.unwrap($.getenv('APP_NAME')) || 'MacWiki'"))
         #expect(settingsQAScript.contains("ObjC.unwrap($.getenv('APP_PID'))"))
-        #expect(settingsQAScript.contains("APP_NAME=\"$APP_NAME\" APP_PID=\"$QA_APP_PID\" osascript"))
+        #expect(settingsQAScript.contains("APP_NAME=\"$APP_NAME\" APP_PID=\"$QA_APP_PID\" SCRIPT_DIR=\"$SCRIPT_DIR\" osascript"))
         #expect(settingsQAScript.contains("se.processes.whose({ unixId: appPid })()"))
         #expect(settingsQAScript.contains("qa_launch_exact_bundle"))
         #expect(settingsQAScript.contains("popups.forEach((popup, index) =>"))
@@ -731,10 +733,16 @@ struct BetaReadinessRegressionTests {
             "scripts/capture_macwiki_audit_set.sh"
         ]
 
-        #expect(safetyLibrary.contains("HOME=\"$QA_HOME\" CFFIXED_USER_HOME=\"$QA_HOME\" \"$APP_BIN\""))
+        #expect(safetyLibrary.contains("HOME=\"$QA_HOME\""))
+        #expect(safetyLibrary.contains("CFFIXED_USER_HOME=\"$QA_HOME\""))
+        #expect(safetyLibrary.contains("MACWIKI_QA_DEFAULTS_SUITE=\"${QA_DEFAULTS_SUITE:?}\""))
+        #expect(safetyLibrary.contains("com.tombunting.MacWiki.qa."))
+        #expect(safetyLibrary.contains("Refusing untrusted QA defaults suite"))
+        #expect(safetyLibrary.contains("/usr/bin/defaults delete \"$QA_DEFAULTS_SUITE\""))
         #expect(safetyLibrary.contains("qa_launch_exact_bundle()"))
         #expect(safetyLibrary.contains("--env \"HOME=$QA_HOME\""))
         #expect(safetyLibrary.contains("--env \"CFFIXED_USER_HOME=$QA_HOME\""))
+        #expect(safetyLibrary.contains("--env \"MACWIKI_QA_DEFAULTS_SUITE=${QA_DEFAULTS_SUITE:?}\""))
         #expect(safetyLibrary.contains("ps -p \"$QA_APP_PID\" -o comm="))
         #expect(safetyLibrary.contains("Refusing to run while $APP_NAME PID"))
 

@@ -6,11 +6,11 @@ extension AppState {
     }
 
     private var isWikiHopPostV1FeatureEnabled: Bool {
-        UserDefaults.standard.bool(forKey: wikiHopPostV1FeatureKey)
+        MacWikiDefaults.current.bool(forKey: wikiHopPostV1FeatureKey)
     }
 
     private var isWikiHopExperimentEnabled: Bool {
-        UserDefaults.standard.bool(forKey: ExperimentFlag.wikiHopPOCEnabled.key)
+        MacWikiDefaults.current.bool(forKey: ExperimentFlag.wikiHopPOCEnabled.key)
     }
 
     private var isWikiHopRuntimeEnabled: Bool {
@@ -74,14 +74,14 @@ extension AppState {
     /// Centralized settings entry point for Wiki-Hop experiment state changes.
     func setWikiHopExperimentEnabled(_ isEnabled: Bool) {
         let resolvedEnabled = isEnabled && isWikiHopPostV1FeatureEnabled
-        UserDefaults.standard.set(resolvedEnabled, forKey: ExperimentFlag.wikiHopPOCEnabled.key)
+        MacWikiDefaults.current.set(resolvedEnabled, forKey: ExperimentFlag.wikiHopPOCEnabled.key)
         applyWikiHopExperimentState(isEnabled: resolvedEnabled)
     }
 
     /// Applies experiment gates to runtime state using current persisted defaults.
     func synchronizeExperimentStateFromDefaults() {
         if !isWikiHopPostV1FeatureEnabled, isWikiHopExperimentEnabled {
-            UserDefaults.standard.set(false, forKey: ExperimentFlag.wikiHopPOCEnabled.key)
+            MacWikiDefaults.current.set(false, forKey: ExperimentFlag.wikiHopPOCEnabled.key)
         }
         applyWikiHopExperimentState(isEnabled: isWikiHopRuntimeEnabled)
     }
@@ -93,7 +93,7 @@ extension AppState {
     }
 
     private func enforceDiscoverStartModeFallbackIfNeeded() {
-        let defaults = UserDefaults.standard
+        let defaults = MacWikiDefaults.current
         guard defaults.string(forKey: DiscoverStartMode.storageKey) == DiscoverStartMode.wikiHop.rawValue else {
             return
         }

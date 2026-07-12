@@ -60,7 +60,7 @@ final class PerformanceMetricsStore {
         var id: MetricKind { kind }
     }
 
-    static let shared = PerformanceMetricsStore()
+    static let shared = PerformanceMetricsStore(userDefaults: MacWikiDefaults.current)
 
     private static let logger = Logger(subsystem: "com.macwiki", category: "performance-metrics")
     private static let defaultStorageKeyPrefix = "com.macwiki.performance-metrics.samples.v2"

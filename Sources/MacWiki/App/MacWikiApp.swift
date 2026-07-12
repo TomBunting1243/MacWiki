@@ -229,7 +229,7 @@ struct MacWikiApp: App {
     }
 
     private static func sanitizePersistedWindowAndSplitViewState() {
-        let defaults = UserDefaults.standard
+        let defaults = MacWikiDefaults.current
         let entries = defaults.dictionaryRepresentation()
         let visibleFrames = NSScreen.screens.map(\.visibleFrame)
         let shellLayoutMigrationKey = "mainWindow.shellLayoutVersion"
@@ -304,7 +304,7 @@ struct MacWikiApp: App {
     }
 
     private func adjustReaderFontSize(by delta: Double) {
-        let defaults = UserDefaults.standard
+        let defaults = MacWikiDefaults.current
         let key = ReaderAppearanceStorageKey.fontSize
         let current = defaults.object(forKey: key) as? Double ?? ReaderAppearance.default.fontSize
         let updated = min(
@@ -315,7 +315,7 @@ struct MacWikiApp: App {
     }
 
     private func resetReaderFontSize() {
-        UserDefaults.standard.set(ReaderAppearance.default.fontSize, forKey: ReaderAppearanceStorageKey.fontSize)
+        MacWikiDefaults.current.set(ReaderAppearance.default.fontSize, forKey: ReaderAppearanceStorageKey.fontSize)
     }
 
     private func showAboutPanel() {
@@ -380,6 +380,7 @@ struct MacWikiApp: App {
     var body: some Scene {
         Window("MacWiki", id: "main") {
             ContentView()
+                .defaultAppStorage(MacWikiDefaults.current)
                 .persistenceIssueAlert()
                 .focusedSceneValue(\.macWikiCommandAppState, appState)
                 .toolbar(removing: .title)
@@ -425,6 +426,7 @@ struct MacWikiApp: App {
         WindowGroup("Article", for: Article.self) { $article in
             if let article = article {
                 ArticleWindowRootView(initialArticle: article)
+                    .defaultAppStorage(MacWikiDefaults.current)
                     .persistenceIssueAlert()
             } else {
                 ContentUnavailableView(
@@ -445,6 +447,7 @@ struct MacWikiApp: App {
         
         Settings {
             SettingsView()
+                .defaultAppStorage(MacWikiDefaults.current)
                 .persistenceIssueAlert()
                 .environment(appState)
         }

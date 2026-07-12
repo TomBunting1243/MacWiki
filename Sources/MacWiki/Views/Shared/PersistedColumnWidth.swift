@@ -41,7 +41,7 @@ private struct PersistedColumnWidthModifier: ViewModifier {
         guard let value = MainWindowColumnWidth.clampedStorageValue(width, range: range) else { return }
         guard lastMeasuredWidth.map({ abs($0 - value) >= tolerance }) ?? true else { return }
 
-        let defaults = UserDefaults.standard
+        let defaults = MacWikiDefaults.current
         let stored = defaults.object(forKey: key) as? Double
         if stored.map({ abs($0 - value) >= tolerance }) ?? true {
             defaults.set(value, forKey: key)

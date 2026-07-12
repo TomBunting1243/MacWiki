@@ -193,7 +193,7 @@ struct ContentView: View {
         guard !hasAppliedLaunchQAHarnessOverrides else { return }
         hasAppliedLaunchQAHarnessOverrides = true
 
-        let defaults = UserDefaults.standard
+        let defaults = MacWikiDefaults.current
         let shouldOpenSidebarSearch = defaults.bool(forKey: LaunchQAHarnessDefaultsKey.openSidebarSearch)
         let seededQuery = defaults.string(forKey: LaunchQAHarnessDefaultsKey.sidebarSearchQuery)?
             .trimmingCharacters(in: .whitespacesAndNewlines)
