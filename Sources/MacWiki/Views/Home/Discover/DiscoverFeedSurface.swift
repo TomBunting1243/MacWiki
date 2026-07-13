@@ -12,6 +12,7 @@ struct DiscoverFeedSurface: View {
     let isAppeared: Bool
     let reduceMotion: Bool
     let showsTimeTravelSkeleton: Bool
+    let onRetry: () -> Void
     let onOpen: (WikipediaService.SearchResult, Bool) -> Void
 
     var body: some View {
@@ -25,6 +26,9 @@ struct DiscoverFeedSurface: View {
                 Text(discoverError)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
+                Button("Try Again", systemImage: "arrow.clockwise", action: onRetry)
+                    .keyboardShortcut(.defaultAction)
+                    .padding(.top, 4)
             }
             .padding(18)
             .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))

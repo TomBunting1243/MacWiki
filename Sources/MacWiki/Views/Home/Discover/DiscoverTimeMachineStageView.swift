@@ -40,6 +40,7 @@ struct DiscoverTimeMachineStageView: View {
                 isAppeared: isAppeared,
                 reduceMotion: reduceMotion,
                 showsTimeTravelSkeleton: showsTimeTravelSkeleton,
+                onRetry: screenModel.refreshDiscover,
                 onOpen: onOpen
             )
         }

@@ -723,6 +723,33 @@ struct BetaReadinessRegressionTests {
         #expect(safety.contains("Refusing unsupported QA network mode"))
     }
 
+    @Test func discoverFailureSurfaceOffersNativeRetry() throws {
+        let surface = try source("Sources/MacWiki/Views/Home/Discover/DiscoverFeedSurface.swift")
+        let stage = try source("Sources/MacWiki/Views/Home/Discover/DiscoverTimeMachineStageView.swift")
+
+        #expect(surface.contains("let onRetry: () -> Void"))
+        #expect(surface.contains("Button(\"Try Again\", systemImage: \"arrow.clockwise\", action: onRetry)"))
+        #expect(surface.contains(".keyboardShortcut(.defaultAction)"))
+        #expect(stage.contains("onRetry: screenModel.refreshDiscover"))
+    }
+
+    @Test func discoverOfflineHarnessUsesExactNativeSelectionAndRetry() throws {
+        let harness = try source("scripts/qa_discover_offline_retry.sh")
+        let selector = try source("scripts/ax_select_sidebar_root.swift")
+
+        #expect(harness.contains("export MACWIKI_QA_NETWORK_MODE=offline"))
+        #expect(harness.contains("discoverOpenMode -string \"Reader Page\""))
+        #expect(harness.contains("ax_select_sidebar_root.swift"))
+        #expect(harness.contains("\"$QA_APP_PID\" Discover"))
+        #expect(harness.contains("\"Discover feed unavailable\""))
+        #expect(harness.contains("kill -0 \"$QA_APP_PID\""))
+        #expect(!harness.contains("killall"))
+
+        #expect(selector.contains("AXUIElementCreateApplication(pid)"))
+        #expect(selector.contains("role == (kAXButtonRole as String)"))
+        #expect(selector.contains("AXUIElementPerformAction(target, kAXPressAction"))
+    }
+
     @Test func auditCaptureHarnessesCanTargetPackagedCandidate() throws {
         let captureScript = try source("scripts/capture_macwiki_window.sh")
         let captureSetScript = try source("scripts/capture_macwiki_audit_set.sh")

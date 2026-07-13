@@ -13,7 +13,7 @@ enum ReaderOfflineError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .usage:
-            "Usage: ax_reader_offline_retry.swift <pid>"
+            "Usage: ax_reader_offline_retry.swift <pid> [failure headline]"
         case .accessibilityUnavailable:
             "Accessibility access is unavailable."
         case .failureSurfaceMissing:
@@ -80,18 +80,21 @@ func retryButton(in application: AXUIElement) -> AXUIElement? {
     }
 }
 
-func hasOfflineFailure(_ text: [String]) -> Bool {
+func hasOfflineFailure(_ text: [String], headline: String) -> Bool {
     let joined = text.joined(separator: "\n")
-    return joined.contains("Failed to Load Article") &&
+    return joined.contains(headline) &&
         (joined.localizedCaseInsensitiveContains("offline") ||
             joined.localizedCaseInsensitiveContains("not connected"))
 }
 
 do {
-    guard CommandLine.arguments.count == 2,
+    guard (2...3).contains(CommandLine.arguments.count),
           let pid = pid_t(CommandLine.arguments[1]) else {
         throw ReaderOfflineError.usage
     }
+    let failureHeadline = CommandLine.arguments.count == 3
+        ? CommandLine.arguments[2]
+        : "Failed to Load Article"
     guard AXIsProcessTrusted() else { throw ReaderOfflineError.accessibilityUnavailable }
 
     let application = AXUIElementCreateApplication(pid)
@@ -101,10 +104,10 @@ do {
     while Date() < initialDeadline {
         initialText = visibleText(in: application)
         button = retryButton(in: application)
-        if hasOfflineFailure(initialText), button != nil { break }
+        if hasOfflineFailure(initialText, headline: failureHeadline), button != nil { break }
         Thread.sleep(forTimeInterval: 0.1)
     }
-    guard hasOfflineFailure(initialText), let button else {
+    guard hasOfflineFailure(initialText, headline: failureHeadline), let button else {
         fputs("Observed AX text:\n\(initialText.joined(separator: "\n"))\n", stderr)
         throw ReaderOfflineError.failureSurfaceMissing
     }
@@ -116,10 +119,10 @@ do {
     var finalText: [String] = []
     while Date() < retryDeadline {
         finalText = visibleText(in: application)
-        if hasOfflineFailure(finalText), retryButton(in: application) != nil { break }
+        if hasOfflineFailure(finalText, headline: failureHeadline), retryButton(in: application) != nil { break }
         Thread.sleep(forTimeInterval: 0.1)
     }
-    guard hasOfflineFailure(finalText), retryButton(in: application) != nil else {
+    guard hasOfflineFailure(finalText, headline: failureHeadline), retryButton(in: application) != nil else {
         throw ReaderOfflineError.failureSurfaceDidNotReturn
     }
 
