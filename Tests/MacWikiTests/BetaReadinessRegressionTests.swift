@@ -54,11 +54,12 @@ struct BetaReadinessRegressionTests {
         #expect(!rowSource.contains(".accessibilityElement(children: .contain)"))
         #expect(rowSource.contains("let onToggleRead: (() -> Void)?"))
         #expect(rowSource.contains(".accessibilityInputLabels([title])"))
-        #expect(rowSource.contains(".accessibilityValue(title)"))
+        #expect(rowSource.contains(".accessibilityValue(\"\\(title), \\(isRead ?"))
+        #expect(rowSource.contains("\"Read\" : \"Unread\""))
         #expect(rowSource.contains("Use the context menu for read status and organization actions."))
         #expect(rowSource.contains(".accessibilityAddTraits(.isButton)"))
         #expect(rowSource.contains(".accessibilityAction {"))
-        #expect(rowSource.contains("named: Text(isRead ? \"Mark as unread\" : \"Mark as read\")"))
+        #expect(rowSource.contains("named: Text(\"Toggle Read Status\")"))
         #expect(!rowSource.contains("accessibilityRepresentation"))
 
         let contextMenuSource = try source("Sources/MacWiki/Views/Components/ArticleContextMenuContent.swift")
@@ -94,7 +95,7 @@ struct BetaReadinessRegressionTests {
         #expect(harness.contains("ATTRIBUTEGRAPH_CYCLE_COUNT"))
 
         let runner = try source("scripts/ax_article_row_secondary_window.swift")
-        #expect(runner.contains("hasReadStateAction(for: updated.0, named: \"Mark as unread\")"))
+        #expect(runner.contains("hasReadStateAction(for: updated.0, named: toggleReadStatusAction)"))
         #expect(runner.contains("customAction(titled: title, on: row)"))
         #expect(runner.contains("menuItem(titled: \"Open in New Window\""))
         #expect(runner.contains("windows(in: application).count == 2"))

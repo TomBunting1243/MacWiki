@@ -45,6 +45,8 @@ private struct VerificationResult: Codable {
     let runtimeDiagnosticCheckpoints: [RuntimeDiagnosticCheckpoint]
 }
 
+private let toggleReadStatusAction = "Toggle Read Status"
+
 private func attributeGraphCycleCount(in logURL: URL?) -> Int {
     guard let logURL,
           let contents = try? String(contentsOf: logURL, encoding: .utf8) else {
@@ -98,6 +100,12 @@ private func actionNames(of element: AXUIElement) -> [String] {
     return names as? [String] ?? []
 }
 
+private func attributeNames(of element: AXUIElement) -> [String] {
+    var names: CFArray?
+    guard AXUIElementCopyAttributeNames(element, &names) == .success else { return [] }
+    return names as? [String] ?? []
+}
+
 private func customActions(of element: AXUIElement) -> [AXUIElement] {
     attributeValue("AXCustomActions" as CFString, from: element) as? [AXUIElement] ?? []
 }
@@ -106,6 +114,12 @@ private func customAction(titled title: String, on element: AXUIElement) -> AXUI
     customActions(of: element).first { action in
         stringAttribute(kAXTitleAttribute as CFString, from: action) == title ||
             stringAttribute(kAXDescriptionAttribute as CFString, from: action) == title
+    }
+}
+
+private func namedActionIdentifier(_ title: String, on element: AXUIElement) -> String? {
+    actionNames(of: element).first { actionName in
+        actionName == title || actionName.hasPrefix("Name:\(title)\n")
     }
 }
 
@@ -134,7 +148,14 @@ private func articleRows(in application: AXUIElement) -> [(AXUIElement, RowEvide
             return nil
         }
         let value = stringAttribute(kAXValueAttribute as CFString, from: element)
-        let title = value
+        let title: String
+        if value.hasSuffix(", Unread") {
+            title = String(value.dropLast(", Unread".count))
+        } else if value.hasSuffix(", Read") {
+            title = String(value.dropLast(", Read".count))
+        } else {
+            title = value
+        }
         let actions = actionNames(of: element)
         guard !title.isEmpty,
               actions.contains(kAXPressAction as String),
@@ -154,7 +175,7 @@ private func hasReadStateAction(
     for row: AXUIElement,
     named title: String
 ) -> Bool {
-    if actionNames(of: row).contains(title) || customAction(titled: title, on: row) != nil {
+    if namedActionIdentifier(title, on: row) != nil || customAction(titled: title, on: row) != nil {
         return true
     }
     return elements(in: row).contains { element in
@@ -164,8 +185,8 @@ private func hasReadStateAction(
 }
 
 private func performReadStateAction(named title: String, on row: AXUIElement) throws {
-    if actionNames(of: row).contains(title) {
-        try perform(title, on: row, description: title)
+    if let actionIdentifier = namedActionIdentifier(title, on: row) {
+        try perform(actionIdentifier, on: row, description: title)
         return
     }
     if let action = customAction(titled: title, on: row) {
@@ -247,9 +268,10 @@ do {
 
     let initialRows = Array(articleRows(in: application).prefix(10))
     guard initialRows.allSatisfy({ row in
-        row.1.value == row.1.title &&
+        row.1.value == "\(row.1.title), Unread" &&
             row.1.actions.contains(kAXPressAction as String) &&
-            row.1.actions.contains(kAXShowMenuAction as String)
+            row.1.actions.contains(kAXShowMenuAction as String) &&
+            namedActionIdentifier(toggleReadStatusAction, on: row.0) != nil
     }) else {
         throw VerificationError.missing("An article row omitted its title, press action, or context-menu action.")
     }
@@ -257,15 +279,21 @@ do {
 
     let targetTitle = initialRows.first(where: { $0.1.title == query })?.1.title ?? initialRows[0].1.title
     guard let unreadTarget = row(titled: targetTitle, in: application),
-          hasReadStateAction(for: unreadTarget.0, named: "Mark as read") else {
-        throw VerificationError.missing("The target row omitted its Mark as read accessibility action.")
+          hasReadStateAction(for: unreadTarget.0, named: toggleReadStatusAction) else {
+        let diagnosticRow = row(titled: targetTitle, in: application)?.0
+        throw VerificationError.missing(
+            "The target row omitted its Toggle Read Status accessibility action. " +
+                "Actions: \(diagnosticRow.map(actionNames) ?? []). " +
+                "Attributes: \(diagnosticRow.map(attributeNames) ?? [])."
+        )
     }
-    try performReadStateAction(named: "Mark as read", on: unreadTarget.0)
+    try performReadStateAction(named: toggleReadStatusAction, on: unreadTarget.0)
     guard wait(condition: {
         guard let updated = row(titled: targetTitle, in: application) else { return false }
-        return hasReadStateAction(for: updated.0, named: "Mark as unread")
+        return updated.1.value == "\(targetTitle), Read" &&
+            hasReadStateAction(for: updated.0, named: toggleReadStatusAction)
     }) else {
-        throw VerificationError.missing("The target row did not expose its inverse Mark as unread button.")
+        throw VerificationError.missing("The target row did not announce Read after toggling its read status.")
     }
     recordRuntimeDiagnostics("marked read")
 
@@ -321,15 +349,16 @@ do {
     recordRuntimeDiagnostics("secondary window closed")
 
     guard let readTarget = row(titled: targetTitle, in: application),
-          hasReadStateAction(for: readTarget.0, named: "Mark as unread") else {
-        throw VerificationError.missing("The restored main-window row omitted its Mark as unread accessibility action.")
+          hasReadStateAction(for: readTarget.0, named: toggleReadStatusAction) else {
+        throw VerificationError.missing("The restored main-window row omitted its Toggle Read Status accessibility action.")
     }
-    try performReadStateAction(named: "Mark as unread", on: readTarget.0)
+    try performReadStateAction(named: toggleReadStatusAction, on: readTarget.0)
     guard wait(condition: {
         guard let restored = row(titled: targetTitle, in: application) else { return false }
-        return hasReadStateAction(for: restored.0, named: "Mark as read")
+        return restored.1.value == "\(targetTitle), Unread" &&
+            hasReadStateAction(for: restored.0, named: toggleReadStatusAction)
     }) else {
-        throw VerificationError.missing("The target row did not restore its Mark as read button.")
+        throw VerificationError.missing("The target row did not announce Unread after restoring its read status.")
     }
     recordRuntimeDiagnostics("restored unread")
 

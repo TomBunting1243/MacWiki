@@ -12,14 +12,14 @@ struct ArticleListAccessibilityModifier: ViewModifier {
             content
                 .accessibilityLabel(title)
                 .accessibilityInputLabels([title])
-                .accessibilityValue(title)
+                .accessibilityValue("\(title), \(isRead ? "Read" : "Unread")")
                 .accessibilityHint("Open \(title). Use the context menu for read status and organization actions.")
                 .accessibilityAddTraits(.isButton)
                 .accessibilityAction {
                     onOpen()
                 }
                 .accessibilityAction(
-                    named: Text(isRead ? "Mark as unread" : "Mark as read"),
+                    named: Text("Toggle Read Status"),
                     onToggleRead
                 )
         } else {
