@@ -52,7 +52,7 @@ qa_launch_candidate "$APP_LOG"
 
 APP_PID="$QA_APP_PID" LABEL_NAME="$LABEL_NAME" RENAMED_LABEL_NAME="$RENAMED_LABEL_NAME" \
 TAG_NAME="$TAG_NAME" RENAMED_TAG_NAME="$RENAMED_TAG_NAME" \
-  qa_run_command_with_timeout 80 osascript -l JavaScript >"$AX_RESULT" <<'JXA'
+  qa_run_command_with_timeout 80 osascript -l JavaScript >"$AX_RESULT" <<'JXA' || qa_status=$?
 ObjC.import('stdlib')
 
 const pid = Number(ObjC.unwrap($.getenv('APP_PID')))
@@ -133,6 +133,14 @@ function waitForNamed(name) {
   return waitUntil(() => elementsNamed(name)[0] || null, `Element did not appear: ${name}`)
 }
 
+function elementsContaining(text) {
+  return allElements().filter(element => stringValues(element).some(value => value.includes(text)))
+}
+
+function waitForText(text) {
+  return waitUntil(() => elementsContaining(text)[0] || null, `Text did not appear: ${text}`)
+}
+
 function press(element) {
   if (actionNames(element).includes('AXPress')) {
     element.actions.byName('AXPress').perform()
@@ -159,8 +167,18 @@ function submitSheet(actionName, value) {
   const sheet = waitForSheet()
   const field = firstTextField(sheet)
   assert(field, `${actionName} sheet did not expose a text field`)
-  field.value = value
-  press(waitForNamed(actionName))
+  field.click()
+  systemEvents.keystroke('a', { using: 'command down' })
+  systemEvents.keystroke(value)
+  const action = waitUntil(
+    () => elementsNamed(actionName).find(element => safe(() => Boolean(element.enabled()), false)) || null,
+    `${actionName} did not enable after typing a valid name`
+  )
+  press(action)
+  waitUntil(
+    () => currentProcess().windows().every(window => safe(() => window.sheets(), []).length === 0),
+    `${actionName} sheet did not dismiss after submission`
+  )
 }
 
 function showContextMenuForName(name) {
@@ -174,17 +192,17 @@ function showContextMenuForName(name) {
 function createRenameDelete(createAction, originalName, renamedName) {
   press(waitForNamed(createAction))
   submitSheet('Create', originalName)
-  waitForNamed(originalName)
+  waitForText(originalName)
 
   showContextMenuForName(originalName)
   press(waitForNamed('Rename'))
   submitSheet('Save', renamedName)
-  waitForNamed(renamedName)
-  waitUntil(() => elementsNamed(originalName).length === 0, `${originalName} remained after rename`)
+  waitForText(renamedName)
+  waitUntil(() => elementsContaining(originalName).length === 0, `${originalName} remained after rename`)
 
   showContextMenuForName(renamedName)
   press(waitForNamed('Delete'))
-  waitUntil(() => elementsNamed(renamedName).length === 0, `${renamedName} remained after delete`)
+  waitUntil(() => elementsContaining(renamedName).length === 0, `${renamedName} remained after delete`)
 }
 
 waitUntil(() => currentProcess().windows().length > 0, 'MacWiki did not expose its main window')
@@ -199,6 +217,16 @@ JSON.stringify({
   tag: { created: tagName, renamed: renamedTagName, deleted: true }
 }, null, 2)
 JXA
+
+if [[ "${qa_status:-0}" != "0" ]]; then
+  if [[ -f "$STORE_PATH" ]]; then
+    sqlite3 -header -tabs "$STORE_PATH" \
+      "SELECT 'label' AS kind, ZNAME AS name FROM ZLABEL UNION ALL SELECT 'tag', ZNAME FROM ZTAG;" \
+      >"$OUTPUT_DIR/failed-store-collections.tsv" 2>/dev/null || true
+  fi
+  echo "Label/tag mutation accessibility driver failed; diagnostic store inventory preserved." >&2
+  exit "${qa_status:-1}"
+fi
 
 for _ in $(seq 1 60); do
   if [[ -f "$STORE_PATH" ]]; then

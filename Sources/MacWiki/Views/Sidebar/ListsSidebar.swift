@@ -316,11 +316,12 @@ struct ListsSidebar: View {
     private var sidebarWithCollectionSnapshotSync: some View {
         sidebarWithDeleteDialog
             .onAppear {
-                refreshCollectionsSnapshot()
                 syncSelectionFromBindings()
                 enforceWikiHopSelectionGuard()
             }
-            .onChange(of: collectionsFingerprint) { _, _ in
+            .task(id: collectionsFingerprint) {
+                await Task.yield()
+                guard !Task.isCancelled else { return }
                 refreshCollectionsSnapshot()
             }
     }
