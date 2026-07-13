@@ -148,6 +148,7 @@ struct BetaReadinessRegressionTests {
         #expect(source.contains(".accessibilityLabel(\"Highlight note\")"))
         #expect(source.contains(".accessibilityIdentifier(\"highlight-note-editor\")"))
         #expect(source.contains("Button(action: activateHighlightRow)"))
+        #expect(source.contains("Section(\"Change Color\")"))
         #expect(!source.contains(".onTapGesture(perform: activateHighlightRow)"))
         #expect(!source.contains(".accessibilityAddTraits(.isButton)"))
     }
@@ -1146,7 +1147,7 @@ struct BetaReadinessRegressionTests {
         #expect(highlightHarness.contains("SELECT count(*) FROM ZHIGHLIGHT"))
         #expect(highlightDriver.contains("guard role(of: element) != \"AXWebArea\""))
         #expect(highlightDriver.contains("kAXShowMenuAction"))
-        #expect(highlightDriver.contains("named: \"Change Color\""))
+        #expect(highlightDriver.contains("named: \"Blue\""))
         #expect(highlightDriver.contains("named: \"Delete Highlight\""))
         #expect(labelTagHarness.contains("createRenameDelete('New Label'"))
         #expect(labelTagHarness.contains("createRenameDelete('New Tag'"))

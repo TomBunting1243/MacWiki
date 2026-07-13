@@ -229,7 +229,7 @@ struct HighlightRowView: View {
 
         Divider()
 
-        Menu {
+        Section("Change Color") {
             ForEach(HighlightColor.allCases, id: \.self) { color in
                 Button {
                     withAnimation(.easeOut(duration: 0.2)) {
@@ -255,8 +255,6 @@ struct HighlightRowView: View {
                     }
                 }
             }
-        } label: {
-            SwiftUI.Label("Change Color", systemImage: "paintpalette")
         }
 
         Divider()

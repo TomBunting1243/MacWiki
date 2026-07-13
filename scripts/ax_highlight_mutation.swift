@@ -175,6 +175,34 @@ private func pressButton(
     }
 }
 
+private func performNamedAction(
+    in application: AXUIElement,
+    named name: String,
+    matchingContains: Bool = false,
+    action: String,
+    failure: String
+) throws {
+    var lastError: AXError = .cannotComplete
+    let succeeded = wait(timeout: 8) {
+        guard let candidate = element(
+            in: application,
+            named: name,
+            matchingContains: matchingContains,
+            requiringAction: action
+        ) else {
+            return false
+        }
+        lastError = AXUIElementPerformAction(candidate, action as CFString)
+        return lastError == .success
+    }
+    guard succeeded else {
+        if lastError == .cannotComplete {
+            throw MutationError.missing(failure)
+        }
+        throw MutationError.actionFailed(name, lastError)
+    }
+}
+
 private func trace(_ stage: String) {
     fputs("\(ISO8601DateFormatter().string(from: Date())) \(stage)\n", stderr)
 }
@@ -190,6 +218,14 @@ private func traceEditableCandidates(in application: AXUIElement) {
         guard isRelevantRole || isRelevantLabel else { continue }
         let identifier = stringAttribute(kAXIdentifierAttribute as CFString, from: candidate)
         trace("candidate role=\(candidateRole) identifier=\(identifier) strings=\(candidateStrings) actions=\(actionNames(of: candidate))")
+    }
+}
+
+private func chooseMenuItem(_ element: AXUIElement, label: String) throws {
+    if actionNames(of: element).contains("AXPick") {
+        try perform("AXPick", on: element, label: label)
+    } else {
+        try press(element, label: label)
     }
 }
 
@@ -240,45 +276,36 @@ do {
     )
     trace("highlight note saved")
 
-    let initialMenuTarget = try waitForElement(
+    try performNamedAction(
         in: application,
         named: highlightText,
         matchingContains: true,
-        requiringAction: kAXShowMenuAction as String,
+        action: kAXShowMenuAction as String,
         failure: "Seeded highlight omitted its native context menu."
     )
-    try perform(kAXShowMenuAction as String, on: initialMenuTarget, label: "Highlight context menu")
-    let changeColor = try waitForElement(
-        in: application,
-        role: kAXMenuItemRole as String,
-        named: "Change Color",
-        failure: "Highlight context menu omitted Change Color."
-    )
-    try press(changeColor, label: "Change Color")
     let blue = try waitForElement(
         in: application,
         role: kAXMenuItemRole as String,
         named: "Blue",
-        failure: "Highlight color menu omitted Blue."
+        failure: "Highlight context menu omitted the Blue color action."
     )
-    try press(blue, label: "Blue")
+    try chooseMenuItem(blue, label: "Blue")
     trace("highlight color changed to Blue")
 
-    let deleteMenuTarget = try waitForElement(
+    try performNamedAction(
         in: application,
         named: highlightText,
         matchingContains: true,
-        requiringAction: kAXShowMenuAction as String,
+        action: kAXShowMenuAction as String,
         failure: "Changed highlight omitted its native context menu."
     )
-    try perform(kAXShowMenuAction as String, on: deleteMenuTarget, label: "Highlight context menu")
     let delete = try waitForElement(
         in: application,
         role: kAXMenuItemRole as String,
         named: "Delete Highlight",
         failure: "Highlight context menu omitted Delete Highlight."
     )
-    try press(delete, label: "Delete Highlight")
+    try chooseMenuItem(delete, label: "Delete Highlight")
     guard wait(condition: {
         element(in: application, named: highlightText, matchingContains: true) == nil
     }) else {
