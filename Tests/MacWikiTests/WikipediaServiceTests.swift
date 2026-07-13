@@ -58,6 +58,17 @@ private actor ScriptedWikipediaTransport {
 /// Tests for WikipediaService. Transport-policy tests use deterministic scripted
 /// responses; API integration coverage below still exercises public Wikipedia.
 struct WikipediaServiceTests {
+    @Test func networkErrorsUseActionableReaderMessages() {
+        let offline = WikipediaService.WikipediaError.networkError(URLError(.notConnectedToInternet))
+        #expect(offline.errorDescription == "You’re offline. Check your internet connection and try again.")
+
+        let timeout = WikipediaService.WikipediaError.networkError(URLError(.timedOut))
+        #expect(timeout.errorDescription == "Wikipedia took too long to respond. Try again in a moment.")
+
+        let unreachable = WikipediaService.WikipediaError.networkError(URLError(.cannotConnectToHost))
+        #expect(unreachable.errorDescription == "MacWiki couldn’t reach Wikipedia. Check your connection and try again.")
+    }
+
     
     let service = WikipediaService()
 

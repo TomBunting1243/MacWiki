@@ -22,4 +22,30 @@ struct MacWikiDefaultsTests {
 
         #expect(defaults === UserDefaults.standard)
     }
+
+    @Test func offlineInjectionRequiresAnExactlyTrustedQASuite() {
+        let networkOnly = [MacWikiQAEnvironment.networkModeKey: "offline"]
+        #expect(MacWikiQAEnvironment.injectedNetworkError(in: networkOnly) == nil)
+
+        let malformedSuite = [
+            MacWikiQAEnvironment.defaultsSuiteKey: "com.tombunting.MacWiki.qa.invalid/suffix",
+            MacWikiQAEnvironment.networkModeKey: "offline"
+        ]
+        #expect(MacWikiQAEnvironment.injectedNetworkError(in: malformedSuite) == nil)
+
+        let trustedSuite = [
+            MacWikiQAEnvironment.defaultsSuiteKey: "com.tombunting.MacWiki.qa.reader-offline",
+            MacWikiQAEnvironment.networkModeKey: "offline"
+        ]
+        #expect(MacWikiQAEnvironment.injectedNetworkError(in: trustedSuite)?.code == .notConnectedToInternet)
+    }
+
+    @Test func unsupportedQANetworkModesDoNotAlterTransport() {
+        let environment = [
+            MacWikiQAEnvironment.defaultsSuiteKey: "com.tombunting.MacWiki.qa.reader-offline",
+            MacWikiQAEnvironment.networkModeKey: "timeout"
+        ]
+
+        #expect(MacWikiQAEnvironment.injectedNetworkError(in: environment) == nil)
+    }
 }

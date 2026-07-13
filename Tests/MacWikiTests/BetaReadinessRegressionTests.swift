@@ -700,6 +700,29 @@ struct BetaReadinessRegressionTests {
         #expect(axDriver.contains("MacWiki Trademark"))
     }
 
+    @Test func readerOfflineHarnessIsTrustedIsolatedAndRetryable() throws {
+        let harness = try source("scripts/qa_reader_offline_retry.sh")
+        let driver = try source("scripts/ax_reader_offline_retry.swift")
+        let safety = try source("scripts/lib/qa_process_safety.sh")
+
+        #expect(harness.contains("source \"$SCRIPT_DIR/lib/qa_process_safety.sh\""))
+        #expect(harness.contains("export MACWIKI_QA_NETWORK_MODE=offline"))
+        #expect(harness.contains("qa_launch_candidate \"$APP_LOG\""))
+        #expect(harness.contains("qa_run_command_with_timeout 40 swift"))
+        #expect(harness.contains("kill -0 \"$QA_APP_PID\""))
+        #expect(!harness.contains("defaults delete com.tombunting.MacWiki"))
+        #expect(!harness.contains("killall"))
+
+        #expect(driver.contains("AXUIElementCreateApplication(pid)"))
+        #expect(driver.contains("Failed to Load Article"))
+        #expect(driver.contains("Try Again"))
+        #expect(driver.contains("AXUIElementPerformAction(button, kAXPressAction"))
+
+        #expect(safety.contains("qa_assert_supported_network_mode"))
+        #expect(safety.contains("MACWIKI_QA_NETWORK_MODE=$MACWIKI_QA_NETWORK_MODE"))
+        #expect(safety.contains("Refusing unsupported QA network mode"))
+    }
+
     @Test func auditCaptureHarnessesCanTargetPackagedCandidate() throws {
         let captureScript = try source("scripts/capture_macwiki_window.sh")
         let captureSetScript = try source("scripts/capture_macwiki_audit_set.sh")
@@ -799,9 +822,9 @@ struct BetaReadinessRegressionTests {
             "scripts/capture_macwiki_audit_set.sh"
         ]
 
-        #expect(safetyLibrary.contains("HOME=\"$QA_HOME\""))
-        #expect(safetyLibrary.contains("CFFIXED_USER_HOME=\"$QA_HOME\""))
-        #expect(safetyLibrary.contains("MACWIKI_QA_DEFAULTS_SUITE=\"${QA_DEFAULTS_SUITE:?}\""))
+        #expect(safetyLibrary.contains("\"HOME=$QA_HOME\""))
+        #expect(safetyLibrary.contains("\"CFFIXED_USER_HOME=$QA_HOME\""))
+        #expect(safetyLibrary.contains("\"MACWIKI_QA_DEFAULTS_SUITE=${QA_DEFAULTS_SUITE:?}\""))
         #expect(safetyLibrary.contains("com.tombunting.MacWiki.qa."))
         #expect(safetyLibrary.contains("Refusing untrusted QA defaults suite"))
         #expect(safetyLibrary.contains("/usr/bin/defaults delete \"$suite_name\""))
@@ -814,7 +837,8 @@ struct BetaReadinessRegressionTests {
         #expect(safetyLibrary.contains("--env \"HOME=$QA_HOME\""))
         #expect(safetyLibrary.contains("--env \"CFFIXED_USER_HOME=$QA_HOME\""))
         #expect(safetyLibrary.contains("--env \"MACWIKI_QA_DEFAULTS_SUITE=${QA_DEFAULTS_SUITE:?}\""))
-        #expect(safetyLibrary.contains("ps -p \"$QA_APP_PID\" -o comm="))
+        #expect(safetyLibrary.contains("qa_pid_executable_path"))
+        #expect(safetyLibrary.contains("/usr/sbin/lsof -a -p \"$pid\" -d txt -Fn"))
         #expect(safetyLibrary.contains("Refusing to run while $APP_NAME PID"))
 
         for scriptName in scriptNames {

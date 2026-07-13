@@ -195,6 +195,12 @@ actor WikipediaService {
 
         if let requestLoader {
             self.requestLoader = requestLoader
+        } else if let injectedError = MacWikiQAEnvironment.injectedNetworkError(
+            in: ProcessInfo.processInfo.environment
+        ) {
+            self.requestLoader = { _ in
+                throw injectedError
+            }
         } else {
             let session = Self.makeDefaultURLSession()
             self.requestLoader = { request in
@@ -259,7 +265,19 @@ actor WikipediaService {
             case .invalidURL:
                 return "Invalid Wikipedia URL"
             case .networkError(let error):
-                return "Network error: \(error.localizedDescription)"
+                if let code = Self.urlErrorCode(from: error) {
+                    switch code {
+                    case .notConnectedToInternet:
+                        return "You’re offline. Check your internet connection and try again."
+                    case .timedOut:
+                        return "Wikipedia took too long to respond. Try again in a moment."
+                    case .cannotFindHost, .cannotConnectToHost, .dnsLookupFailed, .networkConnectionLost:
+                        return "MacWiki couldn’t reach Wikipedia. Check your connection and try again."
+                    default:
+                        break
+                    }
+                }
+                return "MacWiki couldn’t load this from Wikipedia. \(error.localizedDescription)"
             case .decodingError(let error):
                 return "Failed to parse response: \(error.localizedDescription)"
             case .noResults:
@@ -267,6 +285,15 @@ actor WikipediaService {
             case .rateLimited:
                 return "Too many requests. Please wait a moment."
             }
+        }
+
+        private static func urlErrorCode(from error: Error) -> URLError.Code? {
+            if let urlError = error as? URLError {
+                return urlError.code
+            }
+            let nsError = error as NSError
+            guard nsError.domain == NSURLErrorDomain else { return nil }
+            return URLError.Code(rawValue: nsError.code)
         }
     }
 

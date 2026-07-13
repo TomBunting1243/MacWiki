@@ -18,6 +18,14 @@ qa_assert_trusted_defaults_suite() {
   fi
 }
 
+qa_assert_supported_network_mode() {
+  local mode="${MACWIKI_QA_NETWORK_MODE:-}"
+  if [[ -n "$mode" && "$mode" != "offline" ]]; then
+    echo "Refusing unsupported QA network mode: $mode" >&2
+    return 1
+  fi
+}
+
 qa_defaults_suite_name() {
   if [[ -n "${QA_DEFAULTS_SUITE:-}" ]]; then
     qa_assert_trusted_defaults_suite "$QA_DEFAULTS_SUITE" || return 1
@@ -105,8 +113,23 @@ qa_prepare_isolated_home() {
 qa_exact_binary_pids() {
   [[ -x "$APP_BIN" ]] || return 0
   local canonical_binary
+  local pid
+  local executable_path
   canonical_binary="$(qa_canonical_path "$APP_BIN")"
-  ps -axo pid=,comm= | awk -v binary="$canonical_binary" '$2 == binary { print $1 }'
+  while IFS= read -r pid; do
+    [[ -n "$pid" ]] || continue
+    executable_path="$(qa_pid_executable_path "$pid")"
+    [[ -n "$executable_path" ]] || continue
+    if [[ "$(qa_canonical_path "$executable_path")" == "$canonical_binary" ]]; then
+      printf '%s\n' "$pid"
+    fi
+  done < <(pgrep -x "$APP_NAME" 2>/dev/null || true)
+}
+
+qa_pid_executable_path() {
+  local pid="$1"
+  /usr/sbin/lsof -a -p "$pid" -d txt -Fn 2>/dev/null \
+    | awk '/^n/ { print substr($0, 2); exit }'
 }
 
 qa_assert_no_conflicting_processes() {
@@ -129,10 +152,16 @@ qa_launch_exact() {
   qa_assert_isolated_path "$QA_HOME" "$QA_HOME"
   qa_assert_no_conflicting_processes
 
-  HOME="$QA_HOME" \
-    CFFIXED_USER_HOME="$QA_HOME" \
-    MACWIKI_QA_DEFAULTS_SUITE="${QA_DEFAULTS_SUITE:?}" \
-    "$APP_BIN" >"$log_path" 2>&1 &
+  qa_assert_supported_network_mode
+  local environment=(
+    "HOME=$QA_HOME"
+    "CFFIXED_USER_HOME=$QA_HOME"
+    "MACWIKI_QA_DEFAULTS_SUITE=${QA_DEFAULTS_SUITE:?}"
+  )
+  if [[ -n "${MACWIKI_QA_NETWORK_MODE:-}" ]]; then
+    environment+=("MACWIKI_QA_NETWORK_MODE=$MACWIKI_QA_NETWORK_MODE")
+  fi
+  /usr/bin/env "${environment[@]}" "$APP_BIN" >"$log_path" 2>&1 &
   QA_APP_PID=$!
   export QA_APP_PID
 
@@ -141,7 +170,7 @@ qa_launch_exact() {
   expected="$(qa_canonical_path "$APP_BIN")"
   for _ in $(seq 1 50); do
     if kill -0 "$QA_APP_PID" 2>/dev/null; then
-      actual="$(ps -p "$QA_APP_PID" -o comm= | sed 's/^[[:space:]]*//')"
+      actual="$(qa_pid_executable_path "$QA_APP_PID")"
       if [[ "$actual" == "$expected" ]]; then
         return 0
       fi
@@ -161,6 +190,7 @@ qa_launch_exact_bundle() {
 
   qa_assert_isolated_path "$QA_HOME" "$QA_HOME"
   qa_assert_no_conflicting_processes
+  qa_assert_supported_network_mode
 
   expected_binary="$(qa_canonical_path "$APP_BIN")"
   if [[ "$bundle_path" == "$APP_BIN" || ! -d "$bundle_path/Contents/MacOS" ]]; then
@@ -168,13 +198,18 @@ qa_launch_exact_bundle() {
     return 1
   fi
 
-  open -n \
-    --stdout "$log_path" \
-    --stderr "$log_path" \
-    --env "HOME=$QA_HOME" \
-    --env "CFFIXED_USER_HOME=$QA_HOME" \
-    --env "MACWIKI_QA_DEFAULTS_SUITE=${QA_DEFAULTS_SUITE:?}" \
-    -a "$bundle_path"
+  local open_arguments=(
+    -n
+    --stdout "$log_path"
+    --stderr "$log_path"
+    --env "HOME=$QA_HOME"
+    --env "CFFIXED_USER_HOME=$QA_HOME"
+    --env "MACWIKI_QA_DEFAULTS_SUITE=${QA_DEFAULTS_SUITE:?}"
+  )
+  if [[ -n "${MACWIKI_QA_NETWORK_MODE:-}" ]]; then
+    open_arguments+=(--env "MACWIKI_QA_NETWORK_MODE=$MACWIKI_QA_NETWORK_MODE")
+  fi
+  open "${open_arguments[@]}" -a "$bundle_path"
 
   for _ in $(seq 1 50); do
     local matching_pids=()
@@ -186,7 +221,7 @@ qa_launch_exact_bundle() {
       QA_APP_PID="${matching_pids[0]}"
       export QA_APP_PID
       local actual
-      actual="$(ps -p "$QA_APP_PID" -o comm= | sed 's/^[[:space:]]*//')"
+      actual="$(qa_pid_executable_path "$QA_APP_PID")"
       if [[ "$actual" == "$expected_binary" ]]; then
         return 0
       fi
@@ -216,7 +251,7 @@ qa_stop_exact() {
   local expected
   local actual
   expected="$(qa_canonical_path "$APP_BIN")"
-  actual="$(ps -p "$pid" -o comm= 2>/dev/null | sed 's/^[[:space:]]*//' || true)"
+  actual="$(qa_pid_executable_path "$pid")"
   if [[ -n "$actual" && "$actual" == "$expected" ]]; then
     kill "$pid" 2>/dev/null || true
     wait "$pid" 2>/dev/null || true
