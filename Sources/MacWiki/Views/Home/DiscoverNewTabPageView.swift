@@ -4,7 +4,7 @@ import SwiftUI
 /// Apple News-inspired discovery hub used by the New Tab page.
 struct DiscoverNewTabPageView: View {
     @Environment(AppState.self) private var appState
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.macWikiAccessibilityPersonalization.reduceMotion) private var reduceMotion
     @Query(sort: \ReadingList.updatedAt, order: .reverse) private var allLists: [ReadingList]
     @Query(sort: \Label.sortOrder) private var allLabels: [Label]
     @Query(sort: \Tag.sortOrder) private var allTags: [Tag]

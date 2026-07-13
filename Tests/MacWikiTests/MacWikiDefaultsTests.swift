@@ -50,6 +50,58 @@ struct MacWikiDefaultsTests {
         #expect(MacWikiQAEnvironment.injectedNetworkError(in: environment) == nil)
     }
 
+    @Test func accessibilityPersonalizationRequiresTrustedQASuite() {
+        let profileOnly = [
+            MacWikiQAPersonalizationOverrides.environmentKey: "all"
+        ]
+        #expect(MacWikiQAPersonalizationOverrides.requested(in: profileOnly) == nil)
+
+        let malformedSuite = [
+            MacWikiQAEnvironment.defaultsSuiteKey: "com.tombunting.MacWiki.qa.invalid/suffix",
+            MacWikiQAPersonalizationOverrides.environmentKey: "all"
+        ]
+        #expect(MacWikiQAPersonalizationOverrides.requested(in: malformedSuite) == nil)
+    }
+
+    @Test func accessibilityPersonalizationRejectsUnknownProfiles() {
+        let environment = [
+            MacWikiQAEnvironment.defaultsSuiteKey: "com.tombunting.MacWiki.qa.personalization",
+            MacWikiQAPersonalizationOverrides.environmentKey: "reduce-motion,unknown"
+        ]
+
+        #expect(MacWikiQAPersonalizationOverrides.requested(in: environment) == nil)
+    }
+
+    @Test func accessibilityPersonalizationParsesNativeEnvironmentOverrides() throws {
+        let environment = [
+            MacWikiQAEnvironment.defaultsSuiteKey: "com.tombunting.MacWiki.qa.personalization",
+            MacWikiQAPersonalizationOverrides.environmentKey: " reduce-motion, increase-contrast "
+        ]
+        let overrides = try #require(
+            MacWikiQAPersonalizationOverrides.requested(in: environment)
+        )
+
+        #expect(overrides.reduceMotion == true)
+        #expect(overrides.reduceTransparency == nil)
+        #expect(overrides.increaseContrast == true)
+        #expect(overrides.differentiateWithoutColor == nil)
+    }
+
+    @Test func accessibilityPersonalizationAllProfileEnablesEveryNativeValue() throws {
+        let environment = [
+            MacWikiQAEnvironment.defaultsSuiteKey: "com.tombunting.MacWiki.qa.personalization",
+            MacWikiQAPersonalizationOverrides.environmentKey: "all"
+        ]
+        let overrides = try #require(
+            MacWikiQAPersonalizationOverrides.requested(in: environment)
+        )
+
+        #expect(overrides.reduceMotion == true)
+        #expect(overrides.reduceTransparency == true)
+        #expect(overrides.increaseContrast == true)
+        #expect(overrides.differentiateWithoutColor == true)
+    }
+
     @Test func highlightFixtureRequiresTrustedSuiteAndNonemptyValues() {
         let suiteName = MacWikiDefaults.qaSuitePrefix + UUID().uuidString
         guard let defaults = UserDefaults(suiteName: suiteName) else {

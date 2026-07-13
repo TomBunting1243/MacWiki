@@ -2,7 +2,7 @@ import SwiftData
 import SwiftUI
 struct ReaderArticleToolbar: View {
     @Environment(\.colorScheme) private var colorScheme
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.macWikiAccessibilityPersonalization.reduceMotion) private var reduceMotion
     @Environment(AppState.self) private var appState
     @Environment(\.modelContext) private var modelContext
     @Environment(\.openURL) private var openURL

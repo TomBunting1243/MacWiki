@@ -5,7 +5,7 @@ struct DirectoryView: View {
     @Environment(AppState.self) private var appState
     @Environment(\.modelContext) private var modelContext
     @Environment(\.colorScheme) private var colorScheme
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.macWikiAccessibilityPersonalization.reduceMotion) private var reduceMotion
     @AppStorage(AppStorageKey.Recents.scope) private var recentsScope: RecentsScope = .currentTab
     @AppStorage(AppStorageKey.Discover.sidebarTimeMachineHidden) private var discoverSidebarTimeMachineHidden = false
     @AppStorage(ExperimentFlag.wikiHopPOCEnabled.key) private var wikiHopPOCEnabled = false

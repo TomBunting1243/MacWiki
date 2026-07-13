@@ -227,7 +227,7 @@ enum TopChromeMotion {
 }
 
 struct SidebarPaneBackground: View {
-    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.macWikiAccessibilityPersonalization.reduceTransparency) private var reduceTransparency
 
     var body: some View {
         if reduceTransparency {
@@ -247,8 +247,8 @@ struct SidebarPaneBackground: View {
 struct ReaderTabLaneBackground: View {
     @AppStorage(AppStorageKey.Chrome.liquidGlassChrome) private var liquidGlassChrome = true
     @Environment(\.colorScheme) private var colorScheme
-    @Environment(\.colorSchemeContrast) private var colorSchemeContrast
-    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.macWikiAccessibilityPersonalization.colorSchemeContrast) private var colorSchemeContrast
+    @Environment(\.macWikiAccessibilityPersonalization.reduceTransparency) private var reduceTransparency
 
     var body: some View {
         ZStack {

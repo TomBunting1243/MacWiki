@@ -13,7 +13,7 @@ struct DiscoverFeedSections: View {
     let timeMachineTargetDate: Date
     let onOpen: (WikipediaService.SearchResult, Bool) -> Void
     @Environment(\.openURL) private var openURL
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.macWikiAccessibilityPersonalization.reduceMotion) private var reduceMotion
     @State private var allTimeMostReadStore = DiscoverAllTimeMostReadStore()
     @State private var todayMostReadStore = DiscoverTodayMostReadStore()
     @State private var trendPulseStore = DiscoverTrendPulseStore()
@@ -1588,7 +1588,7 @@ struct DiscoverExpandableCollectionCard<Content: View>: View {
     @Binding var isExpanded: Bool
     let collapsedPreviewTitles: [String]
     let content: Content
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.macWikiAccessibilityPersonalization.reduceMotion) private var reduceMotion
     @Environment(\.colorScheme) private var colorScheme
     @State private var isHovered = false
 
@@ -1891,7 +1891,7 @@ struct DiscoverPlaylistPlaceholder: View {
 }
 
 struct DiscoverInteractivePressStyle: ButtonStyle {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.macWikiAccessibilityPersonalization.reduceMotion) private var reduceMotion
     var pressedScale: CGFloat = 0.985
     var pressedOpacity: Double = 0.93
 
@@ -1912,7 +1912,7 @@ struct DiscoverPlaylistArticleRow: View {
     let isKeyboardFocused: Bool
     let onFocus: (() -> Void)?
     let onOpen: (WikipediaService.SearchResult, Bool) -> Void
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.macWikiAccessibilityPersonalization.reduceMotion) private var reduceMotion
     @Environment(\.colorScheme) private var colorScheme
     @State private var isHovered = false
 
@@ -2110,7 +2110,7 @@ struct DiscoverFeatureCard: View {
     let onOpen: (WikipediaService.SearchResult, Bool) -> Void
     let onTrendTapped: (WikipediaService.TrendPulse) -> Void
     var showsSurface: Bool = true
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.macWikiAccessibilityPersonalization.reduceMotion) private var reduceMotion
     @State private var isHovered = false
     @State private var suppressPrimaryTapFromTrend = false
 
@@ -2285,7 +2285,7 @@ struct DiscoverNewsCard: View {
     let result: WikipediaService.SearchResult
     var style: DiscoverNewsCardStyle = .standard
     let onOpen: (WikipediaService.SearchResult, Bool) -> Void
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.macWikiAccessibilityPersonalization.reduceMotion) private var reduceMotion
     @State private var isHovered = false
 
     var body: some View {

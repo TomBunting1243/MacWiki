@@ -612,19 +612,29 @@ struct BetaReadinessRegressionTests {
     @Test func customChromeHonorsTransparencyAndContrastPersonalization() throws {
         let toolbarChrome = try source("Sources/MacWiki/Views/Shared/ReaderToolbarChrome.swift")
         let columnChrome = try source("Sources/MacWiki/Views/Shared/ColumnTopBar.swift")
+        let appSource = try source("Sources/MacWiki/App/MacWikiApp.swift")
+        let qaPersonalizationSource = try source("Sources/MacWiki/App/MacWikiQAPersonalization.swift")
 
-        #expect(toolbarChrome.contains("@Environment(\\.accessibilityReduceTransparency)"))
-        #expect(toolbarChrome.contains("@Environment(\\.colorSchemeContrast)"))
+        #expect(toolbarChrome.contains("@Environment(\\.macWikiAccessibilityPersonalization.reduceTransparency)"))
+        #expect(toolbarChrome.contains("@Environment(\\.macWikiAccessibilityPersonalization.colorSchemeContrast)"))
         #expect(toolbarChrome.contains("if reduceTransparency"))
         #expect(toolbarChrome.contains("Color(nsColor: .windowBackgroundColor)"))
         #expect(toolbarChrome.contains("colorSchemeContrast == .increased"))
 
         #expect(columnChrome.contains("struct SidebarPaneBackground"))
         #expect(columnChrome.contains("struct ReaderTabLaneBackground"))
-        #expect(columnChrome.contains("@Environment(\\.accessibilityReduceTransparency)"))
-        #expect(columnChrome.contains("@Environment(\\.colorSchemeContrast)"))
+        #expect(columnChrome.contains("@Environment(\\.macWikiAccessibilityPersonalization.reduceTransparency)"))
+        #expect(columnChrome.contains("@Environment(\\.macWikiAccessibilityPersonalization.colorSchemeContrast)"))
         #expect(columnChrome.contains("if liquidGlassChrome && reduceTransparency"))
         #expect(columnChrome.contains("colorSchemeContrast == .increased"))
+
+        #expect(appSource.components(separatedBy: ".macWikiQAAccessibilityEnvironment()").count == 6)
+        #expect(qaPersonalizationSource.contains("MacWikiQAEnvironment.trustedSuiteName"))
+        #expect(qaPersonalizationSource.contains("@Environment(\\.accessibilityReduceMotion)"))
+        #expect(qaPersonalizationSource.contains("@Environment(\\.accessibilityReduceTransparency)"))
+        #expect(qaPersonalizationSource.contains("@Environment(\\.accessibilityDifferentiateWithoutColor)"))
+        #expect(qaPersonalizationSource.contains("@Environment(\\.colorSchemeContrast)"))
+        #expect(qaPersonalizationSource.contains("qa.accessibility-personalization"))
     }
 
     @Test func readerFindUsesMacWikiFindBarOnCurrentMacOS() throws {
@@ -1049,6 +1059,7 @@ struct BetaReadinessRegressionTests {
             "scripts/profile_reader_open.sh",
             "scripts/qa_context_menu_accessibility.sh",
             "scripts/qa_context_menu_ocr.sh",
+            "scripts/qa_accessibility_personalization.sh",
             "scripts/qa_folder_collapse_selected_list.sh",
             "scripts/qa_highlight_mutation.sh",
             "scripts/qa_label_tag_mutation.sh",
@@ -1080,6 +1091,7 @@ struct BetaReadinessRegressionTests {
         #expect(safetyLibrary.contains("--env \"HOME=$QA_HOME\""))
         #expect(safetyLibrary.contains("--env \"CFFIXED_USER_HOME=$QA_HOME\""))
         #expect(safetyLibrary.contains("--env \"MACWIKI_QA_DEFAULTS_SUITE=${QA_DEFAULTS_SUITE:?}\""))
+        #expect(safetyLibrary.contains("MACWIKI_QA_ACCESSIBILITY_PROFILE=$MACWIKI_QA_ACCESSIBILITY_PROFILE"))
         #expect(safetyLibrary.contains("qa_pid_executable_path"))
         #expect(safetyLibrary.contains("/usr/sbin/lsof -a -p \"$pid\" -d txt -Fn"))
         #expect(safetyLibrary.contains("Refusing to run while $APP_NAME PID"))
@@ -1091,6 +1103,18 @@ struct BetaReadinessRegressionTests {
             #expect(!script.contains("open -n \"$APP_BIN\""))
             #expect(!script.contains("$HOME/Library/Application Support/default.store"))
         }
+
+        let personalizationHarness = try source("scripts/qa_accessibility_personalization.sh")
+        #expect(personalizationHarness.contains("MACWIKI_QA_ACCESSIBILITY_PROFILE"))
+        #expect(personalizationHarness.contains("ax_accessibility_personalization.swift"))
+        #expect(personalizationHarness.contains("capture_macwiki_window.sh"))
+        #expect(personalizationHarness.contains("compare_images.swift"))
+        #expect(personalizationHarness.contains("visual-diff.json"))
+        #expect(personalizationHarness.contains("Production preferences/data or global accessibility settings touched"))
+
+        let captureHarness = try source("scripts/capture_macwiki_window.sh")
+        #expect(captureHarness.contains("pwd -P"))
+        #expect(captureHarness.contains("actual_binary=\"$(cd \"$(dirname \"$actual_binary\")\""))
 
         let discoverScript = try source("scripts/qa_discover_scroll_time_machine.sh")
         let launchRange = try #require(discoverScript.range(of: "qa_launch_candidate \"/tmp/macwiki-qa-discover-launch.log\""))

@@ -26,6 +26,9 @@ fi
 
 expected_binary="$(cd "$(dirname "$app_binary")" && pwd -P)/$(basename "$app_binary")"
 actual_binary="$(ps -p "$APP_PID" -o comm= 2>/dev/null | sed 's/^[[:space:]]*//' || true)"
+if [[ -n "$actual_binary" && -e "$actual_binary" ]]; then
+  actual_binary="$(cd "$(dirname "$actual_binary")" && pwd -P)/$(basename "$actual_binary")"
+fi
 if [[ "$actual_binary" != "$expected_binary" ]]; then
   echo "PID $APP_PID does not match the requested app binary: $expected_binary" >&2
   exit 1

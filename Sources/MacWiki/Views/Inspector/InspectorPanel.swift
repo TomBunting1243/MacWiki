@@ -7,7 +7,7 @@ struct InspectorPanel: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.openURL) private var openURL
     @Environment(\.colorScheme) private var colorScheme
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.macWikiAccessibilityPersonalization.reduceMotion) private var reduceMotion
     @AppStorage(AppStorageKey.Inspector.infoSplitRatio) private var infoSplitRatioSetting: Double = 0
     @AppStorage(AppStorageKey.Inspector.metadataSectionHeight) private var metadataSectionHeightSetting: Double = 0
     @AppStorage(AppStorageKey.Inspector.tocSectionHeight) private var tocSectionHeightSetting: Double = 0

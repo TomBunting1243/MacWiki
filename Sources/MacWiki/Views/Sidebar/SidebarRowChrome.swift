@@ -95,7 +95,7 @@ private struct SidebarListRowModifier: ViewModifier {
 }
 
 struct SidebarRowContainer<Content: View>: View {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.macWikiAccessibilityPersonalization.reduceMotion) private var reduceMotion
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.controlActiveState) private var controlActiveState
     @Environment(\.sidebarRowLayoutMetrics) private var layoutMetrics

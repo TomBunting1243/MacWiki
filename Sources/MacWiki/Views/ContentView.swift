@@ -14,7 +14,7 @@ struct ContentView: View {
     }
 
     @Environment(AppState.self) private var appState
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.macWikiAccessibilityPersonalization.reduceMotion) private var reduceMotion
     @State private var selectedList: ReadingList?
     @State private var selectedLabel: Label?
     @State private var selectedTag: Tag?

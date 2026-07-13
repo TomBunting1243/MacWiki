@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct MetadataView: View {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.macWikiAccessibilityPersonalization.reduceMotion) private var reduceMotion
 
     let items: [WikipediaService.MetadataItem]
     var onRowBottomsChange: (([CGFloat]) -> Void)? = nil

@@ -165,6 +165,9 @@ qa_launch_exact() {
   if [[ -n "${MACWIKI_QA_NETWORK_MODE:-}" ]]; then
     environment+=("MACWIKI_QA_NETWORK_MODE=$MACWIKI_QA_NETWORK_MODE")
   fi
+  if [[ -n "${MACWIKI_QA_ACCESSIBILITY_PROFILE:-}" ]]; then
+    environment+=("MACWIKI_QA_ACCESSIBILITY_PROFILE=$MACWIKI_QA_ACCESSIBILITY_PROFILE")
+  fi
   /usr/bin/env "${environment[@]}" "$APP_BIN" >"$log_path" 2>&1 &
   QA_APP_PID=$!
   export QA_APP_PID
@@ -212,6 +215,9 @@ qa_launch_exact_bundle() {
   )
   if [[ -n "${MACWIKI_QA_NETWORK_MODE:-}" ]]; then
     open_arguments+=(--env "MACWIKI_QA_NETWORK_MODE=$MACWIKI_QA_NETWORK_MODE")
+  fi
+  if [[ -n "${MACWIKI_QA_ACCESSIBILITY_PROFILE:-}" ]]; then
+    open_arguments+=(--env "MACWIKI_QA_ACCESSIBILITY_PROFILE=$MACWIKI_QA_ACCESSIBILITY_PROFILE")
   fi
   open "${open_arguments[@]}" -a "$bundle_path"
 

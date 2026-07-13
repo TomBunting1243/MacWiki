@@ -31,7 +31,7 @@ enum SidebarSelectionID: Hashable {
 struct ListsSidebar: View {
     @Environment(AppState.self) private var appState
     @Environment(\.modelContext) private var modelContext
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.macWikiAccessibilityPersonalization.reduceMotion) private var reduceMotion
     @Query private var lists: [ReadingList]
     @Query private var areas: [Area]
     @Query private var savedArticles: [SavedArticle]
@@ -1613,7 +1613,7 @@ private struct TagRowView: View {
 /// Collapsible area/folder row with drop-to-add support and nested areas
 private struct AreaRowView<ListRow: View>: View {
     @Environment(\.modelContext) private var modelContext
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.macWikiAccessibilityPersonalization.reduceMotion) private var reduceMotion
     @Environment(\.sidebarRowLayoutMetrics) private var layoutMetrics
 
     let area: Area

@@ -246,7 +246,7 @@ struct AppLoadingSkeletonBar: View {
     var cornerRadius: CGFloat = 8
     var tone: AppLoadingTone = .neutral
 
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.macWikiAccessibilityPersonalization.reduceMotion) private var reduceMotion
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
@@ -362,7 +362,7 @@ private struct AppLoadingBeacon: View {
     let tint: Color?
     let compact: Bool
 
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.macWikiAccessibilityPersonalization.reduceMotion) private var reduceMotion
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {

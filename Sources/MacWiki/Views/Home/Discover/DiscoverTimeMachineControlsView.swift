@@ -8,7 +8,7 @@ struct DiscoverTimeMachineControlsView: View {
     var isScanning = false
 
     @Environment(\.colorScheme) private var colorScheme
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.macWikiAccessibilityPersonalization.reduceMotion) private var reduceMotion
 
     private var prefersWideTimeMachineControls: Bool {
         discoverContentWidth >= 760

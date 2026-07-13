@@ -21,7 +21,7 @@ struct CachedThumbnailImage<Content: View, Placeholder: View, Failure: View>: Vi
     let placeholder: () -> Placeholder
     let failure: () -> Failure
 
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.macWikiAccessibilityPersonalization.reduceMotion) private var reduceMotion
     @Environment(\.displayScale) private var displayScale
     @State private var phase: Phase = .idle
 

@@ -3,7 +3,7 @@ import SwiftUI
 
 struct MainWindowShell: View {
     @Environment(AppState.self) private var appState
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.macWikiAccessibilityPersonalization.reduceMotion) private var reduceMotion
     @State private var sidebarSearchModel = SidebarSearchSurfaceModel()
 
     @Binding var selectedList: ReadingList?

@@ -7,7 +7,7 @@ struct DirectoryColumnView: View {
         static let verticalSpacingAnimation = ColumnMotion.sidebarVisibility
     }
 
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.macWikiAccessibilityPersonalization.reduceMotion) private var reduceMotion
     @AppStorage(AppStorageKey.MainWindow.directoryWidth) private var directoryWidth = AppStorageKey.MainWindow.directoryWidthDefault
     @State private var measuredTopInset = Chrome.topInset
     @State private var hasMeasuredTrafficLightAvoidance = false

@@ -53,7 +53,7 @@ struct DiscoverVisualContextStrip: View {
 struct DiscoverVisualContextCard: View {
     let image: WikipediaService.VisualContextImage
     let onOpenURL: (URL) -> Void
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.macWikiAccessibilityPersonalization.reduceMotion) private var reduceMotion
     @State private var isHovered = false
 
     private var displayTitle: String {
@@ -137,7 +137,7 @@ struct DiscoverThumbnailSlot: View {
     let size: CGFloat
     let cornerRadius: CGFloat
     let imagePadding: CGFloat
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.macWikiAccessibilityPersonalization.reduceMotion) private var reduceMotion
 
     var body: some View {
         Group {
@@ -183,7 +183,7 @@ struct DiscoverFeaturedImageCard: View {
     let image: WikipediaService.DiscoverFeed.FeaturedImage
     var prefersHorizontalLayout: Bool = false
     @Environment(\.openURL) private var openURL
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.macWikiAccessibilityPersonalization.reduceMotion) private var reduceMotion
     @State private var isHovered = false
 
     private var displayImageURL: URL? {

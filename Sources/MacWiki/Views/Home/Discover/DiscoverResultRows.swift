@@ -6,7 +6,7 @@ struct DiscoverHolidayRow: View {
     let onOpen: (WikipediaService.SearchResult, Bool) -> Void
     let referenceDate: Date
     var showsSurface: Bool = true
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.macWikiAccessibilityPersonalization.reduceMotion) private var reduceMotion
     @State private var showingPageViewsPopover = false
     @State private var isHovered = false
 
@@ -82,7 +82,7 @@ struct DiscoverSearchResultRow: View {
     let result: WikipediaService.SearchResult
     let isSaved: Bool
     let onOpen: () -> Void
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.macWikiAccessibilityPersonalization.reduceMotion) private var reduceMotion
     @State private var isHovered = false
 
     var body: some View {

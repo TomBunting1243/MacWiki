@@ -35,7 +35,7 @@ private struct ReaderLinkHoverPreviewOverlay: View {
     let onSave: () -> Void
     var onReveal: () -> Void = {}
     var onHoverStateChange: (Bool) -> Void = { _ in }
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.macWikiAccessibilityPersonalization.reduceMotion) private var reduceMotion
     @State private var preferredPreviewHeight: CGFloat = LinkHoverPreviewMetrics.height
 
     private var previewSwapTransition: AnyTransition {
@@ -164,7 +164,7 @@ private struct ReaderLinkHoverPreviewOverlay: View {
 /// Reader view - shows article content or new tab page
 struct ReaderView: View {
     @Environment(AppState.self) private var appState
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.macWikiAccessibilityPersonalization.reduceMotion) private var reduceMotion
 
     var body: some View {
         @Bindable var appState = appState
@@ -270,7 +270,7 @@ struct ArticleView: View {
     @Environment(\.openWindow) private var openWindow
     @Environment(\.modelContext) private var modelContext
     @Environment(\.colorScheme) private var colorScheme
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.macWikiAccessibilityPersonalization.reduceMotion) private var reduceMotion
     @Environment(\.readerChromeMetrics) private var readerChromeMetrics
     @Query(sort: \ReadingList.updatedAt, order: .reverse) private var allLists: [ReadingList]
     @Query private var highlightsForArticle: [Highlight]

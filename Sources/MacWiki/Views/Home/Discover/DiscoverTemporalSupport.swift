@@ -6,7 +6,7 @@ struct DiscoverNewsStoryCard: View {
     let onOpen: (WikipediaService.SearchResult, Bool) -> Void
     let referenceDate: Date
     var showsSurface: Bool = true
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.macWikiAccessibilityPersonalization.reduceMotion) private var reduceMotion
     @State private var activePageViewsTitle: String?
     @State private var isHovered = false
 
@@ -134,7 +134,7 @@ struct DiscoverStoryLinkChip: View {
     let onOpen: (WikipediaService.SearchResult, Bool) -> Void
     let referenceDate: Date
     @Binding var activePageViewsTitle: String?
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.macWikiAccessibilityPersonalization.reduceMotion) private var reduceMotion
     @State private var isHovered = false
 
     var body: some View {
@@ -192,7 +192,7 @@ struct DiscoverOnThisDayFeatureCard: View {
     let event: WikipediaService.DiscoverFeed.OnThisDayEvent
     let accent: Color
     let onOpen: (WikipediaService.SearchResult, Bool) -> Void
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.macWikiAccessibilityPersonalization.reduceMotion) private var reduceMotion
     @State private var isHovered = false
 
     var body: some View {
@@ -248,7 +248,7 @@ struct DiscoverOnThisDayRow: View {
     let onOpen: (WikipediaService.SearchResult, Bool) -> Void
     let referenceDate: Date
     var showsSurface: Bool = true
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.macWikiAccessibilityPersonalization.reduceMotion) private var reduceMotion
     @State private var showingPageViewsPopover = false
     @State private var isHovered = false
 
@@ -325,7 +325,7 @@ struct DiscoverDidYouKnowRow: View {
     let onOpen: (WikipediaService.SearchResult, Bool) -> Void
     let referenceDate: Date
     var showsSurface: Bool = true
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.macWikiAccessibilityPersonalization.reduceMotion) private var reduceMotion
     @State private var showingPageViewsPopover = false
     @State private var isHovered = false
 

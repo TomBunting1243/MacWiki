@@ -127,8 +127,8 @@ enum ReaderToolbarControl: Hashable {
 
 struct ReaderToolbarPill<Content: View>: View {
     @Environment(\.colorScheme) private var colorScheme
-    @Environment(\.colorSchemeContrast) private var colorSchemeContrast
-    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.macWikiAccessibilityPersonalization.colorSchemeContrast) private var colorSchemeContrast
+    @Environment(\.macWikiAccessibilityPersonalization.reduceTransparency) private var reduceTransparency
 
     let density: ReaderToolbarDensity
     let usesNativeGlass: Bool
@@ -226,8 +226,8 @@ struct ReaderToolbarPill<Content: View>: View {
 
 struct ReaderToolbarIconLabel: View {
     @Environment(\.colorScheme) private var colorScheme
-    @Environment(\.colorSchemeContrast) private var colorSchemeContrast
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.macWikiAccessibilityPersonalization.colorSchemeContrast) private var colorSchemeContrast
+    @Environment(\.macWikiAccessibilityPersonalization.reduceMotion) private var reduceMotion
 
     let control: ReaderToolbarControl
     let systemImage: String

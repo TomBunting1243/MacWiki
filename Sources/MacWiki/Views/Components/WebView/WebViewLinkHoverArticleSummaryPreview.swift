@@ -6,7 +6,7 @@ struct LinkHoverArticleSummaryPreview: View {
     let previewWidth: CGFloat
     var onPreferredHeightChange: (CGFloat) -> Void = { _ in }
 
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.macWikiAccessibilityPersonalization.reduceMotion) private var reduceMotion
     @Environment(\.colorScheme) private var colorScheme
     @State private var descriptionText: String?
     @State private var extractText: String?

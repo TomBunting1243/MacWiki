@@ -91,6 +91,7 @@ private final class MacWikiRuntime {
         window.setFrame(visibleFrame, display: false)
         window.contentView = NSHostingView(
             rootView: ContentView()
+                .macWikiQAAccessibilityEnvironment()
                 .focusedSceneValue(\.macWikiCommandAppState, appState)
                 .toolbar(removing: .title)
                 .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
@@ -381,6 +382,7 @@ struct MacWikiApp: App {
     var body: some Scene {
         Window("MacWiki", id: "main") {
             ContentView()
+                .macWikiQAAccessibilityEnvironment()
                 .defaultAppStorage(MacWikiDefaults.current)
                 .persistenceIssueAlert()
                 .focusedSceneValue(\.macWikiCommandAppState, appState)
@@ -427,6 +429,7 @@ struct MacWikiApp: App {
         WindowGroup("Article", for: Article.self) { $article in
             if let article = article {
                 ArticleWindowRootView(initialArticle: article)
+                    .macWikiQAAccessibilityEnvironment()
                     .defaultAppStorage(MacWikiDefaults.current)
                     .persistenceIssueAlert()
             } else {
@@ -435,6 +438,7 @@ struct MacWikiApp: App {
                     systemImage: "doc.text",
                     description: Text("Open an article from a context menu to create a dedicated article window.")
                 )
+                .macWikiQAAccessibilityEnvironment()
             }
         }
         .modelContainer(bootstrap.modelContainer)
@@ -448,6 +452,7 @@ struct MacWikiApp: App {
         
         Settings {
             SettingsView()
+                .macWikiQAAccessibilityEnvironment()
                 .defaultAppStorage(MacWikiDefaults.current)
                 .persistenceIssueAlert()
                 .environment(appState)
