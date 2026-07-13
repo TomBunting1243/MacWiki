@@ -173,6 +173,16 @@ qa_launch_exact_bundle() {
   return 1
 }
 
+qa_launch_candidate() {
+  local log_path="$1"
+  local bundle_path="${APP_BUNDLE_PATH:-${APP_BIN%/Contents/MacOS/*}}"
+  if [[ "$bundle_path" != "$APP_BIN" && -d "$bundle_path/Contents/MacOS" ]]; then
+    qa_launch_exact_bundle "$log_path"
+  else
+    qa_launch_exact "$log_path"
+  fi
+}
+
 qa_stop_exact() {
   local pid="${QA_APP_PID:-}"
   [[ -n "$pid" ]] || return 0

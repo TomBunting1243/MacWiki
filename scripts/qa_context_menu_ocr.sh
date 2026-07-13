@@ -34,7 +34,25 @@ cleanup() {
   qa_remove_isolated_home
 }
 trap cleanup EXIT INT TERM
-qa_launch_exact "/tmp/macwiki-qa-context-menu-launch.log"
+qa_launch_candidate "/tmp/macwiki-qa-context-menu-launch.log"
+
+capture_screen_with_timeout() {
+  local output_path="$1"
+  screencapture -x "$output_path" &
+  local capture_pid=$!
+  local elapsed_ticks=0
+  while kill -0 "$capture_pid" 2>/dev/null; do
+    if (( elapsed_ticks >= 30 )); then
+      kill "$capture_pid" 2>/dev/null || true
+      wait "$capture_pid" 2>/dev/null || true
+      echo "ERROR: Timed out capturing context-menu evidence." >&2
+      return 124
+    fi
+    sleep 0.1
+    elapsed_ticks=$((elapsed_ticks + 1))
+  done
+  wait "$capture_pid"
+}
 
 echo "Running context-menu OCR smoke..."
 echo "Area: $AREA_NAME"
@@ -280,7 +298,7 @@ end run
 end using terms from
 APPLESCRIPT
 sleep 0.25
-screencapture -x "$out_dir/area-menu.png"
+capture_screen_with_timeout "$out_dir/area-menu.png"
 
 # Assert area menu text via OCR
 for term in "Rename" "Delete Folder"; do
@@ -367,7 +385,7 @@ end run
 end using terms from
 APPLESCRIPT
 sleep 0.25
-screencapture -x "$out_dir/list-menu.png"
+capture_screen_with_timeout "$out_dir/list-menu.png"
 
 # Assert list menu text via OCR
 for term in "Rename" "Change Icon" "Delete"; do

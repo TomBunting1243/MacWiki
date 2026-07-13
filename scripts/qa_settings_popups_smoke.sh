@@ -157,12 +157,26 @@ function auditSettingsPane(title, expectedStrings) {
   let interactiveCount = 0;
   let scrollArea = null;
   let verticalScrollBar = null;
-  for (let pass = 0; pass < 10; pass += 1) {
+  let missingWindowPasses = 0;
+  for (let pass = 0; pass < 60; pass += 1) {
     const currentWindow = settingsWindow();
     if (!currentWindow) {
+      missingWindowPasses += 1;
+      if (missingWindowPasses % 10 === 0) {
+        app.frontmost = true;
+        se.keystroke(',', { using: 'command down' });
+      }
       delay(0.2);
       continue;
     }
+    let currentWindowName = '';
+    try { currentWindowName = String(currentWindow.name()).toLowerCase(); } catch (e) {}
+    if (currentWindowName !== title.toLowerCase()) {
+      pressSettingsTab(title);
+      delay(0.25);
+      continue;
+    }
+    missingWindowPasses = 0;
     const elements = [];
     collectElements(currentWindow, elements);
     elements.flatMap(elementStrings).forEach(value => observedStrings.add(value));

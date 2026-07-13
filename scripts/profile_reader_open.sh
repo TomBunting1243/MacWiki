@@ -301,7 +301,7 @@ run_direct_open() {
   fi
 
   stream_pid="$(start_article_open_stream "$stream_log")"
-  qa_launch_exact "$stdout_log"
+  qa_launch_candidate "$stdout_log"
   local app_pid="$QA_APP_PID"
 
   if line="$(wait_for_article_open "$stream_log" "$timeout_seconds")"; then

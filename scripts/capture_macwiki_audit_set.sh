@@ -63,7 +63,7 @@ cleanup() {
   qa_remove_isolated_home
 }
 trap cleanup EXIT INT TERM
-qa_launch_exact "/tmp/macwiki-audit/macwiki-audit-launch.log"
+qa_launch_candidate "/tmp/macwiki-audit/macwiki-audit-launch.log"
 sleep 1.2
 manifest_path="$output_dir/manifest.md"
 

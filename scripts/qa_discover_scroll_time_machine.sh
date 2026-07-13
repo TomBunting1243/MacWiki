@@ -17,7 +17,6 @@ fi
 OUTPUT_DIR="${1:-/tmp/macwiki-qa/discover-$(date +%Y%m%d_%H%M%S)}"
 DATE_LIST_CSV="${DATE_LIST_CSV:-2026-02-24,2025-12-25,2025-07-04,2024-02-29}"
 USER_AGENT="${USER_AGENT:-MacWiki/1.0 (https://github.com/tombunting/MacWiki)}"
-APP_BUNDLE_ID="${APP_BUNDLE_ID:-com.tombunting.MacWiki}"
 DISCOVER_OPEN_MODE="${DISCOVER_OPEN_MODE:-Sidebar}"
 FORCE_FRESH_LAUNCH="${FORCE_FRESH_LAUNCH:-1}"
 QA_HOME="${QA_HOME:-/tmp/macwiki-qa/discover-home-$(date +%Y%m%d_%H%M%S)-$RANDOM}"
@@ -30,34 +29,10 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
-capture_script="$SCRIPT_DIR/capture_macwiki_window.sh"
-click_script="$SCRIPT_DIR/cg_click.swift"
-scroll_script="$SCRIPT_DIR/cg_scroll.swift"
-ocr_script="$SCRIPT_DIR/ocr_text.swift"
-ocr_centers_script="$SCRIPT_DIR/ocr_find_text_centers.swift"
-
-if [[ ! -x "$capture_script" ]]; then
-  echo "ERROR: Missing executable capture script: $capture_script" >&2
-  exit 1
-fi
-
-if [[ ! -x "$click_script" ]]; then
-  chmod +x "$click_script"
-fi
-if [[ ! -x "$scroll_script" ]]; then
-  chmod +x "$scroll_script"
-fi
-if [[ ! -x "$ocr_script" ]]; then
-  chmod +x "$ocr_script"
-fi
-if [[ ! -x "$ocr_centers_script" ]]; then
-  chmod +x "$ocr_centers_script"
-fi
-
 echo "Output: $OUTPUT_DIR"
 
 prepare_deterministic_launch() {
-  CFFIXED_USER_HOME="$QA_HOME" defaults write "$APP_BUNDLE_ID" discoverOpenMode -string "$DISCOVER_OPEN_MODE" >/dev/null 2>&1 || true
+  /usr/bin/defaults write "${QA_DEFAULTS_SUITE:?}" discoverOpenMode -string "$DISCOVER_OPEN_MODE" >/dev/null
   qa_assert_no_conflicting_processes
 }
 
@@ -217,69 +192,67 @@ $.exit(1);
 JXA
 }
 
-send_page_down() {
-  osascript -e 'tell application "System Events" to key code 121' >/dev/null 2>&1 || true
+verify_discover_via_accessibility() {
+  APP_PID="$QA_APP_PID" osascript -l JavaScript <<'JXA'
+ObjC.import('stdlib');
+const se = Application('System Events');
+const appPid = Number(ObjC.unwrap($.getenv('APP_PID')) || '0');
+const matches = se.processes.whose({ unixId: appPid })();
+if (matches.length !== 1) throw new Error('verified app process missing');
+const app = matches[0];
+app.frontmost = true;
+
+const observed = new Set();
+let discoverVisible = false;
+let timeMachineVisible = false;
+for (let pass = 0; pass < 6; pass += 1) {
+  const elements = [];
+  for (const window of app.windows()) {
+    try { elements.push(...window.entireContents().slice(0, 1500)); } catch (error) {}
+  }
+  for (const element of elements) {
+    for (const read of [() => element.name(), () => element.description(), () => element.value()]) {
+      try {
+        const value = read();
+        if (value !== null && value !== undefined && String(value).length > 0) observed.add(String(value));
+      } catch (error) {}
+    }
+  }
+  const text = [...observed].join('\n');
+  discoverVisible = /Current events and historical anniversaries|Discover date|Loading discover feed|Discover unavailable|Featured Article|News Briefing|In the News|Most Read|This Day in History/i.test(text);
+  timeMachineVisible = /Time Machine|Born on This Day|Died on This Day|Holidays & Observances/i.test(text);
+  if (discoverVisible && timeMachineVisible) break;
+
+  let scrolled = false;
+  for (const element of elements) {
+    let role = '';
+    try { role = String(element.role()); } catch (error) {}
+    if (role !== 'AXScrollArea') continue;
+    try {
+      element.actions.byName('AXScrollDownByPage').perform();
+      scrolled = true;
+    } catch (error) {}
+  }
+  if (!scrolled) se.keyCode(121);
+  delay(0.5);
 }
 
-capture_window() {
-  local path="$1"
-  APP_NAME="$APP_NAME" APP_BIN="$APP_BIN" APP_PID="$QA_APP_PID" "$capture_script" "$path" >/dev/null
-}
-
-ocr_image_to_file() {
-  local image_path="$1"
-  local text_path="$2"
-  "$ocr_script" "$image_path" >"$text_path" 2>/dev/null || true
-}
-
-image_dimensions() {
-  local image_path="$1"
-  local width
-  local height
-  width="$(sips -g pixelWidth "$image_path" 2>/dev/null | awk '/pixelWidth/ {print $2; exit}')"
-  height="$(sips -g pixelHeight "$image_path" 2>/dev/null | awk '/pixelHeight/ {print $2; exit}')"
-  if [[ ! "$width" =~ ^[0-9]+$ ]] || [[ ! "$height" =~ ^[0-9]+$ ]]; then
-    return 1
-  fi
-  echo "$width,$height"
-}
-
-map_image_point_to_window_point() {
-  local image_x="$1"
-  local image_y="$2"
-  awk \
-    -v image_x="$image_x" \
-    -v image_y="$image_y" \
-    -v image_w="$capture_image_w" \
-    -v image_h="$capture_image_h" \
-    -v window_x="$window_x" \
-    -v window_y="$window_y" \
-    -v window_w="$window_w" \
-    -v window_h="$window_h" \
-    'BEGIN {
-      scale_x = image_w / window_w
-      scale_y = image_h / window_h
-      scale = (scale_x + scale_y) / 2.0
-      if (scale <= 0) {
-        exit 1
-      }
-      margin_x = (image_w - (window_w * scale)) / 2.0
-      margin_y = (image_h - (window_h * scale)) / 2.0
-      click_x = window_x + ((image_x - margin_x) / scale)
-      click_y = window_y + ((image_y - margin_y) / scale)
-      printf("%d,%d\n", int(click_x + 0.5), int(click_y + 0.5))
-    }'
+console.log(`DISCOVER_VISIBLE=${discoverVisible}`);
+console.log(`TIME_MACHINE_VISIBLE=${timeMachineVisible}`);
+console.log(`OBSERVED=${[...observed].slice(0, 120).join(' | ')}`);
+if (!discoverVisible || !timeMachineVisible) $.exit(1);
+JXA
 }
 
 prepare_deterministic_launch
-discover_mode_effective="$(defaults read "$APP_BUNDLE_ID" discoverOpenMode 2>/dev/null || true)"
+discover_mode_effective="$(/usr/bin/defaults read "${QA_DEFAULTS_SUITE:?}" discoverOpenMode 2>/dev/null || true)"
 
 if [[ ! -x "$APP_BIN" ]]; then
   echo "ERROR: App binary not found: $APP_BIN" >&2
   exit 1
 fi
 echo "Launching isolated $APP_NAME from $APP_BIN" >&2
-qa_launch_exact "/tmp/macwiki-qa-discover-launch.log"
+qa_launch_candidate "/tmp/macwiki-qa-discover-launch.log"
 window_info="$(ensure_macwiki_window)"
 if [[ ! "$window_info" =~ ^-?[0-9]+,-?[0-9]+,[0-9]+,[0-9]+,[0-9]+$ ]]; then
   echo "ERROR: Unexpected window bounds payload: $window_info" >&2
@@ -291,147 +264,19 @@ echo "Detected MacWiki window pid=$window_pid frame=($window_x,$window_y $window
 activate_macwiki
 sleep 0.7
 
-top_shot="$OUTPUT_DIR/01-before-click.png"
-capture_window "$top_shot"
-ocr_image_to_file "$top_shot" "$OUTPUT_DIR/01-before-click.ocr.txt"
-capture_dimensions="$(image_dimensions "$top_shot" || true)"
-if [[ "$capture_dimensions" =~ ^[0-9]+,[0-9]+$ ]]; then
-  IFS=',' read -r capture_image_w capture_image_h <<<"$capture_dimensions"
-else
-  capture_image_w="$window_w"
-  capture_image_h="$window_h"
-fi
-
-# Attempt to click Discover row area in sidebar.
 discover_selected="false"
-discover_click_shot=""
-discover_centers="$("$ocr_centers_script" "$top_shot" "Discover" 2>/dev/null || true)"
-
 ax_selection_output=""
 if ax_selection_output="$(select_discover_via_accessibility 2>&1)"; then
-  printf '%s\n' "$ax_selection_output" >"$OUTPUT_DIR/02-ax-selection.txt"
-  sleep 1.0
-  shot="$OUTPUT_DIR/02-after-click-ax.png"
-  capture_window "$shot"
-  ocr_file="$OUTPUT_DIR/02-after-click-ax.ocr.txt"
-  ocr_image_to_file "$shot" "$ocr_file"
-  if rg -qi "Time Machine|Current events and historical anniversaries|Discover date|Loading discover feed|Discover unavailable|Featured Article|News Briefing|In the News|Most Read|This Day in History" "$ocr_file"; then
-    discover_selected="true"
-    discover_click_shot="$shot"
-  fi
-else
-  printf '%s\n' "$ax_selection_output" >"$OUTPUT_DIR/02-ax-selection.txt"
+  discover_selected="true"
 fi
-
-if [[ "$discover_selected" != "true" && -n "$discover_centers" ]]; then
-  discover_click_index=0
-  while IFS=',' read -r center_x center_y center_text; do
-    [[ -z "${center_x:-}" || -z "${center_y:-}" ]] && continue
-    discover_click_index=$((discover_click_index + 1))
-    mapped_click="$(map_image_point_to_window_point "$center_x" "$center_y" || true)"
-    if [[ "$mapped_click" =~ ^-?[0-9]+,-?[0-9]+$ ]]; then
-      IFS=',' read -r click_x click_y <<<"$mapped_click"
-    else
-      click_x=$((window_x + center_x))
-      click_y=$((window_y + center_y))
-    fi
-    "$click_script" --x "$click_x" --y "$click_y" >/dev/null || true
-    sleep 1.0
-
-    shot="$OUTPUT_DIR/02-after-click-ocr-${discover_click_index}.png"
-    capture_window "$shot"
-    ocr_file="$OUTPUT_DIR/02-after-click-ocr-${discover_click_index}.ocr.txt"
-    ocr_image_to_file "$shot" "$ocr_file"
-
-    if rg -qi "Current events and historical anniversaries|Discover date|Loading discover feed|Discover unavailable|Featured Article|News Briefing|In the News|Most Read|This Day in History" "$ocr_file"; then
-      discover_selected="true"
-      discover_click_shot="$shot"
-      break
-    fi
-
-    if (( discover_click_index >= 6 )); then
-      break
-    fi
-  done <<< "$discover_centers"
-fi
-
-if [[ "$discover_selected" != "true" ]]; then
-  # Fallback to fixed y offsets when OCR center extraction cannot target the row.
-  for y_offset in 132 160 188 216 244; do
-    click_x=$((window_x + 110))
-    click_y=$((window_y + y_offset))
-    "$click_script" --x "$click_x" --y "$click_y" >/dev/null || true
-    sleep 0.9
-
-    shot="$OUTPUT_DIR/02-after-click-y${y_offset}.png"
-    capture_window "$shot"
-    ocr_file="$OUTPUT_DIR/02-after-click-y${y_offset}.ocr.txt"
-    ocr_image_to_file "$shot" "$ocr_file"
-
-    if rg -qi "Current events and historical anniversaries|Discover date|Loading discover feed|Discover unavailable|Featured Article|News Briefing|In the News|Most Read|This Day in History" "$ocr_file"; then
-      discover_selected="true"
-      discover_click_shot="$shot"
-      break
-    fi
-  done
-fi
-
-scroll_anchor_x=$((window_x + 220))
-scroll_anchor_y=$((window_y + (window_h / 2)))
-scroll_mode="sidebar"
-
-if [[ -n "$discover_click_shot" ]]; then
-  discover_click_ocr="${discover_click_shot%.png}.ocr.txt"
-  if [[ -f "$discover_click_ocr" ]]; then
-    # If Discover opens in reader-page mode, scroll in the reader column.
-    if rg -qi "New Tab|Featured|Most Read|In the News|News Briefing" "$discover_click_ocr"; then
-      scroll_anchor_x=$((window_x + (window_w * 62 / 100)))
-      scroll_mode="reader_page"
-    fi
-    # If Discover opens in sidebar mode, keep scrolling in directory column.
-    if rg -qi "Current events and historical anniversaries|Discover date|Featured Article" "$discover_click_ocr"; then
-      scroll_anchor_x=$((window_x + 220))
-      scroll_mode="sidebar"
-    fi
-  fi
-fi
+printf '%s\n' "$ax_selection_output" >"$OUTPUT_DIR/01-ax-selection.txt"
 
 time_machine_found="false"
-time_machine_shot=""
-latest_scroll_shot=""
-
-if [[ -n "$discover_click_shot" ]]; then
-  discover_click_ocr="${discover_click_shot%.png}.ocr.txt"
-  if rg -qi "Time Machine|Born on This Day|Died on This Day|Holidays & Observances" "$discover_click_ocr"; then
-    time_machine_found="true"
-    time_machine_shot="$discover_click_shot"
-  fi
+ax_verification_output=""
+if [[ "$discover_selected" == "true" ]] && ax_verification_output="$(verify_discover_via_accessibility 2>&1)"; then
+  time_machine_found="true"
 fi
-
-for pass in 1 2 3 4 5 6 7 8 9 10 11 12; do
-  [[ "$time_machine_found" == "true" ]] && break
-  if [[ "$scroll_mode" == "reader_page" ]]; then
-    "$click_script" --x "$scroll_anchor_x" --y "$scroll_anchor_y" >/dev/null || true
-    sleep 0.2
-    send_page_down
-  else
-    # Negative delta scrolls down in this harness.
-    "$scroll_script" --x "$scroll_anchor_x" --y "$scroll_anchor_y" --delta-y -8 --steps 36 --interval-ms 15 >/dev/null || true
-  fi
-  sleep 0.7
-
-  pass_shot="$OUTPUT_DIR/03-scroll-pass-${pass}.png"
-  latest_scroll_shot="$pass_shot"
-  capture_window "$pass_shot"
-  pass_ocr="$OUTPUT_DIR/03-scroll-pass-${pass}.ocr.txt"
-  ocr_image_to_file "$pass_shot" "$pass_ocr"
-
-  if rg -qi "Time Machine|Born on This Day|Died on This Day|Holidays & Observances" "$pass_ocr"; then
-    time_machine_found="true"
-    time_machine_shot="$pass_shot"
-    break
-  fi
-done
+printf '%s\n' "$ax_verification_output" >"$OUTPUT_DIR/02-ax-discover-time-machine.txt"
 
 coverage_csv="$OUTPUT_DIR/time_machine_date_coverage.csv"
 {
@@ -485,7 +330,7 @@ report_path="$OUTPUT_DIR/report.md"
   echo "- MacWiki window pid: \`$window_pid\`"
   echo "- App binary: \`$APP_BIN\`"
   echo "- Window frame: \`x=$window_x y=$window_y w=$window_w h=$window_h\`"
-  echo "- Defaults domain: \`$APP_BUNDLE_ID\`"
+  echo "- Isolated defaults suite: \`$QA_DEFAULTS_SUITE\`"
   echo "- Forced discoverOpenMode: \`$DISCOVER_OPEN_MODE\` (effective: \`${discover_mode_effective:-unknown}\`)"
   echo "- Forced fresh launch: \`$FORCE_FRESH_LAUNCH\`"
   echo
@@ -493,21 +338,8 @@ report_path="$OUTPUT_DIR/report.md"
   echo
   echo "- Before (reported): Discover smart list scroll felt jerky, and Time Machine was not working."
   echo "- After (this QA run):"
-  echo "  - Discover selection detected by OCR: \`$discover_selected\`"
-  if [[ -n "$discover_click_shot" ]]; then
-    echo "  - Discover evidence screenshot: \`$discover_click_shot\`"
-  else
-    echo "  - Discover evidence screenshot: not confirmed by OCR in click attempts."
-  fi
-  echo "  - Time Machine heading detected after scroll by OCR: \`$time_machine_found\`"
-  if [[ -n "$time_machine_shot" ]]; then
-    echo "  - Time Machine evidence screenshot: \`$time_machine_shot\`"
-  else
-    echo "  - Time Machine evidence screenshot: not found in automated scroll passes."
-  fi
-  if [[ -n "$latest_scroll_shot" ]]; then
-    echo "  - Last scroll screenshot: \`$latest_scroll_shot\`"
-  fi
+  echo "  - Discover selected through exact-PID accessibility: \`$discover_selected\`"
+  echo "  - Discover surface and Time Machine semantics reached through accessibility scrolling: \`$time_machine_found\`"
   echo
   echo "## Date Coverage (API)"
   echo
@@ -519,9 +351,9 @@ report_path="$OUTPUT_DIR/report.md"
   echo
   echo "## Artifacts"
   echo
-  echo "- Before click screenshot: \`$top_shot\`"
+  echo "- Discover selection AX log: \`$OUTPUT_DIR/01-ax-selection.txt\`"
+  echo "- Discover/Time Machine AX log: \`$OUTPUT_DIR/02-ax-discover-time-machine.txt\`"
   echo "- Coverage CSV: \`$coverage_csv\`"
-  echo "- OCR text files: \`$OUTPUT_DIR/*.ocr.txt\`"
 } >"$report_path"
 
 echo "QA report: $report_path"

@@ -6,7 +6,6 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 source "$SCRIPT_DIR/lib/qa_process_safety.sh"
 
 APP_NAME="${APP_NAME:-MacWiki}"
-APP_BUNDLE_ID="${APP_BUNDLE_ID:-com.tombunting.MacWiki}"
 APP_BIN_DEFAULT="$REPO_ROOT/.build/arm64-apple-macosx/debug/MacWiki"
 APP_BIN_FALLBACK="$REPO_ROOT/.build/debug/MacWiki"
 APP_BIN="${APP_BIN:-$APP_BIN_DEFAULT}"
@@ -103,8 +102,8 @@ run_osascript_with_timeout() {
 }
 
 prepare_deterministic_defaults() {
-  HOME="$QA_HOME" CFFIXED_USER_HOME="$QA_HOME" defaults delete "$APP_BUNDLE_ID" searchPresentationMode >/dev/null 2>&1 || true
-  HOME="$QA_HOME" CFFIXED_USER_HOME="$QA_HOME" defaults write "$APP_BUNDLE_ID" mainWindow.sidebarWidth -float "$LISTS_SIDEBAR_WIDTH" >/dev/null 2>&1 || true
+  /usr/bin/defaults delete "${QA_DEFAULTS_SUITE:?}" searchPresentationMode >/dev/null 2>&1 || true
+  /usr/bin/defaults write "${QA_DEFAULTS_SUITE:?}" mainWindow.sidebarWidth -float "$LISTS_SIDEBAR_WIDTH" >/dev/null
 }
 
 set_launch_sidebar_search_defaults() {
@@ -112,23 +111,23 @@ set_launch_sidebar_search_defaults() {
   local query_text="$2"
 
   if [[ "$should_open" == "1" ]]; then
-    HOME="$QA_HOME" CFFIXED_USER_HOME="$QA_HOME" defaults write "$APP_BUNDLE_ID" "$LAUNCH_OPEN_SEARCH_KEY" -bool true >/dev/null 2>&1 || true
+    /usr/bin/defaults write "${QA_DEFAULTS_SUITE:?}" "$LAUNCH_OPEN_SEARCH_KEY" -bool true >/dev/null
   else
-    HOME="$QA_HOME" CFFIXED_USER_HOME="$QA_HOME" defaults delete "$APP_BUNDLE_ID" "$LAUNCH_OPEN_SEARCH_KEY" >/dev/null 2>&1 || true
+    /usr/bin/defaults delete "${QA_DEFAULTS_SUITE:?}" "$LAUNCH_OPEN_SEARCH_KEY" >/dev/null 2>&1 || true
   fi
 
-  HOME="$QA_HOME" CFFIXED_USER_HOME="$QA_HOME" defaults write "$APP_BUNDLE_ID" "$LAUNCH_SEARCH_QUERY_KEY" -string "$query_text" >/dev/null 2>&1 || true
+  /usr/bin/defaults write "${QA_DEFAULTS_SUITE:?}" "$LAUNCH_SEARCH_QUERY_KEY" -string "$query_text" >/dev/null
 }
 
 clear_launch_sidebar_search_defaults() {
-  HOME="$QA_HOME" CFFIXED_USER_HOME="$QA_HOME" defaults delete "$APP_BUNDLE_ID" "$LAUNCH_OPEN_SEARCH_KEY" >/dev/null 2>&1 || true
-  HOME="$QA_HOME" CFFIXED_USER_HOME="$QA_HOME" defaults delete "$APP_BUNDLE_ID" "$LAUNCH_SEARCH_QUERY_KEY" >/dev/null 2>&1 || true
+  /usr/bin/defaults delete "${QA_DEFAULTS_SUITE:?}" "$LAUNCH_OPEN_SEARCH_KEY" >/dev/null 2>&1 || true
+  /usr/bin/defaults delete "${QA_DEFAULTS_SUITE:?}" "$LAUNCH_SEARCH_QUERY_KEY" >/dev/null 2>&1 || true
 }
 
 relaunch_app() {
   qa_stop_exact
   sleep 0.7
-  qa_launch_exact "/tmp/macwiki-qa-sidebar-search-launch.log"
+  qa_launch_candidate "/tmp/macwiki-qa-sidebar-search-launch.log"
 
   if ! wait_for_content_window; then
     echo "ERROR: Timed out waiting for MacWiki content window." >&2
@@ -218,7 +217,7 @@ APPLESCRIPT
 
 launch_app_if_needed() {
   qa_stop_exact
-  qa_launch_exact "/tmp/macwiki-qa-sidebar-search-launch.log"
+  qa_launch_candidate "/tmp/macwiki-qa-sidebar-search-launch.log"
 
   if ! wait_for_content_window; then
     echo "ERROR: Timed out waiting for MacWiki content window." >&2
@@ -420,6 +419,30 @@ APPLESCRIPT
 capture_and_ocr() {
   local capture_path="$1"
   local ocr_path="$2"
+  if [[ "$HARNESS_DRIVER" == "ax" ]]; then
+    APP_PID="$QA_APP_PID" osascript -l JavaScript >"$ocr_path" 2>&1 <<'JXA'
+ObjC.import('stdlib');
+const se = Application('System Events');
+const appPid = Number(ObjC.unwrap($.getenv('APP_PID')) || '0');
+const matches = se.processes.whose({ unixId: appPid })();
+if (matches.length !== 1) throw new Error('verified app process missing');
+const observed = new Set();
+for (const window of matches[0].windows()) {
+  let elements = [];
+  try { elements = window.entireContents().slice(0, 1800); } catch (error) {}
+  for (const element of elements) {
+    for (const read of [() => element.name(), () => element.description(), () => element.value()]) {
+      try {
+        const value = read();
+        if (value !== null && value !== undefined && String(value).length > 0) observed.add(String(value));
+      } catch (error) {}
+    }
+  }
+}
+console.log([...observed].join('\n'));
+JXA
+    return
+  fi
   APP_NAME="$APP_NAME" APP_BIN="$APP_BIN" APP_PID="$QA_APP_PID" "$CAPTURE_SCRIPT" "$capture_path" >/dev/null
   "$OCR_SCRIPT" "$capture_path" >"$ocr_path" 2>/dev/null || true
 }
@@ -521,8 +544,7 @@ for raw_width in "${widths[@]}"; do
     {
       echo "## Width $width ($class_label)"
       echo
-      echo "- Fallback capture (search UI unavailable): \`$fallback_shot\`"
-      echo "- Fallback OCR: \`$fallback_ocr\`"
+      echo "- Fallback accessibility/OCR snapshot: \`$fallback_ocr\`"
       echo
     } >>"$REPORT_PATH"
     index=$((index + 1))
@@ -538,8 +560,7 @@ for raw_width in "${widths[@]}"; do
     {
       echo "## Width $width ($class_label)"
       echo
-      echo "- Query fallback capture (query injection unavailable): \`$fallback_shot\`"
-      echo "- Query fallback OCR: \`$fallback_ocr\`"
+      echo "- Query fallback accessibility/OCR snapshot: \`$fallback_ocr\`"
       echo
     } >>"$REPORT_PATH"
     index=$((index + 1))
@@ -555,8 +576,7 @@ for raw_width in "${widths[@]}"; do
     echo "## Width $width ($class_label)"
     echo
     echo "- Verified actual window width: \`${ACTUAL_WINDOW_WIDTH}px\`"
-    echo "- Query capture: \`$query_shot\`"
-    echo "- OCR: \`$query_ocr\`"
+    echo "- Query accessibility/OCR snapshot: \`$query_ocr\`"
   } >>"$REPORT_PATH"
 
   assert_contains_text "$query_ocr" "Search" "Search header visible at $width px" 1
@@ -573,8 +593,7 @@ for raw_width in "${widths[@]}"; do
   capture_and_ocr "$empty_shot" "$empty_ocr"
 
   {
-    echo "- Empty capture: \`$empty_shot\`"
-    echo "- Empty OCR: \`$empty_ocr\`"
+    echo "- Empty accessibility/OCR snapshot: \`$empty_ocr\`"
   } >>"$REPORT_PATH"
 
   assert_contains_text "$empty_ocr" "Search Wikipedia|Search" "Empty-state search prompt visible at $width px" "$STRICT_OCR"
