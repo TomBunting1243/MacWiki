@@ -878,8 +878,10 @@ struct BetaReadinessRegressionTests {
         let safetyLibrary = try source("scripts/lib/qa_process_safety.sh")
         let scriptNames = [
             "scripts/profile_reader_open.sh",
+            "scripts/qa_context_menu_accessibility.sh",
             "scripts/qa_context_menu_ocr.sh",
             "scripts/qa_folder_collapse_selected_list.sh",
+            "scripts/qa_menu_window_states.sh",
             "scripts/qa_nested_folder_rename.sh",
             "scripts/qa_discover_scroll_time_machine.sh",
             "scripts/qa_sidebar_search_width_classes.sh",
@@ -926,6 +928,32 @@ struct BetaReadinessRegressionTests {
         let nestedRenameScript = try source("scripts/qa_nested_folder_rename.sh")
         #expect(!folderCollapseScript.contains("--flip-y"))
         #expect(!nestedRenameScript.contains("--flip-y"))
+    }
+
+    @Test func menuAndContextHarnessesKeepReportsNonExecutableAndStateIsolated() throws {
+        let menuHarness = try source("scripts/qa_menu_window_states.sh")
+        let contextHarness = try source("scripts/qa_context_menu_accessibility.sh")
+
+        for harness in [menuHarness, contextHarness] {
+            #expect(harness.contains("source \"$SCRIPT_DIR/lib/qa_process_safety.sh\""))
+            #expect(harness.contains("qa_prepare_isolated_home"))
+            #expect(harness.contains("qa_assert_no_conflicting_processes"))
+            #expect(harness.contains("qa_launch_candidate \"$APP_LOG\""))
+            #expect(harness.contains("APP_PID=\"$QA_APP_PID\""))
+            #expect(harness.contains("[[ \"$VERSION\" == 1.0* ]]"))
+            #expect(harness.contains("[[ \"$TRACE_DIRTY\" == \"false\" ]]"))
+            #expect(harness.contains("printf -- '- Candidate binary: `%s`\\n' \"$APP_BIN\""))
+            #expect(!harness.contains("<<REPORT"))
+            #expect(!harness.contains("pkill -x"))
+        }
+
+        #expect(menuHarness.contains("processes.whose({ unixId: pid })"))
+        #expect(menuHarness.contains("Window did not enter native full screen"))
+        #expect(menuHarness.contains("MacWiki did not enter an inactive application state"))
+        #expect(contextHarness.contains("qa_assert_isolated_path \"$STORE_PATH\" \"$QA_HOME\""))
+        #expect(contextHarness.contains("sidebar-row-area-$FOLDER_ID"))
+        #expect(contextHarness.contains("sidebar-row-list-$LIST_ID"))
+        #expect(contextHarness.contains("AXShowMenu"))
     }
 
     @Test func widthClassHarnessUsesReachableVerifiedWindowSizes() throws {
