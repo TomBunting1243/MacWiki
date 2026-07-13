@@ -299,7 +299,10 @@ struct TabBarView: View {
                 .onChange(of: appState.activeTabId) { _, _ in
                     scrollToActiveTab(with: proxy, animated: true)
                 }
-                .onChange(of: appState.openTabs.map(\.id)) { _, _ in
+                .onChange(of: appState.openTabs.map(\.id)) { oldTabIDs, newTabIDs in
+                    guard oldTabIDs.count != newTabIDs.count || Set(oldTabIDs) != Set(newTabIDs) else {
+                        return
+                    }
                     scrollToActiveTab(with: proxy, animated: true)
                 }
                 .onChange(of: pendingScrollTabId) { _, tabId in
@@ -536,6 +539,7 @@ struct TabBarView: View {
                 systemImage: chromeStyle.isCompactChrome ? "chevron.down" : "chevron.down.circle",
                 imageScale: .small
             )
+            .accessibilityLabel("All Tabs")
         }
         .menuStyle(.borderlessButton)
         .help("All Tabs")
@@ -650,9 +654,11 @@ struct TabBarView: View {
     private func handleDragChanged(tab: ArticleTab, at index: Int, translation: CGFloat, dragLocationX: CGFloat) {
         // Initialize drag if just starting
         if draggedTabId == nil {
-            draggedTabId = tab.id
-            draggedSourceIndex = index
-            currentTargetIndex = index
+            performAnimation(interactionProfile.dragLift) {
+                draggedTabId = tab.id
+                draggedSourceIndex = index
+                currentTargetIndex = index
+            }
         }
         
         // Always update the visual offset (GPU-cheap)
@@ -690,23 +696,33 @@ struct TabBarView: View {
         let sourceIndex = draggedSourceIndex
         let targetIndex = currentTargetIndex
 
-        // End the gesture transaction before changing the ForEach collection order.
-        // Reordering synchronously from onEnded can create a SwiftUI graph cycle because
-        // the row delivering the gesture is replaced while that gesture is unwinding.
-        performAnimation(interactionProfile.snapBack) {
-            dragOffset = 0
-            draggedTabId = nil
-            currentTargetIndex = 0
-            pendingScrollTabId = nil
+        guard targetIndex != sourceIndex else {
+            performAnimation(interactionProfile.snapBack) {
+                resetDragState()
+            }
+            return
         }
 
-        guard targetIndex != sourceIndex else { return }
+        // End the gesture event before changing the ForEach collection order. The
+        // neighboring rows already reached their final visual positions during the drag,
+        // so commit the model order and clear the temporary offsets atomically instead of
+        // starting a second layout animation that accessibility geometry can observe.
         Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(1))
-            performAnimation(interactionProfile.neighborShift) {
+            var transaction = Transaction(animation: nil)
+            transaction.disablesAnimations = true
+            withTransaction(transaction) {
                 appState.moveTab(from: sourceIndex, to: targetIndex)
+                resetDragState()
             }
         }
+    }
+
+    private func resetDragState() {
+        dragOffset = 0
+        draggedTabId = nil
+        currentTargetIndex = 0
+        pendingScrollTabId = nil
     }
 
     private func targetIndex(for pointerX: CGFloat, fallback: Int) -> Int {
@@ -1246,8 +1262,6 @@ private struct DraggableTabItemView: View {
         .offset(x: isDragged ? dragOffset : shiftAmount, y: activeLiftYOffset)
         .zIndex(isDragged ? 100 : 0)
         .compositingGroup()
-        .animation(interactionProfile.neighborShift, value: shiftAmount)
-        .animation(interactionProfile.dragLift, value: isDragged)
         .highPriorityGesture(dragGesture)
         .onHover { hovering in
             withAnimation(interactionProfile.hover) {
