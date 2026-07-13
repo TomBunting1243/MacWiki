@@ -750,6 +750,33 @@ struct BetaReadinessRegressionTests {
         #expect(selector.contains("AXUIElementPerformAction(target, kAXPressAction"))
     }
 
+    @Test func sidebarSearchFailureOffersNativeRetry() throws {
+        let content = try source("Sources/MacWiki/Views/Sidebar/Search/SidebarSearchContentView.swift")
+        let state = try source("Sources/MacWiki/Views/Sidebar/Search/SidebarSearchStateView.swift")
+        let surface = try source("Sources/MacWiki/Views/Sidebar/SidebarSearchView.swift")
+        let coordinator = try source("Sources/MacWiki/Views/Shared/SearchCoordinator.swift")
+
+        #expect(content.contains("actionTitle: \"Try Again\""))
+        #expect(content.contains("action: onRetry"))
+        #expect(state.contains("Button(actionTitle, systemImage: \"arrow.clockwise\", action: action)"))
+        #expect(state.contains(".keyboardShortcut(.defaultAction)"))
+        #expect(surface.contains("onRetry: model.searchCoordinator.retrySearch"))
+        #expect(coordinator.contains("func retrySearch()"))
+        #expect(coordinator.contains("guard hasQuery, !isLoading else { return }"))
+    }
+
+    @Test func searchOfflineHarnessUsesTrustedLaunchOverridesAndNativeRetry() throws {
+        let harness = try source("scripts/qa_search_offline_retry.sh")
+
+        #expect(harness.contains("qa.sidebarSearch.openOnLaunch -bool true"))
+        #expect(harness.contains("qa.sidebarSearch.queryOnLaunch -string \"$QUERY\""))
+        #expect(harness.contains("export MACWIKI_QA_NETWORK_MODE=offline"))
+        #expect(harness.contains("\"$QA_APP_PID\" \"Search Unavailable\""))
+        #expect(harness.contains("kill -0 \"$QA_APP_PID\""))
+        #expect(!harness.contains("killall"))
+        #expect(!harness.contains("defaults write com.tombunting.MacWiki"))
+    }
+
     @Test func auditCaptureHarnessesCanTargetPackagedCandidate() throws {
         let captureScript = try source("scripts/capture_macwiki_window.sh")
         let captureSetScript = try source("scripts/capture_macwiki_audit_set.sh")

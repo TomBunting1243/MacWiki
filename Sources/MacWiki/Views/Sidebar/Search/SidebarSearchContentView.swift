@@ -5,6 +5,7 @@ struct SidebarSearchContentView: View {
     let allLists: [ReadingList]
     let allLabels: [Label]
     let allTags: [Tag]
+    let onRetry: () -> Void
     let onOpenRow: (SidebarSearchRow, Bool) -> Void
     let onToggleRead: (SidebarSearchRow) -> Void
 
@@ -24,7 +25,9 @@ struct SidebarSearchContentView: View {
                 title: "Search Unavailable",
                 message: message,
                 systemImage: "exclamationmark.triangle.fill",
-                style: .quiet
+                style: .quiet,
+                actionTitle: "Try Again",
+                action: onRetry
             )
         case .searching(let query):
             SidebarSearchLoadingRowsView(

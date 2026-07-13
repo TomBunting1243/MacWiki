@@ -85,6 +85,7 @@ struct SidebarSearchView: View {
                 allLists: allLists,
                 allLabels: allLabels,
                 allTags: allTags,
+                onRetry: model.searchCoordinator.retrySearch,
                 onOpenRow: openRow(_:inNewTab:),
                 onToggleRead: toggleReadState(for:)
             )

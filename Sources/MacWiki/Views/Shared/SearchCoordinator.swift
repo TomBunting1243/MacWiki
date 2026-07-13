@@ -93,6 +93,11 @@ final class SearchCoordinator {
         isTrendingLoading = false
     }
 
+    func retrySearch() {
+        guard hasQuery, !isLoading else { return }
+        scheduleSearch()
+    }
+
     func loadTrendingIfNeeded() {
         guard supportsTrending else { return }
         guard trendingArticles.isEmpty else { return }
