@@ -26,6 +26,14 @@ qa_assert_supported_network_mode() {
   fi
 }
 
+qa_assert_supported_pseudolocalization() {
+  local mode="${MACWIKI_QA_PSEUDOLOCALIZATION:-}"
+  if [[ -n "$mode" && "$mode" != "1" ]]; then
+    echo "Refusing unsupported QA pseudolocalization mode: $mode" >&2
+    return 1
+  fi
+}
+
 qa_defaults_suite_name() {
   if [[ -n "${QA_DEFAULTS_SUITE:-}" ]]; then
     qa_assert_trusted_defaults_suite "$QA_DEFAULTS_SUITE" || return 1
@@ -157,6 +165,7 @@ qa_launch_exact() {
   qa_assert_no_conflicting_processes
 
   qa_assert_supported_network_mode
+  qa_assert_supported_pseudolocalization
   local environment=(
     "HOME=$QA_HOME"
     "CFFIXED_USER_HOME=$QA_HOME"
@@ -168,7 +177,11 @@ qa_launch_exact() {
   if [[ -n "${MACWIKI_QA_ACCESSIBILITY_PROFILE:-}" ]]; then
     environment+=("MACWIKI_QA_ACCESSIBILITY_PROFILE=$MACWIKI_QA_ACCESSIBILITY_PROFILE")
   fi
-  /usr/bin/env "${environment[@]}" "$APP_BIN" >"$log_path" 2>&1 &
+  local launch_arguments=()
+  if [[ "${MACWIKI_QA_PSEUDOLOCALIZATION:-}" == "1" ]]; then
+    launch_arguments=(-NSDoubleLocalizedStrings YES)
+  fi
+  /usr/bin/env "${environment[@]}" "$APP_BIN" "${launch_arguments[@]}" >"$log_path" 2>&1 &
   QA_APP_PID=$!
   export QA_APP_PID
 
@@ -198,6 +211,7 @@ qa_launch_exact_bundle() {
   qa_assert_isolated_path "$QA_HOME" "$QA_HOME"
   qa_assert_no_conflicting_processes
   qa_assert_supported_network_mode
+  qa_assert_supported_pseudolocalization
 
   expected_binary="$(qa_canonical_path "$APP_BIN")"
   if [[ "$bundle_path" == "$APP_BIN" || ! -d "$bundle_path/Contents/MacOS" ]]; then
@@ -219,7 +233,11 @@ qa_launch_exact_bundle() {
   if [[ -n "${MACWIKI_QA_ACCESSIBILITY_PROFILE:-}" ]]; then
     open_arguments+=(--env "MACWIKI_QA_ACCESSIBILITY_PROFILE=$MACWIKI_QA_ACCESSIBILITY_PROFILE")
   fi
-  open "${open_arguments[@]}" -a "$bundle_path"
+  local launch_arguments=()
+  if [[ "${MACWIKI_QA_PSEUDOLOCALIZATION:-}" == "1" ]]; then
+    launch_arguments=(--args -NSDoubleLocalizedStrings YES)
+  fi
+  open "${open_arguments[@]}" -a "$bundle_path" "${launch_arguments[@]}"
 
   for _ in $(seq 1 50); do
     local matching_pids=()

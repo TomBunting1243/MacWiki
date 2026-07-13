@@ -1066,6 +1066,7 @@ struct BetaReadinessRegressionTests {
             "scripts/qa_menu_window_states.sh",
             "scripts/qa_nested_folder_rename.sh",
             "scripts/qa_organization_accessibility.sh",
+            "scripts/qa_pseudolocalization.sh",
             "scripts/qa_reader_inspector_journey.sh",
             "scripts/qa_discover_scroll_time_machine.sh",
             "scripts/qa_sidebar_search_width_classes.sh",
@@ -1092,6 +1093,8 @@ struct BetaReadinessRegressionTests {
         #expect(safetyLibrary.contains("--env \"CFFIXED_USER_HOME=$QA_HOME\""))
         #expect(safetyLibrary.contains("--env \"MACWIKI_QA_DEFAULTS_SUITE=${QA_DEFAULTS_SUITE:?}\""))
         #expect(safetyLibrary.contains("MACWIKI_QA_ACCESSIBILITY_PROFILE=$MACWIKI_QA_ACCESSIBILITY_PROFILE"))
+        #expect(safetyLibrary.contains("qa_assert_supported_pseudolocalization"))
+        #expect(safetyLibrary.contains("-NSDoubleLocalizedStrings YES"))
         #expect(safetyLibrary.contains("qa_pid_executable_path"))
         #expect(safetyLibrary.contains("/usr/sbin/lsof -a -p \"$pid\" -d txt -Fn"))
         #expect(safetyLibrary.contains("Refusing to run while $APP_NAME PID"))
@@ -1111,6 +1114,12 @@ struct BetaReadinessRegressionTests {
         #expect(personalizationHarness.contains("compare_images.swift"))
         #expect(personalizationHarness.contains("visual-diff.json"))
         #expect(personalizationHarness.contains("Production preferences/data or global accessibility settings touched"))
+
+        let pseudolocalizationHarness = try source("scripts/qa_pseudolocalization.sh")
+        #expect(pseudolocalizationHarness.contains("MACWIKI_QA_PSEUDOLOCALIZATION=1"))
+        #expect(pseudolocalizationHarness.contains("Welcome to MacWiki Welcome to MacWiki"))
+        #expect(pseudolocalizationHarness.contains("STRICT_OCR=1"))
+        #expect(pseudolocalizationHarness.contains("Production preferences/data or global language settings touched"))
 
         let captureHarness = try source("scripts/capture_macwiki_window.sh")
         #expect(captureHarness.contains("pwd -P"))
