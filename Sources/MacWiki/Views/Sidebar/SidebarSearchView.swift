@@ -162,12 +162,15 @@ struct SidebarSearchView: View {
     }
 
     private func toggleReadState(for row: SidebarSearchRow) {
-        _ = ReadStateSync.applyReadState(
-            !row.isRead,
-            for: row.article,
-            in: modelContext,
-            appState: appState
-        )
+        Task { @MainActor in
+            await Task.yield()
+            _ = ReadStateSync.applyReadState(
+                !row.isRead,
+                for: row.article,
+                in: modelContext,
+                appState: appState
+            )
+        }
     }
 
     private func markVisibleRows(asRead: Bool) {

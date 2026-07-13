@@ -85,6 +85,8 @@ struct BetaReadinessRegressionTests {
         let searchSource = try source("Sources/MacWiki/Views/Sidebar/SidebarSearchView.swift")
         #expect(searchSource.contains(".task(id: searchSurfaceFingerprint)"))
         #expect(searchSource.contains("model.refreshDerivedState("))
+        #expect(searchSource.contains("Task { @MainActor in"))
+        #expect(searchSource.contains("await Task.yield()"))
 
         let directorySource = try source("Sources/MacWiki/Views/Sidebar/DirectoryView.swift")
         #expect(directorySource.contains(".task(id: isSidebarSearchPresented ? nil : articleIndexesFingerprint)"))
