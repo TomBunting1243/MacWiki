@@ -528,14 +528,13 @@ struct ListsSidebar: View {
         identifier: String,
         action: @escaping () -> Void
     ) -> some View {
-        Button(action: action) {
-            SwiftUI.Label(title, systemImage: systemImage)
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(title)
-        .accessibilityIdentifier(identifier)
+        SidebarEmptyCollectionButton(
+            title: title,
+            systemImage: systemImage,
+            identifier: identifier,
+            action: action
+        )
+        .frame(maxWidth: .infinity, minHeight: 18, alignment: .leading)
     }
 
     private var sidebarLibraryMenu: some View {

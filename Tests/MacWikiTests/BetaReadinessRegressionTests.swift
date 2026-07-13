@@ -138,6 +138,7 @@ struct BetaReadinessRegressionTests {
         let addToList = try source("Sources/MacWiki/Views/Components/AddToListSheet.swift")
         let saveToList = try source("Sources/MacWiki/Views/Components/SaveToListPopover.swift")
         let sidebar = try source("Sources/MacWiki/Views/Sidebar/ListsSidebar.swift")
+        let emptyCollectionButton = try source("Sources/MacWiki/Views/Sidebar/SidebarEmptyCollectionButton.swift")
 
         #expect(newList.contains(".accessibilityLabel(\"Choose list icon\")"))
         #expect(newList.contains(".accessibilityValue(selectedIcon)"))
@@ -158,7 +159,9 @@ struct BetaReadinessRegressionTests {
         #expect(sidebar.contains("identifier: \"sidebar-new-label-empty\""))
         #expect(sidebar.contains("title: \"New Tag\""))
         #expect(sidebar.contains("identifier: \"sidebar-new-tag-empty\""))
-        #expect(sidebar.contains(".accessibilityLabel(title)"))
+        #expect(sidebar.contains("SidebarEmptyCollectionButton("))
+        #expect(emptyCollectionButton.contains("button.setAccessibilityLabel(title)"))
+        #expect(emptyCollectionButton.contains("button.setAccessibilityIdentifier(identifier)"))
     }
 
     @Test func iconOnlyReaderAndFilterControlsExposeState() throws {
