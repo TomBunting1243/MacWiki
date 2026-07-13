@@ -1082,6 +1082,7 @@ struct BetaReadinessRegressionTests {
             "scripts/qa_sidebar_search_width_classes.sh",
             "scripts/qa_settings_popups_smoke.sh",
             "scripts/qa_tab_navigation_performance.sh",
+            "scripts/qa_tab_reorder.sh",
             "scripts/capture_macwiki_audit_set.sh"
         ]
 
@@ -1320,6 +1321,26 @@ struct BetaReadinessRegressionTests {
         #expect(driver.contains("CGEvent(keyboardEventSource:"))
         #expect(driver.contains("DispatchTime.now().uptimeNanoseconds"))
         #expect(driver.contains("for _ in 0..<3"))
+    }
+
+    @Test func tabReorderHarnessCoversLongTitleOverflowPersistenceAndCleanup() throws {
+        let tabBar = try source("Sources/MacWiki/Views/Components/TabBarView.swift")
+        let harness = try source("scripts/qa_tab_reorder.sh")
+        let driver = try source("scripts/ax_tab_reorder.swift")
+
+        #expect(tabBar.contains("private var minimumTabsContentWidth"))
+        #expect(tabBar.contains("minimumTabsContentWidth > (tabsViewportWidth + 30)"))
+        #expect(tabBar.contains(".highPriorityGesture(dragGesture)"))
+        #expect(tabBar.contains(".accessibilityLabel(\"All Tabs\")"))
+        #expect(harness.contains("qa_assert_isolated_path \"$STATE_DIR\" \"$QA_HOME\""))
+        #expect(harness.contains("Set APP_BIN to an exact packaged MacWiki candidate binary."))
+        #expect(harness.contains("TAB_COUNT=16"))
+        #expect(harness.contains("[[ \"$VERSION\" == 1.0* ]]"))
+        #expect(harness.contains("[[ \"$TRACE_DIRTY\" == \"false\" ]]"))
+        #expect(harness.contains("persisted_titles"))
+        #expect(harness.contains("ATTRIBUTEGRAPH_CYCLE_COUNT"))
+        #expect(driver.contains("The constrained tab lane did not expose All Tabs overflow."))
+        #expect(driver.contains("Tab drag did not publish a reordered accessibility sequence."))
     }
 
     @Test func sidebarSearchOwnsItsNativeTopSafeArea() throws {

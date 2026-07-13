@@ -159,9 +159,16 @@ struct TabBarView: View {
     @State private var tabsViewportFrame: CGRect = .zero
     @State private var pendingScrollTabId: UUID?
     @State private var lastDragAutoScrollTimestamp: TimeInterval = 0
-    
+
+    private var minimumTabsContentWidth: CGFloat {
+        let tabCount = appState.openTabs.count
+        guard tabCount > 0 else { return 0 }
+        return (CGFloat(tabCount) * chromeStyle.tabMinWidth)
+            + (CGFloat(max(0, tabCount - 1)) * tabSpacing)
+    }
+
     private var showsOverflowMenu: Bool {
-        tabsContentWidth > (tabsViewportWidth + 30)
+        tabsViewportWidth > 0 && minimumTabsContentWidth > (tabsViewportWidth + 30)
     }
 
     private var savedArticleTitleSet: Set<String> {
@@ -257,52 +264,10 @@ struct TabBarView: View {
             ScrollViewReader { proxy in
                 ScrollView(.horizontal) {
                     MacWikiGlassGroup(spacing: tabSpacing) {
-                        HStack(spacing: tabSpacing) {
-                            ForEach(Array(appState.openTabs.enumerated()), id: \.element.id) { index, tab in
-                                DraggableTabItemView(
-                                    tab: tab,
-                                    tabIndex: index,
-                                    lists: lists,
-                                    allLabels: allLabels,
-                                    liquidGlassChrome: liquidGlassChrome,
-                                    isActive: appState.activeTabId == tab.id,
-                                    isDragged: draggedTabId == tab.id,
-                                    dragOffset: draggedTabId == tab.id ? dragOffset : 0,
-                                    shiftAmount: shiftAmount(for: index),
-                                    chromeStyle: chromeStyle,
-                                    tabWidth: resolvedTabWidth,
-                                    interactionProfile: interactionProfile,
-                                    isSaved: isSaved(tab, savedTitles: savedTitles),
-                                    hasHighlights: hasHighlights(tab, highlightedTitles: highlightedTitles),
-                                    readingProgress: readingProgress(for: tab),
-                                    showSavedMarker: showSavedTabMarker,
-                                    showHighlightMarker: showHighlightTabMarker,
-                                    showReadMarker: showReadTabMarker,
-                                    showProgressTrack: showTabProgressTrack,
-                                    showActiveDepth: showTabActiveDepth,
-                                    reduceMotion: reduceMotion,
-                                    onNewLabelWithArticle: onNewLabelWithArticle,
-                                    onClose: {
-                                        performAnimation(interactionProfile.tabCreateClose) {
-                                            appState.closeTab(tab.id)
-                                        }
-                                    },
-                                    onSelect: {
-                                        performAnimation(interactionProfile.tabSelect) {
-                                            appState.activeTabId = tab.id
-                                        }
-                                        appState.flushSaveNow()
-                                    },
-                                    onDragChanged: { translation, locationX in
-                                        handleDragChanged(tab: tab, at: index, translation: translation, dragLocationX: locationX)
-                                    },
-                                    onDragEnded: {
-                                        finalizeDrag(at: index)
-                                    }
-                                )
-                                .id(tab.id)
-                            }
-                        }
+                        tabItemsStack(
+                            savedTitles: savedTitles,
+                            highlightedTitles: highlightedTitles
+                        )
                         .background(
                             GeometryReader { geo in
                                 Color.clear.preference(key: TabContentWidthPreferenceKey.self, value: geo.size.width)
@@ -373,6 +338,77 @@ struct TabBarView: View {
             }
         }
         .animation(interactionProfile.overflowAffordance, value: showsOverflowMenu)
+    }
+
+    private func tabItemsStack(
+        savedTitles: Set<String>,
+        highlightedTitles: Set<String>
+    ) -> some View {
+        HStack(spacing: tabSpacing) {
+            ForEach(Array(appState.openTabs.enumerated()), id: \.element.id) { index, tab in
+                tabItem(
+                    tab,
+                    at: index,
+                    savedTitles: savedTitles,
+                    highlightedTitles: highlightedTitles
+                )
+            }
+        }
+    }
+
+    private func tabItem(
+        _ tab: ArticleTab,
+        at index: Int,
+        savedTitles: Set<String>,
+        highlightedTitles: Set<String>
+    ) -> some View {
+        DraggableTabItemView(
+            tab: tab,
+            tabIndex: index,
+            lists: lists,
+            allLabels: allLabels,
+            liquidGlassChrome: liquidGlassChrome,
+            isActive: appState.activeTabId == tab.id,
+            isDragged: draggedTabId == tab.id,
+            dragOffset: draggedTabId == tab.id ? dragOffset : 0,
+            shiftAmount: shiftAmount(for: index),
+            chromeStyle: chromeStyle,
+            tabWidth: resolvedTabWidth,
+            interactionProfile: interactionProfile,
+            isSaved: isSaved(tab, savedTitles: savedTitles),
+            hasHighlights: hasHighlights(tab, highlightedTitles: highlightedTitles),
+            readingProgress: readingProgress(for: tab),
+            showSavedMarker: showSavedTabMarker,
+            showHighlightMarker: showHighlightTabMarker,
+            showReadMarker: showReadTabMarker,
+            showProgressTrack: showTabProgressTrack,
+            showActiveDepth: showTabActiveDepth,
+            reduceMotion: reduceMotion,
+            onNewLabelWithArticle: onNewLabelWithArticle,
+            onClose: {
+                performAnimation(interactionProfile.tabCreateClose) {
+                    appState.closeTab(tab.id)
+                }
+            },
+            onSelect: {
+                performAnimation(interactionProfile.tabSelect) {
+                    appState.activeTabId = tab.id
+                }
+                appState.flushSaveNow()
+            },
+            onDragChanged: { translation, locationX in
+                handleDragChanged(
+                    tab: tab,
+                    at: index,
+                    translation: translation,
+                    dragLocationX: locationX
+                )
+            },
+            onDragEnded: {
+                finalizeDrag(at: index)
+            }
+        )
+        .id(tab.id)
     }
 
     @ViewBuilder
@@ -512,6 +548,7 @@ struct TabBarView: View {
         }
         .menuStyle(.borderlessButton)
         .help("All Tabs")
+        .accessibilityLabel("All Tabs")
         .accessibilityHint("Shows open tabs")
     }
 
