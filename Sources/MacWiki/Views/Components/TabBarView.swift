@@ -154,7 +154,6 @@ struct TabBarView: View {
     @State private var currentTargetIndex: Int = 0
 
     // MARK: - Overflow + Scroll
-    @State private var tabsContentWidth: CGFloat = 0
     @State private var tabsViewportWidth: CGFloat = 0
     @State private var tabsViewportFrame: CGRect = .zero
     @State private var pendingScrollTabId: UUID?
@@ -164,6 +163,13 @@ struct TabBarView: View {
         let tabCount = appState.openTabs.count
         guard tabCount > 0 else { return 0 }
         return (CGFloat(tabCount) * chromeStyle.tabMinWidth)
+            + (CGFloat(max(0, tabCount - 1)) * tabSpacing)
+    }
+
+    private var tabsContentWidth: CGFloat {
+        let tabCount = appState.openTabs.count
+        guard tabCount > 0 else { return 0 }
+        return (CGFloat(tabCount) * resolvedTabWidth)
             + (CGFloat(max(0, tabCount - 1)) * tabSpacing)
     }
 
@@ -268,11 +274,6 @@ struct TabBarView: View {
                             savedTitles: savedTitles,
                             highlightedTitles: highlightedTitles
                         )
-                        .background(
-                            GeometryReader { geo in
-                                Color.clear.preference(key: TabContentWidthPreferenceKey.self, value: geo.size.width)
-                            }
-                        )
                     }
                     .coordinateSpace(name: "TabBarSpace")
                     .onPreferenceChange(TabFramePreferenceKey.self) { frames in
@@ -298,10 +299,6 @@ struct TabBarView: View {
                             }
                     }
                 )
-                .onPreferenceChange(TabContentWidthPreferenceKey.self) { width in
-                    guard abs(tabsContentWidth - width) > 0.5 else { return }
-                    tabsContentWidth = width
-                }
                 .onAppear {
                     scrollToActiveTab(with: proxy, animated: false)
                 }
@@ -1694,13 +1691,5 @@ private struct TabFramePreferenceKey: PreferenceKey {
     
     static func reduce(value: inout [UUID: CGRect], nextValue: () -> [UUID: CGRect]) {
         value.merge(nextValue(), uniquingKeysWith: { $1 })
-    }
-}
-
-private struct TabContentWidthPreferenceKey: PreferenceKey {
-    static let defaultValue: CGFloat = 0
-
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = nextValue()
     }
 }

@@ -1072,6 +1072,7 @@ struct BetaReadinessRegressionTests {
             "scripts/qa_accessibility_personalization.sh",
             "scripts/qa_folder_collapse_selected_list.sh",
             "scripts/qa_highlight_mutation.sh",
+            "scripts/qa_highlight_selection_rehydrate.sh",
             "scripts/qa_label_tag_mutation.sh",
             "scripts/qa_menu_window_states.sh",
             "scripts/qa_nested_folder_rename.sh",
@@ -1156,9 +1157,11 @@ struct BetaReadinessRegressionTests {
         let organizationHarness = try source("scripts/qa_organization_accessibility.sh")
         let highlightHarness = try source("scripts/qa_highlight_mutation.sh")
         let highlightDriver = try source("scripts/ax_highlight_mutation.swift")
+        let highlightSelectionHarness = try source("scripts/qa_highlight_selection_rehydrate.sh")
+        let highlightSelectionDriver = try source("scripts/ax_highlight_selection_rehydrate.swift")
         let labelTagHarness = try source("scripts/qa_label_tag_mutation.sh")
 
-        for harness in [menuHarness, contextHarness, organizationHarness, highlightHarness, labelTagHarness] {
+        for harness in [menuHarness, contextHarness, organizationHarness, highlightHarness, highlightSelectionHarness, labelTagHarness] {
             #expect(harness.contains("source \"$SCRIPT_DIR/lib/qa_process_safety.sh\""))
             #expect(harness.contains("qa_prepare_isolated_home"))
             #expect(harness.contains("qa_assert_no_conflicting_processes"))
@@ -1194,6 +1197,16 @@ struct BetaReadinessRegressionTests {
         #expect(highlightDriver.contains("kAXShowMenuAction"))
         #expect(highlightDriver.contains("named: \"Blue\""))
         #expect(highlightDriver.contains("named: \"Delete Highlight\""))
+        #expect(highlightSelectionHarness.contains("qa_assert_isolated_path \"$STORE_PATH\" \"$QA_HOME\""))
+        #expect(highlightSelectionHarness.contains("ax_highlight_selection_rehydrate.swift\" create"))
+        #expect(highlightSelectionHarness.contains("ax_highlight_selection_rehydrate.swift\" rehydrate"))
+        #expect(highlightSelectionHarness.contains("ZELEMENTPATH AS elementPath"))
+        #expect(highlightSelectionHarness.contains("ZISSTALERAW=0 AND ZISARCHIVEDRAW=0"))
+        #expect(highlightSelectionHarness.contains("AttributeGraph cycles"))
+        #expect(highlightSelectionDriver.contains("kAXStringForRangeParameterizedAttribute"))
+        #expect(highlightSelectionDriver.contains("kAXBoundsForRangeParameterizedAttribute"))
+        #expect(highlightSelectionDriver.contains("kAXSelectedTextMarkerRangeAttribute"))
+        #expect(highlightSelectionDriver.contains("named: \"Highlight Color\""))
         #expect(labelTagHarness.contains("createRenameDelete('New Label'"))
         #expect(labelTagHarness.contains("createRenameDelete('New Tag'"))
         #expect(labelTagHarness.contains("SELECT count(*) FROM ZLABEL"))
@@ -1335,7 +1348,9 @@ struct BetaReadinessRegressionTests {
         let driver = try source("scripts/ax_tab_reorder.swift")
 
         #expect(tabBar.contains("private var minimumTabsContentWidth"))
+        #expect(tabBar.contains("private var tabsContentWidth: CGFloat"))
         #expect(tabBar.contains("minimumTabsContentWidth > (tabsViewportWidth + 30)"))
+        #expect(!tabBar.contains("TabContentWidthPreferenceKey"))
         #expect(tabBar.contains(".highPriorityGesture(dragGesture)"))
         #expect(tabBar.contains(".accessibilityLabel(\"All Tabs\")"))
         #expect(harness.contains("qa_assert_isolated_path \"$STATE_DIR\" \"$QA_HOME\""))
@@ -1345,6 +1360,7 @@ struct BetaReadinessRegressionTests {
         #expect(harness.contains("[[ \"$TRACE_DIRTY\" == \"false\" ]]"))
         #expect(harness.contains("persisted_titles"))
         #expect(harness.contains("ATTRIBUTEGRAPH_CYCLE_COUNT"))
+        #expect(harness.contains("Tab reorder journey emitted"))
         #expect(driver.contains("The constrained tab lane did not expose All Tabs overflow."))
         #expect(driver.contains("Tab drag did not publish a reordered accessibility sequence."))
     }

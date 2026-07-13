@@ -108,6 +108,10 @@ fi
 ATTRIBUTEGRAPH_CYCLE_COUNT="$(rg -c 'AttributeGraph: cycle detected' "$APP_LOG" || true)"
 ATTRIBUTEGRAPH_CYCLE_COUNT="${ATTRIBUTEGRAPH_CYCLE_COUNT:-0}"
 rg -n 'AttributeGraph: cycle detected' "$APP_LOG" >"$OUTPUT_DIR/attributegraph-cycles.txt" || true
+if [[ "$ATTRIBUTEGRAPH_CYCLE_COUNT" != "0" ]]; then
+  echo "ERROR: Tab reorder journey emitted $ATTRIBUTEGRAPH_CYCLE_COUNT AttributeGraph cycles." >&2
+  exit 1
+fi
 
 for _ in $(seq 1 50); do
   [[ -f "$TAB_SNAPSHOT" ]] && break
@@ -148,7 +152,7 @@ overflow_count="$(jq -r '.overflowMenuTitles | length' "$RESULT_JSON")"
   printf -- '- Persisted destination index: `%s`\n' "$after_index"
   printf -- '- Rendered and persisted tab orders: `MATCH`\n'
   printf -- '- Runtime failures: no fatal, assertion, or precondition messages\n'
-  printf -- '- AttributeGraph cycle advisories: `%s`\n' "$ATTRIBUTEGRAPH_CYCLE_COUNT"
+  printf -- '- AttributeGraph cycles: `%s`\n' "$ATTRIBUTEGRAPH_CYCLE_COUNT"
   printf -- '- Exact process cleanup: `PASS`\n'
   printf -- '- AX evidence: `%s`\n' "$RESULT_JSON"
 } >"$OUTPUT_DIR/report.md"
