@@ -153,6 +153,18 @@ struct BetaReadinessRegressionTests {
         #expect(saveToList.contains(".accessibilityValue(isSaved ? \"Saved\" : \"Not saved\")"))
     }
 
+    @Test func iconOnlyReaderAndFilterControlsExposeState() throws {
+        let searchHeader = try source("Sources/MacWiki/Views/Sidebar/Search/SidebarSearchHeaderView.swift")
+        let directory = try source("Sources/MacWiki/Views/Sidebar/DirectoryView.swift")
+        let reader = try source("Sources/MacWiki/Views/Reader/ReaderView.swift")
+
+        #expect(searchHeader.contains(".accessibilityLabel(\"Unread only\")"))
+        #expect(searchHeader.contains(".accessibilityValue(model.readFilter == .unread ? \"Enabled\" : \"Disabled\")"))
+        #expect(directory.contains(".accessibilityLabel(\"Unread only\")"))
+        #expect(directory.contains(".accessibilityValue(unreadFilterEnabled ? \"Enabled\" : \"Disabled\")"))
+        #expect(reader.contains(".accessibilityLabel(\"Dismiss finished-reading prompt\")"))
+    }
+
     @Test func inspectorResizeHandleHasKeyboardAccessibleAdjustment() throws {
         let inspectorSource = try source("Sources/MacWiki/Views/Inspector/InspectorPanel.swift")
         let resizeHandle = sourceSection(

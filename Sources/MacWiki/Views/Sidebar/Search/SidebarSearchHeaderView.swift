@@ -128,6 +128,8 @@ struct SidebarSearchHeaderView: View {
                 .frame(width: TopChromeControlMetrics.groupButtonSize, height: TopChromeControlMetrics.groupButtonSize)
         }
         .help(model.readFilter == .unread ? "Show all results" : "Show unread only")
+        .accessibilityLabel("Unread only")
+        .accessibilityValue(model.readFilter == .unread ? "Enabled" : "Disabled")
     }
 
     private var sortMenu: some View {

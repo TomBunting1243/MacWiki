@@ -1000,6 +1000,8 @@ struct DirectoryView: View {
                 .frame(width: TopChromeControlMetrics.groupButtonSize, height: TopChromeControlMetrics.groupButtonSize)
         }
         .help(unreadFilterEnabled ? "Show all articles" : "Show unread only")
+        .accessibilityLabel("Unread only")
+        .accessibilityValue(unreadFilterEnabled ? "Enabled" : "Disabled")
     }
 
     private var directorySortMenu: some View {

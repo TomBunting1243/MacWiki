@@ -775,6 +775,7 @@ struct ArticleView: View {
                     .background(markAsReadSecondaryActionBackground)
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("Dismiss finished-reading prompt")
         }
     }
 
