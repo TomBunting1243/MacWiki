@@ -96,6 +96,7 @@ struct ArticleListItem<Content: View>: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(isRead ? "Mark as unread" : "Mark as read")
+                .accessibilityHidden(true)
                 .help(isRead ? "Mark as unread" : "Mark as read")
                 .padding(.top, 10)
                 .padding(.leading, 4)

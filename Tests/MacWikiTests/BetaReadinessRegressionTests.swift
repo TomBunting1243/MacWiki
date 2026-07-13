@@ -69,12 +69,13 @@ struct BetaReadinessRegressionTests {
         let itemSource = try source("Sources/MacWiki/Views/Sidebar/Directory/DirectoryArticleRowViews.swift")
         #expect(itemSource.contains(".onTapGesture(perform: onTap)"))
         #expect(itemSource.contains(".accessibilityLabel(isRead ? \"Mark as unread\" : \"Mark as read\")"))
+        #expect(itemSource.contains(".accessibilityHidden(true)"))
         #expect(!itemSource.contains("Button(action: onTap)"))
 
         let progressSource = try source("Sources/MacWiki/Views/Components/ReadProgressIndicator.swift")
         #expect(progressSource.contains("PieSlice(progress: fillProgress)"))
         #expect(!progressSource.contains("if fillProgress"))
-        #expect(!progressSource.contains(".animation("))
+        #expect(progressSource.components(separatedBy: ".animation(").count == 2)
 
         let modelSource = try source("Sources/MacWiki/Views/Sidebar/Search/SidebarSearchSurfaceModel.swift")
         #expect(modelSource.contains("private struct DerivedState"))
