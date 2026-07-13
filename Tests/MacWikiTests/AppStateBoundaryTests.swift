@@ -62,6 +62,24 @@ struct AppStateBoundaryTests {
         #expect(appState.navigationSplitViewVisibility == .all)
     }
 
+    @Test func nativeSidebarVisibilityIsIndependentFromListContents() {
+        let appState = AppState(persistenceMode: .ephemeral)
+        appState.navigationSplitViewVisibility = .all
+        appState.listContentsColumnVisible = true
+
+        appState.toggleListsSidebarVisibility()
+
+        #expect(appState.listsSidebarVisible == false)
+        #expect(appState.directoryColumnVisible == true)
+        #expect(appState.navigationSplitViewVisibility == .detailOnly)
+
+        appState.toggleListsSidebarVisibility()
+
+        #expect(appState.listsSidebarVisible == true)
+        #expect(appState.directoryColumnVisible == true)
+        #expect(appState.navigationSplitViewVisibility == .all)
+    }
+
     @Test func dismissFindOnPageInvalidatesQueryResultsAndQueuesLegacyClearRequest() {
         let appState = AppState(persistenceMode: .ephemeral)
         let tabID = UUID()

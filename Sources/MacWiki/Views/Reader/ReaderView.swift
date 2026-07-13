@@ -203,11 +203,24 @@ struct ReaderView: View {
                     NewTabPageView()
                 }
             } else {
-                ContentUnavailableView(
-                    "Welcome to MacWiki",
-                    systemImage: "book.pages",
-                    description: Text("Press ⌘K to search for an article")
-                )
+                ContentUnavailableView {
+                    SwiftUI.Label("Welcome to MacWiki", systemImage: "book.pages")
+                } description: {
+                    Text("Search Wikipedia or explore today's featured articles.")
+                } actions: {
+                    HStack(spacing: 10) {
+                        Button("Search Wikipedia", systemImage: "magnifyingglass") {
+                            appState.startSearch(context: .navigation)
+                        }
+                        .buttonStyle(.borderedProminent)
+
+                        Button("Discover", systemImage: "sparkles") {
+                            appState.showDiscoverPage()
+                        }
+                        .buttonStyle(.bordered)
+                    }
+                    .controlSize(.large)
+                }
             }
         }
         .id(activeReaderSurfaceID)

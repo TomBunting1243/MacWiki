@@ -88,6 +88,10 @@ if ! qa_run_command_with_timeout 70 swift "$SCRIPT_DIR/ax_reader_inspector_journ
   exit 1
 fi
 kill -0 "$QA_APP_PID"
+if rg -n "fatal error|precondition failed|assertion failed" "$APP_LOG"; then
+  echo "Reader/inspector journey emitted a fatal runtime diagnostic." >&2
+  exit 1
+fi
 
 {
   printf '# Reader and Inspector Accessibility Journey\n\n'
@@ -99,7 +103,7 @@ kill -0 "$QA_APP_PID"
   printf -- '- Exact candidate PID: `%s`\n' "$QA_APP_PID"
   printf -- '- Seeded public article: `%s`\n' "$ARTICLE_TITLE"
   printf -- '- Reader assertions: all twelve toolbar controls, native Find field/actions, dismissal\n'
-  printf -- '- Inspector assertions: Info/Notes/References selected values and content, hide/restore command cycle\n'
+  printf -- '- Inspector assertions: native Info/Notes/References selection and content, 12 rapid pane cycles, hide/restore command cycle\n'
   printf -- '- AX evidence: `%s`\n' "$AX_RESULT"
   printf -- '- Production preferences/data touched: **No** — state, defaults, persistence, and caches were isolated.\n'
 } >"$REPORT_PATH"

@@ -3,7 +3,9 @@ import SwiftUI
 
 struct MainWindowShell: View {
     @Environment(AppState.self) private var appState
-    @Environment(\.macWikiAccessibilityPersonalization.reduceMotion) private var reduceMotion
+    @AppStorage(AppStorageKey.MainWindow.sidebarWidth) private var sidebarWidth = AppStorageKey.MainWindow.sidebarWidthDefault
+    @AppStorage(AppStorageKey.MainWindow.directoryWidth) private var directoryWidth = AppStorageKey.MainWindow.directoryWidthDefault
+    @AppStorage(AppStorageKey.MainWindow.inspectorWidth) private var inspectorWidth = AppStorageKey.MainWindow.inspectorWidthDefault
     @State private var sidebarSearchModel = SidebarSearchSurfaceModel()
 
     @Binding var selectedList: ReadingList?
@@ -21,69 +23,59 @@ struct MainWindowShell: View {
     var body: some View {
         @Bindable var appState = appState
 
-        ZStack {
-            if appState.directoryColumnVisible {
-                MainNavigationShell(
-                    columnVisibility: $appState.navigationSplitViewVisibility,
-                    selectedList: $selectedList,
-                    selectedLabel: $selectedLabel,
-                    selectedTag: $selectedTag,
-                    rootSelection: $rootSelection,
-                    sidebarSearchModel: sidebarSearchModel,
-                    onEditLabel: onEditLabel,
-                    onAddNewLabel: onAddNewLabel,
-                    onNewLabelWithArticle: onNewLabelWithArticle,
-                    onNewTagWithArticle: onNewTagWithArticle
+        GeometryReader { proxy in
+            let responsiveInput = MainWindowResponsiveLayout.Input(
+                windowWidth: proxy.size.width,
+                sidebarVisible: appState.listsSidebarVisible,
+                directoryVisible: appState.directoryColumnVisible,
+                hasArticle: appState.currentArticle != nil,
+                sidebarWidth: CGFloat(sidebarWidth),
+                directoryWidth: CGFloat(directoryWidth),
+                inspectorWidth: CGFloat(inspectorWidth)
+            )
+
+            MainNavigationShell(
+                columnVisibility: $appState.navigationSplitViewVisibility,
+                selectedList: $selectedList,
+                selectedLabel: $selectedLabel,
+                selectedTag: $selectedTag,
+                rootSelection: $rootSelection,
+                sidebarSearchModel: sidebarSearchModel,
+                onEditLabel: onEditLabel,
+                onAddNewLabel: onAddNewLabel,
+                onNewLabelWithArticle: onNewLabelWithArticle,
+                onNewTagWithArticle: onNewTagWithArticle
+            )
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .inspector(isPresented: $appState.inspectorPresented) {
+                MainInspectorColumn(
+                    showNewLabelSheet: $showNewLabelSheet,
+                    articleForNewLabel: $articleForNewLabel
                 )
-                    .transition(shellTransition)
-                    .zIndex(1)
-            } else if appState.listsSidebarVisible {
-                MainSidebarReaderShell(
-                    selectedList: $selectedList,
-                    selectedLabel: $selectedLabel,
-                    selectedTag: $selectedTag,
-                    rootSelection: $rootSelection,
-                    sidebarSearchModel: sidebarSearchModel,
-                    onEditLabel: onEditLabel,
-                    onAddNewLabel: onAddNewLabel,
-                    onNewLabelWithArticle: onNewLabelWithArticle
-                )
-                    .transition(shellTransition)
-                    .zIndex(2)
-            } else {
-                MainReaderOnlyShell(onNewLabelWithArticle: onNewLabelWithArticle)
-                    .transition(shellTransition)
-                    .zIndex(3)
+            }
+            .onAppear {
+                updateInspectorAvailability(for: responsiveInput)
+            }
+            .onChange(of: responsiveInput) { _, newValue in
+                updateInspectorAvailability(for: newValue)
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .animation(shellAnimation, value: appState.directoryColumnVisible)
-        .animation(shellAnimation, value: appState.listsSidebarVisible)
-        .inspector(isPresented: $appState.inspectorVisible) {
-            MainInspectorColumn(
-                showNewLabelSheet: $showNewLabelSheet,
-                articleForNewLabel: $articleForNewLabel
-            )
-        }
     }
 
-    private var shellAnimation: Animation? {
-        reduceMotion ? nil : ColumnMotion.readerOnlyVisibility
-    }
-
-    private var shellTransition: AnyTransition {
-        if reduceMotion {
-            return .opacity
-        }
-
-        return .asymmetric(
-            insertion: .opacity.combined(with: .scale(scale: 0.996, anchor: .center)),
-            removal: .opacity.combined(with: .scale(scale: 1.002, anchor: .center))
-        )
+    private func updateInspectorAvailability(for input: MainWindowResponsiveLayout.Input) {
+        let isAvailable = MainWindowResponsiveLayout.canPresentInspector(for: input)
+        guard appState.inspectorPresentationAvailable != isAvailable else { return }
+        appState.inspectorPresentationAvailable = isAvailable
     }
 }
 
+/// A stable native hierarchy keeps the reader and its WebView alive while the
+/// user changes auxiliary columns. NavigationSplitView owns the true sidebar;
+/// HSplitView owns the resizable List Contents and reader workspace.
 private struct MainNavigationShell: View {
+    @Environment(AppState.self) private var appState
+    @AppStorage(AppStorageKey.MainWindow.directoryWidth) private var directoryWidth = AppStorageKey.MainWindow.directoryWidthDefault
+
     @Binding var columnVisibility: NavigationSplitViewVisibility
     @Binding var selectedList: ReadingList?
     @Binding var selectedLabel: Label?
@@ -107,75 +99,35 @@ private struct MainNavigationShell: View {
                 onEditLabel: onEditLabel,
                 onAddNewLabel: onAddNewLabel
             )
-        } content: {
-            DirectoryColumnView(
-                selectedList: $selectedList,
-                rootSelection: $rootSelection,
-                selectedLabel: selectedLabel,
-                selectedTag: selectedTag,
-                sidebarSearchModel: sidebarSearchModel,
-                onNewLabelWithArticle: onNewLabelWithArticle,
-                onNewTagWithArticle: onNewTagWithArticle
-            )
         } detail: {
-            ReaderColumnView(
-                onNewLabelWithArticle: onNewLabelWithArticle
-            )
-            .environment(\.readerChromeMetrics, .hidden)
+            HSplitView {
+                if appState.directoryColumnVisible {
+                    DirectoryColumnView(
+                        selectedList: $selectedList,
+                        rootSelection: $rootSelection,
+                        selectedLabel: selectedLabel,
+                        selectedTag: selectedTag,
+                        sidebarSearchModel: sidebarSearchModel,
+                        onNewLabelWithArticle: onNewLabelWithArticle,
+                        onNewTagWithArticle: onNewTagWithArticle
+                    )
+                    .frame(
+                        minWidth: MainWindowColumnWidth.directoryRange.lowerBound,
+                        idealWidth: CGFloat(directoryWidth),
+                        maxWidth: MainWindowColumnWidth.directoryRange.upperBound
+                    )
+                }
+
+                ReaderColumnView(onNewLabelWithArticle: onNewLabelWithArticle)
+                    .environment(\.readerChromeMetrics, .hidden)
+                    .frame(
+                        minWidth: MainWindowResponsiveLayout.minimumReaderWidth,
+                        maxWidth: .infinity,
+                        maxHeight: .infinity
+                    )
+                    .id("main-reader-column")
+            }
         }
-    }
-}
-
-private struct MainSidebarReaderShell: View {
-    @AppStorage(AppStorageKey.MainWindow.sidebarWidth) private var sidebarWidth = AppStorageKey.MainWindow.sidebarWidthDefault
-
-    @Binding var selectedList: ReadingList?
-    @Binding var selectedLabel: Label?
-    @Binding var selectedTag: Tag?
-    @Binding var rootSelection: SidebarRootSelection
-
-    let sidebarSearchModel: SidebarSearchSurfaceModel
-    let onEditLabel: (Label) -> Void
-    let onAddNewLabel: () -> Void
-    let onNewLabelWithArticle: (SavedArticle) -> Void
-
-    var body: some View {
-        HStack(spacing: 0) {
-            ListsColumnView(
-                selectedList: $selectedList,
-                selectedLabel: $selectedLabel,
-                selectedTag: $selectedTag,
-                rootSelection: $rootSelection,
-                sidebarSearchModel: sidebarSearchModel,
-                onEditLabel: onEditLabel,
-                onAddNewLabel: onAddNewLabel
-            )
-            .frame(
-                minWidth: MainWindowColumnWidth.sidebarRange.lowerBound,
-                idealWidth: CGFloat(sidebarWidth),
-                maxWidth: MainWindowColumnWidth.sidebarRange.upperBound
-            )
-
-            Divider()
-
-            ReaderColumnView(
-                onNewLabelWithArticle: onNewLabelWithArticle
-            )
-            .environment(\.readerChromeMetrics, .hidden)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-        }
-    }
-}
-
-private struct MainReaderOnlyShell: View {
-    let onNewLabelWithArticle: (SavedArticle) -> Void
-
-    var body: some View {
-        ReaderColumnView(
-            onNewLabelWithArticle: onNewLabelWithArticle
-        )
-        .environment(\.readerChromeMetrics, .hidden)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 

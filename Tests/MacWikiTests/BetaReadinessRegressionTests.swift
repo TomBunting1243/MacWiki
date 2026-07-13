@@ -114,6 +114,47 @@ struct BetaReadinessRegressionTests {
         #expect(MainWindowColumnWidth.clampedStorageValue(320, range: MainWindowColumnWidth.inspectorRange) == 320)
     }
 
+    @Test func responsiveInspectorProtectsReaderWidthAndRestoresAtWideSizes() {
+        let base = MainWindowResponsiveLayout.Input(
+            windowWidth: 1_040,
+            sidebarVisible: true,
+            directoryVisible: true,
+            hasArticle: true,
+            sidebarWidth: 220,
+            directoryWidth: 320,
+            inspectorWidth: 320
+        )
+
+        #expect(!MainWindowResponsiveLayout.canPresentInspector(for: base))
+        #expect(MainWindowResponsiveLayout.canPresentInspector(for: .init(
+            windowWidth: 1_400,
+            sidebarVisible: true,
+            directoryVisible: true,
+            hasArticle: true,
+            sidebarWidth: 220,
+            directoryWidth: 320,
+            inspectorWidth: 320
+        )))
+        #expect(!MainWindowResponsiveLayout.canPresentInspector(for: .init(
+            windowWidth: 1_760,
+            sidebarVisible: true,
+            directoryVisible: true,
+            hasArticle: false,
+            sidebarWidth: 220,
+            directoryWidth: 320,
+            inspectorWidth: 320
+        )))
+        #expect(MainWindowResponsiveLayout.canPresentInspector(for: .init(
+            windowWidth: 1_040,
+            sidebarVisible: false,
+            directoryVisible: false,
+            hasArticle: true,
+            sidebarWidth: 220,
+            directoryWidth: 320,
+            inspectorWidth: 320
+        )))
+    }
+
     @Test func sidebarSelectableRowsUseButtonSemantics() throws {
         let sidebarSource = try String(contentsOf: repositoryRoot()
             .appendingPathComponent("Sources")
@@ -332,7 +373,8 @@ struct BetaReadinessRegressionTests {
         #expect(appSource.contains("func applicationShouldHandleReopen"))
         #expect(appSource.contains("MacWikiRuntime.shared.presentMainWindowIfNeeded()"))
         #expect(appSource.contains("private final class MacWikiRuntime"))
-        #expect(appSource.contains("existingWindow.makeKeyAndOrderFront(nil)"))
+        #expect(appSource.contains("MacWikiLaunchPresentation.present(existingWindow)"))
+        #expect(appSource.contains("window.makeKeyAndOrderFront(nil)"))
         #expect(appSource.contains("private func hasOnScreenWindow() -> Bool"))
         #expect(appSource.contains("CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID)"))
         #expect(appSource.contains("NSHostingView("))
@@ -487,6 +529,7 @@ struct BetaReadinessRegressionTests {
     }
 
     @Test func articleToolbarRendersAsCustomReaderChromeWithCurrentPillStyling() throws {
+        let contentSource = try source("Sources/MacWiki/Views/ContentView.swift")
         let shellSource = try source("Sources/MacWiki/Views/Shared/MainWindowShell.swift")
         let readerColumnSource = try source("Sources/MacWiki/Views/Columns/ReaderColumnView.swift")
         let readerSource = try source("Sources/MacWiki/Views/Reader/ReaderView.swift")
@@ -503,13 +546,13 @@ struct BetaReadinessRegressionTests {
         #expect(readerColumnSource.contains("ReaderArticleToolbar()"))
         #expect(!shellSource.contains(".toolbar {"))
         #expect(shellSource.contains("if appState.directoryColumnVisible"))
-        #expect(shellSource.contains("else if appState.listsSidebarVisible"))
-        #expect(shellSource.contains("MainSidebarReaderShell("))
-        #expect(shellSource.contains("MainReaderOnlyShell("))
         #expect(shellSource.contains("MainNavigationShell("))
-        #expect(shellSource.contains("ColumnMotion.readerOnlyVisibility"))
-        #expect(shellSource.contains(".transition(shellTransition)"))
-        #expect(shellSource.contains(".inspector(isPresented: $appState.inspectorVisible)"))
+        #expect(shellSource.contains("HSplitView"))
+        #expect(shellSource.contains(".id(\"main-reader-column\")"))
+        #expect(!shellSource.contains(".transition(shellTransition)"))
+        #expect(shellSource.contains(".inspector(isPresented: $appState.inspectorPresented)"))
+        #expect(!contentSource.contains("ColumnMotion.sidebarVisibility"))
+        #expect(!contentSource.contains("performAnimation(PanelMotion.sidebarToggle)"))
         #expect(readerColumnSource.contains("readerTopChromeBackground"))
         #expect(readerColumnSource.contains("ReaderTabLaneBackground()"))
         #expect(toolbarBody.contains("GeometryReader"))
@@ -552,10 +595,9 @@ struct BetaReadinessRegressionTests {
         #expect(toolbarSource.contains("sidebar.squares.leading"))
         #expect(toolbarSource.contains("leadingPadding(density: density, proxy: proxy)"))
         #expect(toolbarSource.contains("trafficLightReservedWidth"))
-        #expect(navigationSource.contains("listContentsColumnVisible = false"))
-        #expect(navigationSource.contains("listContentsColumnVisible = true"))
+        #expect(navigationSource.contains("listContentsColumnVisible.toggle()"))
         #expect(!navigationSource.contains("func toggleNavigationColumnsVisibility()"))
-        #expect(toolbarSource.contains("withAnimation(ColumnMotion.readerOnlyVisibility)"))
+        #expect(!toolbarSource.contains("withAnimation(ColumnMotion.readerOnlyVisibility)"))
         #expect(toolbarSource.contains("var buttonSize: CGFloat"))
         #expect(toolbarSource.contains("var dividerHeight: CGFloat"))
         #expect(toolbarSource.contains("toolbarDivider(density: density)"))
@@ -586,7 +628,7 @@ struct BetaReadinessRegressionTests {
         #expect(toolbarSource.contains("appState.startSearch(context: .navigation)"))
         #expect(toolbarSource.contains("appState.toggleInspectorVisibility()"))
         #expect(navigationSource.contains("func toggleDirectoryColumnVisibility()"))
-        #expect(navigationSource.contains("navigationSplitViewVisibilityBeforeReaderOnly"))
+        #expect(!navigationSource.contains("navigationSplitViewVisibilityBeforeReaderOnly"))
         #expect(toolbarSource.contains(".fixedSize()"))
         #expect(readerSource.contains("resolvedTopObscuredHeight - 44"))
     }
@@ -669,11 +711,17 @@ struct BetaReadinessRegressionTests {
     }
 
     @Test func inspectorHighlightsAndReferencesKeepGlassCompactBehavior() throws {
+        let inspectorSource = try source("Sources/MacWiki/Views/Inspector/InspectorPanel.swift")
         let highlightListSource = try source("Sources/MacWiki/Views/Components/HighlightListView.swift")
         let highlightRowSource = try source("Sources/MacWiki/Views/Components/HighlightRowView.swift")
         let referenceListSource = try source("Sources/MacWiki/Views/Inspector/ReferenceListView.swift")
         let referenceRowSource = try source("Sources/MacWiki/Views/Inspector/ReferenceRowView.swift")
         let referenceExportBarSource = try source("Sources/MacWiki/Views/Inspector/ReferenceExportBarView.swift")
+
+        #expect(inspectorSource.contains("Picker(\"Inspector mode\""))
+        #expect(inspectorSource.contains(".pickerStyle(.segmented)"))
+        #expect(!inspectorSource.contains("private struct InspectorModeControl"))
+        #expect(inspectorSource.contains("transaction.animation = nil"))
 
         #expect(highlightListSource.contains("HighlightDisplayFilter.visibleHighlights"))
         #expect(highlightListSource.contains(".fill(.ultraThinMaterial)"))
@@ -1065,6 +1113,7 @@ struct BetaReadinessRegressionTests {
 
     @Test func mutatingQAHarnessesRequireIsolatedStateAndExactProcessIdentity() throws {
         let safetyLibrary = try source("scripts/lib/qa_process_safety.sh")
+        let appSource = try source("Sources/MacWiki/App/MacWikiApp.swift")
         let scriptNames = [
             "scripts/profile_reader_open.sh",
             "scripts/qa_context_menu_accessibility.sh",
@@ -1104,6 +1153,10 @@ struct BetaReadinessRegressionTests {
         #expect(safetyLibrary.contains("--env \"HOME=$QA_HOME\""))
         #expect(safetyLibrary.contains("--env \"CFFIXED_USER_HOME=$QA_HOME\""))
         #expect(safetyLibrary.contains("--env \"MACWIKI_QA_DEFAULTS_SUITE=${QA_DEFAULTS_SUITE:?}\""))
+        #expect(safetyLibrary.contains("MACWIKI_QA_BACKGROUND_LAUNCH=${MACWIKI_QA_BACKGROUND_LAUNCH:-1}"))
+        #expect(safetyLibrary.contains("open_arguments+=(-g)"))
+        #expect(appSource.contains("MACWIKI_QA_BACKGROUND_LAUNCH"))
+        #expect(appSource.contains("window.orderBack(nil)"))
         #expect(safetyLibrary.contains("MACWIKI_QA_ACCESSIBILITY_PROFILE=$MACWIKI_QA_ACCESSIBILITY_PROFILE"))
         #expect(safetyLibrary.contains("qa_assert_supported_pseudolocalization"))
         #expect(safetyLibrary.contains("-NSDoubleLocalizedStrings YES"))
@@ -1277,9 +1330,13 @@ struct BetaReadinessRegressionTests {
         #expect(harness.contains("[[ \"$VERSION\" == 1.0* ]]"))
         #expect(harness.contains("if ! qa_run_command_with_timeout 70 swift"))
         #expect(harness.contains("\"$QA_APP_PID\" \"$ARTICLE_TITLE\""))
+        #expect(harness.contains("12 rapid pane cycles"))
+        #expect(harness.contains("fatal error|precondition failed|assertion failed"))
 
         #expect(driver.contains("AXUIElementCreateApplication(pid)"))
         #expect(driver.contains("kAXPressAction"))
+        #expect(driver.contains("kAXRadioButtonRole"))
+        #expect(driver.contains("for _ in 0..<12"))
         #expect(driver.contains("No Highlights Yet"))
         #expect(driver.contains("No References Found"))
         #expect(driver.contains("Find in page"))
@@ -1389,13 +1446,15 @@ struct BetaReadinessRegressionTests {
         #expect(!source.contains("topObscuredHeight"))
     }
 
-    @Test func mainWindowShellScopesAlternateLayoutsAndUsesKeyPathBindings() throws {
+    @Test func mainWindowShellKeepsAStableNativeSplitHierarchyAndUsesKeyPathBindings() throws {
         let source = try source("Sources/MacWiki/Views/Shared/MainWindowShell.swift")
 
         #expect(source.contains("private struct MainNavigationShell: View"))
-        #expect(source.contains("private struct MainSidebarReaderShell: View"))
-        #expect(source.contains("private struct MainReaderOnlyShell: View"))
-        #expect(source.contains(".inspector(isPresented: $appState.inspectorVisible)"))
+        #expect(source.contains("NavigationSplitView(columnVisibility:"))
+        #expect(source.contains("HSplitView"))
+        #expect(!source.contains("private struct MainSidebarReaderShell: View"))
+        #expect(!source.contains("private struct MainReaderOnlyShell: View"))
+        #expect(source.contains(".inspector(isPresented: $appState.inspectorPresented)"))
         #expect(!source.contains("Binding(\n"))
     }
 

@@ -8,7 +8,6 @@ struct DirectoryColumnView: View {
     }
 
     @Environment(\.macWikiAccessibilityPersonalization.reduceMotion) private var reduceMotion
-    @AppStorage(AppStorageKey.MainWindow.directoryWidth) private var directoryWidth = AppStorageKey.MainWindow.directoryWidthDefault
     @State private var measuredTopInset = Chrome.topInset
     @State private var hasMeasuredTrafficLightAvoidance = false
 
@@ -66,11 +65,6 @@ struct DirectoryColumnView: View {
                     }
             }
         }
-        .navigationSplitViewColumnWidth(
-            min: MainWindowColumnWidth.directoryRange.lowerBound,
-            ideal: CGFloat(directoryWidth),
-            max: MainWindowColumnWidth.directoryRange.upperBound
-        )
         .persistedColumnWidth(
             key: AppStorageKey.MainWindow.directoryWidth,
             range: MainWindowColumnWidth.directoryRange

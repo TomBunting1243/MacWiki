@@ -71,16 +71,13 @@ final class AppState {
     /// without the middle content column, so MacWiki tracks that state directly.
     var listContentsColumnVisible: Bool = true
 
-    @ObservationIgnored
-    var navigationSplitViewVisibilityBeforeReaderOnly: NavigationSplitViewVisibility = .all
-
-    /// Compatibility shim while remaining call sites migrate to the split view visibility model.
+    /// Whether the native leading sidebar is currently visible.
     var listsSidebarVisible: Bool {
         get {
             switch navigationSplitViewVisibility {
-            case .all, .automatic:
+            case .all, .automatic, .doubleColumn:
                 return true
-            case .doubleColumn, .detailOnly:
+            case .detailOnly:
                 return false
             default:
                 return true
@@ -94,30 +91,31 @@ final class AppState {
         }
     }
 
-    /// Compatibility shim while remaining call sites migrate to the split view visibility model.
+    /// Whether List Contents participates in the stable detail split workspace.
+    /// This is intentionally independent from the native leading-sidebar state.
     var directoryColumnVisible: Bool {
-        get {
-            guard listContentsColumnVisible else { return false }
-
-            switch navigationSplitViewVisibility {
-            case .detailOnly:
-                return false
-            case .all, .doubleColumn, .automatic:
-                return true
-            default:
-                return true
-            }
-        }
-        set {
-            setNavigationSplitViewVisibility(
-                listsVisible: listsSidebarVisible,
-                directoryVisible: newValue
-            )
-        }
+        get { listContentsColumnVisible }
+        set { listContentsColumnVisible = newValue }
     }
 
-    /// Whether the inspector panel is visible
+    /// The user's inspector preference. Responsive layout suppression never
+    /// overwrites this value, so the inspector returns when space is available.
     var inspectorVisible: Bool = true
+
+    /// Updated by the main window's responsive layout policy.
+    var inspectorPresentationAvailable: Bool = false
+
+    /// The effective binding used by SwiftUI's native inspector presentation.
+    var inspectorPresented: Bool {
+        get { inspectorVisible && inspectorPresentationAvailable }
+        set {
+            if newValue {
+                inspectorVisible = true
+            } else if inspectorPresentationAvailable {
+                inspectorVisible = false
+            }
+        }
+    }
     
     /// Current inspector view mode
     var inspectorMode: InspectorMode = .info

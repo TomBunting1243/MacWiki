@@ -88,6 +88,15 @@ private func button(in application: AXUIElement, label: String) -> AXUIElement? 
     element(in: application, role: kAXButtonRole as String, label: label)
 }
 
+private func inspectorModeControl(in application: AXUIElement, label: String) -> AXUIElement? {
+    button(in: application, label: label) ??
+        element(in: application, role: kAXRadioButtonRole as String, label: label)
+}
+
+private func isSelected(_ element: AXUIElement) -> Bool {
+    ["1", "Selected"].contains(stringAttribute(kAXValueAttribute as CFString, from: element))
+}
+
 private func press(_ element: AXUIElement, label: String) throws {
     let result = AXUIElementPerformAction(element, kAXPressAction as CFString)
     guard result == .success else { throw JourneyError.actionFailed(label, result) }
@@ -150,7 +159,7 @@ do {
     }
 
     func inspectorButton(_ label: String) throws -> AXUIElement {
-        guard let result = button(in: application, label: label) else {
+        guard let result = inspectorModeControl(in: application, label: label) else {
             throw JourneyError.missing("Inspector mode omitted \(label).")
         }
         return result
@@ -167,7 +176,7 @@ do {
     guard wait(condition: { labels(in: application).contains("No Highlights Yet") }) else {
         throw JourneyError.missing("Notes mode did not expose its empty-highlight state.")
     }
-    guard stringAttribute(kAXValueAttribute as CFString, from: try inspectorButton("Notes")) == "Selected" else {
+    guard isSelected(try inspectorButton("Notes")) else {
         throw JourneyError.missing("Notes mode did not expose its selected accessibility value.")
     }
     inspectorStates["Notes"] = ["Selected", "No Highlights Yet"]
@@ -179,7 +188,7 @@ do {
     }) else {
         throw JourneyError.missing("References mode did not expose content or its empty state.")
     }
-    guard stringAttribute(kAXValueAttribute as CFString, from: try inspectorButton("References")) == "Selected" else {
+    guard isSelected(try inspectorButton("References")) else {
         throw JourneyError.missing("References mode did not expose its selected accessibility value.")
     }
     inspectorStates["References"] = ["Selected", labels(in: application).contains("References") ? "References" : "No References Found"]
@@ -187,6 +196,20 @@ do {
     try press(try inspectorButton("Info"), label: "Info")
     guard wait(condition: { labels(in: application).contains("Metadata") }) else {
         throw JourneyError.missing("Info mode did not restore Metadata.")
+    }
+
+    // Rapidly switching the native segmented picker previously exposed an
+    // intermittent inspector failure. Keep this stress loop in the candidate gate.
+    for _ in 0..<12 {
+        try press(try inspectorButton("Notes"), label: "Notes")
+        try press(try inspectorButton("References"), label: "References")
+        try press(try inspectorButton("Info"), label: "Info")
+    }
+    guard wait(condition: {
+        guard let info = inspectorModeControl(in: application, label: "Info") else { return false }
+        return isSelected(info) && labels(in: application).contains("Metadata")
+    }) else {
+        throw JourneyError.missing("Inspector mode stress cycle did not finish in a stable Info state.")
     }
 
     guard let findButton = button(in: application, label: "Find in Page") else {

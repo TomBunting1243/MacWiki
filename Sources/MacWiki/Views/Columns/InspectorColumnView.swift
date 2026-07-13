@@ -14,6 +14,5 @@ struct InspectorColumnView: View {
         )
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .ignoresSafeArea(.container, edges: .top)
-        .zIndex(30)
     }
 }

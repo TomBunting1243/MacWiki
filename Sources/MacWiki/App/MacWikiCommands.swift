@@ -127,6 +127,7 @@ struct MacWikiCommands: Commands {
                 appState.toggleInspectorVisibility()
             }
             .keyboardShortcut("i", modifiers: [.command, .shift])
+            .disabled(!appState.inspectorPresentationAvailable)
         }
 
         CommandGroup(after: .windowSize) {

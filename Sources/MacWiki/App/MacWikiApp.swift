@@ -5,6 +5,21 @@ import os
 
 private let appBootstrapLogger = Logger(subsystem: "com.macwiki", category: "app-bootstrap")
 
+private enum MacWikiLaunchPresentation {
+    static let runsBehindOtherApps =
+        ProcessInfo.processInfo.environment["MACWIKI_QA_BACKGROUND_LAUNCH"] == "1"
+
+    @MainActor
+    static func present(_ window: NSWindow) {
+        if runsBehindOtherApps {
+            window.orderBack(nil)
+        } else {
+            window.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+        }
+    }
+}
+
 private struct MacWikiLaunchIssue: Identifiable {
     let id = UUID()
     let title: String
@@ -19,7 +34,9 @@ final class MacWikiAppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        NSApp.activate(ignoringOtherApps: true)
+        if !MacWikiLaunchPresentation.runsBehindOtherApps {
+            NSApp.activate(ignoringOtherApps: true)
+        }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
             MacWikiRuntime.shared.presentMainWindowIfNeeded()
         }
@@ -60,8 +77,7 @@ private final class MacWikiRuntime {
         }) {
             appBootstrapLogger.notice("Ordering existing main window to front")
             existingWindow.deminiaturize(nil)
-            existingWindow.makeKeyAndOrderFront(nil)
-            NSApp.activate(ignoringOtherApps: true)
+            MacWikiLaunchPresentation.present(existingWindow)
             if hasOnScreenWindow() {
                 return
             }
@@ -69,8 +85,7 @@ private final class MacWikiRuntime {
 
         if let fallbackMainWindow {
             appBootstrapLogger.notice("Reopening fallback main window")
-            fallbackMainWindow.makeKeyAndOrderFront(nil)
-            NSApp.activate(ignoringOtherApps: true)
+            MacWikiLaunchPresentation.present(fallbackMainWindow)
             return
         }
 
@@ -99,8 +114,7 @@ private final class MacWikiRuntime {
                 .modelContainer(modelContainer)
         )
         fallbackMainWindow = window
-        window.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
+        MacWikiLaunchPresentation.present(window)
         presentFallbackLaunchIssueIfNeeded(for: window)
     }
 
@@ -235,7 +249,7 @@ struct MacWikiApp: App {
         let entries = defaults.dictionaryRepresentation()
         let visibleFrames = NSScreen.screens.map(\.visibleFrame)
         let shellLayoutMigrationKey = "mainWindow.shellLayoutVersion"
-        let currentShellLayoutVersion = 12
+        let currentShellLayoutVersion = 13
 
         // Search is now a single sidebar-resident surface. Drop the retired overlay preference.
         defaults.removeObject(forKey: AppStorageKey.Search.presentationMode)
@@ -257,6 +271,7 @@ struct MacWikiApp: App {
             defaults.removeObject(forKey: "NSToolbar Configuration main-window-toolbar-v10")
             defaults.removeObject(forKey: "NSToolbar Configuration main-window-toolbar-v11")
             defaults.removeObject(forKey: "NSToolbar Configuration main-window-toolbar-v12")
+            defaults.removeObject(forKey: "NSToolbar Configuration main-window-toolbar-v13")
             defaults.set(currentShellLayoutVersion, forKey: shellLayoutMigrationKey)
         }
 

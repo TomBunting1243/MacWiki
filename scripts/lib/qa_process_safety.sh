@@ -170,6 +170,7 @@ qa_launch_exact() {
     "HOME=$QA_HOME"
     "CFFIXED_USER_HOME=$QA_HOME"
     "MACWIKI_QA_DEFAULTS_SUITE=${QA_DEFAULTS_SUITE:?}"
+    "MACWIKI_QA_BACKGROUND_LAUNCH=${MACWIKI_QA_BACKGROUND_LAUNCH:-1}"
   )
   if [[ -n "${MACWIKI_QA_NETWORK_MODE:-}" ]]; then
     environment+=("MACWIKI_QA_NETWORK_MODE=$MACWIKI_QA_NETWORK_MODE")
@@ -226,7 +227,11 @@ qa_launch_exact_bundle() {
     --env "HOME=$QA_HOME"
     --env "CFFIXED_USER_HOME=$QA_HOME"
     --env "MACWIKI_QA_DEFAULTS_SUITE=${QA_DEFAULTS_SUITE:?}"
+    --env "MACWIKI_QA_BACKGROUND_LAUNCH=${MACWIKI_QA_BACKGROUND_LAUNCH:-1}"
   )
+  if [[ "${MACWIKI_QA_BACKGROUND_LAUNCH:-1}" == "1" ]]; then
+    open_arguments+=(-g)
+  fi
   if [[ -n "${MACWIKI_QA_NETWORK_MODE:-}" ]]; then
     open_arguments+=(--env "MACWIKI_QA_NETWORK_MODE=$MACWIKI_QA_NETWORK_MODE")
   fi

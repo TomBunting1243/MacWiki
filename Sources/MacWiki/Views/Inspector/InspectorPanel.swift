@@ -239,6 +239,9 @@ struct InspectorPanel: View {
             inspectorContent
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                 .padding(.top, showsInspectorHeaderBar ? InspectorLayout.contentTopPadding : 0)
+                .transaction { transaction in
+                    transaction.animation = nil
+                }
         }
         .overlay(alignment: .bottom) {
             if appState.isHighlightRehydrateInProgress {
@@ -298,15 +301,18 @@ struct InspectorPanel: View {
                 .fill(Color.primary.opacity(ColumnChromeMetrics.dividerOpacity(for: colorScheme)))
                 .frame(height: 0.5)
         }
-        .animation(.easeOut(duration: 0.12), value: appState.inspectorMode)
         .zIndex(1)
     }
 
     private var inspectorModeSelector: some View {
-        InspectorModeControl(
-            selectedMode: inspectorModeSelection,
-            modes: inspectorModeOrder
-        )
+        Picker("Inspector mode", selection: inspectorModeSelection) {
+            ForEach(inspectorModeOrder, id: \.self) { mode in
+                Text(mode.rawValue)
+                    .tag(mode)
+            }
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
         .accessibilityLabel("Inspector mode")
     }
 
@@ -807,135 +813,6 @@ struct InspectorPanel: View {
             .padding(.top, 60)
         } else {
             ReferenceListView(sections: appState.currentArticleReferences)
-        }
-    }
-}
-
-private struct InspectorModeControl: View {
-    @Binding var selectedMode: InspectorMode
-    let modes: [InspectorMode]
-
-    @Environment(\.colorScheme) private var colorScheme
-    @State private var hoveredMode: InspectorMode?
-
-    private enum Metrics {
-        static let railHeight: CGFloat = 30
-        static let railCornerRadius: CGFloat = 10
-        static let selectedHeight: CGFloat = 28
-        static let selectedCornerRadius: CGFloat = 8
-        static let iconPointSize: CGFloat = 13
-        static let dividerHeight: CGFloat = 16
-        static let railInset: CGFloat = 1
-    }
-
-    var body: some View {
-        ZStack {
-            railBackground
-
-            HStack(spacing: 0) {
-                ForEach(Array(modes.enumerated()), id: \.element) { index, mode in
-                    modeButton(mode)
-                        .frame(maxWidth: .infinity)
-
-                    if index < modes.count - 1 {
-                        Rectangle()
-                            .fill(dividerColor)
-                            .frame(width: 1, height: Metrics.dividerHeight)
-                    }
-                }
-            }
-            .padding(.horizontal, Metrics.railInset)
-        }
-        .frame(maxWidth: .infinity)
-        .frame(height: Metrics.railHeight)
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel("Inspector mode")
-    }
-
-    private func modeButton(_ mode: InspectorMode) -> some View {
-        let isSelected = selectedMode == mode
-        let isHovered = hoveredMode == mode && !isSelected
-
-        return Button {
-            guard selectedMode != mode else { return }
-            selectedMode = mode
-        } label: {
-            Image(systemName: isSelected ? mode.selectedIconName : mode.iconName)
-                .symbolRenderingMode(.hierarchical)
-                .font(.system(size: Metrics.iconPointSize, weight: isSelected ? .semibold : .regular))
-                .foregroundStyle(foregroundStyle(isSelected: isSelected, isHovered: isHovered))
-                .frame(maxWidth: .infinity)
-                .frame(height: Metrics.selectedHeight)
-                .background {
-                    modeButtonBackground(isSelected: isSelected, isHovered: isHovered)
-                        .frame(maxWidth: .infinity)
-                }
-                .frame(maxWidth: .infinity)
-                .frame(height: Metrics.railHeight)
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .onHover { hovering in
-            hoveredMode = hovering ? mode : (hoveredMode == mode ? nil : hoveredMode)
-        }
-        .help(mode.rawValue)
-        .accessibilityLabel(mode.rawValue)
-        .accessibilityValue(isSelected ? "Selected" : "")
-    }
-
-    private var railBackground: some View {
-        let shape = RoundedRectangle(cornerRadius: Metrics.railCornerRadius, style: .continuous)
-
-        return shape
-            .fill(.ultraThinMaterial)
-            .overlay {
-                shape
-                    .fill(Color(nsColor: .windowBackgroundColor).opacity(colorScheme == .dark ? 0.07 : 0.10))
-            }
-            .overlay {
-                shape
-                    .fill(Color.primary.opacity(colorScheme == .dark ? 0.026 : 0.016))
-            }
-            .overlay {
-                shape
-                    .strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.070 : 0.038), lineWidth: 0.5)
-            }
-    }
-
-    private var dividerColor: Color {
-        Color.primary.opacity(colorScheme == .dark ? 0.10 : 0.070)
-    }
-
-    private func foregroundStyle(isSelected: Bool, isHovered: Bool) -> AnyShapeStyle {
-        if isSelected {
-            return AnyShapeStyle(Color.primary.opacity(colorScheme == .dark ? 0.92 : 0.82))
-        }
-        if isHovered {
-            return AnyShapeStyle(Color.primary.opacity(colorScheme == .dark ? 0.84 : 0.74))
-        }
-        return AnyShapeStyle(Color.primary.opacity(colorScheme == .dark ? 0.62 : 0.54))
-    }
-
-    @ViewBuilder
-    private func modeButtonBackground(isSelected: Bool, isHovered: Bool) -> some View {
-        let shape = RoundedRectangle(cornerRadius: Metrics.selectedCornerRadius, style: .continuous)
-
-        if isSelected {
-            shape
-                .fill(.thinMaterial)
-                .overlay {
-                    shape.fill(Color.primary.opacity(colorScheme == .dark ? 0.070 : 0.045))
-                }
-                .overlay {
-                    shape
-                        .strokeBorder(Color.white.opacity(colorScheme == .dark ? 0.14 : 0.26), lineWidth: 0.5)
-                }
-                .shadow(color: .black.opacity(colorScheme == .dark ? 0.10 : 0.04), radius: 3, x: 0, y: 1)
-        } else if isHovered {
-            shape
-                .fill(Color.primary.opacity(colorScheme == .dark ? 0.08 : 0.055))
-        } else {
-            Color.clear
         }
     }
 }

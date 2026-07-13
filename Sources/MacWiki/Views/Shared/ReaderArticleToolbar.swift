@@ -301,9 +301,9 @@ struct ReaderArticleToolbar: View {
         toolbarPill(density: density) {
             toolbarIconButton(
                 .inspector,
-                title: appState.inspectorVisible ? "Hide Inspector" : "Show Inspector",
+                title: appState.inspectorPresented ? "Hide Inspector" : "Show Inspector",
                 systemImage: "sidebar.trailing",
-                isEnabled: true,
+                isEnabled: appState.inspectorPresentationAvailable,
                 density: density
             ) {
                 appState.toggleInspectorVisibility()
@@ -439,13 +439,7 @@ struct ReaderArticleToolbar: View {
     }
 
     private func toggleListContentsVisibility() {
-        if reduceMotion {
-            appState.toggleDirectoryColumnVisibility()
-        } else {
-            withAnimation(ColumnMotion.readerOnlyVisibility) {
-                appState.toggleDirectoryColumnVisibility()
-            }
-        }
+        appState.toggleDirectoryColumnVisibility()
     }
 
     private func leadingPadding(density: ReaderToolbarDensity, proxy: GeometryProxy) -> CGFloat {

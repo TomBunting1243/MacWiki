@@ -15,6 +15,51 @@ enum MainWindowColumnWidth {
     }
 }
 
+enum MainWindowResponsiveLayout {
+    struct Input: Equatable {
+        let windowWidth: CGFloat
+        let sidebarVisible: Bool
+        let directoryVisible: Bool
+        let hasArticle: Bool
+        let sidebarWidth: CGFloat
+        let directoryWidth: CGFloat
+        let inspectorWidth: CGFloat
+    }
+
+    /// A readable article should remain the dominant surface when auxiliary
+    /// columns compete for space.
+    static let minimumReaderWidth: CGFloat = 520
+    private static let splitDividerWidth: CGFloat = 1
+
+    static func canPresentInspector(for input: Input) -> Bool {
+        guard input.hasArticle, input.windowWidth.isFinite else { return false }
+
+        let sidebarWidth = input.sidebarVisible
+            ? resolved(input.sidebarWidth, in: MainWindowColumnWidth.sidebarRange)
+            : 0
+        let directoryWidth = input.directoryVisible
+            ? resolved(input.directoryWidth, in: MainWindowColumnWidth.directoryRange)
+            : 0
+        let inspectorWidth = resolved(input.inspectorWidth, in: MainWindowColumnWidth.inspectorRange)
+        let visibleAuxiliaryColumns = [input.sidebarVisible, input.directoryVisible, true]
+            .filter { $0 }
+            .count
+        let dividerBudget = CGFloat(visibleAuxiliaryColumns) * splitDividerWidth
+        let requiredWidth = sidebarWidth
+            + directoryWidth
+            + inspectorWidth
+            + minimumReaderWidth
+            + dividerBudget
+
+        return input.windowWidth >= requiredWidth
+    }
+
+    private static func resolved(_ value: CGFloat, in range: ClosedRange<CGFloat>) -> CGFloat {
+        guard value.isFinite else { return range.lowerBound }
+        return min(max(value, range.lowerBound), range.upperBound)
+    }
+}
+
 private struct PersistedColumnWidthModifier: ViewModifier {
     let key: String
     let range: ClosedRange<CGFloat>

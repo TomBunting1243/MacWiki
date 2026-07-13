@@ -11,49 +11,23 @@ extension AppState {
         guard !isWikiHopNavigationLocked else { return }
 
         switch navigationSplitViewVisibility {
-        case .all, .automatic:
-            navigationSplitViewVisibility = listContentsColumnVisible ? .doubleColumn : .detailOnly
-        case .doubleColumn, .detailOnly:
+        case .detailOnly:
             navigationSplitViewVisibility = .all
         default:
-            navigationSplitViewVisibility = .all
+            navigationSplitViewVisibility = .detailOnly
         }
     }
 
     func toggleDirectoryColumnVisibility() {
         guard !isWikiHopNavigationLocked else { return }
 
-        if directoryColumnVisible {
-            listContentsColumnVisible = false
-            navigationSplitViewVisibilityBeforeReaderOnly = navigationSplitViewVisibility
-            if listsSidebarVisible {
-                navigationSplitViewVisibility = .all
-            } else {
-                navigationSplitViewVisibility = .detailOnly
-            }
-        } else {
-            listContentsColumnVisible = true
-            if navigationSplitViewVisibility == .detailOnly {
-                navigationSplitViewVisibility = navigationSplitViewVisibilityBeforeReaderOnly
-            } else {
-                navigationSplitViewVisibility = .all
-            }
-        }
+        listContentsColumnVisible.toggle()
     }
 
     func setNavigationSplitViewVisibility(listsVisible: Bool, directoryVisible: Bool) {
         listContentsColumnVisible = directoryVisible
 
-        switch (listsVisible, directoryVisible) {
-        case (true, true):
-            navigationSplitViewVisibility = .all
-        case (false, true):
-            navigationSplitViewVisibility = .doubleColumn
-        case (false, false):
-            navigationSplitViewVisibility = .detailOnly
-        case (true, false):
-            navigationSplitViewVisibility = .all
-        }
+        navigationSplitViewVisibility = listsVisible ? .all : .detailOnly
     }
 
     /// Current scroll position for a specific tab id.

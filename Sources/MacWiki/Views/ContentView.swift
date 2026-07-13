@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Main content view implementing the four-column layout
+/// Main content view implementing MacWiki's adaptive native workspace.
 ///
 /// Layout:
 /// - Column 1: Lists sidebar (reading lists, areas)
@@ -38,16 +38,7 @@ struct ContentView: View {
     }
 
     private enum PanelMotion {
-        static let sidebarToggle = ColumnMotion.sidebarVisibility
         static let wikiHopSummaryFade = Animation.easeInOut(duration: 0.3)
-    }
-
-    private func performAnimation(_ animation: Animation?, _ updates: () -> Void) {
-        if reduceMotion {
-            updates()
-        } else {
-            withAnimation(animation, updates)
-        }
     }
 
     var body: some View {
@@ -95,9 +86,7 @@ struct ContentView: View {
             if appState.isWikiHopNavigationLocked {
                 // Determine if we need to force close
                 if appState.listsSidebarVisible || appState.directoryColumnVisible {
-                    performAnimation(PanelMotion.sidebarToggle) {
-                        appState.setNavigationColumnsVisible(false)
-                    }
+                    appState.setNavigationColumnsVisible(false)
                 }
             }
         }
@@ -184,9 +173,7 @@ struct ContentView: View {
         guard !appState.listsSidebarVisible || !appState.directoryColumnVisible else { return }
         guard !appState.isWikiHopNavigationLocked else { return }
 
-        performAnimation(PanelMotion.sidebarToggle) {
-            appState.setNavigationColumnsVisible(true)
-        }
+        appState.setNavigationColumnsVisible(true)
     }
 
     private func applyLaunchQAHarnessOverridesIfNeeded() {
@@ -206,16 +193,5 @@ struct ContentView: View {
 
         appState.launchSidebarSearchQuery = seededQuery
         appState.startSearch(context: .navigation)
-    }
-}
- 
-extension ContentView {
-    // Add logic to enforce sidebar hidden state when locked
-    func enforceWikiHopSidebar() {
-        if appState.isWikiHopNavigationLocked && (appState.listsSidebarVisible || appState.directoryColumnVisible) {
-            performAnimation(PanelMotion.sidebarToggle) {
-                appState.setNavigationColumnsVisible(false)
-            }
-        }
     }
 }
