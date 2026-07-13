@@ -36,6 +36,7 @@ TRACE_DIRTY="$(plutil -extract GitDirty raw "$BUILD_INFO_PLIST")"
 mkdir -p "$OUTPUT_DIR"
 APP_LOG="$OUTPUT_DIR/app.log"
 AX_RESULT="$OUTPUT_DIR/label-tag-mutation-ax.json"
+DRIVER_LOG="$OUTPUT_DIR/driver-errors.log"
 REPORT_PATH="$OUTPUT_DIR/report.md"
 
 cleanup() {
@@ -52,7 +53,7 @@ qa_launch_candidate "$APP_LOG"
 
 APP_PID="$QA_APP_PID" LABEL_NAME="$LABEL_NAME" RENAMED_LABEL_NAME="$RENAMED_LABEL_NAME" \
 TAG_NAME="$TAG_NAME" RENAMED_TAG_NAME="$RENAMED_TAG_NAME" \
-  qa_run_command_with_timeout 80 osascript -l JavaScript >"$AX_RESULT" <<'JXA' || qa_status=$?
+  qa_run_command_with_timeout 300 osascript -l JavaScript >"$AX_RESULT" 2>"$DRIVER_LOG" <<'JXA' || qa_status=$?
 ObjC.import('stdlib')
 
 const pid = Number(ObjC.unwrap($.getenv('APP_PID')))
@@ -64,6 +65,10 @@ const systemEvents = Application('System Events')
 
 function assert(condition, message) {
   if (!condition) throw new Error(message)
+}
+
+function trace(message) {
+  console.log(`${new Date().toISOString()} ${message}`)
 }
 
 function safe(getter, fallback = null) {
@@ -102,8 +107,12 @@ function descendants(element, maximumDepth, depth = 0) {
 function allElements() {
   const elements = []
   const process = currentProcess()
-  for (const window of process.windows()) elements.push(window, ...descendants(window, 14))
-  for (const menuBar of process.menuBars()) elements.push(menuBar, ...descendants(menuBar, 10))
+  for (const window of process.windows()) {
+    elements.push(window, ...safe(() => window.entireContents(), []))
+  }
+  for (const menuBar of process.menuBars()) {
+    elements.push(menuBar, ...safe(() => menuBar.entireContents(), []))
+  }
   return elements
 }
 
@@ -190,19 +199,25 @@ function showContextMenuForName(name) {
 }
 
 function createRenameDelete(createAction, originalName, renamedName) {
+  trace(`begin ${originalName}`)
   press(waitForNamed(createAction))
   submitSheet('Create', originalName)
   waitForText(originalName)
+  trace(`created ${originalName}`)
 
   showContextMenuForName(originalName)
+  trace(`opened initial menu for ${originalName}`)
   press(waitForNamed('Rename'))
   submitSheet('Save', renamedName)
   waitForText(renamedName)
   waitUntil(() => elementsContaining(originalName).length === 0, `${originalName} remained after rename`)
+  trace(`renamed ${originalName} to ${renamedName}`)
 
   showContextMenuForName(renamedName)
+  trace(`opened renamed menu for ${renamedName}`)
   press(waitForNamed('Delete'))
   waitUntil(() => elementsContaining(renamedName).length === 0, `${renamedName} remained after delete`)
+  trace(`deleted ${renamedName}`)
 }
 
 waitUntil(() => currentProcess().windows().length > 0, 'MacWiki did not expose its main window')
