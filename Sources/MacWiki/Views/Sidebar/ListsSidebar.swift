@@ -592,14 +592,15 @@ struct ListsSidebar: View {
                 )
             }
             .accessibilityRepresentation {
-                Button(label.name) {
-                    selectSidebarSelection(selection)
-                }
-                .accessibilityIdentifier(selection.accessibilityIdentifier)
-                .accessibilityValue(sidebarSelectionSet.contains(selection) ? "Selected" : "")
-                .contextMenu {
-                    labelAccessibilityMenu(for: label)
-                }
+                SidebarCollectionAccessibilityButton(
+                    title: label.name,
+                    identifier: selection.accessibilityIdentifier,
+                    isSelected: sidebarSelectionSet.contains(selection),
+                    onPress: { selectSidebarSelection(selection) },
+                    onRename: { onEditLabel(label) },
+                    onDelete: { deleteLabel(label.id) },
+                    onColorChange: { color in changeLabelColor(label.id, color: color) }
+                )
             }
         case .tag(let tag):
             let selection = SidebarSelectionID.tag(tag.id)
@@ -623,14 +624,14 @@ struct ListsSidebar: View {
                 )
             }
             .accessibilityRepresentation {
-                Button(tag.name) {
-                    selectSidebarSelection(selection)
-                }
-                .accessibilityIdentifier(selection.accessibilityIdentifier)
-                .accessibilityValue(sidebarSelectionSet.contains(selection) ? "Selected" : "")
-                .contextMenu {
-                    tagAccessibilityMenu(for: tag)
-                }
+                SidebarCollectionAccessibilityButton(
+                    title: tag.name,
+                    identifier: selection.accessibilityIdentifier,
+                    isSelected: sidebarSelectionSet.contains(selection),
+                    onPress: { selectSidebarSelection(selection) },
+                    onRename: { editingTag = tag },
+                    onDelete: { deleteTag(tag.id) }
+                )
             }
         case .area(let area):
             AreaRowView(
@@ -675,40 +676,6 @@ struct ListsSidebar: View {
             isDisabled: appState.isWikiHopNavigationLocked
         ) {
             rootRowLabel("Search", systemImage: "magnifyingglass")
-        }
-    }
-
-    @ViewBuilder
-    private func labelAccessibilityMenu(for label: Label) -> some View {
-        Button("Rename") {
-            onEditLabel(label)
-        }
-
-        Menu("Change Color") {
-            ForEach(LabelColor.allCases, id: \.self) { color in
-                Button(color.rawValue) {
-                    changeLabelColor(label.id, color: color)
-                }
-            }
-        }
-
-        Divider()
-
-        Button("Delete", role: .destructive) {
-            deleteLabel(label.id)
-        }
-    }
-
-    @ViewBuilder
-    private func tagAccessibilityMenu(for tag: Tag) -> some View {
-        Button("Rename") {
-            editingTag = tag
-        }
-
-        Divider()
-
-        Button("Delete", role: .destructive) {
-            deleteTag(tag.id)
         }
     }
 

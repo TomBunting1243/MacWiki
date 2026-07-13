@@ -105,18 +105,18 @@ struct BetaReadinessRegressionTests {
     }
 
     @Test func sidebarSelectableRowsUseButtonSemantics() throws {
-        let source = try String(contentsOf: repositoryRoot()
+        let sidebarSource = try String(contentsOf: repositoryRoot()
             .appendingPathComponent("Sources")
             .appendingPathComponent("MacWiki")
             .appendingPathComponent("Views")
             .appendingPathComponent("Sidebar")
             .appendingPathComponent("ListsSidebar.swift"), encoding: .utf8)
 
-        guard let functionRange = source.range(of: "private func sidebarSelectableRow") else {
+        guard let functionRange = sidebarSource.range(of: "private func sidebarSelectableRow") else {
             Issue.record("Missing sidebarSelectableRow")
             return
         }
-        let functionBody = String(source[functionRange.lowerBound...])
+        let functionBody = String(sidebarSource[functionRange.lowerBound...])
             .components(separatedBy: "private func rootTitle")
             .first ?? ""
 
@@ -125,18 +125,22 @@ struct BetaReadinessRegressionTests {
         #expect(functionBody.contains("accessibilityLabel: String"))
         #expect(functionBody.contains(".accessibilityLabel(accessibilityLabel)"))
         #expect(functionBody.contains(".accessibilityIdentifier(selection.accessibilityIdentifier)"))
-        #expect(source.contains("accessibilityLabel: label.name"))
-        #expect(source.contains("accessibilityLabel: tag.name"))
-        #expect(source.contains("accessibilityLabel: list.name"))
-        #expect(source.contains("Button(label.name)"))
-        #expect(source.contains("Button(tag.name)"))
-        #expect(source.contains("labelAccessibilityMenu(for: label)"))
-        #expect(source.contains("tagAccessibilityMenu(for: tag)"))
-        #expect(source.contains("sidebarSectionHeader(\"Explore\")"))
-        #expect(source.contains("private var collectionsSnapshot: ListsSidebarSnapshot"))
-        #expect(!source.contains("@State private var collectionsSnapshot"))
-        #expect(!source.contains("private var collectionsFingerprint"))
-        #expect(!source.contains(".onChange(of: collectionsFingerprint)"))
+        #expect(sidebarSource.contains("accessibilityLabel: label.name"))
+        #expect(sidebarSource.contains("accessibilityLabel: tag.name"))
+        #expect(sidebarSource.contains("accessibilityLabel: list.name"))
+        #expect(sidebarSource.contains("SidebarCollectionAccessibilityButton("))
+        let nativeCollectionButton = try source("Sources/MacWiki/Views/Sidebar/SidebarCollectionAccessibilityButton.swift")
+        #expect(nativeCollectionButton.contains("NSButton(title: title"))
+        #expect(nativeCollectionButton.contains("button.setAccessibilityLabel(title)"))
+        #expect(nativeCollectionButton.contains("button.setAccessibilityIdentifier(identifier)"))
+        #expect(nativeCollectionButton.contains("button.menu = coordinator.makeMenu()"))
+        #expect(nativeCollectionButton.contains("title: \"Change Color\""))
+        #expect(nativeCollectionButton.contains("title: \"Delete\""))
+        #expect(sidebarSource.contains("sidebarSectionHeader(\"Explore\")"))
+        #expect(sidebarSource.contains("private var collectionsSnapshot: ListsSidebarSnapshot"))
+        #expect(!sidebarSource.contains("@State private var collectionsSnapshot"))
+        #expect(!sidebarSource.contains("private var collectionsFingerprint"))
+        #expect(!sidebarSource.contains(".onChange(of: collectionsFingerprint)"))
     }
 
     @Test func folderAccessibilityIdentityDoesNotOverrideNestedListIdentity() throws {
