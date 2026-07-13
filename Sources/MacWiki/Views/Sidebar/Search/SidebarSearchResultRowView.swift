@@ -43,6 +43,7 @@ struct SidebarSearchResultRowView: View {
 
     var body: some View {
         ArticleListItem(
+            accessibilityTitle: row.article.title,
             isRead: row.isRead,
             progress: row.readingProgress,
             isCurrent: row.isCurrent,

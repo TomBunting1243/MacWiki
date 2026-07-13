@@ -49,6 +49,25 @@ struct BetaReadinessRegressionTests {
         #expect(value == "Active tab, saved, has highlights, 62% read")
     }
 
+    @Test func articleListRowsExposeArticleIdentityAndReadAction() throws {
+        let status = ArticleListAccessibilityStatus.value(
+            isRead: false,
+            progress: 0.62,
+            isCurrent: true,
+            isSelected: true,
+            labelName: "Research"
+        )
+        #expect(status == "Unread, 62% read, Open in reader, Selected, Label Research")
+
+        let rowSource = try source("Sources/MacWiki/Views/Sidebar/Directory/ArticleListAccessibility.swift")
+        #expect(rowSource.contains("AccessibleArticleRowProxy("))
+        #expect(rowSource.contains("view.setAccessibilityLabel(title)"))
+        #expect(rowSource.contains("view.setAccessibilityValue(value)"))
+        #expect(rowSource.contains("override func accessibilityPerformPress() -> Bool"))
+        #expect(rowSource.contains("override func hitTest(_ point: NSPoint) -> NSView?"))
+        #expect(rowSource.contains("title: isRead ? \"Mark as unread\" : \"Mark as read\""))
+    }
+
     @Test func persistedColumnWidthsRejectInvalidValuesAndClampToSupportedRanges() {
         #expect(MainWindowColumnWidth.clampedStorageValue(.nan, range: MainWindowColumnWidth.sidebarRange) == nil)
         #expect(MainWindowColumnWidth.clampedStorageValue(120, range: MainWindowColumnWidth.sidebarRange) == 176)

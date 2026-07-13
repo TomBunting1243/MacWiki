@@ -65,6 +65,7 @@ struct SavedArticleRow: View {
         )
 
         ArticleListItem(
+            accessibilityTitle: article.title,
             isRead: isRead,
             progress: readProgress,
             isCurrent: isCurrent,

@@ -208,6 +208,7 @@ struct TagArticlesView: View {
                         )
                     } else {
                         ArticleListItem(
+                            accessibilityTitle: article.title,
                             isRead: isRead,
                             progress: progress,
                             isCurrent: isCurrentArticle(article.title),

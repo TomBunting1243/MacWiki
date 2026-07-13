@@ -2126,6 +2126,7 @@ extension DirectoryView {
         let trendPulse = showTrendPulse ? discoverTrendPulseStore.pulse(for: article.title) : nil
 
         return ArticleListItem(
+            accessibilityTitle: article.title,
             isRead: isRead,
             progress: progress,
             isCurrent: isCurrentArticle(article.title),
@@ -2249,6 +2250,7 @@ extension DirectoryView {
 
                     // History rows open directly; save/move prompts stay scoped to Library rows.
                     ArticleListItem(
+                        accessibilityTitle: item.article.title,
                         isRead: isRead,
                         progress: progress,
                         isCurrent: isCurrent,
@@ -2355,6 +2357,7 @@ extension DirectoryView {
                 } else {
                     let rowKey = "recents-unsaved:\(article.id):\(ReadStateSync.normalizedTitle(article.title))"
                     ArticleListItem(
+                        accessibilityTitle: article.title,
                         isRead: isRead,
                         progress: progress,
                         isCurrent: isCurrentArticle(article.title),

@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct ArticleListItem<Content: View>: View {
+    let accessibilityTitle: String
     let isRead: Bool
     let progress: Double
     let isCurrent: Bool
@@ -53,6 +54,7 @@ struct ArticleListItem<Content: View>: View {
     }
 
     init(
+        accessibilityTitle: String,
         isRead: Bool,
         progress: Double = 0,
         isCurrent: Bool = false,
@@ -62,6 +64,7 @@ struct ArticleListItem<Content: View>: View {
         onTap: @escaping () -> Void,
         @ViewBuilder content: @escaping (Bool, Label?) -> Content
     ) {
+        self.accessibilityTitle = accessibilityTitle
         self.isRead = isRead
         self.progress = progress
         self.isCurrent = isCurrent
@@ -134,8 +137,21 @@ struct ArticleListItem<Content: View>: View {
             guard hovering != isHovered else { return }
             isHovered = hovering
         }
-        .accessibilityElement(children: .combine)
-        .accessibilityHint("Open article")
+        .modifier(
+            ArticleListAccessibilityModifier(
+                title: accessibilityTitle,
+                value: ArticleListAccessibilityStatus.value(
+                    isRead: isRead,
+                    progress: progress,
+                    isCurrent: isCurrent,
+                    isSelected: isSelected,
+                    labelName: label?.name
+                ),
+                isRead: isRead,
+                onOpen: onTap,
+                onToggleRead: onToggleRead
+            )
+        )
     }
 }
 
