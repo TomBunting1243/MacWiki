@@ -702,7 +702,7 @@ struct TabBarView: View {
 
         guard targetIndex != sourceIndex else { return }
         Task { @MainActor in
-            await Task.yield()
+            try? await Task.sleep(for: .milliseconds(1))
             performAnimation(interactionProfile.neighborShift) {
                 appState.moveTab(from: sourceIndex, to: targetIndex)
             }

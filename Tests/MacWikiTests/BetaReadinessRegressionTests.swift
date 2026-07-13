@@ -1369,7 +1369,7 @@ struct BetaReadinessRegressionTests {
         #expect(harness.contains("Tab reorder journey emitted"))
         #expect(!tabBar.contains("@GestureState private var isDragActive"))
         #expect(!tabBar.contains(".updating($isDragActive)"))
-        #expect(tabBar.contains("await Task.yield()"))
+        #expect(tabBar.contains("Task.sleep(for: .milliseconds(1))"))
         #expect(tabBar.contains("End the gesture transaction before changing the ForEach collection order"))
         #expect(driver.contains("The constrained tab lane did not expose All Tabs overflow."))
         #expect(driver.contains("Tab drag did not publish a reordered accessibility sequence."))
