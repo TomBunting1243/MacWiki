@@ -505,6 +505,7 @@ struct ListsSidebar: View {
         }
         .buttonStyle(.plain)
         .help(help)
+        .accessibilityLabel(help)
     }
 
     private var sidebarLibraryMenu: some View {
@@ -536,6 +537,7 @@ struct ListsSidebar: View {
         )
         .contentShape(Rectangle())
         .help("New List or Folder")
+        .accessibilityLabel("New List or Folder")
         .accessibilityIdentifier("sidebar-actions-menu")
     }
 

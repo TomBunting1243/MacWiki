@@ -137,6 +137,7 @@ struct BetaReadinessRegressionTests {
         let symbolPicker = try source("Sources/MacWiki/Views/Components/SFSymbolPicker.swift")
         let addToList = try source("Sources/MacWiki/Views/Components/AddToListSheet.swift")
         let saveToList = try source("Sources/MacWiki/Views/Components/SaveToListPopover.swift")
+        let sidebar = try source("Sources/MacWiki/Views/Sidebar/ListsSidebar.swift")
 
         #expect(newList.contains(".accessibilityLabel(\"Choose list icon\")"))
         #expect(newList.contains(".accessibilityValue(selectedIcon)"))
@@ -151,6 +152,8 @@ struct BetaReadinessRegressionTests {
         #expect(addToList.contains(".accessibilityLabel(\"Close Add to List\")"))
         #expect(addToList.contains(".accessibilityValue(\"\\(list.articles.count) articles\")"))
         #expect(saveToList.contains(".accessibilityValue(isSaved ? \"Saved\" : \"Not saved\")"))
+        #expect(sidebar.contains(".accessibilityLabel(help)"))
+        #expect(sidebar.contains(".accessibilityLabel(\"New List or Folder\")"))
     }
 
     @Test func iconOnlyReaderAndFilterControlsExposeState() throws {
@@ -949,6 +952,7 @@ struct BetaReadinessRegressionTests {
             "scripts/qa_folder_collapse_selected_list.sh",
             "scripts/qa_menu_window_states.sh",
             "scripts/qa_nested_folder_rename.sh",
+            "scripts/qa_organization_accessibility.sh",
             "scripts/qa_reader_inspector_journey.sh",
             "scripts/qa_discover_scroll_time_machine.sh",
             "scripts/qa_sidebar_search_width_classes.sh",
@@ -997,11 +1001,12 @@ struct BetaReadinessRegressionTests {
         #expect(!nestedRenameScript.contains("--flip-y"))
     }
 
-    @Test func menuAndContextHarnessesKeepReportsNonExecutableAndStateIsolated() throws {
+    @Test func menuContextAndOrganizationHarnessesKeepReportsNonExecutableAndStateIsolated() throws {
         let menuHarness = try source("scripts/qa_menu_window_states.sh")
         let contextHarness = try source("scripts/qa_context_menu_accessibility.sh")
+        let organizationHarness = try source("scripts/qa_organization_accessibility.sh")
 
-        for harness in [menuHarness, contextHarness] {
+        for harness in [menuHarness, contextHarness, organizationHarness] {
             #expect(harness.contains("source \"$SCRIPT_DIR/lib/qa_process_safety.sh\""))
             #expect(harness.contains("qa_prepare_isolated_home"))
             #expect(harness.contains("qa_assert_no_conflicting_processes"))
@@ -1020,6 +1025,10 @@ struct BetaReadinessRegressionTests {
         #expect(contextHarness.contains("qa_assert_isolated_path \"$STORE_PATH\" \"$QA_HOME\""))
         #expect(contextHarness.contains("sidebar-row-area-$FOLDER_ID"))
         #expect(contextHarness.contains("sidebar-row-list-$LIST_ID"))
+        #expect(organizationHarness.contains("'New List or Folder', 'New Label', 'New Tag'"))
+        #expect(organizationHarness.contains("waitForNamed('Choose list icon')"))
+        #expect(organizationHarness.contains("waitForNamed('Choose folder icon')"))
+        #expect(organizationHarness.contains("waitForNamed('Choose label color')"))
         #expect(contextHarness.contains("AXShowMenu"))
     }
 

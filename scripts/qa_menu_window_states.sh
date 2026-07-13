@@ -78,10 +78,37 @@ while (Date.now() < deadline) {
 assert(process !== null, `PID ${pid} did not expose a menu bar and window`)
 
 process.frontmost = true
-const menuBar = process.menuBars[0]
+
+function currentProcess() {
+  const matches = systemEvents.processes.whose({ unixId: pid })()
+  assert(matches.length === 1, `PID ${pid} is no longer uniquely reachable`)
+  return matches[0]
+}
+
+function currentWindow() {
+  const windows = currentProcess().windows()
+  assert(windows.length > 0, `PID ${pid} has no reachable window`)
+  return windows[0]
+}
 
 function menuItem(menuName, itemName) {
-  return menuBar.menuBarItems.byName(menuName).menus[0].menuItems.byName(itemName)
+  const stop = Date.now() + 5000
+  while (Date.now() < stop) {
+    try {
+      const menuBars = currentProcess().menuBars()
+      if (menuBars.length === 0) throw new Error('menu bar unavailable')
+      const menuBarItems = menuBars[0].menuBarItems.whose({ name: menuName })()
+      if (menuBarItems.length !== 1) throw new Error(`menu unavailable: ${menuName}`)
+      const menus = menuBarItems[0].menus()
+      if (menus.length === 0) throw new Error(`menu contents unavailable: ${menuName}`)
+      const items = menus[0].menuItems.whose({ name: itemName })()
+      // SwiftUI exposes both native shortcut variants for Next/Previous Tab
+      // with the same visible title. Either item represents the same action.
+      if (items.length > 0) return items[0]
+    } catch (_) {}
+    delay(0.1)
+  }
+  throw new Error(`menu item unavailable: ${menuName} → ${itemName}`)
 }
 
 function enabled(menuName, itemName) {
@@ -94,19 +121,20 @@ function commandCharacter(menuName, itemName) {
 }
 
 function fullScreenValue() {
-  const window = process.windows[0]
+  const window = currentWindow()
   try { return Boolean(window.attributes.byName('AXFullScreen').value()) } catch (_) { return false }
 }
 
 function windowSnapshot(label) {
-  const window = process.windows[0]
+  const current = currentProcess()
+  const window = currentWindow()
   return {
     label,
     name: String(window.name() || ''),
     position: window.position(),
     size: window.size(),
     fullScreen: fullScreenValue(),
-    processFrontmost: Boolean(process.frontmost())
+    processFrontmost: Boolean(current.frontmost())
   }
 }
 
@@ -168,11 +196,11 @@ waitUntil(() => !fullScreenValue(), 'Window did not leave native full screen')
 observations.states.push(windowSnapshot('restored-from-full-screen'))
 
 Application('Finder').activate()
-waitUntil(() => !Boolean(process.frontmost()), 'MacWiki did not enter an inactive application state')
+waitUntil(() => !Boolean(currentProcess().frontmost()), 'MacWiki did not enter an inactive application state')
 observations.states.push(windowSnapshot('inactive'))
 
-process.frontmost = true
-waitUntil(() => Boolean(process.frontmost()), 'MacWiki did not reactivate')
+currentProcess().frontmost = true
+waitUntil(() => Boolean(currentProcess().frontmost()), 'MacWiki did not reactivate')
 observations.states.push(windowSnapshot('reactivated'))
 
 JSON.stringify(observations, null, 2)
