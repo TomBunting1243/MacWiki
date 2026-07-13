@@ -57,6 +57,7 @@ struct NewAreaSheet: View {
                 ) {
                     createArea()
                 }
+                .disabled(trimmedName.isEmpty)
             }
         }
         .padding(20)

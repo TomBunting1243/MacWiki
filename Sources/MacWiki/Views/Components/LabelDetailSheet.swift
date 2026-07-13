@@ -91,6 +91,7 @@ struct LabelDetailSheet: View {
                 ) {
                     save()
                 }
+                .disabled(trimmedName.isEmpty)
             }
         }
         .padding(20)

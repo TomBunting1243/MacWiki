@@ -58,6 +58,7 @@ struct NewListSheet: View {
                 ) {
                     createList()
                 }
+                .disabled(trimmedName.isEmpty)
             }
         }
         .padding(20)

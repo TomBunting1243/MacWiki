@@ -42,6 +42,7 @@ struct TagDetailSheet: View {
                 ) {
                     save()
                 }
+                .disabled(trimmedName.isEmpty)
             }
         }
         .padding(20)
