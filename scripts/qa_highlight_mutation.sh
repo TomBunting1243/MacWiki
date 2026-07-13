@@ -37,6 +37,7 @@ TRACE_DIRTY="$(plutil -extract GitDirty raw "$BUILD_INFO_PLIST")"
 mkdir -p "$OUTPUT_DIR" "$STATE_DIR"
 APP_LOG="$OUTPUT_DIR/app.log"
 AX_RESULT="$OUTPUT_DIR/highlight-mutation-ax.json"
+DRIVER_LOG="$OUTPUT_DIR/driver-errors.log"
 REPORT_PATH="$OUTPUT_DIR/report.md"
 
 cleanup() {
@@ -89,152 +90,18 @@ jq -n \
 
 qa_launch_candidate "$APP_LOG"
 
-APP_PID="$QA_APP_PID" HIGHLIGHT_TEXT="$HIGHLIGHT_TEXT" NOTE_TEXT="$NOTE_TEXT" \
-  qa_run_command_with_timeout 80 osascript -l JavaScript >"$AX_RESULT" <<'JXA'
-ObjC.import('stdlib')
+APP_PID="$QA_APP_PID" qa_run_command_with_timeout 120 swift "$SCRIPT_DIR/ax_highlight_mutation.swift" \
+  "$QA_APP_PID" "$HIGHLIGHT_TEXT" "$NOTE_TEXT" >"$AX_RESULT" 2>"$DRIVER_LOG" || qa_status=$?
 
-const pid = Number(ObjC.unwrap($.getenv('APP_PID')))
-const highlightText = String(ObjC.unwrap($.getenv('HIGHLIGHT_TEXT')))
-const noteText = String(ObjC.unwrap($.getenv('NOTE_TEXT')))
-const systemEvents = Application('System Events')
-
-function assert(condition, message) {
-  if (!condition) throw new Error(message)
-}
-
-function safe(getter, fallback = null) {
-  try {
-    const value = getter()
-    return value === undefined ? fallback : value
-  } catch (_) {
-    return fallback
-  }
-}
-
-function waitUntil(predicate, message, timeoutMilliseconds = 15000) {
-  const stop = Date.now() + timeoutMilliseconds
-  while (Date.now() < stop) {
-    try {
-      const value = predicate()
-      if (value) return value
-    } catch (_) {}
-    delay(0.1)
-  }
-  throw new Error(message)
-}
-
-function currentProcess() {
-  const matches = systemEvents.processes.whose({ unixId: pid })()
-  assert(matches.length === 1, `PID ${pid} is not uniquely reachable`)
-  return matches[0]
-}
-
-function descendants(element, maximumDepth, depth = 0) {
-  if (depth >= maximumDepth) return []
-  const children = safe(() => element.uiElements(), [])
-  return children.flatMap(child => [child, ...descendants(child, maximumDepth, depth + 1)])
-}
-
-function allElements() {
-  const elements = []
-  const process = currentProcess()
-  for (const window of process.windows()) {
-    elements.push(window, ...descendants(window, 14))
-  }
-  for (const menuBar of process.menuBars()) {
-    elements.push(menuBar, ...descendants(menuBar, 10))
-  }
-  return elements
-}
-
-function stringValues(element) {
-  const values = []
-  for (const getter of [
-    () => element.name(),
-    () => element.title(),
-    () => element.description(),
-    () => element.value()
-  ]) {
-    const value = safe(getter, '')
-    if (value !== null && String(value).length > 0) values.push(String(value))
-  }
-  return values
-}
-
-function nameOf(element) {
-  return stringValues(element)[0] || ''
-}
-
-function actionNames(element) {
-  return safe(() => element.actions().map(action => String(action.name())), [])
-}
-
-function elementsNamed(name) {
-  return allElements().filter(element => stringValues(element).includes(name))
-}
-
-function waitForNamed(name) {
-  return waitUntil(() => elementsNamed(name)[0] || null, `Element did not appear: ${name}`)
-}
-
-function press(element) {
-  const actions = actionNames(element)
-  if (actions.includes('AXPress')) {
-    element.actions.byName('AXPress').perform()
-    return
-  }
-  element.click()
-}
-
-function showContextMenuForText(text) {
-  const target = waitUntil(() => {
-    const exactMatches = allElements().filter(element => stringValues(element).some(value => value.includes(text)))
-    return exactMatches.find(element => actionNames(element).includes('AXShowMenu')) || null
-  }, `No context-menu target exposed the seeded highlight text: ${text}`)
-  target.actions.byName('AXShowMenu').perform()
-}
-
-waitUntil(
-  () => currentProcess().windows().length > 0,
-  'MacWiki did not expose its main window'
-)
-currentProcess().frontmost = true
-
-press(waitForNamed('Notes'))
-waitForNamed(highlightText)
-
-press(waitForNamed('Add Note'))
-const editor = waitUntil(
-  () => allElements().find(element => safe(() => element.role(), '') === 'AXTextArea') || null,
-  'Highlight note editor did not expose a text area'
-)
-editor.value = noteText
-press(waitForNamed('Save'))
-waitForNamed(noteText)
-
-showContextMenuForText(highlightText)
-press(waitForNamed('Change Color'))
-press(waitForNamed('Blue'))
-delay(0.3)
-
-showContextMenuForText(highlightText)
-const observedDelete = nameOf(waitForNamed('Delete Highlight'))
-press(waitForNamed('Delete Highlight'))
-waitUntil(
-  () => elementsNamed(highlightText).length === 0,
-  'Deleted highlight remained in the Notes accessibility tree'
-)
-
-JSON.stringify({
-  pid,
-  articleMode: 'Notes',
-  highlightText,
-  noteText,
-  selectedColor: 'Blue',
-  deleteAction: observedDelete,
-  highlightRemoved: true
-}, null, 2)
-JXA
+if [[ "${qa_status:-0}" != "0" ]]; then
+  if [[ -f "$STORE_PATH" ]]; then
+    sqlite3 -header -tabs "$STORE_PATH" \
+      "SELECT ZTEXT AS text, ZNOTE AS note, ZCOLOR AS color FROM ZHIGHLIGHT;" \
+      >"$OUTPUT_DIR/failed-store-highlights.tsv" 2>/dev/null || true
+  fi
+  echo "Highlight mutation accessibility driver failed; diagnostic store inventory preserved." >&2
+  exit "${qa_status:-1}"
+fi
 
 for _ in $(seq 1 60); do
   if [[ -f "$STORE_PATH" ]]; then

@@ -421,6 +421,8 @@ struct HighlightRowView: View {
                     .frame(minHeight: 110)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 6)
+                    .accessibilityLabel("Highlight note")
+                    .accessibilityIdentifier("highlight-note-editor")
             }
             .background {
                 RoundedRectangle(cornerRadius: 10, style: .continuous)

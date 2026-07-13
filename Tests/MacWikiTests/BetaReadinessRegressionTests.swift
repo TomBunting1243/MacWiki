@@ -143,6 +143,12 @@ struct BetaReadinessRegressionTests {
         #expect(!sidebarSource.contains(".onChange(of: collectionsFingerprint)"))
     }
 
+    @Test func highlightNoteEditorHasStableAccessibilityIdentity() throws {
+        let source = try source("Sources/MacWiki/Views/Components/HighlightRowView.swift")
+        #expect(source.contains(".accessibilityLabel(\"Highlight note\")"))
+        #expect(source.contains(".accessibilityIdentifier(\"highlight-note-editor\")"))
+    }
+
     @Test func folderAccessibilityIdentityDoesNotOverrideNestedListIdentity() throws {
         let sidebarSource = try source("Sources/MacWiki/Views/Sidebar/ListsSidebar.swift")
         let areaRow = sourceSection(
@@ -1100,6 +1106,7 @@ struct BetaReadinessRegressionTests {
         let contextHarness = try source("scripts/qa_context_menu_accessibility.sh")
         let organizationHarness = try source("scripts/qa_organization_accessibility.sh")
         let highlightHarness = try source("scripts/qa_highlight_mutation.sh")
+        let highlightDriver = try source("scripts/ax_highlight_mutation.swift")
         let labelTagHarness = try source("scripts/qa_label_tag_mutation.sh")
 
         for harness in [menuHarness, contextHarness, organizationHarness, highlightHarness, labelTagHarness] {
@@ -1131,8 +1138,13 @@ struct BetaReadinessRegressionTests {
         #expect(highlightHarness.contains("qa.fixture.highlight.articleTitle"))
         #expect(highlightHarness.contains("qa.fixture.highlight.text"))
         #expect(highlightHarness.contains("qa_assert_isolated_path \"$STORE_PATH\" \"$QA_HOME\""))
+        #expect(highlightHarness.contains("swift \"$SCRIPT_DIR/ax_highlight_mutation.swift\""))
         #expect(highlightHarness.contains("Delete Highlight"))
         #expect(highlightHarness.contains("SELECT count(*) FROM ZHIGHLIGHT"))
+        #expect(highlightDriver.contains("guard role(of: element) != \"AXWebArea\""))
+        #expect(highlightDriver.contains("kAXShowMenuAction"))
+        #expect(highlightDriver.contains("named: \"Change Color\""))
+        #expect(highlightDriver.contains("named: \"Delete Highlight\""))
         #expect(labelTagHarness.contains("createRenameDelete('New Label'"))
         #expect(labelTagHarness.contains("createRenameDelete('New Tag'"))
         #expect(labelTagHarness.contains("SELECT count(*) FROM ZLABEL"))
