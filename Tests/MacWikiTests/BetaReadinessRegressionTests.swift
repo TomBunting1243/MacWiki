@@ -956,6 +956,56 @@ struct BetaReadinessRegressionTests {
         #expect(contextHarness.contains("AXShowMenu"))
     }
 
+    @Test func unquotedShellHeredocsCannotExecuteMarkdownBackticks() throws {
+        let scriptsDirectory = repositoryRoot().appendingPathComponent("scripts")
+        let scripts = try FileManager.default.contentsOfDirectory(
+            at: scriptsDirectory,
+            includingPropertiesForKeys: nil
+        ).filter { $0.pathExtension == "sh" }
+        let opener = try NSRegularExpression(pattern: #"<<-?\s*([A-Za-z_][A-Za-z0-9_]*)"#)
+
+        func containsUnescapedBacktick(_ line: String) -> Bool {
+            for index in line.indices where line[index] == "`" {
+                var slashCount = 0
+                var cursor = index
+                while cursor > line.startIndex {
+                    cursor = line.index(before: cursor)
+                    guard line[cursor] == "\\" else { break }
+                    slashCount += 1
+                }
+                if slashCount.isMultiple(of: 2) { return true }
+            }
+            return false
+        }
+
+        for scriptURL in scripts.sorted(by: { $0.lastPathComponent < $1.lastPathComponent }) {
+            let lines = try String(contentsOf: scriptURL, encoding: .utf8)
+                .split(separator: "\n", omittingEmptySubsequences: false)
+                .map(String.init)
+            var unquotedDelimiter: String?
+
+            for (offset, line) in lines.enumerated() {
+                if let delimiter = unquotedDelimiter {
+                    if line.trimmingCharacters(in: .whitespaces) == delimiter {
+                        unquotedDelimiter = nil
+                    } else if containsUnescapedBacktick(line) {
+                        Issue.record(
+                            "Unescaped backtick in unquoted heredoc at \(scriptURL.lastPathComponent):\(offset + 1)"
+                        )
+                    }
+                    continue
+                }
+
+                let range = NSRange(line.startIndex..<line.endIndex, in: line)
+                guard let match = opener.firstMatch(in: line, range: range),
+                      let delimiterRange = Range(match.range(at: 1), in: line) else {
+                    continue
+                }
+                unquotedDelimiter = String(line[delimiterRange])
+            }
+        }
+    }
+
     @Test func widthClassHarnessUsesReachableVerifiedWindowSizes() throws {
         let script = try source("scripts/qa_sidebar_search_width_classes.sh")
         let captureScript = try source("scripts/capture_macwiki_window.sh")
