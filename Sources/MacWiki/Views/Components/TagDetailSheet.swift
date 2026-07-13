@@ -29,18 +29,19 @@ struct TagDetailSheet: View {
                 }
 
             HStack {
-                Button("Cancel", role: .cancel) {
+                AccessibleActionButton("Cancel", keyEquivalent: "\u{1b}") {
                     isPresented = false
                 }
-                .keyboardShortcut(.cancelAction)
 
                 Spacer()
 
-                Button(tagToEdit == nil ? "Create" : "Save") {
+                AccessibleActionButton(
+                    tagToEdit == nil ? "Create" : "Save",
+                    isEnabled: !trimmedName.isEmpty,
+                    keyEquivalent: "\r"
+                ) {
                     save()
                 }
-                .keyboardShortcut(.defaultAction)
-                .disabled(trimmedName.isEmpty)
             }
         }
         .padding(20)

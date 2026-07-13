@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import AppKit
 
 /// Sheet for creating or editing a label
 /// Consolidates name and color management into a single interface
@@ -29,18 +30,16 @@ struct LabelDetailSheet: View {
             // Color + name row
             HStack(spacing: 12) {
                 // Color picker button
-                Button {
+                AccessibleSymbolActionButton(
+                    systemImage: "circle.fill",
+                    accessibilityLabel: "Choose label color",
+                    accessibilityValue: selectedColor.rawValue,
+                    tint: selectedColor.nativeColor,
+                    pointSize: 16
+                ) {
                     showColorPopover = true
-                } label: {
-                    Image(systemName: "circle.fill")
-                        .font(.system(size: 16))
-                        .foregroundStyle(selectedColor.swiftUIColor)
-                        .frame(width: 24, height: 24)
-                        .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Choose label color")
-                .accessibilityValue(selectedColor.rawValue)
+                .frame(width: 28, height: 28)
                 .popover(isPresented: $showColorPopover, arrowEdge: .bottom) {
                     VStack(spacing: 12) {
                         Text("Select Color")
@@ -50,27 +49,17 @@ struct LabelDetailSheet: View {
                         
                         LazyVGrid(columns: [GridItem(.adaptive(minimum: 30))], spacing: 8) {
                             ForEach(LabelColor.allCases, id: \.self) { color in
-                                Button {
+                                AccessibleSymbolActionButton(
+                                    systemImage: selectedColor == color ? "checkmark.circle.fill" : "circle.fill",
+                                    accessibilityLabel: color.rawValue,
+                                    accessibilityValue: selectedColor == color ? "Selected" : "",
+                                    tint: color.nativeColor,
+                                    pointSize: 18
+                                ) {
                                     selectedColor = color
                                     showColorPopover = false
-                                } label: {
-                                    Circle()
-                                        .fill(color.swiftUIColor)
-                                        .frame(width: 24, height: 24)
-                                        .overlay {
-                                            if selectedColor == color {
-                                                Image(systemName: "checkmark")
-                                                    .font(.system(size: 12, weight: .bold))
-                                                    .foregroundStyle(.white)
-                                                    .shadow(radius: 1)
-                                            }
-                                        }
-                                        .contentShape(Circle())
                                 }
-                                .buttonStyle(.plain)
-                                .help(color.rawValue)
-                                .accessibilityLabel(color.rawValue)
-                                .accessibilityValue(selectedColor == color ? "Selected" : "")
+                                .frame(width: 30, height: 30)
                             }
                         }
                     }
@@ -89,18 +78,19 @@ struct LabelDetailSheet: View {
 
             // Standard action buttons
             HStack {
-                Button("Cancel", role: .cancel) {
+                AccessibleActionButton("Cancel", keyEquivalent: "\u{1b}") {
                     isPresented = false
                 }
-                .keyboardShortcut(.cancelAction)
 
                 Spacer()
 
-                Button(labelToEdit == nil ? "Create" : "Save") {
+                AccessibleActionButton(
+                    labelToEdit == nil ? "Create" : "Save",
+                    isEnabled: !trimmedName.isEmpty,
+                    keyEquivalent: "\r"
+                ) {
                     save()
                 }
-                .keyboardShortcut(.defaultAction)
-                .disabled(trimmedName.isEmpty)
             }
         }
         .padding(20)
@@ -130,6 +120,21 @@ struct LabelDetailSheet: View {
             isPresented = false
             modelContext.saveReportingFailure(operation: #function)
             onSave?(label)
+        }
+    }
+}
+
+private extension LabelColor {
+    var nativeColor: NSColor {
+        switch self {
+        case .red: return .systemRed
+        case .orange: return .systemOrange
+        case .yellow: return .systemYellow
+        case .green: return .systemGreen
+        case .blue: return .systemBlue
+        case .purple: return .systemPurple
+        case .pink: return .systemPink
+        case .gray: return .systemGray
         }
     }
 }

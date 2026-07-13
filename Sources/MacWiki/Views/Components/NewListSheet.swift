@@ -25,19 +25,14 @@ struct NewListSheet: View {
             // Inline icon + name row
             HStack(spacing: 12) {
                 // Icon selector button
-                Button {
+                AccessibleSymbolActionButton(
+                    systemImage: selectedIcon,
+                    accessibilityLabel: "Choose list icon",
+                    accessibilityValue: selectedIcon
+                ) {
                     showIconPicker = true
-                } label: {
-                    Image(systemName: selectedIcon)
-                        .font(.system(size: 20))
-                        .foregroundStyle(.secondary)
-                        .frame(width: 36, height: 36)
-                        .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
                 }
-                .buttonStyle(.plain)
-                .help("Choose icon")
-                .accessibilityLabel("Choose list icon")
-                .accessibilityValue(selectedIcon)
+                .frame(width: 36, height: 36)
                 
                 // Name field
                 TextField("Name", text: $name)
@@ -50,18 +45,19 @@ struct NewListSheet: View {
             
             // Standard action buttons
             HStack {
-                Button("Cancel", role: .cancel) {
+                AccessibleActionButton("Cancel", keyEquivalent: "\u{1b}") {
                     isPresented = false
                 }
-                .keyboardShortcut(.cancelAction)
                 
                 Spacer()
                 
-                Button("Create") {
+                AccessibleActionButton(
+                    "Create",
+                    isEnabled: !trimmedName.isEmpty,
+                    keyEquivalent: "\r"
+                ) {
                     createList()
                 }
-                .keyboardShortcut(.defaultAction)
-                .disabled(trimmedName.isEmpty)
             }
         }
         .padding(20)

@@ -107,21 +107,24 @@ struct SettingsHelpText: View {
     }
 }
 
-struct AccessibleSettingsActionButton: NSViewRepresentable {
+struct AccessibleActionButton: NSViewRepresentable {
     let title: String
     let isDestructive: Bool
     let isEnabled: Bool
+    let keyEquivalent: String
     let action: () -> Void
 
     init(
         _ title: String,
         isDestructive: Bool = false,
         isEnabled: Bool = true,
+        keyEquivalent: String = "",
         action: @escaping () -> Void
     ) {
         self.title = title
         self.isDestructive = isDestructive
         self.isEnabled = isEnabled
+        self.keyEquivalent = keyEquivalent
         self.action = action
     }
 
@@ -148,7 +151,9 @@ struct AccessibleSettingsActionButton: NSViewRepresentable {
         coordinator.action = action
         button.title = title
         button.isEnabled = isEnabled
+        button.keyEquivalent = keyEquivalent
         button.contentTintColor = isDestructive ? .systemRed : nil
+        button.setAccessibilityTitle(title)
         button.setAccessibilityLabel(title)
         button.setAccessibilityRole(.button)
     }

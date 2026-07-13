@@ -44,7 +44,7 @@ struct SettingsAdvancedPane: View {
 
                 HStack {
                     Spacer()
-                    AccessibleSettingsActionButton(
+                    AccessibleActionButton(
                         "Clear Performance Samples",
                         isEnabled: performanceMetrics.hasSamples
                     ) {
@@ -99,7 +99,7 @@ struct SettingsAdvancedPane: View {
     private var storageActions: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
-                AccessibleSettingsActionButton(
+                AccessibleActionButton(
                     "Refresh Stats",
                     isEnabled: !isCacheActionRunning
                 ) {
@@ -116,14 +116,14 @@ struct SettingsAdvancedPane: View {
             }
 
             HStack(spacing: 8) {
-                AccessibleSettingsActionButton(
+                AccessibleActionButton(
                     "Clear Memory Cache",
                     isEnabled: !isCacheActionRunning
                 ) {
                     queueCacheAction(.clearMemory)
                 }
 
-                AccessibleSettingsActionButton(
+                AccessibleActionButton(
                     "Clear Temporary Disk Cache",
                     isEnabled: !isCacheActionRunning
                 ) {
@@ -132,7 +132,7 @@ struct SettingsAdvancedPane: View {
             }
 
             HStack(spacing: 8) {
-                AccessibleSettingsActionButton(
+                AccessibleActionButton(
                     "Clear All Article Cache",
                     isDestructive: true,
                     isEnabled: !isCacheActionRunning
@@ -140,7 +140,7 @@ struct SettingsAdvancedPane: View {
                     queueCacheAction(.clearAllArticleCache)
                 }
 
-                AccessibleSettingsActionButton(
+                AccessibleActionButton(
                     "Reset All App Data",
                     isDestructive: true,
                     isEnabled: !isCacheActionRunning

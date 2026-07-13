@@ -149,7 +149,9 @@ const observations = {
   sidebarActions: {},
   listIcon: {},
   folderIcon: {},
-  labelColor: {}
+  labelColor: {},
+  labelPalette: {},
+  tagSheet: {}
 }
 
 for (const name of ['New List or Folder', 'New Label', 'New Tag']) {
@@ -176,7 +178,25 @@ press(waitForNamed('New Label'))
 const labelColor = waitForNamed('Choose label color')
 observations.labelColor = { name: nameOf(labelColor), value: valueOf(labelColor) }
 assert(observations.labelColor.value.length > 0, 'Label color chooser exposed no selected color value')
+press(labelColor)
+for (const colorName of ['Red', 'Orange', 'Yellow', 'Green', 'Blue', 'Purple', 'Pink', 'Gray']) {
+  const colorButton = waitForNamed(colorName)
+  observations.labelPalette[colorName] = valueOf(colorButton)
+}
+assert(observations.labelPalette.Blue === 'Selected', 'Default Blue label color was not exposed as selected')
+press(waitForNamed('Blue'))
 cancelPresentedSheet('Choose label color')
+
+press(waitForNamed('New Tag'))
+const tagCancel = waitForNamed('Cancel')
+const tagCreate = waitForNamed('Create')
+observations.tagSheet = {
+  cancelRole: (() => { try { return String(tagCancel.role()) } catch (_) { return '' } })(),
+  createEnabled: (() => { try { return Boolean(tagCreate.enabled()) } catch (_) { return true } })()
+}
+assert(observations.tagSheet.createEnabled === false, 'Empty tag name unexpectedly enabled Create')
+press(tagCancel)
+waitUntil(() => elementsNamed('Cancel').length === 0, 'New Tag sheet did not dismiss')
 
 JSON.stringify(observations, null, 2)
 JXA
@@ -190,7 +210,7 @@ JXA
   printf -- '- BuildInfo dirty: `%s`\n' "$TRACE_DIRTY"
   printf -- '- Exact candidate PID: `%s`\n' "$QA_APP_PID"
   printf -- '- Sidebar actions: New List or Folder, New Label, and New Tag expose explicit accessibility names.\n'
-  printf -- '- Creation sheets: list icon, folder icon, and label color choosers expose names plus current values.\n'
+  printf -- '- Creation sheets: list icon, folder icon, label color, all eight palette choices, and tag actions expose native names plus state.\n'
   printf -- '- Mutation policy: every sheet was cancelled; no list, folder, label, or tag was created.\n'
   printf -- '- AX snapshot: `%s`\n' "$SNAPSHOT_PATH"
   printf -- '- Production preferences/data touched: **No** — launch, defaults, persistence, and caches were isolated.\n'
