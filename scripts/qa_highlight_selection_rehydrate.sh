@@ -43,6 +43,10 @@ CREATE_DRIVER_LOG="$OUTPUT_DIR/create-driver.log"
 REHYDRATE_DRIVER_LOG="$OUTPUT_DIR/rehydrate-driver.log"
 DATABASE_SNAPSHOT="$OUTPUT_DIR/highlight-record.json"
 REPORT_PATH="$OUTPUT_DIR/report.md"
+: >"$APP_LOG"
+: >"$RELAUNCH_LOG"
+: >"$CREATE_DRIVER_LOG"
+: >"$REHYDRATE_DRIVER_LOG"
 
 cleanup() {
   qa_stop_exact

@@ -42,6 +42,8 @@ TRACE_DIRTY="$(plutil -extract GitDirty raw "$BUILD_INFO_PLIST")"
 [[ "$TRACE_COMMIT" =~ ^[0-9a-f]{40}$ ]] || { echo "BuildInfo commit is invalid" >&2; exit 1; }
 
 mkdir -p "$OUTPUT_DIR"
+: >"$APP_LOG"
+: >"$DRIVER_LOG"
 qa_prepare_isolated_home
 qa_assert_isolated_path "$STATE_DIR" "$QA_HOME"
 qa_assert_no_conflicting_processes

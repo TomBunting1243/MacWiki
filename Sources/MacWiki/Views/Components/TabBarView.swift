@@ -396,7 +396,7 @@ struct TabBarView: View {
                 )
             },
             onDragEnded: {
-                finalizeDrag(at: index)
+                finalizeDrag()
             }
         )
         .id(tab.id)
@@ -686,24 +686,26 @@ struct TabBarView: View {
     }
     
     /// Finalize the drag operation
-    private func finalizeDrag(at sourceIndex: Int) {
+    private func finalizeDrag() {
+        let sourceIndex = draggedSourceIndex
         let targetIndex = currentTargetIndex
-        
-        // Perform the actual move if needed
-        // Use draggedSourceIndex (set when drag started) rather than sourceIndex parameter,
-        // which may become stale if the ForEach re-renders during the drag gesture.
-        if targetIndex != draggedSourceIndex {
-            performAnimation(interactionProfile.neighborShift) {
-                appState.moveTab(from: draggedSourceIndex, to: targetIndex)
-            }
-        }
-        
-        // Reset drag state after move to avoid visual snap-back jitter
+
+        // End the gesture transaction before changing the ForEach collection order.
+        // Reordering synchronously from onEnded can create a SwiftUI graph cycle because
+        // the row delivering the gesture is replaced while that gesture is unwinding.
         performAnimation(interactionProfile.snapBack) {
             dragOffset = 0
             draggedTabId = nil
             currentTargetIndex = 0
             pendingScrollTabId = nil
+        }
+
+        guard targetIndex != sourceIndex else { return }
+        Task { @MainActor in
+            await Task.yield()
+            performAnimation(interactionProfile.neighborShift) {
+                appState.moveTab(from: sourceIndex, to: targetIndex)
+            }
         }
     }
 
@@ -1003,7 +1005,6 @@ private struct DraggableTabItemView: View {
     @State private var isHovered = false
     @State private var showCloseButton = false
     @State private var saveScheduler = DebouncedActionScheduler()
-    @GestureState private var isDragActive = false
     @AppStorage(MacWikiGlassRuntime.forceLegacyFallbackKey) private var forceLegacyGlassFallback = false
     
     /// The most recently used list (for quick save)
@@ -1379,9 +1380,6 @@ private struct DraggableTabItemView: View {
             minimumDistance: chromeStyle.isCompactChrome ? 1 : interactionProfile.dragStartDistance,
             coordinateSpace: .named("TabBarSpace")
         )
-            .updating($isDragActive) { _, state, _ in
-                state = true
-            }
             .onChanged { value in
                 onDragChanged(value.translation.width, value.location.x)
             }
