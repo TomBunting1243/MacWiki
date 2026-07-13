@@ -65,7 +65,6 @@ struct ListsSidebar: View {
     @State private var showAreaRenameAlert = false
     @State private var pendingAreaDeletion: ListsSidebarAreaDeletionPlan?
     @State private var showAreaDeleteContentsPrompt = false
-    @State private var collectionsSnapshot = ListsSidebarSnapshot.empty
     @State private var saveScheduler = DebouncedActionScheduler()
 
     // Tag management
@@ -119,21 +118,8 @@ struct ListsSidebar: View {
         )
     }
 
-    private var collectionsFingerprint: Int {
-        listsSidebarSnapshotFingerprint(
-            lists: lists,
-            areas: areas,
-            labels: labels,
-            tags: tags,
-            savedArticles: savedArticles,
-            highlights: highlights,
-            articleStates: articleStates,
-            sortOrder: sortOrder
-        )
-    }
-
-    private func refreshCollectionsSnapshot() {
-        collectionsSnapshot = ListsSidebarSnapshot(
+    private var collectionsSnapshot: ListsSidebarSnapshot {
+        ListsSidebarSnapshot(
             lists: lists,
             areas: areas,
             labels: labels,
@@ -318,11 +304,6 @@ struct ListsSidebar: View {
             .onAppear {
                 syncSelectionFromBindings()
                 enforceWikiHopSelectionGuard()
-            }
-            .task(id: collectionsFingerprint) {
-                await Task.yield()
-                guard !Task.isCancelled else { return }
-                refreshCollectionsSnapshot()
             }
     }
 

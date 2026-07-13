@@ -124,8 +124,9 @@ struct BetaReadinessRegressionTests {
         #expect(!functionBody.contains(".onTapGesture"))
         #expect(functionBody.contains(".accessibilityIdentifier(selection.accessibilityIdentifier)"))
         #expect(source.contains("sidebarSectionHeader(\"Explore\")"))
-        #expect(source.contains(".task(id: collectionsFingerprint)"))
-        #expect(source.contains("await Task.yield()"))
+        #expect(source.contains("private var collectionsSnapshot: ListsSidebarSnapshot"))
+        #expect(!source.contains("@State private var collectionsSnapshot"))
+        #expect(!source.contains("private var collectionsFingerprint"))
         #expect(!source.contains(".onChange(of: collectionsFingerprint)"))
     }
 
