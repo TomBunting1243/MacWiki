@@ -48,6 +48,7 @@ struct SettingsAdvancedPane: View {
                         performanceMetrics.clear()
                     }
                     .disabled(!performanceMetrics.hasSamples)
+                    .accessibilityLabel("Clear Performance Samples")
                 }
             }
         }
@@ -103,6 +104,7 @@ struct SettingsAdvancedPane: View {
                     }
                 }
                 .disabled(isCacheActionRunning)
+                .accessibilityLabel("Refresh Stats")
 
                 if isCacheActionRunning {
                     AppLoadingActivityMark(tone: .accent)
@@ -116,11 +118,13 @@ struct SettingsAdvancedPane: View {
                     queueCacheAction(.clearMemory)
                 }
                 .disabled(isCacheActionRunning)
+                .accessibilityLabel("Clear Memory Cache")
 
                 Button("Clear Temporary Disk Cache") {
                     queueCacheAction(.clearTemporaryDisk)
                 }
                 .disabled(isCacheActionRunning)
+                .accessibilityLabel("Clear Temporary Disk Cache")
             }
 
             HStack(spacing: 8) {
@@ -128,11 +132,13 @@ struct SettingsAdvancedPane: View {
                     queueCacheAction(.clearAllArticleCache)
                 }
                 .disabled(isCacheActionRunning)
+                .accessibilityLabel("Clear All Article Cache")
 
                 Button("Reset All App Data", role: .destructive) {
                     queueCacheAction(.resetAllAppData)
                 }
                 .disabled(isCacheActionRunning)
+                .accessibilityLabel("Reset All App Data")
             }
 
             SettingsHelpText("Temporary clear preserves saved, highlighted, and tagged article cache. Full article clear removes pinned cache too. App reset removes local app data and preferences.")

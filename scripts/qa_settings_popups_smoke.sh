@@ -6,16 +6,11 @@ APP_NAME="${APP_NAME:-MacWiki}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 source "$SCRIPT_DIR/lib/qa_process_safety.sh"
-APP_BIN_DEFAULT="$REPO_ROOT/.build/arm64-apple-macosx/debug/MacWiki"
-APP_BIN_FALLBACK="$REPO_ROOT/.build/debug/MacWiki"
-APP_BIN="${APP_BIN:-$APP_BIN_DEFAULT}"
+APP_BIN="${APP_BIN:-}"
 QA_HOME="${QA_HOME:-/tmp/macwiki-qa/settings-popups-home-$(date +%Y%m%d_%H%M%S)-$RANDOM}"
 
-if [[ ! -x "$APP_BIN" && -x "$APP_BIN_FALLBACK" ]]; then
-  APP_BIN="$APP_BIN_FALLBACK"
-fi
-if [[ ! -x "$APP_BIN" ]]; then
-  echo "ERROR: App binary not found: $APP_BIN" >&2
+if [[ -z "$APP_BIN" || ! -x "$APP_BIN" ]]; then
+  echo "ERROR: Set APP_BIN to an executable inside the exact packaged candidate." >&2
   exit 1
 fi
 
@@ -29,7 +24,7 @@ qa_launch_exact_bundle "/tmp/macwiki-qa-settings-popups-launch.log"
 
 echo "Running Settings popups smoke QA..."
 
-APP_NAME="$APP_NAME" APP_PID="$QA_APP_PID" SCRIPT_DIR="$SCRIPT_DIR" qa_run_command_with_timeout 75 osascript -l JavaScript <<'JXA'
+APP_NAME="$APP_NAME" APP_PID="$QA_APP_PID" SCRIPT_DIR="$SCRIPT_DIR" qa_run_command_with_timeout 180 osascript -l JavaScript <<'JXA'
 ObjC.import('stdlib');
 
 const se = Application('System Events');
@@ -435,6 +430,111 @@ function validate(name, result) {
   return true;
 }
 
+function processText() {
+  const values = new Set();
+  for (const window of app.windows()) {
+    const elements = [];
+    collectElements(window, elements);
+    elements.flatMap(elementStrings).forEach(value => values.add(value));
+  }
+  return [...values].join('\n');
+}
+
+function findAdvancedButton(title) {
+  pressSettingsTab('Advanced');
+  let observedButtons = new Set();
+  for (let pass = 0; pass < 12; pass += 1) {
+    const currentWindow = settingsWindow();
+    if (!currentWindow) {
+      delay(0.15);
+      continue;
+    }
+    const elements = [];
+    collectElements(currentWindow, elements);
+    const buttons = elements.filter(element => {
+      let role = '';
+      try { role = String(element.role()); } catch (e) {}
+      return role === 'AXButton';
+    });
+    buttons.flatMap(elementStrings).forEach(value => observedButtons.add(value));
+    const button = buttons.find(element => elementStrings(element).includes(title));
+    if (button) return button;
+
+    const scrollAreas = elements.filter(element => {
+      try { return String(element.role()) === 'AXScrollArea'; } catch (e) { return false; }
+    }).sort((lhs, rhs) => {
+      try {
+        const leftSize = lhs.size();
+        const rightSize = rhs.size();
+        return Number(rightSize[0]) * Number(rightSize[1]) - Number(leftSize[0]) * Number(leftSize[1]);
+      } catch (e) { return 0; }
+    });
+    const scrollArea = scrollAreas[0] || null;
+    const verticalScrollBar = elements.find(element => {
+      try {
+        if (String(element.role()) !== 'AXScrollBar') return false;
+        const size = element.size();
+        return Number(size[1]) > Number(size[0]);
+      } catch (e) { return false; }
+    });
+    let scrolled = false;
+    if (verticalScrollBar) {
+      try {
+        verticalScrollBar.value = 1;
+        scrolled = true;
+      } catch (e) {}
+    }
+    if (scrollArea) {
+      try {
+        scrollArea.actions.byName('AXScrollDownByPage').perform();
+        scrolled = true;
+      } catch (e) {}
+      // SwiftUI may report a successful AX scroll action without moving its
+      // lazily exposed content. A real pointer scroll keeps this deterministic.
+      scrolled = cgScrollArea(scrollArea, -8) || scrolled;
+    }
+    if (!scrolled) se.keyCode(121);
+    delay(0.25);
+  }
+  throw new Error(`Advanced action button not found: ${title}; observed buttons: ${[...observedButtons].join(' | ')}`);
+}
+
+function verifyDestructiveCancel(buttonTitle, confirmationTitle, requiredMessage, destructiveLabel) {
+  const button = findAdvancedButton(buttonTitle);
+  button.actions.byName('AXPress').perform();
+
+  let alertText = '';
+  const deadline = Date.now() + 6000;
+  while (Date.now() < deadline) {
+    alertText = processText();
+    if (
+      alertText.includes(confirmationTitle) &&
+      alertText.includes(requiredMessage) &&
+      alertText.includes('Cancel') &&
+      alertText.includes(destructiveLabel)
+    ) break;
+    delay(0.1);
+  }
+  if (
+    !alertText.includes(confirmationTitle) ||
+    !alertText.includes(requiredMessage) ||
+    !alertText.includes('Cancel') ||
+    !alertText.includes(destructiveLabel)
+  ) {
+    throw new Error(`Incomplete confirmation semantics for ${buttonTitle}: ${alertText}`);
+  }
+
+  se.keyCode(53); // Escape must choose the safe cancel path.
+  for (let attempt = 0; attempt < 40; attempt += 1) {
+    delay(0.1);
+    if (!processText().includes(confirmationTitle)) {
+      console.log(`Confirmation ${confirmationTitle}: complete semantics and Escape cancellation PASS`);
+      return;
+    }
+  }
+  throw new Error(`Escape did not dismiss ${confirmationTitle}`);
+}
+
 let ok = true;
 popups.forEach((popup, index) => {
   ok = validate(popupName(popup, index), togglePopupAndRestore(popup, index)) && ok;
@@ -444,5 +544,18 @@ if (!ok) {
   throw new Error('settings popup smoke failed');
 }
 
-console.log(`PASS: ${paneContracts.length} Settings panes exposed expected semantics; ${sliders.length} native sliders exposed labels/values and ${popups.length} popup controls changed/restored.`);
+verifyDestructiveCancel(
+  'Clear All Article Cache',
+  'Clear All Article Cache?',
+  'including pinned saved/highlighted/tagged entries',
+  'Clear'
+);
+verifyDestructiveCancel(
+  'Reset All App Data',
+  'Reset All App Data?',
+  'This action cannot be undone.',
+  'Reset'
+);
+
+console.log(`PASS: ${paneContracts.length} Settings panes exposed expected semantics; ${sliders.length} native sliders exposed labels/values; ${popups.length} popup controls changed/restored; both destructive confirmations exposed complete semantics and cancelled with Escape.`);
 JXA
