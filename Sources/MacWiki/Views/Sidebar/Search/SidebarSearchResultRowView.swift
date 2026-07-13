@@ -52,6 +52,7 @@ struct SidebarSearchResultRowView: View {
             onToggleRead: {
                 onToggleRead(row)
             },
+            usesDefaultAccessibilitySemantics: false,
             onTap: {
                 onOpenRow(row, SystemBridge.isCommandPressed)
             }
@@ -69,35 +70,65 @@ struct SidebarSearchResultRowView: View {
                 onTagClick: onTagClick
             )
         }
+        .accessibilityRepresentation {
+            VStack {
+                Button {
+                    onOpenRow(row, SystemBridge.isCommandPressed)
+                } label: {
+                    Text(row.article.title)
+                }
+                .accessibilityLabel(row.article.title)
+                .accessibilityInputLabels([row.article.title])
+                .accessibilityValue(row.article.title)
+                .accessibilityHint("Open \(row.article.title). Use the context menu for read status and organization actions.")
+                .accessibilityIdentifier("article-row.\(row.id).open")
+                .contextMenu {
+                    articleContextMenu
+                }
+
+                Button {
+                    onToggleRead(row)
+                } label: {
+                    Text(row.isRead ? "Mark as unread" : "Mark as read")
+                }
+                .accessibilityLabel(row.isRead ? "Mark as unread" : "Mark as read")
+                .accessibilityIdentifier("article-row.\(row.id).read")
+                .help(row.isRead ? "Mark as unread" : "Mark as read")
+            }
+        }
         .contextMenu {
-            ArticleContextMenuContent(
-                article: row.article,
-                isRead: row.isRead,
-                currentTags: row.tags,
-                allLabels: allLabels,
-                allTags: allTags,
-                allLists: allLists,
-                modelContext: modelContext,
-                appState: appState,
-                onNewLabel: { savedArticle in
-                    appState.requestNewArticleLabel(for: savedArticle)
-                },
-                onNewTag: { article in
-                    appState.requestNewArticleTag(for: article)
-                },
-                onOpen: {
-                    onOpenRow(row, false)
-                },
-                onOpenInNewTab: {
-                    onOpenRow(row, true)
-                },
-                onShowPageViews: onShowPageViews
-            )
+            articleContextMenu
         }
         .draggable(dragPayload) {
             SwiftUI.Label(row.article.title, systemImage: "doc.text")
                 .padding(8)
                 .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
         }
+    }
+
+    private var articleContextMenu: some View {
+        ArticleContextMenuContent(
+            article: row.article,
+            isRead: row.isRead,
+            currentTags: row.tags,
+            allLabels: allLabels,
+            allTags: allTags,
+            allLists: allLists,
+            modelContext: modelContext,
+            appState: appState,
+            onNewLabel: { savedArticle in
+                appState.requestNewArticleLabel(for: savedArticle)
+            },
+            onNewTag: { article in
+                appState.requestNewArticleTag(for: article)
+            },
+            onOpen: {
+                onOpenRow(row, false)
+            },
+            onOpenInNewTab: {
+                onOpenRow(row, true)
+            },
+            onShowPageViews: onShowPageViews
+        )
     }
 }

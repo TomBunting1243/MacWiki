@@ -139,9 +139,19 @@ private func row(titled title: String, in application: AXUIElement) -> (AXUIElem
     articleRows(in: application).first { $0.1.title == title }
 }
 
-private func readStateButton(in row: AXUIElement, help: String) -> AXUIElement? {
-    elements(in: row).first { element in
+private func readStateButton(
+    for row: AXUIElement,
+    in application: AXUIElement,
+    help: String
+) -> AXUIElement? {
+    let rowIdentifier = stringAttribute(kAXIdentifierAttribute as CFString, from: row)
+    let readIdentifier = rowIdentifier.hasSuffix(".open")
+        ? String(rowIdentifier.dropLast(".open".count)) + ".read"
+        : ""
+
+    return elements(in: application).first { element in
         stringAttribute(kAXRoleAttribute as CFString, from: element) == kAXButtonRole as String &&
+            (readIdentifier.isEmpty || stringAttribute(kAXIdentifierAttribute as CFString, from: element) == readIdentifier) &&
             stringAttribute(kAXHelpAttribute as CFString, from: element) == help
     }
 }
@@ -221,13 +231,13 @@ do {
 
     let targetTitle = initialRows.first(where: { $0.1.title == query })?.1.title ?? initialRows[0].1.title
     guard let unreadTarget = row(titled: targetTitle, in: application),
-          let markRead = readStateButton(in: unreadTarget.0, help: "Mark as read") else {
+          let markRead = readStateButton(for: unreadTarget.0, in: application, help: "Mark as read") else {
         throw VerificationError.missing("The target row omitted its independent Mark as read button.")
     }
     try perform(kAXPressAction as String, on: markRead, description: "Mark target article as read")
     guard wait(condition: {
         guard let updated = row(titled: targetTitle, in: application) else { return false }
-        return readStateButton(in: updated.0, help: "Mark as unread") != nil
+        return readStateButton(for: updated.0, in: application, help: "Mark as unread") != nil
     }) else {
         throw VerificationError.missing("The target row did not expose its inverse Mark as unread button.")
     }
@@ -285,13 +295,13 @@ do {
     recordRuntimeDiagnostics("secondary window closed")
 
     guard let readTarget = row(titled: targetTitle, in: application),
-          let markUnread = readStateButton(in: readTarget.0, help: "Mark as unread") else {
+          let markUnread = readStateButton(for: readTarget.0, in: application, help: "Mark as unread") else {
         throw VerificationError.missing("The restored main-window row omitted Mark as unread.")
     }
     try perform(kAXPressAction as String, on: markUnread, description: "Restore target article to unread")
     guard wait(condition: {
         guard let restored = row(titled: targetTitle, in: application) else { return false }
-        return readStateButton(in: restored.0, help: "Mark as read") != nil
+        return readStateButton(for: restored.0, in: application, help: "Mark as read") != nil
     }) else {
         throw VerificationError.missing("The target row did not restore its Mark as read button.")
     }

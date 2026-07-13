@@ -51,14 +51,13 @@ struct BetaReadinessRegressionTests {
 
     @Test func articleListRowsExposeArticleIdentityAndIndependentReadAction() throws {
         let rowSource = try source("Sources/MacWiki/Views/Sidebar/Directory/ArticleListAccessibility.swift")
-        #expect(!rowSource.contains(".accessibilityElement(children: .contain)"))
-        #expect(rowSource.contains(".background {"))
-        #expect(rowSource.contains("Button(action: onOpen)"))
+        #expect(rowSource.contains(".accessibilityElement(children: .contain)"))
+        #expect(rowSource.contains("let isEnabled: Bool"))
         #expect(rowSource.contains(".accessibilityInputLabels([title])"))
         #expect(rowSource.contains(".accessibilityValue(title)"))
         #expect(rowSource.contains("Use the context menu for read status and organization actions."))
-        #expect(!rowSource.contains(".accessibilityAddTraits(.isButton)"))
-        #expect(!rowSource.contains(".accessibilityAction {"))
+        #expect(rowSource.contains(".accessibilityAddTraits(.isButton)"))
+        #expect(rowSource.contains(".accessibilityAction {"))
         #expect(!rowSource.contains("accessibilityRepresentation"))
 
         let contextMenuSource = try source("Sources/MacWiki/Views/Components/ArticleContextMenuContent.swift")
@@ -69,6 +68,12 @@ struct BetaReadinessRegressionTests {
         #expect(itemSource.contains(".onTapGesture(perform: onTap)"))
         #expect(itemSource.contains(".accessibilityLabel(isRead ? \"Mark as unread\" : \"Mark as read\")"))
         #expect(!itemSource.contains("Button(action: onTap)"))
+
+        let searchRowSource = try source("Sources/MacWiki/Views/Sidebar/Search/SidebarSearchResultRowView.swift")
+        #expect(searchRowSource.contains("usesDefaultAccessibilitySemantics: false"))
+        #expect(searchRowSource.contains(".accessibilityRepresentation {"))
+        #expect(searchRowSource.contains(".accessibilityIdentifier(\"article-row.\\(row.id).open\")"))
+        #expect(searchRowSource.contains(".accessibilityIdentifier(\"article-row.\\(row.id).read\")"))
 
         let progressSource = try source("Sources/MacWiki/Views/Components/ReadProgressIndicator.swift")
         #expect(progressSource.contains("PieSlice(progress: fillProgress)"))
@@ -94,7 +99,7 @@ struct BetaReadinessRegressionTests {
         #expect(harness.contains("ATTRIBUTEGRAPH_CYCLE_COUNT"))
 
         let runner = try source("scripts/ax_article_row_secondary_window.swift")
-        #expect(runner.contains("readStateButton(in: updated.0, help: \"Mark as unread\")"))
+        #expect(runner.contains("readStateButton(for: updated.0, in: application, help: \"Mark as unread\")"))
         #expect(runner.contains("menuItem(titled: \"Open in New Window\""))
         #expect(runner.contains("windows(in: application).count == 2"))
         #expect(runner.contains("runtimeDiagnosticCheckpoints"))
