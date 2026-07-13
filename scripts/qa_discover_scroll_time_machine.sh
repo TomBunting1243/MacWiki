@@ -219,8 +219,8 @@ for (let pass = 0; pass < 6; pass += 1) {
     }
   }
   const text = [...observed].join('\n');
-  discoverVisible = /Current events and historical anniversaries|Discover date|Loading discover feed|Discover unavailable|Featured Article|News Briefing|In the News|Most Read|This Day in History/i.test(text);
   timeMachineVisible = /Time Machine|Born on This Day|Died on This Day|Holidays & Observances/i.test(text);
+  discoverVisible = timeMachineVisible || /Current events and historical anniversaries|Discover date|Loading discover feed|Discover unavailable|Featured Article|News Briefing|In the News|Most Read|This Day in History/i.test(text);
   if (discoverVisible && timeMachineVisible) break;
 
   let scrolled = false;
