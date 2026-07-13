@@ -107,6 +107,66 @@ struct SettingsHelpText: View {
     }
 }
 
+struct AccessibleSettingsActionButton: NSViewRepresentable {
+    let title: String
+    let isDestructive: Bool
+    let isEnabled: Bool
+    let action: () -> Void
+
+    init(
+        _ title: String,
+        isDestructive: Bool = false,
+        isEnabled: Bool = true,
+        action: @escaping () -> Void
+    ) {
+        self.title = title
+        self.isDestructive = isDestructive
+        self.isEnabled = isEnabled
+        self.action = action
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(action: action)
+    }
+
+    func makeNSView(context: Context) -> NSButton {
+        let button = NSButton(
+            title: title,
+            target: context.coordinator,
+            action: #selector(Coordinator.performAction)
+        )
+        button.bezelStyle = .rounded
+        configure(button, coordinator: context.coordinator)
+        return button
+    }
+
+    func updateNSView(_ button: NSButton, context: Context) {
+        configure(button, coordinator: context.coordinator)
+    }
+
+    private func configure(_ button: NSButton, coordinator: Coordinator) {
+        coordinator.action = action
+        button.title = title
+        button.isEnabled = isEnabled
+        button.contentTintColor = isDestructive ? .systemRed : nil
+        button.setAccessibilityLabel(title)
+        button.setAccessibilityRole(.button)
+    }
+
+    @MainActor
+    final class Coordinator: NSObject {
+        var action: () -> Void
+
+        init(action: @escaping () -> Void) {
+            self.action = action
+        }
+
+        @objc func performAction() {
+            action()
+        }
+    }
+}
+
 struct SettingsSliderRow: View {
     let title: String
     @Binding var value: Double

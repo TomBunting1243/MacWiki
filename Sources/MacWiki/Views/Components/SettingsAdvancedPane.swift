@@ -44,11 +44,12 @@ struct SettingsAdvancedPane: View {
 
                 HStack {
                     Spacer()
-                    Button("Clear Performance Samples") {
+                    AccessibleSettingsActionButton(
+                        "Clear Performance Samples",
+                        isEnabled: performanceMetrics.hasSamples
+                    ) {
                         performanceMetrics.clear()
                     }
-                    .disabled(!performanceMetrics.hasSamples)
-                    .accessibilityLabel("Clear Performance Samples")
                 }
             }
         }
@@ -98,13 +99,14 @@ struct SettingsAdvancedPane: View {
     private var storageActions: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
-                Button("Refresh Stats") {
+                AccessibleSettingsActionButton(
+                    "Refresh Stats",
+                    isEnabled: !isCacheActionRunning
+                ) {
                     Task {
                         await refreshCacheMetrics()
                     }
                 }
-                .disabled(isCacheActionRunning)
-                .accessibilityLabel("Refresh Stats")
 
                 if isCacheActionRunning {
                     AppLoadingActivityMark(tone: .accent)
@@ -114,31 +116,37 @@ struct SettingsAdvancedPane: View {
             }
 
             HStack(spacing: 8) {
-                Button("Clear Memory Cache") {
+                AccessibleSettingsActionButton(
+                    "Clear Memory Cache",
+                    isEnabled: !isCacheActionRunning
+                ) {
                     queueCacheAction(.clearMemory)
                 }
-                .disabled(isCacheActionRunning)
-                .accessibilityLabel("Clear Memory Cache")
 
-                Button("Clear Temporary Disk Cache") {
+                AccessibleSettingsActionButton(
+                    "Clear Temporary Disk Cache",
+                    isEnabled: !isCacheActionRunning
+                ) {
                     queueCacheAction(.clearTemporaryDisk)
                 }
-                .disabled(isCacheActionRunning)
-                .accessibilityLabel("Clear Temporary Disk Cache")
             }
 
             HStack(spacing: 8) {
-                Button("Clear All Article Cache", role: .destructive) {
+                AccessibleSettingsActionButton(
+                    "Clear All Article Cache",
+                    isDestructive: true,
+                    isEnabled: !isCacheActionRunning
+                ) {
                     queueCacheAction(.clearAllArticleCache)
                 }
-                .disabled(isCacheActionRunning)
-                .accessibilityLabel("Clear All Article Cache")
 
-                Button("Reset All App Data", role: .destructive) {
+                AccessibleSettingsActionButton(
+                    "Reset All App Data",
+                    isDestructive: true,
+                    isEnabled: !isCacheActionRunning
+                ) {
                     queueCacheAction(.resetAllAppData)
                 }
-                .disabled(isCacheActionRunning)
-                .accessibilityLabel("Reset All App Data")
             }
 
             SettingsHelpText("Temporary clear preserves saved, highlighted, and tagged article cache. Full article clear removes pinned cache too. App reset removes local app data and preferences.")

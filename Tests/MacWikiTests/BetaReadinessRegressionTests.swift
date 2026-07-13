@@ -537,6 +537,7 @@ struct BetaReadinessRegressionTests {
     @Test func settingsPopupQAHonorsConfiguredAppName() throws {
         let settingsQAScript = try source("scripts/qa_settings_popups_smoke.sh")
         let advancedSettingsSource = try source("Sources/MacWiki/Views/Components/SettingsAdvancedPane.swift")
+        let settingsControlsSource = try source("Sources/MacWiki/Views/Components/SettingsControls.swift")
 
         #expect(settingsQAScript.contains("APP_NAME=\"${APP_NAME:-MacWiki}\""))
         #expect(settingsQAScript.contains("ObjC.import('stdlib')"))
@@ -555,8 +556,11 @@ struct BetaReadinessRegressionTests {
         #expect(settingsQAScript.contains("'Clear All Article Cache?'"))
         #expect(settingsQAScript.contains("'Reset All App Data?'"))
         #expect(settingsQAScript.contains("se.keyCode(53); // Escape must choose the safe cancel path."))
-        #expect(advancedSettingsSource.contains(".accessibilityLabel(\"Clear All Article Cache\")"))
-        #expect(advancedSettingsSource.contains(".accessibilityLabel(\"Reset All App Data\")"))
+        #expect(advancedSettingsSource.contains("AccessibleSettingsActionButton("))
+        #expect(advancedSettingsSource.contains("\"Clear All Article Cache\","))
+        #expect(advancedSettingsSource.contains("\"Reset All App Data\","))
+        #expect(settingsControlsSource.contains("button.setAccessibilityLabel(title)"))
+        #expect(settingsControlsSource.contains("button.setAccessibilityRole(.button)"))
         #expect(!settingsQAScript.contains("const appName = 'MacWiki';"))
         #expect(!settingsQAScript.contains("se.processes.byName(appName)"))
         #expect(!settingsQAScript.contains("Search Presentation"))
