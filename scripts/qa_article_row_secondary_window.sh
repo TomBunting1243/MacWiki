@@ -74,7 +74,7 @@ rg -n 'AttributeGraph: cycle detected' "$APP_LOG" >"$OUTPUT_DIR/attributegraph-c
   printf -- '- Search query: `%s`\n' "$SEARCH_QUERY"
   printf -- '- Row assertions: ten title-bearing semantic buttons with press and native context-menu actions\n'
   printf -- '- Mutation assertion: unread to read to unread through an independent native row button, with the inverse action exposed after each change\n'
-  printf -- '- Secondary-window assertions: selected article plus Metadata, Contents, Find in Page, inspector controls\n'
+  printf -- '- Secondary-window assertions: selected article, Metadata and Contents, inspector Info/Notes/References, main-window preservation\n'
   printf -- '- Runtime failures: no fatal, assertion, or precondition messages\n'
   printf -- '- AttributeGraph cycle advisories: `%s` (captured separately; the complete AX journey remained functional)\n' "$ATTRIBUTEGRAPH_CYCLE_COUNT"
   printf -- '- AX evidence: `%s`\n' "$AX_RESULT"
