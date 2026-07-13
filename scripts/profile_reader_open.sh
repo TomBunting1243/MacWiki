@@ -329,16 +329,31 @@ drive_scroll_input() {
   local delay="$3"
   (
     sleep "$delay"
-    osascript - "$APP_NAME" >/dev/null 2>&1 <<'APPLESCRIPT' || true
+    exact_pid=""
+    for _ in $(seq 1 80); do
+      candidate_pids="$(qa_exact_binary_pids)"
+      pid_count="$(printf '%s\n' "$candidate_pids" | awk 'NF { count += 1 } END { print count + 0 }')"
+      if [[ "$pid_count" -eq 1 ]]; then
+        exact_pid="$candidate_pids"
+        break
+      fi
+      sleep 0.1
+    done
+    [[ -n "$exact_pid" ]] || exit 0
+
+    osascript - "$exact_pid" <<'APPLESCRIPT' || exit 0
 on run argv
-  tell application (item 1 of argv) to activate
+  set targetPID to item 1 of argv as integer
+  tell application "System Events"
+    set frontmost of first process whose unix id is targetPID to true
+  end tell
 end run
 APPLESCRIPT
     for ((i = 0; i < pulses; i++)); do
-      osascript -e 'tell application "System Events" to key code 49' >/dev/null 2>&1 || true
+      osascript -e 'tell application "System Events" to key code 49' || true
       sleep "$interval"
     done
-  ) &
+  ) >/dev/null 2>&1 &
   echo $!
 }
 
@@ -359,11 +374,15 @@ run_trace_capture() {
 
   rm -rf "$trace_path"
   set +e
-  xcrun xctrace record \
+  qa_run_command_with_timeout "$((trace_seconds + 30))" xcrun xctrace record \
     --template 'Time Profiler' \
     --time-limit "${trace_seconds}s" \
     --output "$trace_path" \
-    --launch -- /usr/bin/env "CFFIXED_USER_HOME=$QA_HOME" "$APP_BINARY" >"$trace_log" 2>&1
+    --launch -- /usr/bin/env \
+      "HOME=$QA_HOME" \
+      "CFFIXED_USER_HOME=$QA_HOME" \
+      "MACWIKI_QA_DEFAULTS_SUITE=$QA_DEFAULTS_SUITE" \
+      "$APP_BINARY" >"$trace_log" 2>&1
   local trace_status=$?
   set -e
   if [[ "$trace_status" -ne 0 && ! -d "$trace_path" ]]; then
@@ -384,7 +403,7 @@ run_trace_capture() {
   fi
 
   if [[ -d "$trace_path" ]]; then
-    if ! xcrun xctrace export \
+    if ! qa_run_command_with_timeout 90 xcrun xctrace export \
       --input "$trace_path" \
       --xpath '/trace-toc/run[@number="1"]/data/table[@schema="time-profile"]' \
       >"$trace_xml" 2>"$log_dir/${label}_trace_export.log"; then

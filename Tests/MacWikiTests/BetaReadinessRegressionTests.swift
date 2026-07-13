@@ -1294,6 +1294,7 @@ struct BetaReadinessRegressionTests {
     @Test func internalBetaPerformanceBudgetsAreExplicitAndEnforced() throws {
         let budgets = try source("INTERNAL_BETA_PERFORMANCE_BUDGETS.json")
         let verifier = try source("scripts/verify_performance_budgets.py")
+        let readerProfiler = try source("scripts/profile_reader_open.sh")
 
         #expect(budgets.contains("readerColdReveal"))
         #expect(budgets.contains("readerWarmReveal"))
@@ -1305,6 +1306,11 @@ struct BetaReadinessRegressionTests {
         #expect(verifier.contains("minimumSamples"))
         #expect(verifier.contains("measured <= maximum"))
         #expect(verifier.contains("Overall: **{'FAIL' if failures else 'PASS'}**"))
+        #expect(readerProfiler.contains("qa_run_command_with_timeout \"$((trace_seconds + 30))\" xcrun xctrace record"))
+        #expect(readerProfiler.contains("qa_run_command_with_timeout 90 xcrun xctrace export"))
+        #expect(readerProfiler.contains("MACWIKI_QA_DEFAULTS_SUITE=$QA_DEFAULTS_SUITE"))
+        #expect(readerProfiler.contains("candidate_pids=\"$(qa_exact_binary_pids)\""))
+        #expect(!readerProfiler.contains("tell application (item 1 of argv) to activate"))
     }
 
     @Test func tabNavigationHarnessUsesNativeCommandsAndExactAXState() throws {
