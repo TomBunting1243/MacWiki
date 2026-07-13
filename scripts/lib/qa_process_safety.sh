@@ -52,7 +52,11 @@ qa_run_command_with_timeout() {
   shift
   local input_path
   input_path="$(mktemp "${TMPDIR:-/tmp}/macwiki-qa-command-input.XXXXXX")"
-  cat >"$input_path"
+  if [[ -t 0 ]]; then
+    : >"$input_path"
+  else
+    cat >"$input_path"
+  fi
   "$@" <"$input_path" &
   local command_pid=$!
   local elapsed_ticks=0

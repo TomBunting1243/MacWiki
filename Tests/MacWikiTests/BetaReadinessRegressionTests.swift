@@ -996,6 +996,8 @@ struct BetaReadinessRegressionTests {
         #expect(safetyLibrary.contains("qa_launch_exact_bundle()"))
         #expect(safetyLibrary.contains("qa_launch_candidate()"))
         #expect(safetyLibrary.contains("qa_run_command_with_timeout()"))
+        #expect(safetyLibrary.contains("if [[ -t 0 ]]; then"))
+        #expect(safetyLibrary.contains(": >\"$input_path\""))
         #expect(safetyLibrary.contains("cat >\"$input_path\""))
         #expect(safetyLibrary.contains("\"$@\" <\"$input_path\" &"))
         #expect(safetyLibrary.contains("--env \"HOME=$QA_HOME\""))
