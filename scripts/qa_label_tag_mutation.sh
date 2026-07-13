@@ -224,6 +224,31 @@ if [[ "${qa_status:-0}" != "0" ]]; then
       "SELECT 'label' AS kind, ZNAME AS name FROM ZLABEL UNION ALL SELECT 'tag', ZNAME FROM ZTAG;" \
       >"$OUTPUT_DIR/failed-store-collections.tsv" 2>/dev/null || true
   fi
+  APP_PID="$QA_APP_PID" osascript -l JavaScript >"$OUTPUT_DIR/failed-sidebar-elements.tsv" <<'JXA_DIAGNOSTIC' || true
+ObjC.import('stdlib')
+const pid = Number(ObjC.unwrap($.getenv('APP_PID')))
+const se = Application('System Events')
+const matches = se.processes.whose({ unixId: pid })()
+if (matches.length !== 1) throw new Error('Exact process missing')
+function safe(getter, fallback = '') { try { return getter() } catch (_) { return fallback } }
+function descendants(element, depth = 0) {
+  if (depth >= 14) return []
+  const children = safe(() => element.uiElements(), [])
+  return children.flatMap(child => [child, ...descendants(child, depth + 1)])
+}
+const rows = []
+for (const window of matches[0].windows()) {
+  for (const element of [window, ...descendants(window)]) {
+    const identifier = String(safe(() => element.attributes.byName('AXIdentifier').value()))
+    const name = String(safe(() => element.name()))
+    const role = String(safe(() => element.role()))
+    if (identifier.includes('sidebar-row-label') || identifier.includes('sidebar-row-tag') || name.includes('QA ')) {
+      rows.push([role, identifier, name].join('\t'))
+    }
+  }
+}
+rows.join('\n')
+JXA_DIAGNOSTIC
   echo "Label/tag mutation accessibility driver failed; diagnostic store inventory preserved." >&2
   exit "${qa_status:-1}"
 fi

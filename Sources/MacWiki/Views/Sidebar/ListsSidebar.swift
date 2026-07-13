@@ -562,6 +562,7 @@ struct ListsSidebar: View {
         case .root(let selection):
             sidebarSelectableRow(
                 selection: .root(selection),
+                accessibilityLabel: rootTitle(for: selection),
                 isSelected: sidebarSelectionSet.contains(.root(selection))
             ) {
                 rootRowLabel(rootTitle(for: selection), systemImage: rootSystemImage(for: selection))
@@ -571,6 +572,7 @@ struct ListsSidebar: View {
         case .label(let label):
             sidebarSelectableRow(
                 selection: .label(label.id),
+                accessibilityLabel: label.name,
                 isSelected: sidebarSelectionSet.contains(.label(label.id))
             ) {
                 LabelRowView(
@@ -591,6 +593,7 @@ struct ListsSidebar: View {
         case .tag(let tag):
             sidebarSelectableRow(
                 selection: .tag(tag.id),
+                accessibilityLabel: tag.name,
                 isSelected: sidebarSelectionSet.contains(.tag(tag.id))
             ) {
                 TagRowView(
@@ -645,6 +648,7 @@ struct ListsSidebar: View {
     private var sidebarSearchButton: some View {
         sidebarSelectableRow(
             selection: .search,
+            accessibilityLabel: "Search",
             isSelected: sidebarSelectionSet.contains(.search),
             isDisabled: appState.isWikiHopNavigationLocked
         ) {
@@ -654,6 +658,7 @@ struct ListsSidebar: View {
 
     private func sidebarSelectableRow<Content: View>(
         selection: SidebarSelectionID,
+        accessibilityLabel: String,
         isSelected: Bool = false,
         isDisabled: Bool = false,
         @ViewBuilder label: () -> Content
@@ -670,6 +675,7 @@ struct ListsSidebar: View {
         .tag(selection)
         .disabled(isDisabled)
         .accessibilityElement(children: .combine)
+        .accessibilityLabel(accessibilityLabel)
         .accessibilityValue(isSelected ? "Selected" : "")
         .accessibilityIdentifier(selection.accessibilityIdentifier)
         .listRowInsets(EdgeInsets())
@@ -905,6 +911,7 @@ struct ListsSidebar: View {
     private func listRow(for list: ReadingList) -> some View {
         sidebarSelectableRow(
             selection: .list(list.id),
+            accessibilityLabel: list.name,
             isSelected: sidebarSelectionSet.contains(.list(list.id))
         ) {
             ListRowView(

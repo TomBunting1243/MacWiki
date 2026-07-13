@@ -122,7 +122,12 @@ struct BetaReadinessRegressionTests {
 
         #expect(functionBody.contains("Button {"))
         #expect(!functionBody.contains(".onTapGesture"))
+        #expect(functionBody.contains("accessibilityLabel: String"))
+        #expect(functionBody.contains(".accessibilityLabel(accessibilityLabel)"))
         #expect(functionBody.contains(".accessibilityIdentifier(selection.accessibilityIdentifier)"))
+        #expect(source.contains("accessibilityLabel: label.name"))
+        #expect(source.contains("accessibilityLabel: tag.name"))
+        #expect(source.contains("accessibilityLabel: list.name"))
         #expect(source.contains("sidebarSectionHeader(\"Explore\")"))
         #expect(source.contains("private var collectionsSnapshot: ListsSidebarSnapshot"))
         #expect(!source.contains("@State private var collectionsSnapshot"))
