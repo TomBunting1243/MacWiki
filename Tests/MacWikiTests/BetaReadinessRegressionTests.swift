@@ -154,6 +154,10 @@ struct BetaReadinessRegressionTests {
         #expect(saveToList.contains(".accessibilityValue(isSaved ? \"Saved\" : \"Not saved\")"))
         #expect(sidebar.contains(".accessibilityLabel(help)"))
         #expect(sidebar.contains(".accessibilityLabel(\"New List or Folder\")"))
+        #expect(sidebar.contains("title: \"New Label\""))
+        #expect(sidebar.contains("identifier: \"sidebar-new-label-empty\""))
+        #expect(sidebar.contains("title: \"New Tag\""))
+        #expect(sidebar.contains("identifier: \"sidebar-new-tag-empty\""))
     }
 
     @Test func iconOnlyReaderAndFilterControlsExposeState() throws {

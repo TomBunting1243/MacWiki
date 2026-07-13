@@ -90,7 +90,10 @@ function valueOf(element) {
 }
 
 function elementsNamed(name) {
-  return allElements().filter(element => nameOf(element) === name)
+  return allElements().filter(element => {
+    const observedName = nameOf(element)
+    return observedName === name || observedName.endsWith(`, ${name}`)
+  })
 }
 
 function waitForNamed(name) {

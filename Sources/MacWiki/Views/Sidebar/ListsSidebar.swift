@@ -451,7 +451,14 @@ struct ListsSidebar: View {
             }
         case .labels:
             Section {
-                if !section.nodes.isEmpty {
+                if section.nodes.isEmpty {
+                    sidebarEmptyCollectionAction(
+                        title: "New Label",
+                        systemImage: "plus.circle",
+                        identifier: "sidebar-new-label-empty",
+                        action: onAddNewLabel
+                    )
+                } else {
                     ForEach(section.nodes) { node in
                         sidebarNodeView(node)
                     }
@@ -467,7 +474,14 @@ struct ListsSidebar: View {
             }
         case .tags:
             Section {
-                if !section.nodes.isEmpty {
+                if section.nodes.isEmpty {
+                    sidebarEmptyCollectionAction(
+                        title: "New Tag",
+                        systemImage: "plus.circle",
+                        identifier: "sidebar-new-tag-empty",
+                        action: { showNewTagSheet = true }
+                    )
+                } else {
                     ForEach(section.nodes) { node in
                         sidebarNodeView(node)
                     }
@@ -506,6 +520,21 @@ struct ListsSidebar: View {
         .buttonStyle(.plain)
         .help(help)
         .accessibilityLabel(help)
+    }
+
+    private func sidebarEmptyCollectionAction(
+        title: String,
+        systemImage: String,
+        identifier: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            SwiftUI.Label(title, systemImage: systemImage)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier(identifier)
     }
 
     private var sidebarLibraryMenu: some View {
