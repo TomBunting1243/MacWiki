@@ -229,6 +229,11 @@ private func chooseMenuItem(_ element: AXUIElement, label: String) throws {
     }
 }
 
+private func postKey(_ virtualKey: CGKeyCode) {
+    CGEvent(keyboardEventSource: nil, virtualKey: virtualKey, keyDown: true)?.post(tap: .cghidEventTap)
+    CGEvent(keyboardEventSource: nil, virtualKey: virtualKey, keyDown: false)?.post(tap: .cghidEventTap)
+}
+
 do {
     guard CommandLine.arguments.count == 4,
           let pid = pid_t(CommandLine.arguments[1]) else {
@@ -290,6 +295,8 @@ do {
         failure: "Highlight context menu omitted the Blue color action."
     )
     try chooseMenuItem(blue, label: "Blue")
+    postKey(53)
+    Thread.sleep(forTimeInterval: 0.3)
     trace("highlight color changed to Blue")
 
     try performNamedAction(
