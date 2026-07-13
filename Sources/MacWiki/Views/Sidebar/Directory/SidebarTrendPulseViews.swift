@@ -15,22 +15,17 @@ struct TrendPulsePopoverView: View {
         static let chartEdgePadding: CGFloat = 10
         static let popoverWidth: CGFloat = 372
     }
-    private struct TrendPoint: Identifiable {
-        let id: Int
-        let date: Date
-        let views: Int
-    }
-    private var fullPoints: [TrendPoint] {
+    private var fullPoints: [TrendPulsePoint] {
         let calendar = Calendar.current
         return pulse.points.enumerated().map { index, views in
             let date = calendar.date(byAdding: .day, value: index, to: pulse.windowStart) ?? pulse.windowStart
-            return TrendPoint(id: index, date: date, views: views)
+            return TrendPulsePoint(id: index, date: date, views: views)
         }
     }
-    private var chartPoints: [TrendPoint] {
-        downsampledTrendPoints(fullPoints, maxPoints: 220)
+    private var chartPoints: [TrendPulsePoint] {
+        TrendPulseDownsampler.points(fullPoints, maximumCount: 220)
     }
-    private var selectedPoint: TrendPoint? {
+    private var selectedPoint: TrendPulsePoint? {
         if let selectedIndex {
             return fullPoints.first(where: { $0.id == selectedIndex }) ?? selectionAnchorPoint
         }
@@ -118,11 +113,11 @@ struct TrendPulsePopoverView: View {
         }
         return ticks
     }
-    private var recentPoints: [TrendPoint] {
+    private var recentPoints: [TrendPulsePoint] {
         Array(fullPoints.suffix(5).reversed())
     }
 
-    private var selectionAnchorPoint: TrendPoint? {
+    private var selectionAnchorPoint: TrendPulsePoint? {
         nearestPoint(to: presentationContext.selectionAnchorDate) ?? fullPoints.last
     }
 
@@ -430,62 +425,6 @@ struct TrendPulsePopoverView: View {
         }
     }
 
-    private func downsampledTrendPoints(_ points: [TrendPoint], maxPoints: Int) -> [TrendPoint] {
-        guard points.count > maxPoints, maxPoints >= 8 else { return points }
-        guard let first = points.first, let last = points.last else { return points }
-
-        let interior = Array(points.dropFirst().dropLast())
-        guard !interior.isEmpty else { return points }
-
-        let bucketCount = Swift.max(1, (maxPoints - 2) / 2)
-        let bucketSize = Swift.max(1, Int((Double(interior.count) / Double(bucketCount)).rounded(.up)))
-
-        var sampled: [TrendPoint] = [first]
-        sampled.reserveCapacity(maxPoints)
-
-        var start = 0
-        while start < interior.count {
-            let end = Swift.min(start + bucketSize, interior.count)
-            let bucket = interior[start..<end]
-            if let minPoint = bucket.min(by: { $0.views < $1.views }),
-               let maxPoint = bucket.max(by: { $0.views < $1.views }) {
-                if minPoint.id == maxPoint.id {
-                    sampled.append(minPoint)
-                } else if minPoint.id < maxPoint.id {
-                    sampled.append(minPoint)
-                    sampled.append(maxPoint)
-                } else {
-                    sampled.append(maxPoint)
-                    sampled.append(minPoint)
-                }
-            }
-            start += bucketSize
-        }
-
-        sampled.append(last)
-
-        var seen = Set<Int>()
-        let dedupedSorted = sampled
-            .filter { seen.insert($0.id).inserted }
-            .sorted(by: { $0.id < $1.id })
-
-        if dedupedSorted.count <= maxPoints {
-            return dedupedSorted
-        }
-
-        let stride = Swift.max(1, Int((Double(points.count - 2) / Double(maxPoints - 2)).rounded(.up)))
-        var reduced: [TrendPoint] = [first]
-        var index = 1
-        while index < points.count - 1 {
-            reduced.append(points[index])
-            index += stride
-        }
-        if reduced.last?.id != last.id {
-            reduced.append(last)
-        }
-        return Array(reduced.prefix(maxPoints))
-    }
-
     private func loadPeakDays() async {
         isLoadingPeakDays = true
         defer { isLoadingPeakDays = false }
@@ -504,7 +443,7 @@ struct TrendPulsePopoverView: View {
         }
     }
 
-    private func nearestPoint(to targetDate: Date) -> TrendPoint? {
+    private func nearestPoint(to targetDate: Date) -> TrendPulsePoint? {
         fullPoints.min { lhs, rhs in
             abs(lhs.date.timeIntervalSince(targetDate)) < abs(rhs.date.timeIntervalSince(targetDate))
         }
