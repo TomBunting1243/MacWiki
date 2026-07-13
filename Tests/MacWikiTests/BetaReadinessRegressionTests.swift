@@ -74,7 +74,7 @@ struct BetaReadinessRegressionTests {
         let progressSource = try source("Sources/MacWiki/Views/Components/ReadProgressIndicator.swift")
         #expect(progressSource.contains("PieSlice(progress: fillProgress)"))
         #expect(!progressSource.contains("if fillProgress"))
-        #expect(progressSource.components(separatedBy: ".animation(").count == 2)
+        #expect(!progressSource.contains(".animation("))
 
         let modelSource = try source("Sources/MacWiki/Views/Sidebar/Search/SidebarSearchSurfaceModel.swift")
         #expect(modelSource.contains("private struct DerivedState"))

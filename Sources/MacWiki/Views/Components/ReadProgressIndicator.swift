@@ -45,6 +45,5 @@ struct ReadProgressIndicator: View {
                 .fill(tint)
         }
         .frame(width: size, height: size)
-        .animation(.easeInOut(duration: 0.15), value: fillProgress)
     }
 }
