@@ -102,7 +102,7 @@ APPLESCRIPT
 }
 
 select_discover_via_accessibility() {
-  APP_PID="$QA_APP_PID" osascript -l JavaScript <<'JXA'
+  APP_PID="$QA_APP_PID" qa_run_command_with_timeout 15 osascript -l JavaScript <<'JXA'
 ObjC.import('stdlib');
 const se = Application('System Events');
 const appPid = Number(ObjC.unwrap($.getenv('APP_PID')) || '0');
@@ -193,7 +193,7 @@ JXA
 }
 
 verify_discover_via_accessibility() {
-  APP_PID="$QA_APP_PID" osascript -l JavaScript <<'JXA'
+  APP_PID="$QA_APP_PID" qa_run_command_with_timeout 15 osascript -l JavaScript <<'JXA'
 ObjC.import('stdlib');
 const se = Application('System Events');
 const appPid = Number(ObjC.unwrap($.getenv('APP_PID')) || '0');

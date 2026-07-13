@@ -232,7 +232,7 @@ set_window_geometry() {
   local y="$4"
   local actual_width
 
-  if ! actual_width="$(run_osascript_with_timeout 10 "$APP_NAME" "$width" "$height" "$x" "$y" 2>/dev/null <<'APPLESCRIPT'
+  if ! actual_width="$(run_osascript_with_timeout 3 "$APP_NAME" "$width" "$height" "$x" "$y" 2>/dev/null <<'APPLESCRIPT'
 using terms from application "System Events"
 on contentWindowIndex(appName)
     tell application "System Events"
@@ -608,6 +608,10 @@ echo "- Warnings: $warn_count" >>"$REPORT_PATH"
 echo "- Hard failures: $hard_fail_count" >>"$REPORT_PATH"
 echo >>"$REPORT_PATH"
 echo "- Harness: \`scripts/qa_sidebar_search_width_classes.sh\`" >>"$REPORT_PATH"
+
+PERFORMANCE_CSV="$OUTPUT_DIR/performance-metrics.csv"
+swift "$SCRIPT_DIR/dump_performance_metrics.swift" "$QA_DEFAULTS_SUITE" >"$PERFORMANCE_CSV"
+echo "- Performance metrics: \`$PERFORMANCE_CSV\`" >>"$REPORT_PATH"
 
 if (( hard_fail_count > 0 )); then
   echo "FAIL: Harness found $hard_fail_count hard failure(s). Report: $REPORT_PATH" >&2

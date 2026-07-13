@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "policy": "Budgets are release gates for the macOS 26+ internal beta. They include headroom above observed same-host baselines and must not be relaxed solely to pass a candidate.",
+  "operationalBudgets": {
+    "appWindowReadinessMilliseconds": 5000,
+    "windowResizeVerificationMilliseconds": 3000,
+    "discoverAccessibilityTraversalMilliseconds": 15000
+  },
+  "metrics": {
+    "search": {
+      "statistic": "p95",
+      "maximumMilliseconds": 750,
+      "minimumSamples": 3,
+      "scope": "15-character Wikipedia query returning 10 results, including the 300 ms debounce"
+    },
+    "sidebarHydration": {
+      "statistic": "maximum",
+      "maximumMilliseconds": 2000,
+      "minimumSamples": 5,
+      "scope": "Cold and incremental hydration cohorts up to 30 visible titles"
+    },
+    "sessionRestore": {
+      "statistic": "p95",
+      "maximumMilliseconds": 250,
+      "minimumSamples": 1,
+      "scope": "Local persisted app-state decode and publication; window readiness is verified separately"
+    },
+    "readerColdReveal": {
+      "statistic": "maximum",
+      "maximumMilliseconds": 3500,
+      "minimumSamples": 1,
+      "scope": "Cold Ada Lovelace reader reveal on the reference internal-beta host"
+    },
+    "readerWarmReveal": {
+      "statistic": "p95",
+      "maximumMilliseconds": 2500,
+      "minimumSamples": 5,
+      "scope": "Warm-disk Ada Lovelace reader reveal on the reference internal-beta host"
+    }
+  }
+}

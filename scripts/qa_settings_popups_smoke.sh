@@ -29,7 +29,7 @@ qa_launch_exact_bundle "/tmp/macwiki-qa-settings-popups-launch.log"
 
 echo "Running Settings popups smoke QA..."
 
-APP_NAME="$APP_NAME" APP_PID="$QA_APP_PID" SCRIPT_DIR="$SCRIPT_DIR" osascript -l JavaScript <<'JXA'
+APP_NAME="$APP_NAME" APP_PID="$QA_APP_PID" SCRIPT_DIR="$SCRIPT_DIR" qa_run_command_with_timeout 75 osascript -l JavaScript <<'JXA'
 ObjC.import('stdlib');
 
 const se = Application('System Events');

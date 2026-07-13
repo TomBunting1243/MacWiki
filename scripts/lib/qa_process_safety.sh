@@ -39,6 +39,32 @@ qa_delete_defaults_suite() {
   rm -f "$HOME/Library/Preferences/$suite_name.plist"
 }
 
+qa_run_command_with_timeout() {
+  local timeout_seconds="$1"
+  shift
+  local input_path
+  input_path="$(mktemp "${TMPDIR:-/tmp}/macwiki-qa-command-input.XXXXXX")"
+  cat >"$input_path"
+  "$@" <"$input_path" &
+  local command_pid=$!
+  local elapsed_ticks=0
+  local maximum_ticks=$((timeout_seconds * 10))
+  while kill -0 "$command_pid" 2>/dev/null; do
+    if (( elapsed_ticks >= maximum_ticks )); then
+      kill "$command_pid" 2>/dev/null || true
+      wait "$command_pid" 2>/dev/null || true
+      rm -f "$input_path"
+      return 124
+    fi
+    sleep 0.1
+    elapsed_ticks=$((elapsed_ticks + 1))
+  done
+  local command_status=0
+  wait "$command_pid" || command_status=$?
+  rm -f "$input_path"
+  return "$command_status"
+}
+
 qa_assert_isolated_path() {
   local candidate="$1"
   local root="$2"

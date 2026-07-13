@@ -521,7 +521,7 @@ struct BetaReadinessRegressionTests {
         #expect(settingsQAScript.contains("ObjC.import('stdlib')"))
         #expect(settingsQAScript.contains("ObjC.unwrap($.getenv('APP_NAME')) || 'MacWiki'"))
         #expect(settingsQAScript.contains("ObjC.unwrap($.getenv('APP_PID'))"))
-        #expect(settingsQAScript.contains("APP_NAME=\"$APP_NAME\" APP_PID=\"$QA_APP_PID\" SCRIPT_DIR=\"$SCRIPT_DIR\" osascript"))
+        #expect(settingsQAScript.contains("APP_NAME=\"$APP_NAME\" APP_PID=\"$QA_APP_PID\" SCRIPT_DIR=\"$SCRIPT_DIR\" qa_run_command_with_timeout 75 osascript"))
         #expect(settingsQAScript.contains("se.processes.whose({ unixId: appPid })()"))
         #expect(settingsQAScript.contains("qa_launch_exact_bundle"))
         #expect(settingsQAScript.contains("popups.forEach((popup, index) =>"))
@@ -748,6 +748,9 @@ struct BetaReadinessRegressionTests {
         #expect(safetyLibrary.contains("rm -f \"$HOME/Library/Preferences/$suite_name.plist\""))
         #expect(safetyLibrary.contains("qa_launch_exact_bundle()"))
         #expect(safetyLibrary.contains("qa_launch_candidate()"))
+        #expect(safetyLibrary.contains("qa_run_command_with_timeout()"))
+        #expect(safetyLibrary.contains("cat >\"$input_path\""))
+        #expect(safetyLibrary.contains("\"$@\" <\"$input_path\" &"))
         #expect(safetyLibrary.contains("--env \"HOME=$QA_HOME\""))
         #expect(safetyLibrary.contains("--env \"CFFIXED_USER_HOME=$QA_HOME\""))
         #expect(safetyLibrary.contains("--env \"MACWIKI_QA_DEFAULTS_SUITE=${QA_DEFAULTS_SUITE:?}\""))
@@ -778,14 +781,35 @@ struct BetaReadinessRegressionTests {
     @Test func widthClassHarnessUsesReachableVerifiedWindowSizes() throws {
         let script = try source("scripts/qa_sidebar_search_width_classes.sh")
         let captureScript = try source("scripts/capture_macwiki_window.sh")
+        let performanceDumpScript = try source("scripts/dump_performance_metrics.swift")
 
         #expect(script.contains("WIDTH_PRESETS_CSV=\"${WIDTH_PRESETS_CSV:-1040,1400,1760}\""))
+        #expect(script.contains("performance-metrics.csv"))
+        #expect(script.contains("dump_performance_metrics.swift"))
+        #expect(performanceDumpScript.contains("com.tombunting.MacWiki.qa."))
+        #expect(performanceDumpScript.contains("sessionRestore"))
+        #expect(performanceDumpScript.contains("sidebarHydration"))
         #expect(script.contains("Verified actual window width"))
         #expect(script.contains("Could not establish and verify target window width"))
         #expect(!script.contains("236,288,360"))
         #expect(!script.contains("esc badge"))
         #expect(captureScript.contains("for attempt in 1 2 3"))
         #expect(captureScript.contains("after 3 attempts"))
+    }
+
+    @Test func internalBetaPerformanceBudgetsAreExplicitAndEnforced() throws {
+        let budgets = try source("INTERNAL_BETA_PERFORMANCE_BUDGETS.json")
+        let verifier = try source("scripts/verify_performance_budgets.py")
+
+        #expect(budgets.contains("readerColdReveal"))
+        #expect(budgets.contains("readerWarmReveal"))
+        #expect(budgets.contains("sidebarHydration"))
+        #expect(budgets.contains("appWindowReadinessMilliseconds"))
+        #expect(budgets.contains("discoverAccessibilityTraversalMilliseconds"))
+        #expect(budgets.contains("must not be relaxed solely to pass a candidate"))
+        #expect(verifier.contains("minimumSamples"))
+        #expect(verifier.contains("measured <= maximum"))
+        #expect(verifier.contains("Overall: **{'FAIL' if failures else 'PASS'}**"))
     }
 
     @Test func sidebarSearchOwnsItsNativeTopSafeArea() throws {
