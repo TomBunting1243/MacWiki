@@ -76,30 +76,15 @@ struct ArticleListItem<Content: View>: View {
     }
 
     var body: some View {
-        Button(action: onTap) {
-            HStack(alignment: .top, spacing: 4) {
-                let labelColor = label?.color.swiftUIColor
-                let defaultIndicatorTint = Color.accentColor.opacity(isSelected ? 0.78 : (isCurrent ? 0.72 : 0.86))
-                let indicatorTint = (labelDisplayMode == .coloredDot ? labelColor?.opacity(isSelected ? 0.72 : 0.82) : nil) ?? defaultIndicatorTint
-                let defaultIndicatorTrack = Color.primary.opacity(isSelected ? 0.18 : 0.14)
-                let indicatorTrack = (labelDisplayMode == .coloredDot ? labelColor?.opacity(isSelected ? 0.16 : 0.22) : nil) ?? defaultIndicatorTrack
+        HStack(alignment: .top, spacing: 4) {
+            let labelColor = label?.color.swiftUIColor
+            let defaultIndicatorTint = Color.accentColor.opacity(isSelected ? 0.78 : (isCurrent ? 0.72 : 0.86))
+            let indicatorTint = (labelDisplayMode == .coloredDot ? labelColor?.opacity(isSelected ? 0.72 : 0.82) : nil) ?? defaultIndicatorTint
+            let defaultIndicatorTrack = Color.primary.opacity(isSelected ? 0.18 : 0.14)
+            let indicatorTrack = (labelDisplayMode == .coloredDot ? labelColor?.opacity(isSelected ? 0.16 : 0.22) : nil) ?? defaultIndicatorTrack
 
-                if let toggle = onToggleRead {
-                    Button(action: toggle) {
-                        ReadProgressIndicator(
-                            progress: progress,
-                            isRead: isRead,
-                            tint: indicatorTint,
-                            trackColor: indicatorTrack,
-                            size: 10,
-                            lineWidth: 1.1
-                        )
-                    }
-                    .buttonStyle(.plain)
-                    .help(isRead ? "Mark as unread" : "Mark as read")
-                    .padding(.top, 10)
-                    .padding(.leading, 4)
-                } else {
+            if let toggle = onToggleRead {
+                Button(action: toggle) {
                     ReadProgressIndicator(
                         progress: progress,
                         isRead: isRead,
@@ -108,28 +93,42 @@ struct ArticleListItem<Content: View>: View {
                         size: 10,
                         lineWidth: 1.1
                     )
-                    .padding(.top, 10)
-                    .padding(.leading, 4)
                 }
+                .buttonStyle(.plain)
+                .accessibilityLabel(isRead ? "Mark as unread" : "Mark as read")
+                .help(isRead ? "Mark as unread" : "Mark as read")
+                .padding(.top, 10)
+                .padding(.leading, 4)
+            } else {
+                ReadProgressIndicator(
+                    progress: progress,
+                    isRead: isRead,
+                    tint: indicatorTint,
+                    trackColor: indicatorTrack,
+                    size: 10,
+                    lineWidth: 1.1
+                )
+                .padding(.top, 10)
+                .padding(.leading, 4)
+            }
 
-                let labelToDisplay = (labelDisplayMode == .rowHighlight) ? label : nil
-                content(isHovered, labelToDisplay)
-            }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 8)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .opacity(isRead ? 0.76 : 1.0)
-            .background {
-                RoundedRectangle(cornerRadius: rowCornerRadius, style: .continuous)
-                    .fill(rowFill)
-                    .overlay {
-                        RoundedRectangle(cornerRadius: rowCornerRadius, style: .continuous)
-                            .strokeBorder(rowStroke, lineWidth: 0.75)
-                    }
-            }
-            .contentShape(Rectangle())
+            let labelToDisplay = (labelDisplayMode == .rowHighlight) ? label : nil
+            content(isHovered, labelToDisplay)
         }
-        .buttonStyle(.plain)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .opacity(isRead ? 0.76 : 1.0)
+        .background {
+            RoundedRectangle(cornerRadius: rowCornerRadius, style: .continuous)
+                .fill(rowFill)
+                .overlay {
+                    RoundedRectangle(cornerRadius: rowCornerRadius, style: .continuous)
+                        .strokeBorder(rowStroke, lineWidth: 0.75)
+                }
+        }
+        .contentShape(Rectangle())
+        .onTapGesture(perform: onTap)
         .listRowSeparator(.hidden)
         .listRowInsets(EdgeInsets(top: 2, leading: 0, bottom: 2, trailing: 0))
         .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: isHovered)
@@ -140,16 +139,7 @@ struct ArticleListItem<Content: View>: View {
         .modifier(
             ArticleListAccessibilityModifier(
                 title: accessibilityTitle,
-                value: ArticleListAccessibilityStatus.value(
-                    isRead: isRead,
-                    progress: progress,
-                    isCurrent: isCurrent,
-                    isSelected: isSelected,
-                    labelName: label?.name
-                ),
-                isRead: isRead,
-                onOpen: onTap,
-                onToggleRead: onToggleRead
+                onOpen: onTap
             )
         )
     }

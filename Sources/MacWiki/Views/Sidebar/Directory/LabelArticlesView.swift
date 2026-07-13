@@ -188,14 +188,12 @@ struct LabelArticlesView: View {
                 }
             }
         }
-        .onAppear {
-            refreshArticleIndexesSnapshot()
-            refreshVisibleSnapshot()
-        }
-        .onChange(of: articleIndexesFingerprint) { _, _ in
+        .task(id: articleIndexesFingerprint) {
+            await Task.yield()
             refreshArticleIndexesSnapshot()
         }
-        .onChange(of: visibleSnapshotFingerprint) { _, _ in
+        .task(id: visibleSnapshotFingerprint) {
+            await Task.yield()
             refreshVisibleSnapshot()
         }
     }

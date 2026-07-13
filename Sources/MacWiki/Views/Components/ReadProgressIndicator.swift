@@ -41,16 +41,10 @@ struct ReadProgressIndicator: View {
             Circle()
                 .stroke(trackColor, lineWidth: lineWidth)
 
-            if fillProgress >= 0.999 {
-                Circle()
-                    .fill(tint)
-            } else if fillProgress > 0.001 {
-                PieSlice(progress: fillProgress)
-                    .fill(tint)
-            }
+            PieSlice(progress: fillProgress)
+                .fill(tint)
         }
         .frame(width: size, height: size)
         .animation(.easeInOut(duration: 0.15), value: fillProgress)
-        .animation(.easeInOut(duration: 0.15), value: isRead)
     }
 }

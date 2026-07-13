@@ -4,6 +4,11 @@ import SwiftData
 
 @Observable @MainActor
 final class SidebarSearchSurfaceModel {
+    @MainActor private struct DerivedState {
+        var articleIndexes = DirectoryArticleIndexes.empty
+        var visibleSnapshot = SidebarSearchVisibleSnapshot.empty
+    }
+
     let searchCoordinator: SearchCoordinator
     let metadataHydrator: ArticleMetadataHydrator
 
@@ -13,8 +18,15 @@ final class SidebarSearchSurfaceModel {
     var tagFilter: Tag?
     var selectedRowID: String?
     var activePageViewsPopover: SidebarSearchPageViewsPopoverPayload?
-    private(set) var articleIndexes = DirectoryArticleIndexes.empty
-    private(set) var visibleSnapshot = SidebarSearchVisibleSnapshot.empty
+    private var derivedState = DerivedState()
+
+    var articleIndexes: DirectoryArticleIndexes {
+        derivedState.articleIndexes
+    }
+
+    var visibleSnapshot: SidebarSearchVisibleSnapshot {
+        derivedState.visibleSnapshot
+    }
 
     init(
         searchCoordinator: SearchCoordinator = SearchCoordinator(
@@ -126,7 +138,7 @@ final class SidebarSearchSurfaceModel {
         highlights: [Highlight],
         savedArticles: [SavedArticle]
     ) {
-        articleIndexes = DirectoryArticleIndexes(
+        derivedState.articleIndexes = DirectoryArticleIndexes(
             articleStates: articleStates,
             highlights: highlights,
             savedArticles: savedArticles
@@ -134,8 +146,42 @@ final class SidebarSearchSurfaceModel {
     }
 
     func refreshVisibleSnapshot(labels: [Label], appState: AppState) {
+        derivedState.visibleSnapshot = makeVisibleSnapshot(
+            labels: labels,
+            appState: appState,
+            articleIndexes: derivedState.articleIndexes
+        )
+    }
+
+    func refreshDerivedState(
+        articleStates: [ArticleState],
+        highlights: [Highlight],
+        savedArticles: [SavedArticle],
+        labels: [Label],
+        appState: AppState
+    ) {
+        let indexes = DirectoryArticleIndexes(
+            articleStates: articleStates,
+            highlights: highlights,
+            savedArticles: savedArticles
+        )
+        derivedState = DerivedState(
+            articleIndexes: indexes,
+            visibleSnapshot: makeVisibleSnapshot(
+                labels: labels,
+                appState: appState,
+                articleIndexes: indexes
+            )
+        )
+    }
+
+    private func makeVisibleSnapshot(
+        labels: [Label],
+        appState: AppState,
+        articleIndexes: DirectoryArticleIndexes
+    ) -> SidebarSearchVisibleSnapshot {
         let currentTitle = DirectoryArticleIndexes.currentArticleTitleNormalized(in: appState)
-        visibleSnapshot = SidebarSearchSnapshotBuilder.build(
+        return SidebarSearchSnapshotBuilder.build(
             sourceResults: sourceResults,
             sourceKind: sourceKind,
             readFilter: readFilter,

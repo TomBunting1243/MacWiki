@@ -94,7 +94,6 @@ struct SidebarSearchView: View {
         .padding(.top, TabBarChromeStyle.strip.height)
         .background(Color(nsColor: .textBackgroundColor))
         .onAppear {
-            refreshSearchState()
             if let launchQuery = appState.consumeLaunchSidebarSearchQuery() {
                 model.searchCoordinator.searchText = launchQuery
             }
@@ -103,7 +102,8 @@ struct SidebarSearchView: View {
             }
             model.searchCoordinator.loadTrendingIfNeeded()
         }
-        .onChange(of: searchSurfaceFingerprint) { _, _ in
+        .task(id: searchSurfaceFingerprint) {
+            await Task.yield()
             refreshSearchState()
         }
         .onChange(of: model.searchCoordinator.searchText) { _, _ in
@@ -129,12 +129,13 @@ struct SidebarSearchView: View {
     }
 
     private func refreshSearchState() {
-        model.refreshArticleIndexes(
+        model.refreshDerivedState(
             articleStates: articleStates,
             highlights: highlights,
-            savedArticles: savedArticles
+            savedArticles: savedArticles,
+            labels: allLabels,
+            appState: appState
         )
-        model.refreshVisibleSnapshot(labels: allLabels, appState: appState)
         model.reconcileSelection()
     }
 

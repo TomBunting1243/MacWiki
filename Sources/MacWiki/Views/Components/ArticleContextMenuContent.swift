@@ -305,7 +305,12 @@ extension ArticleContextMenuContent {
         self.allLists = allLists
         
         self.onToggleRead = {
-            appState.updateReadState(forTitle: article.title, isRead: !isRead)
+            _ = ReadStateSync.applyReadState(
+                !isRead,
+                for: article,
+                in: modelContext,
+                appState: appState
+            )
         }
         
         self.onSetLabel = { labelId in

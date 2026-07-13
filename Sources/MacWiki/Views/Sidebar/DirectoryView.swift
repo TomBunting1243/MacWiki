@@ -553,17 +553,19 @@ struct DirectoryView: View {
             }
         }
         .onAppear {
-            refreshArticleIndexesSnapshot()
-            refreshVisibleSnapshot()
             updateSidebarTimeTravelSkeletonVisibility()
         }
         .onChange(of: shouldQueueSidebarTimeTravelSkeleton) { _, _ in
             updateSidebarTimeTravelSkeletonVisibility()
         }
-        .onChange(of: articleIndexesFingerprint) { _, _ in
+        .task(id: isSidebarSearchPresented ? nil : articleIndexesFingerprint) {
+            guard !isSidebarSearchPresented else { return }
+            await Task.yield()
             refreshArticleIndexesSnapshot()
         }
-        .onChange(of: visibleSnapshotFingerprint) { _, _ in
+        .task(id: isSidebarSearchPresented ? nil : visibleSnapshotFingerprint) {
+            guard !isSidebarSearchPresented else { return }
+            await Task.yield()
             refreshVisibleSnapshot()
         }
         .onChange(of: selectionResetKey) {

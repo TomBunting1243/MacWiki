@@ -49,22 +49,52 @@ struct BetaReadinessRegressionTests {
         #expect(value == "Active tab, saved, has highlights, 62% read")
     }
 
-    @Test func articleListRowsExposeArticleIdentityAndReadAction() throws {
-        let status = ArticleListAccessibilityStatus.value(
-            isRead: false,
-            progress: 0.62,
-            isCurrent: true,
-            isSelected: true,
-            labelName: "Research"
-        )
-        #expect(status == "Unread, 62% read, Open in reader, Selected, Label Research")
-
+    @Test func articleListRowsExposeArticleIdentityAndIndependentReadAction() throws {
         let rowSource = try source("Sources/MacWiki/Views/Sidebar/Directory/ArticleListAccessibility.swift")
-        #expect(rowSource.contains("content.accessibilityRepresentation"))
-        #expect(rowSource.contains("Button(title, action: onOpen)"))
+        #expect(rowSource.contains(".accessibilityElement(children: .contain)"))
         #expect(rowSource.contains(".accessibilityInputLabels([title])"))
-        #expect(rowSource.contains(".accessibilityValue(\"\\(title), \\(value)\")"))
-        #expect(rowSource.contains("named: Text(isRead ? \"Mark as unread\" : \"Mark as read\")"))
+        #expect(rowSource.contains(".accessibilityValue(title)"))
+        #expect(rowSource.contains("Use the context menu for read status and organization actions."))
+        #expect(rowSource.contains(".accessibilityAddTraits(.isButton)"))
+        #expect(rowSource.contains(".accessibilityAction {"))
+        #expect(!rowSource.contains("accessibilityRepresentation"))
+
+        let contextMenuSource = try source("Sources/MacWiki/Views/Components/ArticleContextMenuContent.swift")
+        #expect(contextMenuSource.contains("ReadStateSync.applyReadState("))
+        #expect(!contextMenuSource.contains("appState.updateReadState(forTitle: article.title"))
+
+        let itemSource = try source("Sources/MacWiki/Views/Sidebar/Directory/DirectoryArticleRowViews.swift")
+        #expect(itemSource.contains(".onTapGesture(perform: onTap)"))
+        #expect(itemSource.contains(".accessibilityLabel(isRead ? \"Mark as unread\" : \"Mark as read\")"))
+        #expect(!itemSource.contains("Button(action: onTap)"))
+
+        let progressSource = try source("Sources/MacWiki/Views/Components/ReadProgressIndicator.swift")
+        #expect(progressSource.contains("PieSlice(progress: fillProgress)"))
+        #expect(!progressSource.contains("if fillProgress"))
+        #expect(progressSource.components(separatedBy: ".animation(").count == 2)
+
+        let modelSource = try source("Sources/MacWiki/Views/Sidebar/Search/SidebarSearchSurfaceModel.swift")
+        #expect(modelSource.contains("private struct DerivedState"))
+        #expect(modelSource.contains("func refreshDerivedState("))
+        #expect(modelSource.contains("derivedState = DerivedState("))
+
+        let searchSource = try source("Sources/MacWiki/Views/Sidebar/SidebarSearchView.swift")
+        #expect(searchSource.contains(".task(id: searchSurfaceFingerprint)"))
+        #expect(searchSource.contains("model.refreshDerivedState("))
+
+        let directorySource = try source("Sources/MacWiki/Views/Sidebar/DirectoryView.swift")
+        #expect(directorySource.contains(".task(id: isSidebarSearchPresented ? nil : articleIndexesFingerprint)"))
+
+        let harness = try source("scripts/qa_article_row_secondary_window.sh")
+        #expect(harness.contains("qa_prepare_isolated_home"))
+        #expect(harness.contains("qa_assert_no_conflicting_processes"))
+        #expect(harness.contains("qa_launch_candidate"))
+        #expect(harness.contains("ATTRIBUTEGRAPH_CYCLE_COUNT"))
+
+        let runner = try source("scripts/ax_article_row_secondary_window.swift")
+        #expect(runner.contains("readStateButton(in: updated.0, help: \"Mark as unread\")"))
+        #expect(runner.contains("menuItem(titled: \"Open in New Window\""))
+        #expect(runner.contains("windows(in: application).count == 2"))
     }
 
     @Test func persistedColumnWidthsRejectInvalidValuesAndClampToSupportedRanges() {
