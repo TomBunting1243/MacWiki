@@ -104,6 +104,7 @@ struct WikiHopOverlay: View {
         }
         .buttonStyle(.plain)
         .help("Give Up")
+        .accessibilityLabel("Give Up Wiki-Hop")
     }
 
     @ViewBuilder

@@ -165,6 +165,24 @@ struct BetaReadinessRegressionTests {
         #expect(reader.contains(".accessibilityLabel(\"Dismiss finished-reading prompt\")"))
     }
 
+    @Test func iconOnlySearchAndTagActionsExposeNames() throws {
+        let directory = try source("Sources/MacWiki/Views/Sidebar/DirectoryView.swift")
+        let labelArticles = try source("Sources/MacWiki/Views/Sidebar/Directory/LabelArticlesView.swift")
+        let tagArticles = try source("Sources/MacWiki/Views/Sidebar/Directory/TagArticlesView.swift")
+        let searchResults = try source("Sources/MacWiki/Views/Sidebar/Search/SidebarSearchResultsView.swift")
+        let discoverSearch = try source("Sources/MacWiki/Views/Home/Discover/DiscoverSearchBarView.swift")
+        let wikiHop = try source("Sources/MacWiki/Views/Components/WikiHopOverlay.swift")
+
+        #expect(directory.contains(".accessibilityLabel(\"Clear tag filter\")"))
+        #expect(labelArticles.contains(".accessibilityLabel(\"Clear tag filter\")"))
+        #expect(tagArticles.contains(".accessibilityLabel(\"Clear tag filter\")"))
+        #expect(searchResults.contains(".accessibilityLabel(\"Clear filter\")"))
+        #expect(discoverSearch.contains(".accessibilityLabel(\"Refresh Discover\")"))
+        #expect(discoverSearch.contains(".accessibilityValue(discoverFeedStore.isLoading ? \"Refreshing\" : \"Ready\")"))
+        #expect(discoverSearch.contains(".accessibilityLabel(\"Clear Search\")"))
+        #expect(wikiHop.contains(".accessibilityLabel(\"Give Up Wiki-Hop\")"))
+    }
+
     @Test func inspectorResizeHandleHasKeyboardAccessibleAdjustment() throws {
         let inspectorSource = try source("Sources/MacWiki/Views/Inspector/InspectorPanel.swift")
         let resizeHandle = sourceSection(

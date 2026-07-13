@@ -149,6 +149,7 @@ struct TagArticlesView: View {
                                 .foregroundStyle(.tertiary)
                         }
                         .buttonStyle(.plain)
+                        .accessibilityLabel("Clear tag filter")
                     }
                     .padding(.vertical, 4)
                 }

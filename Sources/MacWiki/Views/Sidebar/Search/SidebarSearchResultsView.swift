@@ -124,5 +124,6 @@ private struct SidebarSearchActiveFiltersRow: View {
         }
         .buttonStyle(.plain)
         .help("Clear Filter")
+        .accessibilityLabel("Clear filter")
     }
 }

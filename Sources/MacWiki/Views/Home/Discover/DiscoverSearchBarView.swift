@@ -42,6 +42,8 @@ struct DiscoverSearchBarView: View {
                 .buttonStyle(DiscoverInteractivePressStyle())
                 .disabled(discoverFeedStore.isLoading)
                 .help(discoverFeedStore.isLoading ? "Refreshing Discover…" : "Refresh Discover")
+                .accessibilityLabel("Refresh Discover")
+                .accessibilityValue(discoverFeedStore.isLoading ? "Refreshing" : "Ready")
             } else if searchCoordinator.hasInput {
                 Button(action: onClearSearch) {
                     Image(systemName: "xmark.circle.fill")
@@ -49,6 +51,7 @@ struct DiscoverSearchBarView: View {
                         .foregroundStyle(.tertiary)
                 }
                 .buttonStyle(DiscoverInteractivePressStyle())
+                .accessibilityLabel("Clear Search")
             }
         }
         .padding(.horizontal, 13)
