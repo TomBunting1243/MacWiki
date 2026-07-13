@@ -177,11 +177,11 @@ qa_launch_exact() {
   if [[ -n "${MACWIKI_QA_ACCESSIBILITY_PROFILE:-}" ]]; then
     environment+=("MACWIKI_QA_ACCESSIBILITY_PROFILE=$MACWIKI_QA_ACCESSIBILITY_PROFILE")
   fi
-  local launch_arguments=()
   if [[ "${MACWIKI_QA_PSEUDOLOCALIZATION:-}" == "1" ]]; then
-    launch_arguments=(-NSDoubleLocalizedStrings YES)
+    /usr/bin/env "${environment[@]}" "$APP_BIN" -NSDoubleLocalizedStrings YES >"$log_path" 2>&1 &
+  else
+    /usr/bin/env "${environment[@]}" "$APP_BIN" >"$log_path" 2>&1 &
   fi
-  /usr/bin/env "${environment[@]}" "$APP_BIN" "${launch_arguments[@]}" >"$log_path" 2>&1 &
   QA_APP_PID=$!
   export QA_APP_PID
 
@@ -233,11 +233,11 @@ qa_launch_exact_bundle() {
   if [[ -n "${MACWIKI_QA_ACCESSIBILITY_PROFILE:-}" ]]; then
     open_arguments+=(--env "MACWIKI_QA_ACCESSIBILITY_PROFILE=$MACWIKI_QA_ACCESSIBILITY_PROFILE")
   fi
-  local launch_arguments=()
   if [[ "${MACWIKI_QA_PSEUDOLOCALIZATION:-}" == "1" ]]; then
-    launch_arguments=(--args -NSDoubleLocalizedStrings YES)
+    open "${open_arguments[@]}" -a "$bundle_path" --args -NSDoubleLocalizedStrings YES
+  else
+    open "${open_arguments[@]}" -a "$bundle_path"
   fi
-  open "${open_arguments[@]}" -a "$bundle_path" "${launch_arguments[@]}"
 
   for _ in $(seq 1 50); do
     local matching_pids=()

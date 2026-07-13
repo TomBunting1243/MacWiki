@@ -1095,6 +1095,7 @@ struct BetaReadinessRegressionTests {
         #expect(safetyLibrary.contains("MACWIKI_QA_ACCESSIBILITY_PROFILE=$MACWIKI_QA_ACCESSIBILITY_PROFILE"))
         #expect(safetyLibrary.contains("qa_assert_supported_pseudolocalization"))
         #expect(safetyLibrary.contains("-NSDoubleLocalizedStrings YES"))
+        #expect(!safetyLibrary.contains("local launch_arguments=()"))
         #expect(safetyLibrary.contains("qa_pid_executable_path"))
         #expect(safetyLibrary.contains("/usr/sbin/lsof -a -p \"$pid\" -d txt -Fn"))
         #expect(safetyLibrary.contains("Refusing to run while $APP_NAME PID"))
