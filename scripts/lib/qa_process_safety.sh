@@ -10,12 +10,17 @@ qa_canonical_path() {
   printf '%s/%s\n' "$directory" "$(basename "$path")"
 }
 
+qa_assert_trusted_defaults_suite() {
+  local suite_name="$1"
+  if [[ ! "$suite_name" =~ ^com\.tombunting\.MacWiki\.qa\.[A-Za-z0-9.-]+$ ]]; then
+    echo "Refusing untrusted QA defaults suite: $suite_name" >&2
+    return 1
+  fi
+}
+
 qa_defaults_suite_name() {
   if [[ -n "${QA_DEFAULTS_SUITE:-}" ]]; then
-    if [[ ! "$QA_DEFAULTS_SUITE" =~ ^com\.tombunting\.MacWiki\.qa\.[A-Za-z0-9.-]+$ ]]; then
-      echo "Refusing untrusted QA defaults suite: $QA_DEFAULTS_SUITE" >&2
-      return 1
-    fi
+    qa_assert_trusted_defaults_suite "$QA_DEFAULTS_SUITE" || return 1
     printf '%s\n' "$QA_DEFAULTS_SUITE"
     return 0
   fi
@@ -25,6 +30,13 @@ qa_defaults_suite_name() {
   canonical_root="$(qa_canonical_path "${QA_HOME:?}")"
   digest="$(printf '%s' "$canonical_root" | shasum -a 256 | awk '{ print substr($1, 1, 16) }')"
   printf 'com.tombunting.MacWiki.qa.%s\n' "$digest"
+}
+
+qa_delete_defaults_suite() {
+  local suite_name="$1"
+  qa_assert_trusted_defaults_suite "$suite_name" || return 1
+  /usr/bin/defaults delete "$suite_name" >/dev/null 2>&1 || true
+  rm -f "$HOME/Library/Preferences/$suite_name.plist"
 }
 
 qa_assert_isolated_path() {
@@ -61,7 +73,7 @@ qa_prepare_isolated_home() {
   mkdir -p "$QA_HOME/Library/Application Support" "$QA_HOME/Library/Caches"
   QA_DEFAULTS_SUITE="$(qa_defaults_suite_name)"
   export QA_DEFAULTS_SUITE
-  /usr/bin/defaults delete "$QA_DEFAULTS_SUITE" >/dev/null 2>&1 || true
+  qa_delete_defaults_suite "$QA_DEFAULTS_SUITE"
 }
 
 qa_exact_binary_pids() {
@@ -189,7 +201,7 @@ qa_remove_isolated_home() {
   [[ -n "${QA_HOME:-}" ]] || return 0
   qa_assert_isolated_path "$QA_HOME" "$QA_HOME"
   if [[ "${QA_DEFAULTS_SUITE:-}" == com.tombunting.MacWiki.qa.* ]]; then
-    /usr/bin/defaults delete "$QA_DEFAULTS_SUITE" >/dev/null 2>&1 || true
+    qa_delete_defaults_suite "$QA_DEFAULTS_SUITE"
   fi
   QA_DEFAULTS_SUITE=""
   export QA_DEFAULTS_SUITE

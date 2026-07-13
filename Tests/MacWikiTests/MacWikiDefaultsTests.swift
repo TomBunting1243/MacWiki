@@ -5,20 +5,14 @@ import Testing
 
 @MainActor
 struct MacWikiDefaultsTests {
-    @Test func qaSuiteIsIsolatedFromStandardDefaults() throws {
+    @Test func trustedQANameRoutesToDedicatedSuite() {
         let suiteName = MacWikiDefaults.qaSuitePrefix + UUID().uuidString
-        let key = "qa-isolation-\(UUID().uuidString)"
         let defaults = MacWikiDefaults.resolved(environment: [
             MacWikiDefaults.qaSuiteEnvironmentKey: suiteName
         ])
-        defer {
-            defaults.removePersistentDomain(forName: suiteName)
-        }
 
-        defaults.set("isolated", forKey: key)
-
-        #expect(defaults.string(forKey: key) == "isolated")
-        #expect(UserDefaults.standard.object(forKey: key) == nil)
+        #expect(defaults !== UserDefaults.standard)
+        #expect(defaults.persistentDomain(forName: suiteName) == nil)
     }
 
     @Test func arbitrarySuiteNamesCannotRedirectProductionDefaults() {

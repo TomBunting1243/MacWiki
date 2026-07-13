@@ -151,14 +151,20 @@ function pressSettingsTab(title) {
 }
 
 function auditSettingsPane(title, expectedStrings) {
-  const paneWindow = pressSettingsTab(title);
+  pressSettingsTab(title);
+  delay(0.4);
   const observedStrings = new Set();
   let interactiveCount = 0;
   let scrollArea = null;
   let verticalScrollBar = null;
   for (let pass = 0; pass < 10; pass += 1) {
+    const currentWindow = settingsWindow();
+    if (!currentWindow) {
+      delay(0.2);
+      continue;
+    }
     const elements = [];
-    collectElements(settingsWindow() || paneWindow, elements);
+    collectElements(currentWindow, elements);
     elements.flatMap(elementStrings).forEach(value => observedStrings.add(value));
     interactiveCount = Math.max(interactiveCount, elements.filter(el => {
       let role = '';
@@ -208,8 +214,13 @@ function auditSettingsPane(title, expectedStrings) {
     usedCGScroll = cgScrollArea(scrollArea, -8);
     if (usedCGScroll) {
       for (let pass = 0; pass < 4; pass += 1) {
+        const currentWindow = settingsWindow();
+        if (!currentWindow) {
+          delay(0.2);
+          continue;
+        }
         const elements = [];
-        collectElements(settingsWindow() || paneWindow, elements);
+        collectElements(currentWindow, elements);
         elements.flatMap(elementStrings).forEach(value => observedStrings.add(value));
         delay(0.1);
       }
@@ -229,7 +240,7 @@ function auditSettingsPane(title, expectedStrings) {
   console.log(`Pane ${title}: interactive=${interactiveCount}, expected=${expectedStrings.length}, missing=${missing.join(' | ') || 'none'}`);
   if (missing.length > 0) {
     let windowSize = '';
-    try { windowSize = String((settingsWindow() || paneWindow).size()); } catch (e) {}
+    try { windowSize = String(settingsWindow().size()); } catch (e) {}
     let scrollActions = '';
     try { scrollActions = scrollArea.actions().map(action => String(action.name())).join(' | '); } catch (e) {}
     let scrollValue = '';
@@ -244,59 +255,55 @@ function popupValue(popup) {
   try { return String(popup.value()); } catch (e) { return ''; }
 }
 
-function togglePopupAndRestore(popup, popupIndex) {
-  const before = popupValue(popup);
-  popup.actions.byName('AXPress').perform();
-  delay(0.15);
-  let changedByName = false;
-  try {
-    const menus = popup.menus();
-    if (menus.length > 0) {
-      for (const item of menus[0].menuItems()) {
-        let itemName = '';
-        try { itemName = String(item.name()); } catch (e) {}
-        if (itemName.length > 0 && itemName !== before) {
-          item.actions.byName('AXPress').perform();
-          changedByName = true;
-          break;
-        }
-      }
-    }
-  } catch (e) {}
-  if (!changedByName) {
-    se.keyCode(53); // escape when no alternate item is available
-  }
-  delay(0.20);
-  const changed = popupValue(popup);
-
+function refreshedPopup(popupIndex, fallback) {
   const refreshedPopups = [];
   collectPopups(settingsWindow(), refreshedPopups);
-  const restorePopup = refreshedPopups[popupIndex] || popup;
-  restorePopup.actions.byName('AXPress').perform();
-  delay(0.15);
-  let restoredByName = false;
-  const restoreCandidates = [];
-  try {
-    const menus = restorePopup.menus();
-    if (menus.length > 0) {
-      for (const item of menus[0].menuItems()) {
-        let itemName = '';
-        try { itemName = String(item.name()); } catch (e) {}
-        restoreCandidates.push(itemName);
-        if (itemName === before) {
-          item.actions.byName('AXPress').perform();
-          restoredByName = true;
-          break;
+  return refreshedPopups[popupIndex] || fallback;
+}
+
+function selectPopupItem(popupIndex, fallback, acceptsName) {
+  const observedCandidates = new Set();
+  for (let openAttempt = 0; openAttempt < 4; openAttempt += 1) {
+    const currentPopup = refreshedPopup(popupIndex, fallback);
+    try { currentPopup.actions.byName('AXPress').perform(); } catch (e) { continue; }
+    for (let readinessAttempt = 0; readinessAttempt < 12; readinessAttempt += 1) {
+      delay(0.1);
+      try {
+        const menus = currentPopup.menus();
+        if (menus.length === 0) continue;
+        for (const item of menus[0].menuItems()) {
+          let itemName = '';
+          try { itemName = String(item.name()); } catch (e) {}
+          if (itemName.length > 0) observedCandidates.add(itemName);
+          if (itemName.length > 0 && acceptsName(itemName)) {
+            item.actions.byName('AXPress').perform();
+            delay(0.25);
+            return { selected: true, candidates: [...observedCandidates] };
+          }
         }
-      }
+      } catch (e) {}
     }
-  } catch (e) {}
-  if (!restoredByName) {
-    console.log(`Restore candidates for '${before}': ${restoreCandidates.join(' | ')}`);
-    se.keyCode(53); // escape without committing another value
+    se.keyCode(53);
+    delay(0.1);
   }
-  delay(0.20);
+  return { selected: false, candidates: [...observedCandidates] };
+}
+
+function togglePopupAndRestore(popup, popupIndex) {
+  const before = popupValue(popup);
+  const changeResult = selectPopupItem(popupIndex, popup, name => name !== before);
+  const changedPopup = refreshedPopup(popupIndex, popup);
+  const changed = popupValue(changedPopup);
+
+  const restoreResult = selectPopupItem(popupIndex, changedPopup, name => name === before);
+  const restorePopup = refreshedPopup(popupIndex, changedPopup);
   const after = popupValue(restorePopup);
+  if (!changeResult.selected) {
+    console.log(`Change candidates for '${before}': ${changeResult.candidates.join(' | ')}`);
+  }
+  if (!restoreResult.selected) {
+    console.log(`Restore candidates for '${before}': ${restoreResult.candidates.join(' | ')}`);
+  }
 
   return { before, changed, after };
 }
