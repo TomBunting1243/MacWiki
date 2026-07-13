@@ -127,6 +127,8 @@ enum ReaderToolbarControl: Hashable {
 
 struct ReaderToolbarPill<Content: View>: View {
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.colorSchemeContrast) private var colorSchemeContrast
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     let density: ReaderToolbarDensity
     let usesNativeGlass: Bool
@@ -174,14 +176,33 @@ struct ReaderToolbarPill<Content: View>: View {
 
     private var nativeStroke: some View {
         Capsule(style: .continuous)
-            .strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.056 : 0.038), lineWidth: 0.45)
+            .strokeBorder(
+                Color.primary.opacity(
+                    colorSchemeContrast == .increased
+                        ? (colorScheme == .dark ? 0.18 : 0.14)
+                        : (colorScheme == .dark ? 0.056 : 0.038)
+                ),
+                lineWidth: colorSchemeContrast == .increased ? 0.8 : 0.45
+            )
     }
 
     @ViewBuilder
     private var fallbackBackground: some View {
         let darkMode = colorScheme == .dark
         let shape = Capsule(style: .continuous)
-        if liquidGlassChrome {
+        if reduceTransparency {
+            shape
+                .fill(Color(nsColor: .windowBackgroundColor))
+                .overlay {
+                    shape.fill(Color(nsColor: .controlBackgroundColor).opacity(darkMode ? 0.78 : 0.90))
+                }
+                .overlay {
+                    shape.strokeBorder(
+                        Color.primary.opacity(colorSchemeContrast == .increased ? 0.24 : 0.13),
+                        lineWidth: colorSchemeContrast == .increased ? 1 : 0.7
+                    )
+                }
+        } else if liquidGlassChrome {
             shape
                 .fill(.thinMaterial)
                 .overlay {
@@ -205,6 +226,7 @@ struct ReaderToolbarPill<Content: View>: View {
 
 struct ReaderToolbarIconLabel: View {
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.colorSchemeContrast) private var colorSchemeContrast
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     let control: ReaderToolbarControl
@@ -240,9 +262,9 @@ struct ReaderToolbarIconLabel: View {
         if !isEnabled {
             fillOpacity = 0
         } else if isActive {
-            fillOpacity = darkMode ? 0.16 : 0.095
+            fillOpacity = colorSchemeContrast == .increased ? (darkMode ? 0.30 : 0.18) : (darkMode ? 0.16 : 0.095)
         } else if isHovered {
-            fillOpacity = darkMode ? 0.14 : 0.075
+            fillOpacity = colorSchemeContrast == .increased ? (darkMode ? 0.26 : 0.15) : (darkMode ? 0.14 : 0.075)
         } else {
             fillOpacity = 0
         }
@@ -251,8 +273,12 @@ struct ReaderToolbarIconLabel: View {
             .fill(Color.primary.opacity(fillOpacity))
             .overlay {
                 shape.strokeBorder(
-                    Color.primary.opacity((isHovered || isActive) && isEnabled ? (darkMode ? 0.10 : 0.060) : 0),
-                    lineWidth: 0.40
+                    Color.primary.opacity(
+                        (isHovered || isActive) && isEnabled
+                            ? (colorSchemeContrast == .increased ? 0.28 : (darkMode ? 0.10 : 0.060))
+                            : 0
+                    ),
+                    lineWidth: colorSchemeContrast == .increased ? 0.8 : 0.40
                 )
             }
             .shadow(

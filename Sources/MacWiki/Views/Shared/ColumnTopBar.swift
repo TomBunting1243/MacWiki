@@ -227,8 +227,13 @@ enum TopChromeMotion {
 }
 
 struct SidebarPaneBackground: View {
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+
     var body: some View {
-        if #available(macOS 26, *) {
+        if reduceTransparency {
+            Rectangle()
+                .fill(Color(nsColor: .windowBackgroundColor))
+        } else if #available(macOS 26, *) {
             Rectangle()
                 .fill(.thinMaterial)
                 .backgroundExtensionEffect()
@@ -242,10 +247,19 @@ struct SidebarPaneBackground: View {
 struct ReaderTabLaneBackground: View {
     @AppStorage(AppStorageKey.Chrome.liquidGlassChrome) private var liquidGlassChrome = true
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.colorSchemeContrast) private var colorSchemeContrast
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     var body: some View {
         ZStack {
-            if liquidGlassChrome {
+            if liquidGlassChrome && reduceTransparency {
+                Rectangle()
+                    .fill(Color(nsColor: .windowBackgroundColor))
+
+                Rectangle()
+                    .fill(Color(nsColor: .controlBackgroundColor))
+                    .opacity(colorScheme == .dark ? 0.72 : 0.86)
+            } else if liquidGlassChrome {
                 Rectangle()
                     .fill(.thinMaterial)
 
@@ -264,6 +278,13 @@ struct ReaderTabLaneBackground: View {
                 .blendMode(.screen)
             } else {
                 Color.clear
+            }
+
+            if colorSchemeContrast == .increased {
+                Rectangle()
+                    .fill(Color.primary.opacity(0.12))
+                    .frame(height: 1)
+                    .frame(maxHeight: .infinity, alignment: .bottom)
             }
         }
             .allowsHitTesting(false)

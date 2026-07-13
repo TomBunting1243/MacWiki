@@ -440,6 +440,24 @@ struct BetaReadinessRegressionTests {
         #expect(laneSource.contains("AppStorageKey.Chrome.liquidGlassChrome"))
     }
 
+    @Test func customChromeHonorsTransparencyAndContrastPersonalization() throws {
+        let toolbarChrome = try source("Sources/MacWiki/Views/Shared/ReaderToolbarChrome.swift")
+        let columnChrome = try source("Sources/MacWiki/Views/Shared/ColumnTopBar.swift")
+
+        #expect(toolbarChrome.contains("@Environment(\\.accessibilityReduceTransparency)"))
+        #expect(toolbarChrome.contains("@Environment(\\.colorSchemeContrast)"))
+        #expect(toolbarChrome.contains("if reduceTransparency"))
+        #expect(toolbarChrome.contains("Color(nsColor: .windowBackgroundColor)"))
+        #expect(toolbarChrome.contains("colorSchemeContrast == .increased"))
+
+        #expect(columnChrome.contains("struct SidebarPaneBackground"))
+        #expect(columnChrome.contains("struct ReaderTabLaneBackground"))
+        #expect(columnChrome.contains("@Environment(\\.accessibilityReduceTransparency)"))
+        #expect(columnChrome.contains("@Environment(\\.colorSchemeContrast)"))
+        #expect(columnChrome.contains("if liquidGlassChrome && reduceTransparency"))
+        #expect(columnChrome.contains("colorSchemeContrast == .increased"))
+    }
+
     @Test func readerFindUsesMacWikiFindBarOnCurrentMacOS() throws {
         let readerSource = try source("Sources/MacWiki/Views/Reader/ReaderView.swift")
         #expect(readerSource.contains("FindOnPageBarView("))
