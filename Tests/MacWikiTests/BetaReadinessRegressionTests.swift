@@ -60,12 +60,11 @@ struct BetaReadinessRegressionTests {
         #expect(status == "Unread, 62% read, Open in reader, Selected, Label Research")
 
         let rowSource = try source("Sources/MacWiki/Views/Sidebar/Directory/ArticleListAccessibility.swift")
-        #expect(rowSource.contains("AccessibleArticleRowProxy("))
-        #expect(rowSource.contains("view.setAccessibilityLabel(title)"))
-        #expect(rowSource.contains("view.setAccessibilityValue(value)"))
-        #expect(rowSource.contains("override func accessibilityPerformPress() -> Bool"))
-        #expect(rowSource.contains("override func hitTest(_ point: NSPoint) -> NSView?"))
-        #expect(rowSource.contains("title: isRead ? \"Mark as unread\" : \"Mark as read\""))
+        #expect(rowSource.contains("content.accessibilityRepresentation"))
+        #expect(rowSource.contains("Button(title, action: onOpen)"))
+        #expect(rowSource.contains(".accessibilityInputLabels([title])"))
+        #expect(rowSource.contains(".accessibilityValue(\"\\(title), \\(value)\")"))
+        #expect(rowSource.contains("named: Text(isRead ? \"Mark as unread\" : \"Mark as read\")"))
     }
 
     @Test func persistedColumnWidthsRejectInvalidValuesAndClampToSupportedRanges() {

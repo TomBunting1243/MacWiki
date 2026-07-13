@@ -1,4 +1,3 @@
-import AppKit
 import SwiftUI
 
 enum ArticleListAccessibilityStatus {
@@ -36,66 +35,23 @@ struct ArticleListAccessibilityModifier: ViewModifier {
 
     @ViewBuilder
     func body(content: Content) -> some View {
-        content
-            .accessibilityHidden(true)
-            .background {
-                HStack(spacing: 0) {
-                    AccessibleArticleRowProxy(
-                        title: title,
-                        value: value,
-                        help: "Open article",
-                        action: onOpen
-                    )
-                    if let onToggleRead {
-                        AccessibleArticleRowProxy(
-                            title: isRead ? "Mark as unread" : "Mark as read",
-                            value: isRead ? "Read" : "Unread",
-                            help: isRead ? "Mark this article as unread" : "Mark this article as read",
-                            action: onToggleRead
-                        )
-                    }
-                }
+        let semanticRow = Button(title, action: onOpen)
+            .accessibilityLabel(title)
+            .accessibilityInputLabels([title])
+            .accessibilityValue("\(title), \(value)")
+            .accessibilityHint("Open \(title)")
+
+        if let onToggleRead {
+            content.accessibilityRepresentation {
+                semanticRow.accessibilityAction(
+                    named: Text(isRead ? "Mark as unread" : "Mark as read"),
+                    onToggleRead
+                )
             }
-    }
-}
-
-/// A native accessibility-only proxy for article rows. SwiftUI's macOS List
-/// bridge drops dynamic Button titles in this nested composition, even when an
-/// explicit accessibility label or representation is supplied. The proxy does
-/// not draw or participate in hit testing, so SwiftUI keeps all pointer,
-/// keyboard, drag, and context-menu behavior.
-private struct AccessibleArticleRowProxy: NSViewRepresentable {
-    let title: String
-    let value: String
-    let help: String
-    let action: () -> Void
-
-    func makeNSView(context: Context) -> ProxyView {
-        ProxyView()
-    }
-
-    func updateNSView(_ view: ProxyView, context: Context) {
-        view.action = action
-        view.setAccessibilityElement(true)
-        view.setAccessibilityRole(.button)
-        view.setAccessibilityTitle(title)
-        view.setAccessibilityLabel(title)
-        view.setAccessibilityValue(value)
-        view.setAccessibilityHelp(help)
-    }
-
-    @MainActor
-    final class ProxyView: NSView {
-        var action: (() -> Void)?
-
-        override func hitTest(_ point: NSPoint) -> NSView? {
-            nil
-        }
-
-        override func accessibilityPerformPress() -> Bool {
-            guard let action else { return false }
-            action()
-            return true
+        } else {
+            content.accessibilityRepresentation {
+                semanticRow
+            }
         }
     }
 }
