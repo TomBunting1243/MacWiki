@@ -5,6 +5,21 @@ import Testing
 @testable import MacWiki
 
 struct TabBarDragPlannerTests {
+    @Test func fixedWidthFramesAreDeterministicWithoutLayoutFeedback() {
+        let tabIDs = [UUID(), UUID(), UUID()]
+
+        let frames = TabBarDragPlanner.frames(
+            for: tabIDs,
+            tabWidth: 120,
+            tabSpacing: 12,
+            tabHeight: 32
+        )
+
+        #expect(frames[tabIDs[0]] == CGRect(x: 0, y: 0, width: 120, height: 32))
+        #expect(frames[tabIDs[1]] == CGRect(x: 132, y: 0, width: 120, height: 32))
+        #expect(frames[tabIDs[2]] == CGRect(x: 264, y: 0, width: 120, height: 32))
+    }
+
     @Test func targetIndexHonorsHysteresisAroundCurrentTarget() {
         let firstID = UUID()
         let secondID = UUID()

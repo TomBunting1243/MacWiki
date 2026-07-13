@@ -147,8 +147,6 @@ struct TabBarView: View {
     @State private var draggedTabId: UUID?
     @State private var draggedSourceIndex: Int = 0
     @State private var dragOffset: CGFloat = 0
-    @State private var tabFrames: [UUID: CGRect] = [:]
-    
     // MARK: - Performance: Memoized target position
     /// Only changes when drag crosses a tab boundary, not every pixel
     @State private var currentTargetIndex: Int = 0
@@ -171,6 +169,15 @@ struct TabBarView: View {
         guard tabCount > 0 else { return 0 }
         return (CGFloat(tabCount) * resolvedTabWidth)
             + (CGFloat(max(0, tabCount - 1)) * tabSpacing)
+    }
+
+    private var tabFrames: [UUID: CGRect] {
+        TabBarDragPlanner.frames(
+            for: appState.openTabs.map(\.id),
+            tabWidth: resolvedTabWidth,
+            tabSpacing: tabSpacing,
+            tabHeight: chromeStyle.height
+        )
     }
 
     private var showsOverflowMenu: Bool {
@@ -276,29 +283,16 @@ struct TabBarView: View {
                         )
                     }
                     .coordinateSpace(name: "TabBarSpace")
-                    .onPreferenceChange(TabFramePreferenceKey.self) { frames in
-                        guard frames != tabFrames else { return }
-                        tabFrames = frames
-                    }
                 }
                 .scrollIndicators(.hidden)
                 .scrollDisabled(draggedTabId != nil)
                 .scrollClipDisabled(false)
-                .background(
-                    GeometryReader { geo in
-                        Color.clear
-                            .onAppear {
-                                updateTabsViewportWidth(geo.size.width)
-                                updateTabsViewportFrame(geo.frame(in: .named("TabBarSpace")))
-                            }
-                            .onChange(of: geo.size.width) { _, newWidth in
-                                updateTabsViewportWidth(newWidth)
-                            }
-                            .onChange(of: geo.frame(in: .named("TabBarSpace"))) { _, newFrame in
-                                updateTabsViewportFrame(newFrame)
-                            }
-                    }
-                )
+                .onScrollGeometryChange(for: CGRect.self) { geometry in
+                    geometry.visibleRect
+                } action: { _, visibleRect in
+                    updateTabsViewportWidth(visibleRect.width)
+                    updateTabsViewportFrame(visibleRect)
+                }
                 .onAppear {
                     scrollToActiveTab(with: proxy, animated: false)
                 }
@@ -1253,16 +1247,6 @@ private struct DraggableTabItemView: View {
         .compositingGroup()
         .animation(interactionProfile.neighborShift, value: shiftAmount)
         .animation(interactionProfile.dragLift, value: isDragged)
-        // Measure width for drag calculations
-        .background(
-            GeometryReader { geo in
-                Color.clear
-                    .preference(
-                        key: TabFramePreferenceKey.self,
-                        value: [tab.id: geo.frame(in: .named("TabBarSpace"))]
-                    )
-            }
-        )
         .highPriorityGesture(dragGesture)
         .onHover { hovering in
             withAnimation(interactionProfile.hover) {
@@ -1682,14 +1666,4 @@ private struct DraggableTabItemView: View {
         appState.closeOtherTabs(keeping: tab.id)
     }
     
-}
-
-// MARK: - Extensions
-
-private struct TabFramePreferenceKey: PreferenceKey {
-    static let defaultValue: [UUID: CGRect] = [:]
-    
-    static func reduce(value: inout [UUID: CGRect], nextValue: () -> [UUID: CGRect]) {
-        value.merge(nextValue(), uniquingKeysWith: { $1 })
-    }
 }

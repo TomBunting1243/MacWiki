@@ -2,6 +2,26 @@ import CoreGraphics
 import Foundation
 
 enum TabBarDragPlanner {
+    static func frames(
+        for tabOrder: [UUID],
+        tabWidth: CGFloat,
+        tabSpacing: CGFloat,
+        tabHeight: CGFloat
+    ) -> [UUID: CGRect] {
+        let stride = tabWidth + tabSpacing
+        return Dictionary(uniqueKeysWithValues: tabOrder.enumerated().map { index, tabID in
+            (
+                tabID,
+                CGRect(
+                    x: CGFloat(index) * stride,
+                    y: 0,
+                    width: tabWidth,
+                    height: tabHeight
+                )
+            )
+        })
+    }
+
     static func shiftAmount(
         for index: Int,
         draggedTabID: UUID?,

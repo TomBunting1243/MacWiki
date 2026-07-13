@@ -1349,8 +1349,11 @@ struct BetaReadinessRegressionTests {
 
         #expect(tabBar.contains("private var minimumTabsContentWidth"))
         #expect(tabBar.contains("private var tabsContentWidth: CGFloat"))
+        #expect(tabBar.contains("private var tabFrames: [UUID: CGRect]"))
         #expect(tabBar.contains("minimumTabsContentWidth > (tabsViewportWidth + 30)"))
         #expect(!tabBar.contains("TabContentWidthPreferenceKey"))
+        #expect(!tabBar.contains("TabFramePreferenceKey"))
+        #expect(tabBar.contains(".onScrollGeometryChange(for: CGRect.self)"))
         #expect(tabBar.contains(".highPriorityGesture(dragGesture)"))
         #expect(tabBar.contains(".accessibilityLabel(\"All Tabs\")"))
         #expect(harness.contains("qa_assert_isolated_path \"$STATE_DIR\" \"$QA_HOME\""))
