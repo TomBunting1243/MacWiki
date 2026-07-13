@@ -311,10 +311,12 @@ struct BetaReadinessRegressionTests {
         let shellSource = try source("Sources/MacWiki/Views/Shared/MainWindowShell.swift")
         let readerColumnSource = try source("Sources/MacWiki/Views/Columns/ReaderColumnView.swift")
         let readerSource = try source("Sources/MacWiki/Views/Reader/ReaderView.swift")
-        let toolbarSource = try source("Sources/MacWiki/Views/Shared/ReaderArticleToolbar.swift")
+        let toolbarViewSource = try source("Sources/MacWiki/Views/Shared/ReaderArticleToolbar.swift")
+        let toolbarChromeSource = try source("Sources/MacWiki/Views/Shared/ReaderToolbarChrome.swift")
+        let toolbarSource = toolbarViewSource + "\n" + toolbarChromeSource
         let navigationSource = try source("Sources/MacWiki/App/AppState+NavigationTabs.swift")
         let toolbarBody = sourceSection(
-            toolbarSource,
+            toolbarViewSource,
             startingAt: "var body: some View",
             endingBefore: "private var navigationPill"
         )
@@ -333,11 +335,11 @@ struct BetaReadinessRegressionTests {
         #expect(readerColumnSource.contains("ReaderTabLaneBackground()"))
         #expect(toolbarBody.contains("GeometryReader"))
         #expect(toolbarBody.contains("ToolbarDensity(width: proxy.size.width)"))
-        #expect(toolbarSource.contains("private enum ToolbarDensity"))
-        #expect(toolbarSource.contains("private struct ToolbarVisibility"))
+        #expect(toolbarSource.contains("enum ReaderToolbarDensity"))
+        #expect(toolbarSource.contains("struct ReaderToolbarVisibility"))
         #expect(toolbarSource.contains("case compact"))
         #expect(toolbarSource.contains("case narrow"))
-        #expect(toolbarSource.contains("let visibility = ToolbarVisibility(width: proxy.size.width)"))
+        #expect(toolbarSource.contains("let visibility = ReaderToolbarVisibility(width: proxy.size.width)"))
         #expect(toolbarSource.contains("var hasOverflowActions: Bool"))
         #expect(toolbarSource.contains("showsBackForward = width >= 620"))
         #expect(toolbarSource.contains("showsReaderStyle = width >= 700"))
@@ -391,7 +393,7 @@ struct BetaReadinessRegressionTests {
         #expect(toolbarSource.contains("Color.primary.opacity"))
         #expect(toolbarSource.contains(".buttonStyle(.plain)"))
         #expect(toolbarSource.contains("showingMorePopover"))
-        #expect(toolbarSource.contains("morePopover(visibility: visibility)"))
+        #expect(toolbarSource.contains("ReaderToolbarOverflowPopover("))
         #expect(toolbarSource.contains(".scaleEffect(isInteractive && !reduceMotion ? 1.012 : 1)"))
         #expect(toolbarSource.contains(".animation(.easeOut(duration: 0.14), value: isHovered)"))
         #expect(!toolbarSource.contains("ControlGroup"))
