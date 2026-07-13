@@ -67,6 +67,7 @@ def main() -> int:
         "search": metrics.get("search", []),
         "sidebarHydration": metrics.get("sidebarHydration", []),
         "sessionRestore": metrics.get("sessionRestore", []),
+        "tabSwitch": metrics.get("tabSwitch", []),
         "readerColdReveal": reader_cold,
         "readerWarmReveal": reader_warm,
     }

@@ -736,6 +736,7 @@ struct BetaReadinessRegressionTests {
             "scripts/qa_discover_scroll_time_machine.sh",
             "scripts/qa_sidebar_search_width_classes.sh",
             "scripts/qa_settings_popups_smoke.sh",
+            "scripts/qa_tab_navigation_performance.sh",
             "scripts/capture_macwiki_audit_set.sh"
         ]
 
@@ -804,12 +805,29 @@ struct BetaReadinessRegressionTests {
         #expect(budgets.contains("readerColdReveal"))
         #expect(budgets.contains("readerWarmReveal"))
         #expect(budgets.contains("sidebarHydration"))
+        #expect(budgets.contains("tabSwitch"))
         #expect(budgets.contains("appWindowReadinessMilliseconds"))
         #expect(budgets.contains("discoverAccessibilityTraversalMilliseconds"))
         #expect(budgets.contains("must not be relaxed solely to pass a candidate"))
         #expect(verifier.contains("minimumSamples"))
         #expect(verifier.contains("measured <= maximum"))
         #expect(verifier.contains("Overall: **{'FAIL' if failures else 'PASS'}**"))
+    }
+
+    @Test func tabNavigationHarnessUsesNativeCommandsAndExactAXState() throws {
+        let script = try source("scripts/qa_tab_navigation_performance.sh")
+        let driver = try source("scripts/ax_tab_navigation.swift")
+
+        #expect(script.contains("qa_launch_candidate"))
+        #expect(script.contains("qa_run_command_with_timeout 30 swift"))
+        #expect(script.contains("ax_tab_navigation.swift"))
+        #expect(script.contains("performance-metrics.csv"))
+        #expect(driver.contains("AXUIElementCreateApplication"))
+        #expect(driver.contains("kAXValueAttribute"))
+        #expect(driver.contains("value.hasPrefix(\"Active tab\")"))
+        #expect(driver.contains("CGEvent(keyboardEventSource:"))
+        #expect(driver.contains("DispatchTime.now().uptimeNanoseconds"))
+        #expect(driver.contains("for _ in 0..<3"))
     }
 
     @Test func sidebarSearchOwnsItsNativeTopSafeArea() throws {

@@ -25,6 +25,12 @@
       "minimumSamples": 1,
       "scope": "Local persisted app-state decode and publication; window readiness is verified separately"
     },
+    "tabSwitch": {
+      "statistic": "p95",
+      "maximumMilliseconds": 1000,
+      "minimumSamples": 4,
+      "scope": "Native next/previous keyboard shortcut through a fresh flattened AX active-tab snapshot"
+    },
     "readerColdReveal": {
       "statistic": "maximum",
       "maximumMilliseconds": 3500,
