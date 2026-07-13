@@ -117,6 +117,19 @@ struct BetaReadinessRegressionTests {
         #expect(!sliderRow.contains(".accessibilityElement(children: .ignore)"))
     }
 
+    @Test func highlightColorButtonsExposeNamesAndSelectionState() throws {
+        let source = try source("Sources/MacWiki/Views/Components/HighlightToolbar.swift")
+        let colorPicker = sourceSection(
+            source,
+            startingAt: "private var colorPickerView",
+            endingBefore: "private var actionGroup"
+        )
+
+        #expect(colorPicker.contains(".accessibilityLabel(\"Highlight \\(color.rawValue.lowercased())\")"))
+        #expect(colorPicker.contains(".accessibilityValue(selectedColor == color ? \"Selected\" : \"\")"))
+        #expect(colorPicker.contains(".accessibilityHint(\"Creates a \\(color.rawValue.lowercased()) highlight\")"))
+    }
+
     @Test func inspectorResizeHandleHasKeyboardAccessibleAdjustment() throws {
         let inspectorSource = try source("Sources/MacWiki/Views/Inspector/InspectorPanel.swift")
         let resizeHandle = sourceSection(

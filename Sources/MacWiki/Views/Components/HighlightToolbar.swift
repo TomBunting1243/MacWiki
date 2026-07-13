@@ -84,6 +84,9 @@ struct HighlightToolbar: View {
                         }
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel("Highlight \(color.rawValue.lowercased())")
+                    .accessibilityValue(selectedColor == color ? "Selected" : "")
+                    .accessibilityHint("Creates a \(color.rawValue.lowercased()) highlight")
                     .onHover { hovering in
                         withAnimation(.easeOut(duration: 0.15)) {
                             isHoveringColor = hovering ? color : nil
