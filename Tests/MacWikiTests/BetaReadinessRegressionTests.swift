@@ -643,6 +643,23 @@ struct BetaReadinessRegressionTests {
         #expect(!profileScript.contains("APP_BINARY=\"$REPO_ROOT/.build/debug/MacWiki\""))
     }
 
+    @Test func corruptSessionHarnessUsesIsolatedStateAndExactCandidateIdentity() throws {
+        let script = try source("scripts/qa_corrupt_session_recovery.sh")
+
+        #expect(script.contains("source \"$SCRIPT_DIR/lib/qa_process_safety.sh\""))
+        #expect(script.contains("qa_prepare_isolated_home"))
+        #expect(script.contains("qa_assert_no_conflicting_processes"))
+        #expect(script.contains("qa_launch_candidate \"$FIRST_LOG\""))
+        #expect(script.contains("qa_launch_candidate \"$SECOND_LOG\""))
+        #expect(script.contains("processes.whose({ unixId: appPid })()"))
+        #expect(script.contains("app-state.corrupted.json"))
+        #expect(script.contains("tab-session.corrupted.json"))
+        #expect(script.contains("APP_SENTINEL"))
+        #expect(script.contains("TAB_SENTINEL"))
+        #expect(!script.contains("defaults delete com.tombunting.MacWiki"))
+        #expect(!script.contains("killall"))
+    }
+
     @Test func auditCaptureHarnessesCanTargetPackagedCandidate() throws {
         let captureScript = try source("scripts/capture_macwiki_window.sh")
         let captureSetScript = try source("scripts/capture_macwiki_audit_set.sh")
