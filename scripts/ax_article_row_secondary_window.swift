@@ -12,7 +12,7 @@ private enum VerificationError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .usage:
-            "Usage: ax_article_row_secondary_window.swift <pid> <expected query>"
+            "Usage: ax_article_row_secondary_window.swift <pid> <expected query> [app log path]"
         case .accessibilityUnavailable:
             "Accessibility access is unavailable."
         case .missing(let description):
@@ -29,6 +29,11 @@ private struct RowEvidence: Codable {
     let actions: [String]
 }
 
+private struct RuntimeDiagnosticCheckpoint: Codable {
+    let stage: String
+    let attributeGraphCycleCount: Int
+}
+
 private struct VerificationResult: Codable {
     let pid: Int32
     let query: String
@@ -37,6 +42,15 @@ private struct VerificationResult: Codable {
     let contextMenuAction: String
     let secondaryWindow: [String]
     let finalWindowCount: Int
+    let runtimeDiagnosticCheckpoints: [RuntimeDiagnosticCheckpoint]
+}
+
+private func attributeGraphCycleCount(in logURL: URL?) -> Int {
+    guard let logURL,
+          let contents = try? String(contentsOf: logURL, encoding: .utf8) else {
+        return 0
+    }
+    return contents.components(separatedBy: "AttributeGraph: cycle detected").count - 1
 }
 
 private func attributeValue(_ name: CFString, from element: AXUIElement) -> CFTypeRef? {
@@ -170,13 +184,26 @@ private func close(_ window: AXUIElement) throws {
 }
 
 do {
-    guard CommandLine.arguments.count == 3,
+    guard (3...4).contains(CommandLine.arguments.count),
           let pid = pid_t(CommandLine.arguments[1]) else {
         throw VerificationError.usage
     }
     guard AXIsProcessTrusted() else { throw VerificationError.accessibilityUnavailable }
 
     let query = CommandLine.arguments[2]
+    let appLogURL = CommandLine.arguments.count == 4
+        ? URL(fileURLWithPath: CommandLine.arguments[3])
+        : nil
+    var runtimeDiagnosticCheckpoints: [RuntimeDiagnosticCheckpoint] = []
+    func recordRuntimeDiagnostics(_ stage: String) {
+        runtimeDiagnosticCheckpoints.append(
+            RuntimeDiagnosticCheckpoint(
+                stage: stage,
+                attributeGraphCycleCount: attributeGraphCycleCount(in: appLogURL)
+            )
+        )
+    }
+
     let application = AXUIElementCreateApplication(pid)
     guard wait(timeout: 40, condition: { articleRows(in: application).count >= 10 }) else {
         throw VerificationError.missing("Search did not expose ten semantic article result rows.")
@@ -190,6 +217,7 @@ do {
     }) else {
         throw VerificationError.missing("An article row omitted its title, press action, or context-menu action.")
     }
+    recordRuntimeDiagnostics("initial rows")
 
     let targetTitle = initialRows.first(where: { $0.1.title == query })?.1.title ?? initialRows[0].1.title
     guard let unreadTarget = row(titled: targetTitle, in: application),
@@ -203,6 +231,7 @@ do {
     }) else {
         throw VerificationError.missing("The target row did not expose its inverse Mark as unread button.")
     }
+    recordRuntimeDiagnostics("marked read")
 
     guard let contextTarget = row(titled: targetTitle, in: application) else {
         throw VerificationError.missing("The target row disappeared before its context-menu check.")
@@ -211,6 +240,7 @@ do {
     guard menuItem(titled: "Mark as Unread", in: application) != nil else {
         throw VerificationError.missing("The article context menu did not expose the inverse Mark as Unread action.")
     }
+    recordRuntimeDiagnostics("context menu")
     guard let openInNewWindow = menuItem(titled: "Open in New Window", in: application) else {
         throw VerificationError.missing("The article context menu omitted Open in New Window.")
     }
@@ -246,11 +276,13 @@ do {
             "The secondary article window omitted: \(missingSecondaryLabels.joined(separator: ", "))."
         )
     }
+    recordRuntimeDiagnostics("secondary window")
 
     try close(articleWindow)
     guard wait(condition: { windows(in: application).count == 1 }) else {
         throw VerificationError.missing("Closing the secondary window did not preserve exactly one main window.")
     }
+    recordRuntimeDiagnostics("secondary window closed")
 
     guard let readTarget = row(titled: targetTitle, in: application),
           let markUnread = readStateButton(in: readTarget.0, help: "Mark as unread") else {
@@ -263,6 +295,7 @@ do {
     }) else {
         throw VerificationError.missing("The target row did not restore its Mark as read button.")
     }
+    recordRuntimeDiagnostics("restored unread")
 
     let result = VerificationResult(
         pid: pid,
@@ -271,7 +304,8 @@ do {
         readStateCycle: "unread -> read -> unread",
         contextMenuAction: "Open in New Window",
         secondaryWindow: expectedSecondaryLabels,
-        finalWindowCount: windows(in: application).count
+        finalWindowCount: windows(in: application).count,
+        runtimeDiagnosticCheckpoints: runtimeDiagnosticCheckpoints
     )
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.prettyPrinted, .sortedKeys]

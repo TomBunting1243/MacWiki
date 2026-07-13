@@ -48,7 +48,7 @@ qa_assert_no_conflicting_processes
 
 qa_launch_candidate "$APP_LOG"
 if ! qa_run_command_with_timeout 90 swift "$SCRIPT_DIR/ax_article_row_secondary_window.swift" \
-  "$QA_APP_PID" "$SEARCH_QUERY" >"$AX_RESULT"; then
+  "$QA_APP_PID" "$SEARCH_QUERY" "$APP_LOG" >"$AX_RESULT"; then
   echo "Article-row/secondary-window AX verification failed." >&2
   exit 1
 fi

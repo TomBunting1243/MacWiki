@@ -95,6 +95,9 @@ struct BetaReadinessRegressionTests {
         #expect(runner.contains("readStateButton(in: updated.0, help: \"Mark as unread\")"))
         #expect(runner.contains("menuItem(titled: \"Open in New Window\""))
         #expect(runner.contains("windows(in: application).count == 2"))
+        #expect(runner.contains("runtimeDiagnosticCheckpoints"))
+        #expect(runner.contains("recordRuntimeDiagnostics(\"marked read\")"))
+        #expect(runner.contains("recordRuntimeDiagnostics(\"restored unread\")"))
     }
 
     @Test func persistedColumnWidthsRejectInvalidValuesAndClampToSupportedRanges() {
