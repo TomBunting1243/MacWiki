@@ -534,6 +534,7 @@ struct ListsSidebar: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(title)
         .accessibilityIdentifier(identifier)
     }
 

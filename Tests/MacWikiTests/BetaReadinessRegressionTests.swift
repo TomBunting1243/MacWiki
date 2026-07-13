@@ -158,6 +158,7 @@ struct BetaReadinessRegressionTests {
         #expect(sidebar.contains("identifier: \"sidebar-new-label-empty\""))
         #expect(sidebar.contains("title: \"New Tag\""))
         #expect(sidebar.contains("identifier: \"sidebar-new-tag-empty\""))
+        #expect(sidebar.contains(".accessibilityLabel(title)"))
     }
 
     @Test func iconOnlyReaderAndFilterControlsExposeState() throws {
