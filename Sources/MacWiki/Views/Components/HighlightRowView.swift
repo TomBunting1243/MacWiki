@@ -27,10 +27,6 @@ struct HighlightRowView: View {
         return isExpanded ? "Collapse this highlight." : "Expand this highlight."
     }
 
-    private var rowActivationActionName: Text {
-        Text(isEditing ? "Select Highlight" : (isExpanded ? "Collapse Highlight" : "Expand Highlight"))
-    }
-
     var body: some View {
         interactiveRow
             .contextMenu {
@@ -50,11 +46,6 @@ struct HighlightRowView: View {
 
     private var interactiveRow: some View {
         styledRowContent
-            .contentShape(Rectangle())
-            .onTapGesture(perform: activateHighlightRow)
-            .accessibilityAddTraits(.isButton)
-            .accessibilityHint(rowActivationHint)
-            .accessibilityAction(named: rowActivationActionName, activateHighlightRow)
             .onHover { hovering in
                 withAnimation(.easeOut(duration: 0.15)) {
                     isHovered = hovering
@@ -87,68 +78,79 @@ struct HighlightRowView: View {
     }
 
     private var rowContent: some View {
-        HStack(alignment: .top, spacing: 12) {
-            VStack(alignment: .leading, spacing: 10) {
-                labelRow
+        VStack(alignment: .leading, spacing: 10) {
+            Button(action: activateHighlightRow) {
+                rowSummary
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint(rowActivationHint)
 
-                if isExpanded {
-                    Text(highlight.text)
-                        .font(.callout)
-                        .lineSpacing(2)
-                        .foregroundStyle(.primary)
-                        .layoutPriority(1)
-                } else {
-                    Text(highlight.text)
-                        .font(.callout)
-                        .lineLimit(3)
-                        .lineSpacing(2)
-                        .truncationMode(.tail)
-                        .foregroundStyle(.primary)
-                        .layoutPriority(1)
-                }
+            if isEditing {
+                noteEditor
+            }
 
-                if let note = highlight.note, !note.isEmpty {
-                    Text(note)
-                        .font(MacWikiTypography.settingsHelp)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(isExpanded ? nil : 3)
-                }
+            actionRow
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
 
-                if isEditing {
-                    noteEditor
-                }
+    private var rowSummary: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            labelRow
 
-                actionRow
+            if isExpanded {
+                Text(highlight.text)
+                    .font(.callout)
+                    .lineSpacing(2)
+                    .foregroundStyle(.primary)
+                    .layoutPriority(1)
+            } else {
+                Text(highlight.text)
+                    .font(.callout)
+                    .lineLimit(3)
+                    .lineSpacing(2)
+                    .truncationMode(.tail)
+                    .foregroundStyle(.primary)
+                    .layoutPriority(1)
+            }
 
-                if highlight.isStale {
-                    HStack(spacing: 6) {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .font(.system(size: 9))
-                        Text("Article updated — highlight may be out of date")
-                            .lineLimit(1)
-                    }
-                    .font(.caption2)
-                    .foregroundStyle(.orange)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 4)
-                    .background(Color.orange.opacity(colorScheme == .dark ? 0.18 : 0.12), in: Capsule())
-                }
-
-                if highlight.isArchived {
-                    HStack(spacing: 6) {
-                        Image(systemName: "archivebox.fill")
-                            .font(.system(size: 9))
-                        Text("Archived — hidden from article rendering")
-                            .lineLimit(1)
-                    }
-                    .font(.caption2)
+            if let note = highlight.note, !note.isEmpty {
+                Text(note)
+                    .font(MacWikiTypography.settingsHelp)
                     .foregroundStyle(.secondary)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 4)
-                    .background(Color.gray.opacity(colorScheme == .dark ? 0.18 : 0.10), in: Capsule())
+                    .lineLimit(isExpanded ? nil : 3)
+            }
+
+            if highlight.isStale {
+                HStack(spacing: 6) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 9))
+                    Text("Article updated — highlight may be out of date")
+                        .lineLimit(1)
                 }
+                .font(.caption2)
+                .foregroundStyle(.orange)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 4)
+                .background(Color.orange.opacity(colorScheme == .dark ? 0.18 : 0.12), in: Capsule())
+            }
+
+            if highlight.isArchived {
+                HStack(spacing: 6) {
+                    Image(systemName: "archivebox.fill")
+                        .font(.system(size: 9))
+                    Text("Archived — hidden from article rendering")
+                        .lineLimit(1)
+                }
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 4)
+                .background(Color.gray.opacity(colorScheme == .dark ? 0.18 : 0.10), in: Capsule())
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
     }
 
     private var labelRow: some View {

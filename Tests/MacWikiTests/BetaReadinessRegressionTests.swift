@@ -147,6 +147,9 @@ struct BetaReadinessRegressionTests {
         let source = try source("Sources/MacWiki/Views/Components/HighlightRowView.swift")
         #expect(source.contains(".accessibilityLabel(\"Highlight note\")"))
         #expect(source.contains(".accessibilityIdentifier(\"highlight-note-editor\")"))
+        #expect(source.contains("Button(action: activateHighlightRow)"))
+        #expect(!source.contains(".onTapGesture(perform: activateHighlightRow)"))
+        #expect(!source.contains(".accessibilityAddTraits(.isButton)"))
     }
 
     @Test func folderAccessibilityIdentityDoesNotOverrideNestedListIdentity() throws {

@@ -179,6 +179,20 @@ private func trace(_ stage: String) {
     fputs("\(ISO8601DateFormatter().string(from: Date())) \(stage)\n", stderr)
 }
 
+private func traceEditableCandidates(in application: AXUIElement) {
+    for candidate in elements(in: application) {
+        let candidateRole = role(of: candidate)
+        let candidateStrings = strings(of: candidate)
+        let isRelevantRole = candidateRole.contains("Text") || candidateRole.contains("Edit")
+        let isRelevantLabel = candidateStrings.contains { value in
+            value.localizedCaseInsensitiveContains("note")
+        }
+        guard isRelevantRole || isRelevantLabel else { continue }
+        let identifier = stringAttribute(kAXIdentifierAttribute as CFString, from: candidate)
+        trace("candidate role=\(candidateRole) identifier=\(identifier) strings=\(candidateStrings) actions=\(actionNames(of: candidate))")
+    }
+}
+
 do {
     guard CommandLine.arguments.count == 4,
           let pid = pid_t(CommandLine.arguments[1]) else {
@@ -212,6 +226,7 @@ do {
         }
         return resolvedEditor != nil
     }), let editor = resolvedEditor else {
+        traceEditableCandidates(in: application)
         throw MutationError.missing("Highlight note editor did not expose named editable text.")
     }
     let valueResult = AXUIElementSetAttributeValue(editor, kAXValueAttribute as CFString, noteText as CFString)
