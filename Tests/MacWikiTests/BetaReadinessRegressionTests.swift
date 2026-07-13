@@ -51,7 +51,7 @@ struct BetaReadinessRegressionTests {
 
     @Test func articleListRowsExposeArticleIdentityAndIndependentReadAction() throws {
         let rowSource = try source("Sources/MacWiki/Views/Sidebar/Directory/ArticleListAccessibility.swift")
-        #expect(rowSource.contains(".accessibilityElement(children: .contain)"))
+        #expect(!rowSource.contains(".accessibilityElement(children: .contain)"))
         #expect(rowSource.contains(".accessibilityInputLabels([title])"))
         #expect(rowSource.contains(".accessibilityValue(title)"))
         #expect(rowSource.contains("Use the context menu for read status and organization actions."))

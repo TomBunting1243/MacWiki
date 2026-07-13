@@ -6,7 +6,6 @@ struct ArticleListAccessibilityModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .accessibilityElement(children: .contain)
             .accessibilityLabel(title)
             .accessibilityInputLabels([title])
             .accessibilityValue(title)
