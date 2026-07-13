@@ -9,7 +9,6 @@ struct ArticleListItem<Content: View>: View {
     let onToggleRead: (() -> Void)?
     let onTap: () -> Void
     let label: Label?
-    let usesDefaultAccessibilitySemantics: Bool
     @ViewBuilder let content: (Bool, Label?) -> Content
 
     @AppStorage(AppStorageKey.Labels.displayMode) private var labelDisplayMode: LabelDisplayMode = .rowHighlight
@@ -62,7 +61,6 @@ struct ArticleListItem<Content: View>: View {
         isSelected: Bool = false,
         label: Label? = nil,
         onToggleRead: (() -> Void)? = nil,
-        usesDefaultAccessibilitySemantics: Bool = true,
         onTap: @escaping () -> Void,
         @ViewBuilder content: @escaping (Bool, Label?) -> Content
     ) {
@@ -73,7 +71,6 @@ struct ArticleListItem<Content: View>: View {
         self.isSelected = isSelected
         self.label = label
         self.onToggleRead = onToggleRead
-        self.usesDefaultAccessibilitySemantics = usesDefaultAccessibilitySemantics
         self.onTap = onTap
         self.content = content
     }
@@ -142,8 +139,9 @@ struct ArticleListItem<Content: View>: View {
         .modifier(
             ArticleListAccessibilityModifier(
                 title: accessibilityTitle,
+                isRead: isRead,
                 onOpen: onTap,
-                isEnabled: usesDefaultAccessibilitySemantics
+                onToggleRead: onToggleRead
             )
         )
     }

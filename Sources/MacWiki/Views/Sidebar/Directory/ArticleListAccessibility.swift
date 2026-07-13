@@ -2,14 +2,14 @@ import SwiftUI
 
 struct ArticleListAccessibilityModifier: ViewModifier {
     let title: String
+    let isRead: Bool
     let onOpen: () -> Void
-    let isEnabled: Bool
+    let onToggleRead: (() -> Void)?
 
     @ViewBuilder
     func body(content: Content) -> some View {
-        if isEnabled {
+        if let onToggleRead {
             content
-                .accessibilityElement(children: .contain)
                 .accessibilityLabel(title)
                 .accessibilityInputLabels([title])
                 .accessibilityValue(title)
@@ -18,8 +18,20 @@ struct ArticleListAccessibilityModifier: ViewModifier {
                 .accessibilityAction {
                     onOpen()
                 }
+                .accessibilityAction(
+                    named: Text(isRead ? "Mark as unread" : "Mark as read"),
+                    onToggleRead
+                )
         } else {
             content
+                .accessibilityLabel(title)
+                .accessibilityInputLabels([title])
+                .accessibilityValue(title)
+                .accessibilityHint("Open \(title). Use the context menu for organization actions.")
+                .accessibilityAddTraits(.isButton)
+                .accessibilityAction {
+                    onOpen()
+                }
         }
     }
 }

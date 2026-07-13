@@ -98,6 +98,17 @@ private func actionNames(of element: AXUIElement) -> [String] {
     return names as? [String] ?? []
 }
 
+private func customActions(of element: AXUIElement) -> [AXUIElement] {
+    attributeValue("AXCustomActions" as CFString, from: element) as? [AXUIElement] ?? []
+}
+
+private func customAction(titled title: String, on element: AXUIElement) -> AXUIElement? {
+    customActions(of: element).first { action in
+        stringAttribute(kAXTitleAttribute as CFString, from: action) == title ||
+            stringAttribute(kAXDescriptionAttribute as CFString, from: action) == title
+    }
+}
+
 private func perform(_ action: String, on element: AXUIElement, description: String) throws {
     let result = AXUIElementPerformAction(element, action as CFString)
     guard result == .success else { throw VerificationError.actionFailed(description, result) }
@@ -139,21 +150,36 @@ private func row(titled title: String, in application: AXUIElement) -> (AXUIElem
     articleRows(in: application).first { $0.1.title == title }
 }
 
-private func readStateButton(
+private func hasReadStateAction(
     for row: AXUIElement,
-    in application: AXUIElement,
-    help: String
-) -> AXUIElement? {
-    let rowIdentifier = stringAttribute(kAXIdentifierAttribute as CFString, from: row)
-    let readIdentifier = rowIdentifier.hasSuffix(".open")
-        ? String(rowIdentifier.dropLast(".open".count)) + ".read"
-        : ""
-
-    return elements(in: application).first { element in
-        stringAttribute(kAXRoleAttribute as CFString, from: element) == kAXButtonRole as String &&
-            (readIdentifier.isEmpty || stringAttribute(kAXIdentifierAttribute as CFString, from: element) == readIdentifier) &&
-            stringAttribute(kAXHelpAttribute as CFString, from: element) == help
+    named title: String
+) -> Bool {
+    if actionNames(of: row).contains(title) || customAction(titled: title, on: row) != nil {
+        return true
     }
+    return elements(in: row).contains { element in
+        stringAttribute(kAXRoleAttribute as CFString, from: element) == kAXButtonRole as String &&
+            stringAttribute(kAXHelpAttribute as CFString, from: element) == title
+    }
+}
+
+private func performReadStateAction(named title: String, on row: AXUIElement) throws {
+    if actionNames(of: row).contains(title) {
+        try perform(title, on: row, description: title)
+        return
+    }
+    if let action = customAction(titled: title, on: row) {
+        try perform(kAXPressAction as String, on: action, description: title)
+        return
+    }
+    if let button = elements(in: row).first(where: { element in
+        stringAttribute(kAXRoleAttribute as CFString, from: element) == kAXButtonRole as String &&
+            stringAttribute(kAXHelpAttribute as CFString, from: element) == title
+    }) {
+        try perform(kAXPressAction as String, on: button, description: title)
+        return
+    }
+    throw VerificationError.missing("The target row omitted its \(title) accessibility action.")
 }
 
 private func menuItem(titled title: String, in application: AXUIElement) -> AXUIElement? {
@@ -231,13 +257,13 @@ do {
 
     let targetTitle = initialRows.first(where: { $0.1.title == query })?.1.title ?? initialRows[0].1.title
     guard let unreadTarget = row(titled: targetTitle, in: application),
-          let markRead = readStateButton(for: unreadTarget.0, in: application, help: "Mark as read") else {
-        throw VerificationError.missing("The target row omitted its independent Mark as read button.")
+          hasReadStateAction(for: unreadTarget.0, named: "Mark as read") else {
+        throw VerificationError.missing("The target row omitted its Mark as read accessibility action.")
     }
-    try perform(kAXPressAction as String, on: markRead, description: "Mark target article as read")
+    try performReadStateAction(named: "Mark as read", on: unreadTarget.0)
     guard wait(condition: {
         guard let updated = row(titled: targetTitle, in: application) else { return false }
-        return readStateButton(for: updated.0, in: application, help: "Mark as unread") != nil
+        return hasReadStateAction(for: updated.0, named: "Mark as unread")
     }) else {
         throw VerificationError.missing("The target row did not expose its inverse Mark as unread button.")
     }
@@ -295,13 +321,13 @@ do {
     recordRuntimeDiagnostics("secondary window closed")
 
     guard let readTarget = row(titled: targetTitle, in: application),
-          let markUnread = readStateButton(for: readTarget.0, in: application, help: "Mark as unread") else {
-        throw VerificationError.missing("The restored main-window row omitted Mark as unread.")
+          hasReadStateAction(for: readTarget.0, named: "Mark as unread") else {
+        throw VerificationError.missing("The restored main-window row omitted its Mark as unread accessibility action.")
     }
-    try perform(kAXPressAction as String, on: markUnread, description: "Restore target article to unread")
+    try performReadStateAction(named: "Mark as unread", on: readTarget.0)
     guard wait(condition: {
         guard let restored = row(titled: targetTitle, in: application) else { return false }
-        return readStateButton(for: restored.0, in: application, help: "Mark as read") != nil
+        return hasReadStateAction(for: restored.0, named: "Mark as read")
     }) else {
         throw VerificationError.missing("The target row did not restore its Mark as read button.")
     }
