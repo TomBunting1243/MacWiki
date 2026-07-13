@@ -158,6 +158,7 @@ struct MacWikiApp: App {
         self.bootstrap = bootstrap
         _appState = State(initialValue: appState)
         _launchIssue = State(initialValue: nil)
+        MacWikiQAFixtureSeeder.seedRequestedFixtures(in: bootstrap.modelContainer)
         MacWikiRuntime.shared.configure(
             appState: appState,
             modelContainer: bootstrap.modelContainer,

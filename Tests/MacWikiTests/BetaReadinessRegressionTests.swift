@@ -1023,6 +1023,8 @@ struct BetaReadinessRegressionTests {
             "scripts/qa_context_menu_accessibility.sh",
             "scripts/qa_context_menu_ocr.sh",
             "scripts/qa_folder_collapse_selected_list.sh",
+            "scripts/qa_highlight_mutation.sh",
+            "scripts/qa_label_tag_mutation.sh",
             "scripts/qa_menu_window_states.sh",
             "scripts/qa_nested_folder_rename.sh",
             "scripts/qa_organization_accessibility.sh",
@@ -1080,8 +1082,10 @@ struct BetaReadinessRegressionTests {
         let menuHarness = try source("scripts/qa_menu_window_states.sh")
         let contextHarness = try source("scripts/qa_context_menu_accessibility.sh")
         let organizationHarness = try source("scripts/qa_organization_accessibility.sh")
+        let highlightHarness = try source("scripts/qa_highlight_mutation.sh")
+        let labelTagHarness = try source("scripts/qa_label_tag_mutation.sh")
 
-        for harness in [menuHarness, contextHarness, organizationHarness] {
+        for harness in [menuHarness, contextHarness, organizationHarness, highlightHarness, labelTagHarness] {
             #expect(harness.contains("source \"$SCRIPT_DIR/lib/qa_process_safety.sh\""))
             #expect(harness.contains("qa_prepare_isolated_home"))
             #expect(harness.contains("qa_assert_no_conflicting_processes"))
@@ -1107,6 +1111,15 @@ struct BetaReadinessRegressionTests {
         #expect(organizationHarness.contains("'Red', 'Orange', 'Yellow', 'Green', 'Blue', 'Purple', 'Pink', 'Gray'"))
         #expect(organizationHarness.contains("observations.tagSheet.createEnabled === false"))
         #expect(contextHarness.contains("AXShowMenu"))
+        #expect(highlightHarness.contains("qa.fixture.highlight.articleTitle"))
+        #expect(highlightHarness.contains("qa.fixture.highlight.text"))
+        #expect(highlightHarness.contains("qa_assert_isolated_path \"$STORE_PATH\" \"$QA_HOME\""))
+        #expect(highlightHarness.contains("Delete Highlight"))
+        #expect(highlightHarness.contains("SELECT count(*) FROM ZHIGHLIGHT"))
+        #expect(labelTagHarness.contains("createRenameDelete('New Label'"))
+        #expect(labelTagHarness.contains("createRenameDelete('New Tag'"))
+        #expect(labelTagHarness.contains("SELECT count(*) FROM ZLABEL"))
+        #expect(labelTagHarness.contains("SELECT count(*) FROM ZTAG"))
     }
 
     @Test func unquotedShellHeredocsCannotExecuteMarkdownBackticks() throws {
