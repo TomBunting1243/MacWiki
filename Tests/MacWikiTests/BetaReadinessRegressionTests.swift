@@ -660,6 +660,28 @@ struct BetaReadinessRegressionTests {
         #expect(!script.contains("killall"))
     }
 
+    @Test func aboutHarnessVerifiesRenderedAndPackagedProvenance() throws {
+        let script = try source("scripts/qa_about_provenance.sh")
+
+        #expect(script.contains("CFBundleShortVersionString"))
+        #expect(script.contains("CFBundleVersion"))
+        #expect(script.contains("BuildInfo.plist"))
+        #expect(script.contains("[[ \"$VERSION\" == 1.0* ]]"))
+        #expect(script.contains("[[ \"$TRACE_DIRTY\" == \"false\" ]]"))
+        #expect(script.contains("processes.whose({ unixId: appPid })()"))
+        #expect(script.contains("menuItems.byName('About MacWiki').click()"))
+        #expect(script.contains("qa_launch_candidate \"$APP_LOG\""))
+        #expect(!script.contains("se.processes.byName"))
+
+        let axDriver = try source("scripts/ax_about_snapshot.swift")
+        #expect(axDriver.contains("AXUIElementCreateApplication(pid)"))
+        #expect(axDriver.contains("kAXDialogSubrole"))
+        #expect(axDriver.contains("A native macOS Wikipedia client."))
+        #expect(axDriver.contains("GitHub Repository"))
+        #expect(axDriver.contains("Apache-2.0"))
+        #expect(axDriver.contains("MacWiki Trademark"))
+    }
+
     @Test func auditCaptureHarnessesCanTargetPackagedCandidate() throws {
         let captureScript = try source("scripts/capture_macwiki_window.sh")
         let captureSetScript = try source("scripts/capture_macwiki_audit_set.sh")
