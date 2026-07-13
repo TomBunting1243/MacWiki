@@ -883,6 +883,7 @@ struct BetaReadinessRegressionTests {
             "scripts/qa_folder_collapse_selected_list.sh",
             "scripts/qa_menu_window_states.sh",
             "scripts/qa_nested_folder_rename.sh",
+            "scripts/qa_reader_inspector_journey.sh",
             "scripts/qa_discover_scroll_time_machine.sh",
             "scripts/qa_sidebar_search_width_classes.sh",
             "scripts/qa_settings_popups_smoke.sh",
@@ -1004,6 +1005,28 @@ struct BetaReadinessRegressionTests {
                 unquotedDelimiter = String(line[delimiterRange])
             }
         }
+    }
+
+    @Test func readerInspectorHarnessUsesExactPackagedStateAndNativeAXActions() throws {
+        let harness = try source("scripts/qa_reader_inspector_journey.sh")
+        let driver = try source("scripts/ax_reader_inspector_journey.swift")
+
+        #expect(harness.contains("source \"$SCRIPT_DIR/lib/qa_process_safety.sh\""))
+        #expect(harness.contains("STATE_DIR=\"$QA_HOME/Library/Application Support/MacWiki\""))
+        #expect(harness.contains("qa_prepare_isolated_home"))
+        #expect(harness.contains("qa_assert_no_conflicting_processes"))
+        #expect(harness.contains("qa_launch_candidate \"$APP_LOG\""))
+        #expect(harness.contains("[[ \"$VERSION\" == 1.0* ]]"))
+        #expect(harness.contains("if ! qa_run_command_with_timeout 70 swift"))
+        #expect(harness.contains("\"$QA_APP_PID\" \"$ARTICLE_TITLE\""))
+
+        #expect(driver.contains("AXUIElementCreateApplication(pid)"))
+        #expect(driver.contains("kAXPressAction"))
+        #expect(driver.contains("No Highlights Yet"))
+        #expect(driver.contains("No References Found"))
+        #expect(driver.contains("Find in page"))
+        #expect(driver.contains("Toggle Inspector"))
+        #expect(driver.contains("Open in Browser (More)"))
     }
 
     @Test func widthClassHarnessUsesReachableVerifiedWindowSizes() throws {
