@@ -36,6 +36,8 @@ struct NewListSheet: View {
                 }
                 .buttonStyle(.plain)
                 .help("Choose icon")
+                .accessibilityLabel("Choose list icon")
+                .accessibilityValue(selectedIcon)
                 
                 // Name field
                 TextField("Name", text: $name)

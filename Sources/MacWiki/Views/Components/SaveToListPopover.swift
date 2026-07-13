@@ -75,6 +75,9 @@ struct SaveToListPopover: View {
                                 .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
+                            .accessibilityLabel(list.name)
+                            .accessibilityValue(isSaved ? "Saved" : "Not saved")
+                            .accessibilityHint("Toggles this article in the list")
                         }
                     }
                 }

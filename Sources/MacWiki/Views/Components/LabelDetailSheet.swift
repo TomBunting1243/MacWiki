@@ -39,6 +39,8 @@ struct LabelDetailSheet: View {
                         .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("Choose label color")
+                .accessibilityValue(selectedColor.rawValue)
                 .popover(isPresented: $showColorPopover, arrowEdge: .bottom) {
                     VStack(spacing: 12) {
                         Text("Select Color")
@@ -67,6 +69,8 @@ struct LabelDetailSheet: View {
                                 }
                                 .buttonStyle(.plain)
                                 .help(color.rawValue)
+                                .accessibilityLabel(color.rawValue)
+                                .accessibilityValue(selectedColor == color ? "Selected" : "")
                             }
                         }
                     }

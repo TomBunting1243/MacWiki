@@ -40,6 +40,7 @@ struct AddToListSheet: View {
                 }
                 .buttonStyle(.plain)
                 .keyboardShortcut(.cancelAction)
+                .accessibilityLabel("Close Add to List")
             }
             .padding()
             
@@ -89,6 +90,8 @@ struct AddToListSheet: View {
                                 .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
+                            .accessibilityLabel(list.name)
+                            .accessibilityValue("\(list.articles.count) articles")
                         }
                     }
                     

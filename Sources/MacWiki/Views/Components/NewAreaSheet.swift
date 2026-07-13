@@ -35,6 +35,8 @@ struct NewAreaSheet: View {
                 }
                 .buttonStyle(.plain)
                 .help("Choose icon")
+                .accessibilityLabel("Choose folder icon")
+                .accessibilityValue(selectedIcon)
                 
                 // Name field
                 TextField("Name", text: $name)

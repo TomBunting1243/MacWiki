@@ -160,6 +160,7 @@ struct SFSymbolPicker: View {
                             .foregroundStyle(.secondary)
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel("Clear symbol search")
                 }
             }
             .padding(8)
@@ -237,6 +238,8 @@ struct SFSymbolPicker: View {
                 }
                 .buttonStyle(.plain)
                 .help(symbol)
+                .accessibilityLabel("Select \(symbol)")
+                .accessibilityValue(selectedSymbol == symbol ? "Selected" : "")
             }
         }
     }

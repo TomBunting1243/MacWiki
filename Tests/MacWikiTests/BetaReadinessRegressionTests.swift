@@ -130,6 +130,29 @@ struct BetaReadinessRegressionTests {
         #expect(colorPicker.contains(".accessibilityHint(\"Creates a \\(color.rawValue.lowercased()) highlight\")"))
     }
 
+    @Test func iconOnlyOrganizationControlsExposeNamesAndValues() throws {
+        let newList = try source("Sources/MacWiki/Views/Components/NewListSheet.swift")
+        let newFolder = try source("Sources/MacWiki/Views/Components/NewAreaSheet.swift")
+        let labelDetail = try source("Sources/MacWiki/Views/Components/LabelDetailSheet.swift")
+        let symbolPicker = try source("Sources/MacWiki/Views/Components/SFSymbolPicker.swift")
+        let addToList = try source("Sources/MacWiki/Views/Components/AddToListSheet.swift")
+        let saveToList = try source("Sources/MacWiki/Views/Components/SaveToListPopover.swift")
+
+        #expect(newList.contains(".accessibilityLabel(\"Choose list icon\")"))
+        #expect(newList.contains(".accessibilityValue(selectedIcon)"))
+        #expect(newFolder.contains(".accessibilityLabel(\"Choose folder icon\")"))
+        #expect(newFolder.contains(".accessibilityValue(selectedIcon)"))
+        #expect(labelDetail.contains(".accessibilityLabel(\"Choose label color\")"))
+        #expect(labelDetail.contains(".accessibilityValue(selectedColor.rawValue)"))
+        #expect(labelDetail.contains(".accessibilityValue(selectedColor == color ? \"Selected\" : \"\")"))
+        #expect(symbolPicker.contains(".accessibilityLabel(\"Clear symbol search\")"))
+        #expect(symbolPicker.contains(".accessibilityLabel(\"Select \\(symbol)\")"))
+        #expect(symbolPicker.contains(".accessibilityValue(selectedSymbol == symbol ? \"Selected\" : \"\")"))
+        #expect(addToList.contains(".accessibilityLabel(\"Close Add to List\")"))
+        #expect(addToList.contains(".accessibilityValue(\"\\(list.articles.count) articles\")"))
+        #expect(saveToList.contains(".accessibilityValue(isSaved ? \"Saved\" : \"Not saved\")"))
+    }
+
     @Test func inspectorResizeHandleHasKeyboardAccessibleAdjustment() throws {
         let inspectorSource = try source("Sources/MacWiki/Views/Inspector/InspectorPanel.swift")
         let resizeHandle = sourceSection(
