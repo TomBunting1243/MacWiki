@@ -665,26 +665,44 @@ struct BetaReadinessRegressionTests {
     }
 
     @Test func customLiquidGlassChromeUsesSharedGroupingAndPolicy() throws {
-        let floatingGlassSources = [
+        let singleSurfaceGlassSources = [
             "Sources/MacWiki/Views/Components/FindOnPageBarView.swift",
             "Sources/MacWiki/Views/Components/HighlightToolbar.swift",
             "Sources/MacWiki/Views/Components/WikiHopOverlay.swift",
-            "Sources/MacWiki/Views/Components/WebView/WebViewLinkHoverPreviewPane.swift",
-            "Sources/MacWiki/Views/Reader/ReaderView.swift"
+            "Sources/MacWiki/Views/Components/WebView/WebViewLinkHoverPreviewPane.swift"
         ]
 
-        for path in floatingGlassSources {
+        for path in singleSurfaceGlassSources {
             let source = try source(path)
-            #expect(source.contains("MacWikiGlassGroup("))
+            #expect(!source.contains("MacWikiGlassGroup("))
             #expect(source.contains("AppStorageKey.Chrome.liquidGlassChrome"))
             #expect(!source.contains("AppStorageKey.Chrome.tabBarLiquidGlass"))
             #expect(source.contains("MacWikiGlassRuntime.usesNativeGlass("))
             #expect(source.contains("isEnabled: liquidGlassChrome"))
+            #expect(source.contains(".glassEffect("))
+            #expect(source.contains("reduceTransparency"))
         }
 
         let tabBarSource = try source("Sources/MacWiki/Views/Components/TabBarView.swift")
+        let tabItemSource = try source("Sources/MacWiki/Views/Components/ReaderTabItemView.swift")
+        let tabAccessorySource = try source("Sources/MacWiki/Views/Components/ReaderTabAccessoryCluster.swift")
+        let readerSource = try source("Sources/MacWiki/Views/Reader/ReaderView.swift")
+        let glassGroupSource = try source("Sources/MacWiki/Views/Shared/MacWikiGlass.swift")
+
         #expect(tabBarSource.contains("AppStorageKey.Chrome.liquidGlassChrome"))
+        #expect(tabBarSource.contains("MacWikiGlassGroup(spacing: tabSpacing)"))
         #expect(!tabBarSource.contains("usesNativeStripGlassCells"))
+        #expect(tabItemSource.contains(".regular.tint(tint).interactive()"))
+        #expect(tabItemSource.contains("MacWikiGlassRuntime.usesNativeGlass("))
+        #expect(!tabItemSource.contains(".compositingGroup()"))
+        #expect(tabAccessorySource.contains("MacWikiGlassGroup(spacing: 8)"))
+        #expect(tabAccessorySource.contains(".regular.interactive()"))
+        #expect(readerSource.contains("MacWikiGlassGroup(spacing: 7)"))
+        #expect(readerSource.contains("usesNativeReaderGlass"))
+        #expect(readerSource.contains("if accessibilityPersonalization.reduceTransparency"))
+        #expect(!readerSource.contains(".compositingGroup()"))
+        #expect(glassGroupSource.contains("GlassEffectContainer(spacing: spacing)"))
+        #expect(!glassGroupSource.contains("@AppStorage"))
 
         let laneSource = try source("Sources/MacWiki/Views/Shared/ColumnTopBar.swift")
         #expect(laneSource.contains("ReaderTabLaneBackground"))

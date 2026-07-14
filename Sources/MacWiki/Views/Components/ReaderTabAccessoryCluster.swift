@@ -148,7 +148,11 @@ struct ReaderTabAccessoryCluster: View {
         let increasedContrast = accessibilityPersonalization.colorSchemeContrast == .increased
 
         return shape
-            .fill(.thinMaterial)
+            .fill(.clear)
+            .glassEffect(
+                .regular.interactive(),
+                in: .rect(cornerRadius: cornerRadius)
+            )
             .overlay {
                 shape
                     .fill(

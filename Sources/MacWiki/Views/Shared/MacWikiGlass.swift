@@ -17,8 +17,6 @@ enum MacWikiGlassRuntime {
 }
 
 struct MacWikiGlassGroup<Content: View>: View {
-    @AppStorage(AppStorageKey.Chrome.liquidGlassChrome) private var liquidGlassChrome = true
-    @AppStorage(MacWikiGlassRuntime.forceLegacyFallbackKey) private var forceLegacyGlassFallback = false
     private let spacing: CGFloat
     private let content: Content
 
@@ -28,11 +26,7 @@ struct MacWikiGlassGroup<Content: View>: View {
     }
 
     var body: some View {
-        if #available(macOS 26, *),
-           MacWikiGlassRuntime.usesNativeGlass(
-            isEnabled: liquidGlassChrome,
-            forceLegacyFallback: forceLegacyGlassFallback
-           ) {
+        if #available(macOS 26, *) {
             GlassEffectContainer(spacing: spacing) {
                 content
             }

@@ -209,7 +209,11 @@ struct LinkHoverPreviewPane: View {
         .clipShape(RoundedRectangle(cornerRadius: LinkHoverGlassMetrics.cornerRadius, style: .continuous))
         .overlay(glassBorder)
         .shadow(
-            color: .black.opacity(isDarkMode ? 0.18 : 0.08),
+            color: .black.opacity(
+                accessibilityPersonalization.reduceTransparency
+                    ? 0
+                    : (isDarkMode ? 0.18 : 0.08)
+            ),
             radius: 14,
             y: 6
         )
@@ -303,8 +307,12 @@ struct LinkHoverPreviewPane: View {
     private var glassBorder: some View {
         RoundedRectangle(cornerRadius: LinkHoverGlassMetrics.cornerRadius, style: .continuous)
             .strokeBorder(
-                Color.primary.opacity(isDarkMode ? 0.080 : 0.050),
-                lineWidth: 0.55
+                Color.primary.opacity(
+                    accessibilityPersonalization.colorSchemeContrast == .increased
+                        ? 0.30
+                        : (isDarkMode ? 0.080 : 0.050)
+                ),
+                lineWidth: accessibilityPersonalization.colorSchemeContrast == .increased ? 1 : 0.55
             )
     }
 

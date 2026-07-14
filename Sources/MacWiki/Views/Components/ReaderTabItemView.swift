@@ -5,6 +5,7 @@ struct ReaderTabItemView: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.controlActiveState) private var controlActiveState
     @Environment(\.macWikiAccessibilityPersonalization) private var accessibilityPersonalization
+    @AppStorage(MacWikiGlassRuntime.forceLegacyFallbackKey) private var forceLegacyGlassFallback = false
 
     let tab: ArticleTab
     let lists: [ReadingList]
@@ -72,6 +73,13 @@ struct ReaderTabItemView: View {
 
     private var increasedContrast: Bool {
         accessibilityPersonalization.colorSchemeContrast == .increased
+    }
+
+    private var usesNativeGlass: Bool {
+        MacWikiGlassRuntime.usesNativeGlass(
+            isEnabled: liquidGlassChrome,
+            forceLegacyFallback: forceLegacyGlassFallback
+        ) && !accessibilityPersonalization.reduceTransparency
     }
 
     private var showsSavedMarker: Bool {
@@ -211,7 +219,6 @@ struct ReaderTabItemView: View {
         )
         .offset(x: isDragged ? dragOffset : shiftAmount, y: activeLiftYOffset)
         .zIndex(isDragged ? 100 : 0)
-        .compositingGroup()
         .modifier(
             TabReorderDragModifier(
                 minimumDistance: interactionProfile.dragStartDistance,
@@ -268,6 +275,31 @@ struct ReaderTabItemView: View {
                         Color.primary.opacity(increasedContrast ? 0.34 : (isActive ? 0.16 : 0.09)),
                         lineWidth: increasedContrast ? 1 : 0.5
                     )
+                }
+        } else if #available(macOS 26, *), usesNativeGlass {
+            let tint: Color = {
+                if isActive && isKeyWindow {
+                    return Color.accentColor.opacity(colorScheme == .dark ? 0.20 : 0.15)
+                }
+                if isActive {
+                    return Color.primary.opacity(0.055)
+                }
+                if isHovered {
+                    return Color.primary.opacity(0.035)
+                }
+                return .clear
+            }()
+            let shape = RoundedRectangle(cornerRadius: tabCornerRadius, style: .continuous)
+            shape
+                .fill(.clear)
+                .glassEffect(
+                    .regular.tint(tint).interactive(),
+                    in: .rect(cornerRadius: tabCornerRadius)
+                )
+                .overlay {
+                    if increasedContrast {
+                        shape.strokeBorder(Color.primary.opacity(0.30), lineWidth: 1)
+                    }
                 }
         } else if liquidGlassChrome {
             let edgeOpacity = darkMode

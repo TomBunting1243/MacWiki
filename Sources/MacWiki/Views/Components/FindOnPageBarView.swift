@@ -109,20 +109,18 @@ struct FindOnPageBarView: View {
     var body: some View {
         @Bindable var appState = appState
 
-        MacWikiGlassGroup(spacing: 8) {
-            HStack(spacing: 8) {
-                searchFieldGroup
+        HStack(spacing: 8) {
+            searchFieldGroup
 
-                if !isCompactLayout {
-                    statusChip
-                }
-
-                actionGroup
+            if !isCompactLayout {
+                statusChip
             }
-            .padding(.horizontal, Metrics.horizontalPadding)
-            .padding(.vertical, Metrics.verticalPadding)
-            .background(findBarBackground)
+
+            actionGroup
         }
+        .padding(.horizontal, Metrics.horizontalPadding)
+        .padding(.vertical, Metrics.verticalPadding)
+        .background(findBarBackground)
         .shadow(
             color: .black.opacity(
                 isKeyWindow && !accessibilityPersonalization.reduceTransparency

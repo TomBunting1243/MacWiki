@@ -284,7 +284,7 @@ struct ArticleView: View {
     @Environment(\.workspaceOpenWindowHandler) private var workspaceOpenWindowHandler
     @Environment(\.modelContext) private var modelContext
     @Environment(\.colorScheme) private var colorScheme
-    @Environment(\.macWikiAccessibilityPersonalization.reduceMotion) private var reduceMotion
+    @Environment(\.macWikiAccessibilityPersonalization) private var accessibilityPersonalization
     @Environment(\.readerChromeMetrics) private var readerChromeMetrics
     @Query(sort: \ReadingList.updatedAt, order: .reverse) private var allLists: [ReadingList]
     @Query private var highlightsForArticle: [Highlight]
@@ -323,6 +323,21 @@ struct ArticleView: View {
     @AppStorage(AppStorageKey.Reader.linkPreviewImmediateModifier) private var linkPreviewImmediateModifier: ReaderLinkPreviewImmediateModifier = .default
     @AppStorage(AppStorageKey.Chrome.liquidGlassChrome) private var liquidGlassChrome = true
     @AppStorage(MacWikiGlassRuntime.forceLegacyFallbackKey) private var forceLegacyGlassFallback = false
+
+    private var reduceMotion: Bool {
+        accessibilityPersonalization.reduceMotion
+    }
+
+    private var increasedContrast: Bool {
+        accessibilityPersonalization.colorSchemeContrast == .increased
+    }
+
+    private var usesNativeReaderGlass: Bool {
+        MacWikiGlassRuntime.usesNativeGlass(
+            isEnabled: liquidGlassChrome,
+            forceLegacyFallback: forceLegacyGlassFallback
+        ) && !accessibilityPersonalization.reduceTransparency
+    }
 
     init(tabId: UUID, article: Article, scrollPosition: Binding<CGFloat>) {
         self.tabId = tabId
@@ -703,8 +718,15 @@ struct ArticleView: View {
             .padding(.vertical, 9)
             .background(markAsReadPromptBackground)
         }
-        .shadow(color: .black.opacity(colorScheme == .dark ? 0.16 : 0.06), radius: 10, y: 4)
-        .compositingGroup()
+        .shadow(
+            color: .black.opacity(
+                accessibilityPersonalization.reduceTransparency
+                    ? 0
+                    : (colorScheme == .dark ? 0.16 : 0.06)
+            ),
+            radius: 10,
+            y: 4
+        )
         .frame(maxWidth: 620)
         .frame(maxWidth: .infinity)
         .padding(.horizontal, 12)
@@ -780,11 +802,16 @@ struct ArticleView: View {
     @ViewBuilder
     private var markAsReadPromptBackground: some View {
         let shape = RoundedRectangle(cornerRadius: ReaderMotion.promptCornerRadius, style: .continuous)
-        if #available(macOS 26, *),
-           MacWikiGlassRuntime.usesNativeGlass(
-            isEnabled: liquidGlassChrome,
-            forceLegacyFallback: forceLegacyGlassFallback
-           ) {
+        if accessibilityPersonalization.reduceTransparency {
+            shape
+                .fill(Color(nsColor: .windowBackgroundColor))
+                .overlay {
+                    shape.strokeBorder(
+                        Color.primary.opacity(increasedContrast ? 0.34 : 0.14),
+                        lineWidth: increasedContrast ? 1 : 0.6
+                    )
+                }
+        } else if #available(macOS 26, *), usesNativeReaderGlass {
             shape
                 .fill(.clear)
                 .glassEffect(.regular, in: .rect(cornerRadius: ReaderMotion.promptCornerRadius))
@@ -792,7 +819,12 @@ struct ArticleView: View {
                     shape.fill(Color(nsColor: .windowBackgroundColor).opacity(colorScheme == .dark ? 0.022 : 0.014))
                 }
                 .overlay {
-                    shape.strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.075 : 0.048), lineWidth: 0.50)
+                    shape.strokeBorder(
+                        Color.primary.opacity(
+                            (colorScheme == .dark ? 0.075 : 0.048) + (increasedContrast ? 0.14 : 0)
+                        ),
+                        lineWidth: increasedContrast ? 1 : 0.50
+                    )
                 }
         } else {
             shape
@@ -823,11 +855,16 @@ struct ArticleView: View {
     @ViewBuilder
     private var markAsReadPrimaryActionBackground: some View {
         let shape = Capsule(style: .continuous)
-        if #available(macOS 26, *),
-           MacWikiGlassRuntime.usesNativeGlass(
-            isEnabled: liquidGlassChrome,
-            forceLegacyFallback: forceLegacyGlassFallback
-           ) {
+        if accessibilityPersonalization.reduceTransparency {
+            shape
+                .fill(Color(nsColor: .controlBackgroundColor))
+                .overlay {
+                    shape.strokeBorder(
+                        Color.primary.opacity(increasedContrast ? 0.34 : 0.14),
+                        lineWidth: increasedContrast ? 1 : 0.6
+                    )
+                }
+        } else if #available(macOS 26, *), usesNativeReaderGlass {
             shape
                 .fill(.clear)
                 .glassEffect(.regular.interactive(), in: .capsule)
@@ -835,7 +872,10 @@ struct ArticleView: View {
                     shape.fill(Color(nsColor: .windowBackgroundColor).opacity(colorScheme == .dark ? 0.028 : 0.016))
                 }
                 .overlay {
-                    shape.strokeBorder(Color.primary.opacity(markAsReadPrimaryStrokeOpacity), lineWidth: 0.50)
+                    shape.strokeBorder(
+                        Color.primary.opacity(markAsReadPrimaryStrokeOpacity + (increasedContrast ? 0.14 : 0)),
+                        lineWidth: increasedContrast ? 1 : 0.50
+                    )
                 }
         } else {
             shape
