@@ -138,10 +138,7 @@ struct TabBarView: View {
                 .onChange(of: appState.activeTabId) { _, _ in
                     scrollToActiveTab(with: proxy, animated: true)
                 }
-                .onChange(of: appState.openTabs.map(\.id)) { oldTabIDs, newTabIDs in
-                    guard oldTabIDs.count != newTabIDs.count || Set(oldTabIDs) != Set(newTabIDs) else {
-                        return
-                    }
+                .onChange(of: tabMembership) { _, _ in
                     scrollToActiveTab(with: proxy, animated: true)
                 }
                 .onChange(of: pendingScrollTabId) { _, tabId in
@@ -250,6 +247,10 @@ struct TabBarView: View {
         )
     }
 
+    private var tabMembership: Set<UUID> {
+        Set(appState.openTabs.map(\.id))
+    }
+
     @ViewBuilder
     private var tabBarBackground: some View {
         ReaderTabLaneBackground()
@@ -333,19 +334,17 @@ struct TabBarView: View {
             return
         }
 
-        // Let AppKit finish mouse-up and SwiftUI tear down the active gesture
-        // before changing the ForEach collection order. One immediate yield is
-        // insufficient in optimized macOS 27 builds and creates an
-        // AttributeGraph cycle. The neighboring rows stay at their final visual
-        // positions during this sub-frame handoff, then the model order and
-        // temporary offsets commit atomically without a second layout animation.
+        // End the gesture event before changing the ForEach collection order.
+        // Clear the transient drag graph first, then publish the model reorder
+        // in the same animation-disabled transaction so rows never recompute
+        // against a new index while still carrying old drag offsets.
         Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(48))
+            try? await Task.sleep(for: .milliseconds(1))
             var transaction = Transaction(animation: nil)
             transaction.disablesAnimations = true
             withTransaction(transaction) {
-                appState.moveTab(from: sourceIndex, to: targetIndex)
                 resetDragState()
+                appState.moveTab(from: sourceIndex, to: targetIndex)
             }
         }
     }
