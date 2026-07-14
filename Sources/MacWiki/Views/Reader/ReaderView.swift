@@ -606,6 +606,7 @@ struct ArticleView: View {
                 },
                 fallbackScrollProgress: progressCoordinator.latestReadingProgress,
                 readerAppearance: resolvedReaderAppearance,
+                reduceTransparency: accessibilityPersonalization.reduceTransparency,
                 readerTopInset: readerTopInset,
                 preferImmediateReveal: preferImmediateWebReveal,
                 onTableOfContentsUpdate: { toc in

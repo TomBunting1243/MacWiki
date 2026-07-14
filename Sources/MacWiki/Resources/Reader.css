@@ -527,16 +527,14 @@ html.macwiki-hide-reference-sections .mw-references-wrap {
     }
 }
 
-@media (prefers-reduced-transparency: reduce) {
-    :root {
-        --table-surface: #f7f7f8;
-        --table-header-surface: #e9e9ec;
-        --table-row-stripe: #f0f0f2;
-    }
+html.macwiki-reduce-transparency {
+    --table-surface: #f7f7f8;
+    --table-header-surface: #e9e9ec;
+    --table-row-stripe: #f0f0f2;
 }
 
-@media (prefers-reduced-transparency: reduce) and (prefers-color-scheme: dark) {
-    :root {
+@media (prefers-color-scheme: dark) {
+    html.macwiki-reduce-transparency {
         --table-surface: #282e3d;
         --table-header-surface: #343b4c;
         --table-row-stripe: #2e3545;

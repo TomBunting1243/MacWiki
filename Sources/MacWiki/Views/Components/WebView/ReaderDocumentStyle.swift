@@ -34,7 +34,8 @@ enum ReaderDocumentStyle {
 
     static func makeInjectionScript(
         css: String,
-        tableEnhancementScript: String = tableEnhancementScript
+        tableEnhancementScript: String = tableEnhancementScript,
+        reduceTransparency: Bool = false
     ) -> String {
         let cssLiteral = WebViewJavaScript.stringLiteral(css)
 
@@ -47,6 +48,10 @@ enum ReaderDocumentStyle {
                     document.documentElement.appendChild(node);
                 }
             }
+
+            \(ReaderDocumentAccessibilityStyle.updateScript(
+                reduceTransparency: reduceTransparency
+            ))
 
             var style = document.createElement('style');
             style.textContent = \(cssLiteral);
@@ -64,13 +69,15 @@ enum ReaderDocumentStyle {
 
     static func makeInjectionScript(
         minimumReadableColumnWidth: CGFloat,
-        readerTopInset: CGFloat
+        readerTopInset: CGFloat,
+        reduceTransparency: Bool = false
     ) -> String {
         makeInjectionScript(
             css: renderedCSS(
                 minimumReadableColumnWidth: minimumReadableColumnWidth,
                 readerTopInset: readerTopInset
-            )
+            ),
+            reduceTransparency: reduceTransparency
         )
     }
 

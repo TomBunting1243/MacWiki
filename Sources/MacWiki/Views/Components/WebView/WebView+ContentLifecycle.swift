@@ -26,6 +26,7 @@ extension WebView.Coordinator {
         openTimer?.wrappedValue.markWebViewDidFinish()
         syncLinkPreviewImmediateModifier(on: webView, force: true)
         syncNativeHighlightMenuMode(on: webView, force: true)
+        syncReaderAccessibilityStyle(on: webView, force: true)
         let restoreSessionID = beginRestoreSession()
         let scrollY = scrollPosition.wrappedValue
         let fallbackProgress = self.fallbackScrollProgress ?? 0
@@ -199,6 +200,25 @@ extension WebView.Coordinator {
             self?.lastAppliedReaderAppearance = self?.readerAppearance
             self?.lastAppliedReaderTopInset = self?.readerTopInset ?? -1
             completion?(true)
+        }
+    }
+
+    func syncReaderAccessibilityStyle(on webView: WKWebView, force: Bool = false) {
+        guard force || lastAppliedReduceTransparency != reduceTransparency else { return }
+        guard canRunDocumentJavaScript(on: webView) else { return }
+
+        let requestedValue = reduceTransparency
+        webView.evaluateJavaScript(
+            ReaderDocumentAccessibilityStyle.updateScript(
+                reduceTransparency: requestedValue
+            )
+        ) { [weak self] _, error in
+            guard error == nil,
+                  let self,
+                  self.reduceTransparency == requestedValue else {
+                return
+            }
+            self.lastAppliedReduceTransparency = requestedValue
         }
     }
 
