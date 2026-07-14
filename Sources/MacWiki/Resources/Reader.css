@@ -376,6 +376,7 @@ html.macwiki-hide-reference-sections .mw-references-wrap {
 
 /* Tables retain their semantic DOM and authored alignment/color rules. */
 .macwiki-table-scroll {
+    width: fit-content;
     max-width: 100%;
     margin-block: 1.5em;
     overflow-x: auto;
@@ -397,7 +398,7 @@ html.macwiki-hide-reference-sections .mw-references-wrap {
 
 .macwiki-table-scroll > table {
     width: auto;
-    min-width: 100%;
+    min-width: 0;
     max-width: none;
     margin: 0;
 }
@@ -415,7 +416,7 @@ html.macwiki-hide-reference-sections .mw-references-wrap {
     padding-block: 0 0.65em;
     padding-inline: 0.1em;
     color: var(--text-secondary);
-    font-size: 0.9em;
+    font-size: 1em;
     font-weight: 600;
     line-height: 1.35;
     text-align: start;
@@ -435,12 +436,39 @@ html.macwiki-hide-reference-sections .mw-references-wrap {
     background: var(--table-header-surface);
 }
 
+:where(table.macwiki-reader-data-table th[scope="col"]:not([style]):not([bgcolor])),
+:where(table.macwiki-reader-data-table tbody > tr:first-child > th:not([style]):not([bgcolor])) {
+    background: var(--table-header-surface);
+}
+
 :where(table.macwiki-reader-data-table tbody > tr:nth-child(even):not([class]):not([style])) {
     background: var(--table-row-stripe);
 }
 
 :where(table.macwiki-reader-data-table tbody > tr:last-child > :is(th, td)) {
     border-block-end-color: transparent;
+}
+
+/* Authored table fills stay semantic while their foreground follows actual luminance. */
+.macwiki-authored-light-surface {
+    --macwiki-authored-surface-foreground: #000000;
+}
+
+.macwiki-authored-dark-surface {
+    --macwiki-authored-surface-foreground: #ffffff;
+}
+
+:where(.macwiki-authored-light-surface, .macwiki-authored-dark-surface) {
+    color: var(--macwiki-authored-surface-foreground);
+}
+
+:where(table.macwiki-reader-data-table)
+    :is(.macwiki-authored-light-surface, .macwiki-authored-dark-surface)
+    :is(a, a *) {
+    color: var(--macwiki-authored-surface-foreground) !important;
+    text-decoration-line: underline;
+    text-decoration-thickness: from-font;
+    text-underline-offset: 0.14em;
 }
 
 /* Collapsible tables (Wikipedia mobile PCS) */
@@ -542,7 +570,9 @@ html.macwiki-reduce-transparency {
     }
 
     :where(table.macwiki-reader-data-table),
-    :where(table.macwiki-reader-data-table :is(th, td)) {
+    :where(table.macwiki-reader-data-table :is(th, td)),
+    :where(.macwiki-authored-light-surface, .macwiki-authored-dark-surface),
+    :where(.macwiki-authored-light-surface, .macwiki-authored-dark-surface) :is(a, a *) {
         color: CanvasText;
         background: Canvas;
         border-color: CanvasText;
