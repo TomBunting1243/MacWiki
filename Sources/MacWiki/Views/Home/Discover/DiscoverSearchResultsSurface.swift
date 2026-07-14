@@ -10,9 +10,24 @@ struct DiscoverSearchResultsSurface: View {
     let referenceDate: Date
     let onOpen: (WikipediaService.SearchResult, Bool) -> Void
 
+    static func scrollID(for result: WikipediaService.SearchResult) -> String {
+        "discover-search-result:\(result.id):\(ReadStateSync.normalizedTitle(result.title))"
+    }
+
+    private var statusSubtitle: String {
+        let count = searchCoordinator.searchResults.count
+        if searchCoordinator.isLoading {
+            return count == 0 ? "Searching Wikipedia" : "\(count) found · Updating"
+        }
+        if searchCoordinator.errorMessage != nil && count == 0 {
+            return "Search unavailable"
+        }
+        return "\(count) \(count == 1 ? "match" : "matches")"
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            DiscoverSectionHeader(title: "Search Results", subtitle: "\(searchCoordinator.searchResults.count) matches")
+            DiscoverSectionHeader(title: "Search Results", subtitle: statusSubtitle)
             if searchCoordinator.isLoading && searchCoordinator.searchResults.isEmpty {
                 AppLoadingListPlaceholder(
                     title: "Searching Wikipedia",
@@ -46,12 +61,18 @@ struct DiscoverSearchResultsSurface: View {
                 .frame(minHeight: 220)
             } else {
                 VStack(spacing: 8) {
-                    ForEach(searchCoordinator.searchResults.prefix(20)) { result in
+                    ForEach(Array(searchCoordinator.searchResults.prefix(20).enumerated()), id: \.element.id) { index, result in
                         let rowKey = "search:\(result.id):\(ReadStateSync.normalizedTitle(result.title))"
                         let isSaved = savedTitles.contains(ReadStateSync.normalizedTitle(result.title))
-                        DiscoverSearchResultRow(result: result, isSaved: isSaved) {
+                        DiscoverSearchResultRow(
+                            result: result,
+                            isSaved: isSaved,
+                            isKeyboardFocused: searchCoordinator.selectedIndex == index
+                        ) {
+                            searchCoordinator.selectedIndex = index
                             onOpen(result, SystemBridge.isCommandPressed)
                         }
+                        .id(Self.scrollID(for: result))
                         .contextMenu {
                             SearchResultContextMenuContent(
                                 result: result,

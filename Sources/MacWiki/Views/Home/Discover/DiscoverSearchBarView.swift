@@ -4,7 +4,8 @@ import SwiftUI
 struct DiscoverSearchBarView: View {
     let searchCoordinator: SearchCoordinator
     let discoverFeedStore: DiscoverFeedStore
-    let onOpenFirstResult: () -> Void
+    let onOpenSelectedResult: () -> Void
+    let onMoveSelection: (MoveCommandDirection) -> Void
     let onRefreshDiscover: () -> Void
     let onClearSearch: () -> Void
 
@@ -23,7 +24,7 @@ struct DiscoverSearchBarView: View {
                 .textFieldStyle(.plain)
                 .font(.system(size: 15, weight: .medium))
                 .focused($isSearchFocused)
-                .onSubmit(onOpenFirstResult)
+                .onSubmit(onOpenSelectedResult)
 
             if searchCoordinator.isLoading {
                 AppLoadingActivityMark(tone: .accent)
@@ -67,5 +68,6 @@ struct DiscoverSearchBarView: View {
             shadowRadius: 6,
             shadowY: 2
         )
+        .onMoveCommand(perform: onMoveSelection)
     }
 }

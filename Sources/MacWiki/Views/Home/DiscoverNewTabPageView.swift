@@ -64,63 +64,73 @@ struct DiscoverNewTabPageView: View {
     }
 
     private var discoverFeedContent: some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: responsiveLayout.pageSectionSpacing) {
-                DiscoverSearchBarView(
-                    searchCoordinator: searchCoordinator,
-                    discoverFeedStore: discoverFeedStore,
-                    onOpenFirstResult: {
-                        if let first = searchCoordinator.searchResults.first {
-                            open(first, inNewTab: false)
-                        }
-                    },
-                    onRefreshDiscover: {
-                        screenModel.refreshDiscover()
-                    },
-                    onClearSearch: {
-                        searchCoordinator.clearSearch()
-                    },
-                    isSearchFocused: $isSearchFocused
-                )
-
-                if searchCoordinator.hasQuery {
-                    DiscoverSearchResultsSurface(
+        ScrollViewReader { scrollProxy in
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: responsiveLayout.pageSectionSpacing) {
+                    DiscoverSearchBarView(
                         searchCoordinator: searchCoordinator,
-                        screenModel: screenModel,
-                        savedTitles: savedArticleTitlesNormalized,
-                        allLists: allLists,
-                        allLabels: allLabels,
-                        allTags: allTags,
-                        referenceDate: discoverReferenceDate,
-                        onOpen: open
-                    )
-                } else {
-                    DiscoverTimeMachineStageView(
-                        screenModel: screenModel,
                         discoverFeedStore: discoverFeedStore,
-                        responsiveLayout: responsiveLayout,
-                        isSearchFieldFocused: isSearchFocused,
-                        refreshGeneration: screenModel.discoverRefreshGeneration,
-                        allLists: allLists,
-                        allLabels: allLabels,
-                        allTags: allTags,
-                        isAppeared: isAppeared,
-                        reduceMotion: reduceMotion,
-                        showsTimeTravelSkeleton: showsTimeTravelSkeleton,
-                        onOpen: open
+                        onOpenSelectedResult: openSelectedSearchResult,
+                        onMoveSelection: moveSearchSelection,
+                        onRefreshDiscover: {
+                            screenModel.refreshDiscover()
+                        },
+                        onClearSearch: {
+                            searchCoordinator.clearSearch()
+                        },
+                        isSearchFocused: $isSearchFocused
                     )
+
+                    if searchCoordinator.hasQuery {
+                        DiscoverSearchResultsSurface(
+                            searchCoordinator: searchCoordinator,
+                            screenModel: screenModel,
+                            savedTitles: savedArticleTitlesNormalized,
+                            allLists: allLists,
+                            allLabels: allLabels,
+                            allTags: allTags,
+                            referenceDate: discoverReferenceDate,
+                            onOpen: open
+                        )
+                    } else {
+                        DiscoverTimeMachineStageView(
+                            screenModel: screenModel,
+                            discoverFeedStore: discoverFeedStore,
+                            responsiveLayout: responsiveLayout,
+                            isSearchFieldFocused: isSearchFocused,
+                            refreshGeneration: screenModel.discoverRefreshGeneration,
+                            allLists: allLists,
+                            allLabels: allLabels,
+                            allTags: allTags,
+                            isAppeared: isAppeared,
+                            reduceMotion: reduceMotion,
+                            showsTimeTravelSkeleton: showsTimeTravelSkeleton,
+                            onOpen: open
+                        )
+                    }
+                }
+                .frame(maxWidth: responsiveLayout.pageMaxWidth, alignment: .leading)
+                .frame(maxWidth: .infinity, alignment: .center)
+                .padding(.horizontal, responsiveLayout.horizontalPadding)
+                .padding(.top, 24)
+                .padding(.bottom, 48)
+                .onGeometryChange(for: DiscoverResponsiveLayoutProfile?.self) { proxy in
+                    DiscoverResponsiveLayoutProfile(width: proxy.size.width)
+                } action: { newLayout in
+                    guard let newLayout, newLayout != responsiveLayout else { return }
+                    responsiveLayout = newLayout
                 }
             }
-            .frame(maxWidth: responsiveLayout.pageMaxWidth, alignment: .leading)
-            .frame(maxWidth: .infinity, alignment: .center)
-            .padding(.horizontal, responsiveLayout.horizontalPadding)
-            .padding(.top, 24)
-            .padding(.bottom, 48)
-            .onGeometryChange(for: DiscoverResponsiveLayoutProfile?.self) { proxy in
-                DiscoverResponsiveLayoutProfile(width: proxy.size.width)
-            } action: { newLayout in
-                guard let newLayout, newLayout != responsiveLayout else { return }
-                responsiveLayout = newLayout
+            .onChange(of: searchCoordinator.selectedIndex) { _, _ in
+                guard searchCoordinator.hasQuery,
+                      let selectedResult = searchCoordinator.selectedResult(usingTrendingFallback: false) else {
+                    return
+                }
+                withAnimation(reduceMotion ? nil : .easeOut(duration: 0.16)) {
+                    scrollProxy.scrollTo(
+                        DiscoverSearchResultsSurface.scrollID(for: selectedResult)
+                    )
+                }
             }
         }
         .background(DiscoverEditionBackground().ignoresSafeArea())
@@ -180,6 +190,25 @@ struct DiscoverNewTabPageView: View {
 
     private func updateTimeTravelSkeletonVisibility() {
         screenModel.updateTimeTravelSkeletonVisibility(reduceMotion: reduceMotion)
+    }
+
+    private func moveSearchSelection(_ direction: MoveCommandDirection) {
+        guard searchCoordinator.hasQuery else { return }
+        switch direction {
+        case .down:
+            searchCoordinator.moveSelectionDown(usingTrendingFallback: false)
+        case .up:
+            searchCoordinator.moveSelectionUp(usingTrendingFallback: false)
+        default:
+            break
+        }
+    }
+
+    private func openSelectedSearchResult() {
+        guard let selectedResult = searchCoordinator.selectedResult(usingTrendingFallback: false) else {
+            return
+        }
+        open(selectedResult, inNewTab: SystemBridge.isCommandPressed)
     }
 
     private func open(_ result: WikipediaService.SearchResult, inNewTab: Bool) {

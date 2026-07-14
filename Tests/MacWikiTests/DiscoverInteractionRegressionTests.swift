@@ -43,6 +43,26 @@ struct DiscoverInteractionRegressionTests {
         #expect(!mediaRows.contains(".disabled(image.filePageURL == nil)"))
     }
 
+    @Test func searchUsesVisibleKeyboardSelectionAndHonestStatusCopy() throws {
+        let page = try repositorySource("Sources/MacWiki/Views/Home/DiscoverNewTabPageView.swift")
+        let surface = try repositorySource(
+            "Sources/MacWiki/Views/Home/Discover/DiscoverSearchResultsSurface.swift"
+        )
+        let rows = try repositorySource(
+            "Sources/MacWiki/Views/Home/Discover/DiscoverResultRows.swift"
+        )
+
+        #expect(page.contains("selectedResult(usingTrendingFallback: false)"))
+        #expect(page.contains("moveSelectionDown(usingTrendingFallback: false)"))
+        #expect(page.contains("moveSelectionUp(usingTrendingFallback: false)"))
+        #expect(page.contains("scrollProxy.scrollTo("))
+        #expect(surface.contains("count == 0 ? \"Searching Wikipedia\""))
+        #expect(surface.contains("return \"Search unavailable\""))
+        #expect(surface.contains("searchCoordinator.selectedIndex == index"))
+        #expect(rows.contains(".accessibilityAddTraits(isKeyboardFocused ? .isSelected : [])"))
+        #expect(!page.contains("searchCoordinator.searchResults.first"))
+    }
+
     private func repositorySource(_ relativePath: String) throws -> String {
         let repositoryRoot = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()

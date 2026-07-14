@@ -91,6 +91,7 @@ struct DiscoverHolidayRow: View {
 struct DiscoverSearchResultRow: View {
     let result: WikipediaService.SearchResult
     let isSaved: Bool
+    let isKeyboardFocused: Bool
     let onOpen: () -> Void
     @Environment(\.macWikiAccessibilityPersonalization.reduceMotion) private var reduceMotion
     @State private var isHovered = false
@@ -127,12 +128,16 @@ struct DiscoverSearchResultRow: View {
             .padding(.vertical, 10)
             .discoverSurfaceChrome(
                 cornerRadius: 14,
-                borderOpacity: isHovered ? 0.46 : 0.32
+                tintColors: isKeyboardFocused ? [Color.accentColor.opacity(0.12), .clear] : [],
+                borderColor: isKeyboardFocused ? Color.accentColor : Color(nsColor: .separatorColor),
+                borderOpacity: isKeyboardFocused ? 0.66 : (isHovered ? 0.46 : 0.32),
+                borderWidth: isKeyboardFocused ? 1.1 : 0.7
             )
         }
         .buttonStyle(DiscoverInteractivePressStyle())
         .accessibilityLabel(result.title)
         .accessibilityValue(isSaved ? "Saved" : "Not Saved")
+        .accessibilityAddTraits(isKeyboardFocused ? .isSelected : [])
         .discoverHoverEffect(.row, isActive: isHovered, reduceMotion: reduceMotion)
         .onHover { isHovered = $0 }
         .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
