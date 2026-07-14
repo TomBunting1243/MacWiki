@@ -195,24 +195,20 @@ body {
     display: none !important;
 }
 
-/* CRITICAL: Expand all collapsed sections (Wikipedia mobile-html) */
-.pcs-section-block, .pcs-collapse-block, section {
+/* Expand only Wikimedia PCS article containers. Generic `section`, `[hidden]`,
+   and `.collapsed` state remains under document/assistive-technology control. */
+.pcs-section-block, .pcs-collapse-block, .pcs-section-content {
     display: block !important;
     max-height: none !important;
     overflow: visible !important;
+    height: auto !important;
 }
 
-/* Ensure collapsed content is visible */
-[hidden], .pcs-hidden, .collapsed {
+.pcs-section-block:is([hidden], .pcs-hidden),
+.pcs-collapse-block:is([hidden], .pcs-hidden),
+.pcs-section-content:is([hidden], .pcs-hidden) {
     display: block !important;
     visibility: visible !important;
-}
-
-/* Expand section content */
-.pcs-section-content {
-    display: block !important;
-    height: auto !important;
-    max-height: none !important;
 }
 
 /* Typography */
