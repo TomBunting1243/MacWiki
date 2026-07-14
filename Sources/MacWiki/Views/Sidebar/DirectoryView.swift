@@ -40,8 +40,6 @@ struct DirectoryView: View {
     @State private var pendingPageViewsRowKey: String?
     @State private var activePageViewsPopover: SidebarPageViewsPopoverPayload?
     @State private var discoverDateLoadTask: Task<Void, Never>?
-    @State private var sidebarTimeTravelSkeletonDelayTask: Task<Void, Never>?
-    @State private var shouldShowDelayedSidebarTimeTravelSkeleton = false
     @State private var isTimeMachineDatePickerPresented = false
     @State private var timeMachineLensLastDragX: CGFloat?
     @State private var timeMachineLensDragAccumulatedX: CGFloat = 0
@@ -271,15 +269,11 @@ struct DirectoryView: View {
         Self.discoverFeedDateFormatter.string(from: discoverReferenceDate)
     }
 
-    private var shouldQueueSidebarTimeTravelSkeleton: Bool {
+    private var isSidebarTimeTraveling: Bool {
         guard rootSelection == .discover else { return false }
         guard discoverFeedStore.isLoading else { return false }
         guard let visibleFeed = discoverFeedStore.feed else { return false }
         return visibleFeed.dateKey != selectedDiscoverDateKey
-    }
-
-    private var showsSidebarTimeTravelSkeleton: Bool {
-        shouldShowDelayedSidebarTimeTravelSkeleton && shouldQueueSidebarTimeTravelSkeleton
     }
 
     private var discoverTrendReferenceDate: Date {
@@ -552,12 +546,6 @@ struct DirectoryView: View {
                 directoryList
             }
         }
-        .onAppear {
-            updateSidebarTimeTravelSkeletonVisibility()
-        }
-        .onChange(of: shouldQueueSidebarTimeTravelSkeleton) { _, _ in
-            updateSidebarTimeTravelSkeletonVisibility()
-        }
         .task(id: isSidebarSearchPresented ? nil : articleIndexesFingerprint) {
             guard !isSidebarSearchPresented else { return }
             await Task.yield()
@@ -596,12 +584,8 @@ struct DirectoryView: View {
                 discoverFeedStore.cancel()
                 discoverTrendPulseStore.cancel()
             }
-            updateSidebarTimeTravelSkeletonVisibility()
         }
         .onDisappear {
-            sidebarTimeTravelSkeletonDelayTask?.cancel()
-            sidebarTimeTravelSkeletonDelayTask = nil
-            shouldShowDelayedSidebarTimeTravelSkeleton = false
             flushScheduledModelContextSave()
             metadataHydrator.cancel()
         }
@@ -643,7 +627,6 @@ struct DirectoryView: View {
                 recentsEmptyStateOverlay
             }
         }
-        .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: showsSidebarTimeTravelSkeleton)
         .background {
             GeometryReader { proxy in
                 Color.clear
@@ -1422,34 +1405,6 @@ extension DirectoryView {
         timeMachineAccentSecondary.opacity(colorScheme == .dark ? 0.34 : 0.20)
     }
 
-    private static let sidebarTimeTravelSkeletonDelayNanoseconds: UInt64 = 1_600_000_000
-
-    private func updateSidebarTimeTravelSkeletonVisibility() {
-        sidebarTimeTravelSkeletonDelayTask?.cancel()
-        sidebarTimeTravelSkeletonDelayTask = nil
-
-        guard shouldQueueSidebarTimeTravelSkeleton else {
-            if shouldShowDelayedSidebarTimeTravelSkeleton {
-                withAnimation(reduceMotion ? nil : .easeOut(duration: 0.14)) {
-                    shouldShowDelayedSidebarTimeTravelSkeleton = false
-                }
-            } else {
-                shouldShowDelayedSidebarTimeTravelSkeleton = false
-            }
-            return
-        }
-
-        guard !shouldShowDelayedSidebarTimeTravelSkeleton else { return }
-        sidebarTimeTravelSkeletonDelayTask = Task { @MainActor in
-            try? await Task.sleep(nanoseconds: Self.sidebarTimeTravelSkeletonDelayNanoseconds)
-            guard !Task.isCancelled else { return }
-            guard shouldQueueSidebarTimeTravelSkeleton else { return }
-            withAnimation(reduceMotion ? nil : .easeOut(duration: 0.16)) {
-                shouldShowDelayedSidebarTimeTravelSkeleton = true
-            }
-        }
-    }
-
     private func queueDiscoverLoadDebounced(
         forceRefresh: Bool = false,
         delayNanoseconds: UInt64 = 170_000_000
@@ -1806,24 +1761,17 @@ extension DirectoryView {
 
     private var timeMachineScanningBadge: some View {
         HStack(spacing: 5) {
-            AppLoadingActivityMark(tone: .retro)
+            ProgressView()
+                .controlSize(.mini)
 
-            Text("SCANNING")
-                .font(.system(size: 8.5, weight: .bold, design: .monospaced))
-                .foregroundStyle(timeMachineAccentPrimary.opacity(0.86))
+            Text("Loading")
+                .font(.caption2.weight(.medium))
+                .foregroundStyle(.secondary)
                 .lineLimit(1)
         }
         .fixedSize()
-        .padding(.horizontal, 7)
-        .padding(.vertical, 3)
-        .background(
-            Capsule(style: .continuous)
-                .fill(timeMachineAccentPrimary.opacity(colorScheme == .dark ? 0.18 : 0.10))
-        )
-        .overlay(
-            Capsule(style: .continuous)
-                .strokeBorder(timeMachineControlStrokeColor, lineWidth: 0.6)
-        )
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Loading selected date")
     }
 
     @ViewBuilder
@@ -1888,9 +1836,9 @@ extension DirectoryView {
 
                         Spacer(minLength: 0)
 
-                        if showsSidebarTimeTravelSkeleton {
+                        if isSidebarTimeTraveling {
                             timeMachineScanningBadge
-                                .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .trailing)))
+                                .transition(.opacity)
                         }
                     }
 
@@ -1935,17 +1883,8 @@ extension DirectoryView {
                     RoundedRectangle(cornerRadius: 10, style: .continuous)
                         .strokeBorder(timeMachineControlStrokeColor.opacity(colorScheme == .dark ? 0.75 : 0.85), lineWidth: 0.7)
                 )
-                .overlay {
-                    if showsSidebarTimeTravelSkeleton {
-                        SidebarGlitchScanlineOverlay(lineOpacity: colorScheme == .dark ? 0.030 : 0.020)
-                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                            .blendMode(.screen)
-                            .opacity(reduceMotion ? 0.08 : 0.16)
-                            .allowsHitTesting(false)
-                    }
-                }
                 .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.16 : 0.07), radius: 4, y: 1)
-                .animation(reduceMotion ? nil : .easeOut(duration: 0.14), value: showsSidebarTimeTravelSkeleton)
+                .animation(reduceMotion ? nil : .easeOut(duration: 0.14), value: isSidebarTimeTraveling)
                 .help("Time Machine lets you see what people were reading in the past.")
                 .padding(.vertical, 3)
                 .listRowSeparator(.hidden)
@@ -1953,9 +1892,7 @@ extension DirectoryView {
             }
         }
 
-        if showsSidebarTimeTravelSkeleton {
-            sidebarTimeTravelLoadingSections
-        } else if discoverFeedStore.isLoading && discoverFeedStore.feed == nil {
+        if discoverFeedStore.isLoading && discoverFeedStore.feed == nil {
             Section {
                 AppLoadingInlineLabel(
                     text: "Loading discover feed…",
@@ -1976,113 +1913,101 @@ extension DirectoryView {
                 .padding(.vertical, 6)
             }
         } else if let feed = discoverFeedStore.feed {
-            let mostReadItems = discoverMostReadItems(from: feed)
-
-            if let featured = feed.featuredArticle {
-                Section("Featured Article") {
-                    discoverArticleRow(featured, showTrendPulse: true)
-                }
-            }
-
-            Section("Most Read") {
-                if mostReadItems.isEmpty {
-                    Text("Most Read is temporarily unavailable for this date.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .padding(.vertical, 4)
-                } else {
-                    ForEach(mostReadItems) { result in
-                        discoverArticleRow(result, showTrendPulse: true)
-                    }
-                }
-            }
-
-            if !feed.newsStories.isEmpty {
-                Section("News Briefing") {
-                    ForEach(feed.newsStories.prefix(8)) { story in
-                        DiscoverStoryRow(story: story, referenceDate: discoverTrendReferenceDate) { article, inNewTab in
-                            openDiscoverArticle(article, inNewTab: inNewTab)
-                        }
-                    }
-                }
-            }
-
-            if !feed.inTheNews.isEmpty {
-                Section("In the News") {
-                    ForEach(feed.inTheNews.prefix(12)) { result in
-                        discoverArticleRow(result)
-                    }
-                }
-            }
-
-            let primaryTimeline = feed.onThisDaySelected.isEmpty ? feed.onThisDay : feed.onThisDaySelected
-            if !primaryTimeline.isEmpty {
-                Section("This Day in History") {
-                    ForEach(primaryTimeline.prefix(12)) { event in
-                        DiscoverTimelineRow(event: event, referenceDate: discoverTrendReferenceDate) { article, inNewTab in
-                            openDiscoverArticle(article, inNewTab: inNewTab)
-                        }
-                    }
-                }
-            }
-
-            if !feed.onThisDayBirths.isEmpty {
-                Section("Born on This Day") {
-                    ForEach(feed.onThisDayBirths.prefix(8)) { event in
-                        DiscoverTimelineRow(event: event, referenceDate: discoverTrendReferenceDate) { article, inNewTab in
-                            openDiscoverArticle(article, inNewTab: inNewTab)
-                        }
-                    }
-                }
-            }
-
-            if !feed.onThisDayDeaths.isEmpty {
-                Section("Died on This Day") {
-                    ForEach(feed.onThisDayDeaths.prefix(8)) { event in
-                        DiscoverTimelineRow(event: event, referenceDate: discoverTrendReferenceDate) { article, inNewTab in
-                            openDiscoverArticle(article, inNewTab: inNewTab)
-                        }
-                    }
-                }
-            }
-
-            if !feed.holidays.isEmpty {
-                Section("Holidays & Observances") {
-                    ForEach(feed.holidays.prefix(8)) { holiday in
-                        DiscoverHolidayListRow(holiday: holiday, referenceDate: discoverTrendReferenceDate) { article, inNewTab in
-                            openDiscoverArticle(article, inNewTab: inNewTab)
-                        }
-                    }
-                }
-            }
-
-            if !feed.didYouKnow.isEmpty {
-                Section("Did You Know?") {
-                    ForEach(feed.didYouKnow.prefix(8)) { fact in
-                        DiscoverFactRow(fact: fact, referenceDate: discoverTrendReferenceDate) { article, inNewTab in
-                            openDiscoverArticle(article, inNewTab: inNewTab)
-                        }
-                    }
-                }
-            }
+            sidebarDiscoverFeedSections(feed)
+                .allowsHitTesting(!isSidebarTimeTraveling)
+                .accessibilityHidden(isSidebarTimeTraveling)
         }
     }
 
     @ViewBuilder
-    private var sidebarTimeTravelLoadingSections: some View {
-        Section("Featured Article") {
-            SidebarTimeTravelLoadingRow(index: 0, style: .feature)
-        }
+    private func sidebarDiscoverFeedSections(_ feed: WikipediaService.DiscoverFeed) -> some View {
+        let mostReadItems = discoverMostReadItems(from: feed)
 
-        Section("Most Read") {
-            ForEach(1..<6, id: \.self) { index in
-                SidebarTimeTravelLoadingRow(index: index, style: .article)
+        if let featured = feed.featuredArticle {
+            Section("Featured Article") {
+                discoverArticleRow(featured, showTrendPulse: true)
             }
         }
 
-        Section("This Day in History") {
-            ForEach(6..<9, id: \.self) { index in
-                SidebarTimeTravelLoadingRow(index: index, style: .timeline)
+        Section("Most Read") {
+            if mostReadItems.isEmpty {
+                Text("Most Read is temporarily unavailable for this date.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .padding(.vertical, 4)
+            } else {
+                ForEach(mostReadItems) { result in
+                    discoverArticleRow(result, showTrendPulse: true)
+                }
+            }
+        }
+
+        if !feed.newsStories.isEmpty {
+            Section("News Briefing") {
+                ForEach(feed.newsStories.prefix(8)) { story in
+                    DiscoverStoryRow(story: story, referenceDate: discoverTrendReferenceDate) { article, inNewTab in
+                        openDiscoverArticle(article, inNewTab: inNewTab)
+                    }
+                }
+            }
+        }
+
+        if !feed.inTheNews.isEmpty {
+            Section("In the News") {
+                ForEach(feed.inTheNews.prefix(12)) { result in
+                    discoverArticleRow(result)
+                }
+            }
+        }
+
+        let primaryTimeline = feed.onThisDaySelected.isEmpty ? feed.onThisDay : feed.onThisDaySelected
+        if !primaryTimeline.isEmpty {
+            Section("This Day in History") {
+                ForEach(primaryTimeline.prefix(12)) { event in
+                    DiscoverTimelineRow(event: event, referenceDate: discoverTrendReferenceDate) { article, inNewTab in
+                        openDiscoverArticle(article, inNewTab: inNewTab)
+                    }
+                }
+            }
+        }
+
+        if !feed.onThisDayBirths.isEmpty {
+            Section("Born on This Day") {
+                ForEach(feed.onThisDayBirths.prefix(8)) { event in
+                    DiscoverTimelineRow(event: event, referenceDate: discoverTrendReferenceDate) { article, inNewTab in
+                        openDiscoverArticle(article, inNewTab: inNewTab)
+                    }
+                }
+            }
+        }
+
+        if !feed.onThisDayDeaths.isEmpty {
+            Section("Died on This Day") {
+                ForEach(feed.onThisDayDeaths.prefix(8)) { event in
+                    DiscoverTimelineRow(event: event, referenceDate: discoverTrendReferenceDate) { article, inNewTab in
+                        openDiscoverArticle(article, inNewTab: inNewTab)
+                    }
+                }
+            }
+        }
+
+        if !feed.holidays.isEmpty {
+            Section("Holidays & Observances") {
+                ForEach(feed.holidays.prefix(8)) { holiday in
+                    DiscoverHolidayListRow(holiday: holiday, referenceDate: discoverTrendReferenceDate) { article, inNewTab in
+                        openDiscoverArticle(article, inNewTab: inNewTab)
+                    }
+                }
+            }
+        }
+
+        if !feed.didYouKnow.isEmpty {
+            Section("Did You Know?") {
+                ForEach(feed.didYouKnow.prefix(8)) { fact in
+                    DiscoverFactRow(fact: fact, referenceDate: discoverTrendReferenceDate) { article, inNewTab in
+                        openDiscoverArticle(article, inNewTab: inNewTab)
+                    }
+                }
             }
         }
     }

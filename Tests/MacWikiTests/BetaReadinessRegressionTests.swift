@@ -1843,6 +1843,25 @@ struct BetaReadinessRegressionTests {
         #expect(surface.contains("else {\n            List {"))
     }
 
+    @Test func discoverDirectoryPreservesTheVisibleEditionWhileTimeTravelLoads() throws {
+        let source = try source("Sources/MacWiki/Views/Sidebar/DirectoryView.swift")
+
+        #expect(source.contains("private var isSidebarTimeTraveling: Bool"))
+        #expect(source.contains("sidebarDiscoverFeedSections(feed)"))
+        #expect(source.contains(".allowsHitTesting(!isSidebarTimeTraveling)"))
+        #expect(source.contains(".accessibilityHidden(isSidebarTimeTraveling)"))
+        #expect(source.contains("ProgressView()"))
+        #expect(source.contains(".accessibilityLabel(\"Loading selected date\")"))
+        #expect(!source.contains("SidebarTimeTravelLoadingRow"))
+        #expect(!source.contains("SidebarGlitchScanlineOverlay"))
+        #expect(!source.contains("sidebarTimeTravelSkeletonDelay"))
+
+        let retiredSkeleton = repositoryRoot().appendingPathComponent(
+            "Sources/MacWiki/Views/Sidebar/Directory/SidebarTimeTravelSkeletonViews.swift"
+        )
+        #expect(!FileManager.default.fileExists(atPath: retiredSkeleton.path))
+    }
+
     private func source(_ relativePath: String) throws -> String {
         try String(contentsOf: repositoryRoot().appendingPathComponent(relativePath), encoding: .utf8)
     }
