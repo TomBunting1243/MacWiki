@@ -97,7 +97,6 @@ struct BetaReadinessRegressionTests {
         #expect(harness.contains("qa_launch_candidate"))
         #expect(harness.contains("qa_assert_candidate_manifest_matches_executable \"$BUILD_INFO_PLIST\""))
         #expect(harness.contains("ATTRIBUTEGRAPH_CYCLE_COUNT"))
-        #expect(harness.contains("rg -c 'AttributeGraph: cycle detected' \"$FIRST_LOG\" \"$RELAUNCH_LOG\" || true"))
 
         let runner = try source("scripts/ax_article_row_secondary_window.swift")
         #expect(runner.contains("hasReadStateAction(for: updated.0, named: toggleReadStatusAction)"))
@@ -1598,6 +1597,7 @@ struct BetaReadinessRegressionTests {
         #expect(harness.contains("relaunch_titles"))
         #expect(harness.contains("relaunch_overflow_count"))
         #expect(harness.contains("ATTRIBUTEGRAPH_CYCLE_COUNT"))
+        #expect(harness.contains("rg -c 'AttributeGraph: cycle detected' \"$FIRST_LOG\" \"$RELAUNCH_LOG\" || true"))
         #expect(harness.contains(": >\"$FIRST_LOG\""))
         #expect(harness.contains(": >\"$RELAUNCH_LOG\""))
         #expect(harness.contains("Tab reorder journey emitted"))
