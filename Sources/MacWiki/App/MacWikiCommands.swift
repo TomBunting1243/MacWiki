@@ -189,7 +189,7 @@ struct MacWikiCommands: Commands {
             .keyboardShortcut("[", modifiers: .command)
             .disabled(
                 !supports(.reader)
-                    || appState.currentTab?.canGoBack != true
+                    || !appState.canGoBack
                     || appState.isWikiHopNavigationLocked
             )
 
@@ -199,7 +199,7 @@ struct MacWikiCommands: Commands {
             .keyboardShortcut("]", modifiers: .command)
             .disabled(
                 !supports(.reader)
-                    || appState.currentTab?.canGoForward != true
+                    || !appState.canGoForward
                     || appState.isWikiHopNavigationLocked
             )
 
@@ -264,7 +264,7 @@ struct MacWikiCommands: Commands {
             .keyboardShortcut(.tab, modifiers: .control)
             .disabled(
                 !supports(.tabs)
-                    || appState.openTabs.isEmpty
+                    || !appState.hasOpenTabs
                     || appState.isWikiHopNavigationLocked
             )
 
@@ -274,7 +274,7 @@ struct MacWikiCommands: Commands {
             .keyboardShortcut(.rightArrow, modifiers: [.command, .option])
             .disabled(
                 !supports(.tabs)
-                    || appState.openTabs.isEmpty
+                    || !appState.hasOpenTabs
                     || appState.isWikiHopNavigationLocked
             )
 
@@ -284,7 +284,7 @@ struct MacWikiCommands: Commands {
             .keyboardShortcut(.tab, modifiers: [.control, .shift])
             .disabled(
                 !supports(.tabs)
-                    || appState.openTabs.isEmpty
+                    || !appState.hasOpenTabs
                     || appState.isWikiHopNavigationLocked
             )
 
@@ -294,7 +294,7 @@ struct MacWikiCommands: Commands {
             .keyboardShortcut(.leftArrow, modifiers: [.command, .option])
             .disabled(
                 !supports(.tabs)
-                    || appState.openTabs.isEmpty
+                    || !appState.hasOpenTabs
                     || appState.isWikiHopNavigationLocked
             )
         }

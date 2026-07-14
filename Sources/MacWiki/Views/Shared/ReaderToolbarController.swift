@@ -201,7 +201,8 @@ final class ReaderToolbarController: NSObject,
 
     private func makeSnapshot(forceSavedStateRefresh: Bool = false) -> Snapshot {
         let appState = environment.appState
-        let article = appState.currentArticle
+        let readerProjection = appState.activeReaderProjection
+        let article = readerProjection.article
         let articleID = article?.id
         let isSaved: Bool
         if !forceSavedStateRefresh,
@@ -224,8 +225,8 @@ final class ReaderToolbarController: NSObject,
             articleID: articleID,
             articleIsRead: article?.isRead == true,
             articleIsSaved: isSaved,
-            canGoBack: !appState.isWikiHopNavigationLocked && appState.currentTab?.canGoBack == true,
-            canGoForward: !appState.isWikiHopNavigationLocked && appState.currentTab?.canGoForward == true,
+            canGoBack: !appState.isWikiHopNavigationLocked && readerProjection.canGoBack,
+            canGoForward: !appState.isWikiHopNavigationLocked && readerProjection.canGoForward,
             navigationLocked: appState.isWikiHopNavigationLocked,
             readerStylePresentationRequestID: appState.readerStylePresentationRequestID,
             readerPageViewsPresentationRequestID: appState.readerPageViewsPresentationRequestID,

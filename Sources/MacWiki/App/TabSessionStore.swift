@@ -96,6 +96,57 @@ struct TabSessionMutationResult: Equatable {
     }
 }
 
+/// The narrow reader state consumed outside the tab strip.
+///
+/// Keeping this projection stored prevents views that only render the active
+/// article from observing the full ordered tab collection. Reordering tabs can
+/// therefore update the tab strip without invalidating the reader hierarchy.
+struct ActiveReaderProjection: Equatable {
+    static let empty = ActiveReaderProjection(
+        activeTabID: nil,
+        historyItemID: nil,
+        article: nil,
+        isPlaceholder: false,
+        canGoBack: false,
+        canGoForward: false
+    )
+
+    let activeTabID: UUID?
+    let historyItemID: UUID?
+    let article: Article?
+    let isPlaceholder: Bool
+    let canGoBack: Bool
+    let canGoForward: Bool
+
+    init(activeTabID: UUID, tab: ArticleTab) {
+        let historyItem = tab.currentHistoryItem
+        self.init(
+            activeTabID: activeTabID,
+            historyItemID: historyItem?.id,
+            article: historyItem?.article,
+            isPlaceholder: tab.isPlaceholder,
+            canGoBack: tab.canGoBack,
+            canGoForward: tab.canGoForward
+        )
+    }
+
+    private init(
+        activeTabID: UUID?,
+        historyItemID: UUID?,
+        article: Article?,
+        isPlaceholder: Bool,
+        canGoBack: Bool,
+        canGoForward: Bool
+    ) {
+        self.activeTabID = activeTabID
+        self.historyItemID = historyItemID
+        self.article = article
+        self.isPlaceholder = isPlaceholder
+        self.canGoBack = canGoBack
+        self.canGoForward = canGoForward
+    }
+}
+
 @Observable @MainActor
 final class TabSessionStore {
     private struct LegacySavedState: Codable {
@@ -116,9 +167,26 @@ final class TabSessionStore {
     private(set) var saveRequestGeneration = 0
 #endif
 
-    var openTabs: [ArticleTab] = []
-    var activeTabId: UUID?
+    var openTabs: [ArticleTab] = [] {
+        didSet {
+            synchronizeOpenTabIDs()
+            synchronizeActiveReaderProjection()
+        }
+    }
+    var activeTabId: UUID? {
+        didSet {
+            synchronizeActiveReaderProjection()
+        }
+    }
     var recentlyClosedTabs: [ArticleTab] = []
+
+    /// Identity-only membership for consumers that do not care about tab order.
+    /// The guarded synchronization deliberately avoids assigning on pure reorder.
+    private(set) var openTabIDs: Set<UUID> = []
+
+    /// Stored rather than computed so active-reader consumers do not establish a
+    /// transitive observation dependency on `openTabs`.
+    private(set) var activeReaderProjection: ActiveReaderProjection = .empty
 
     init(persistenceMode: AppStatePersistenceMode = .shared) {
         self.persistenceMode = persistenceMode
@@ -126,6 +194,8 @@ final class TabSessionStore {
         if persistenceMode.isEnabled {
             load()
         }
+        synchronizeOpenTabIDs()
+        synchronizeActiveReaderProjection()
     }
 
     var currentTab: ArticleTab? {
@@ -134,7 +204,7 @@ final class TabSessionStore {
     }
 
     var currentArticle: Article? {
-        currentTab?.currentArticle
+        activeReaderProjection.article
     }
 
     @discardableResult
@@ -448,6 +518,42 @@ final class TabSessionStore {
         if recentlyClosedTabs.count > 20 {
             recentlyClosedTabs.removeFirst(recentlyClosedTabs.count - 20)
         }
+    }
+
+    private func synchronizeOpenTabIDs() {
+        let updatedIDs = Set(openTabs.map(\.id))
+        guard updatedIDs != openTabIDs else { return }
+        openTabIDs = updatedIDs
+    }
+
+    private func synchronizeActiveReaderProjection() {
+        guard let activeTabId else {
+            guard activeReaderProjection != .empty else { return }
+            activeReaderProjection = .empty
+            return
+        }
+
+        guard let activeTab = openTabs.first(where: { $0.id == activeTabId }) else {
+            // Closing an active tab removes it from the collection before the
+            // replacement active ID is chosen. Preserve the outgoing projection
+            // across that transient so reader consumers never see a false empty
+            // state between the two coordinated mutations.
+            if activeReaderProjection.activeTabID == activeTabId {
+                return
+            }
+
+            // An externally supplied invalid active ID has no reader content.
+            guard activeReaderProjection != .empty else { return }
+            activeReaderProjection = .empty
+            return
+        }
+
+        let updatedProjection = ActiveReaderProjection(
+            activeTabID: activeTabId,
+            tab: activeTab
+        )
+        guard updatedProjection != activeReaderProjection else { return }
+        activeReaderProjection = updatedProjection
     }
 
     @MainActor

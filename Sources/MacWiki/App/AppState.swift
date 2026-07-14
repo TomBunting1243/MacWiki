@@ -61,6 +61,15 @@ final class AppState {
         get { tabSessionStore.activeTabId }
         set { tabSessionStore.activeTabId = newValue }
     }
+
+    /// Identity-only tab membership for consumers that do not render tab order.
+    var openTabIDs: Set<UUID> {
+        tabSessionStore.openTabIDs
+    }
+
+    var hasOpenTabs: Bool {
+        !tabSessionStore.openTabIDs.isEmpty
+    }
     
     // MARK: - UI State
     
@@ -268,10 +277,32 @@ final class AppState {
     var currentTab: ArticleTab? {
         tabSessionStore.currentTab
     }
-    
+
+    /// Narrow stored state for the active reader. Unlike `currentTab`, this does
+    /// not observe the ordered tab collection and is stable across pure reorder.
+    var activeReaderProjection: ActiveReaderProjection {
+        tabSessionStore.activeReaderProjection
+    }
+
     /// The currently displayed article (from active tab)
     var currentArticle: Article? {
-        tabSessionStore.currentArticle
+        tabSessionStore.activeReaderProjection.article
+    }
+
+    var activeReaderHistoryItemID: UUID? {
+        tabSessionStore.activeReaderProjection.historyItemID
+    }
+
+    var isActiveTabPlaceholder: Bool {
+        tabSessionStore.activeReaderProjection.isPlaceholder
+    }
+
+    var canGoBack: Bool {
+        tabSessionStore.activeReaderProjection.canGoBack
+    }
+
+    var canGoForward: Bool {
+        tabSessionStore.activeReaderProjection.canGoForward
     }
 
     func requestNewReadingList() {

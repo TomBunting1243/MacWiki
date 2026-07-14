@@ -36,12 +36,12 @@ struct ArticleWindowReaderToolbar: CustomizableToolbarContent {
                 Button("Back", systemImage: "chevron.left") {
                     appState.goBack()
                 }
-                .disabled(article == nil || appState.currentTab?.canGoBack != true)
+                .disabled(article == nil || !appState.canGoBack)
 
                 Button("Forward", systemImage: "chevron.right") {
                     appState.goForward()
                 }
-                .disabled(article == nil || appState.currentTab?.canGoForward != true)
+                .disabled(article == nil || !appState.canGoForward)
             }
             .labelStyle(.iconOnly)
         }

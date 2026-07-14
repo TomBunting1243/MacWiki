@@ -75,11 +75,7 @@ struct ArticleLookupIndex {
     }
 
     static func currentArticleTitleNormalized(in appState: AppState) -> String? {
-        guard let activeId = appState.activeTabId,
-              let tab = appState.openTabs.first(where: { $0.id == activeId }) else {
-            return nil
-        }
-        guard let article = tab.currentArticle else { return nil }
+        guard let article = appState.currentArticle else { return nil }
         return ReadStateSync.normalizedTitle(article.title)
     }
 }
