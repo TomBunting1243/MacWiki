@@ -6,6 +6,21 @@ import Testing
 
 @MainActor
 struct PersistenceIssueCenterTests {
+    @Test func persistenceAlertUsesTheModernBackDeployablePresentationAPI() throws {
+        let source = try String(
+            contentsOf: repositoryRoot.appending(
+                path: "Sources/MacWiki/Utilities/PersistenceIssueCenter.swift"
+            ),
+            encoding: .utf8
+        )
+
+        #expect(source.contains("isPresented: isPresented"))
+        #expect(source.contains("presenting: issueCenter.activeIssue"))
+        #expect(source.contains("Button(\"OK\")"))
+        #expect(!source.contains("\n            Alert("))
+        #expect(!source.contains(".alert(item:"))
+    }
+
     @Test func reportedFailurePreservesOperationAndCanBeDismissed() {
         let center = PersistenceIssueCenter()
         let error = NSError(
@@ -45,5 +60,12 @@ struct PersistenceIssueCenterTests {
             configurations: configuration
         )
         return ModelContext(container)
+    }
+
+    private var repositoryRoot: URL {
+        URL(filePath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
     }
 }

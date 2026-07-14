@@ -374,6 +374,11 @@ struct BetaReadinessRegressionTests {
         #expect(!appSource.contains("CGWindowListCopyWindowInfo("))
         #expect(appSource.contains("private struct MacWikiLaunchIssue: Identifiable"))
         #expect(appSource.contains("launchIssue: MacWikiLaunchIssue?"))
+        #expect(appSource.contains("isPresented: isLaunchIssuePresented"))
+        #expect(appSource.contains("presenting: launchIssue"))
+        #expect(appSource.contains("Button(\"Continue\")"))
+        #expect(!appSource.contains(".alert(item: $launchIssue)"))
+        #expect(!appSource.contains("\n                    Alert("))
         #expect(appSource.components(separatedBy: ".defaultAppStorage(MacWikiDefaults.current)").count - 1 == 3)
         #expect(!appSource.contains("UserDefaults.standard"))
     }

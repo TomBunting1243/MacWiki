@@ -49,18 +49,27 @@ private struct PersistenceIssueAlertModifier: ViewModifier {
     @State private var issueCenter = PersistenceIssueCenter.shared
 
     func body(content: Content) -> some View {
-        @Bindable var issueCenter = issueCenter
-
-        content.alert(item: $issueCenter.activeIssue) { issue in
-            Alert(
-                title: Text("Couldn’t Save Changes"),
-                message: Text(
-                    "MacWiki couldn’t complete \(issue.operation). "
-                    + "The unsaved changes were rolled back.\n\n\(issue.detail)"
-                ),
-                dismissButton: .default(Text("OK")) {
+        let isPresented = Binding(
+            get: { issueCenter.activeIssue != nil },
+            set: { isPresented in
+                if !isPresented {
                     issueCenter.dismiss()
                 }
+            }
+        )
+
+        content.alert(
+            "Couldn’t Save Changes",
+            isPresented: isPresented,
+            presenting: issueCenter.activeIssue
+        ) { _ in
+            Button("OK") {
+                issueCenter.dismiss()
+            }
+        } message: { issue in
+            Text(
+                "MacWiki couldn’t complete \(issue.operation). "
+                + "The unsaved changes were rolled back.\n\n\(issue.detail)"
             )
         }
     }

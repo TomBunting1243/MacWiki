@@ -259,6 +259,17 @@ struct MacWikiApp: App {
         return NSAttributedString(string: title, attributes: attributes)
     }
 
+    private var isLaunchIssuePresented: Binding<Bool> {
+        Binding(
+            get: { launchIssue != nil },
+            set: { isPresented in
+                if !isPresented {
+                    launchIssue = nil
+                }
+            }
+        )
+    }
+
     var body: some Scene {
         Window("MacWiki", id: "main") {
             ContentView()
@@ -266,12 +277,16 @@ struct MacWikiApp: App {
                 .defaultAppStorage(MacWikiDefaults.current)
                 .persistenceIssueAlert()
                 .focusedSceneValue(\.macWikiCommandAppState, appState)
-                .alert(item: $launchIssue) { issue in
-                    Alert(
-                        title: Text(issue.title),
-                        message: Text(issue.message),
-                        dismissButton: .default(Text("Continue"))
-                    )
+                .alert(
+                    Text(launchIssue?.title ?? "MacWiki"),
+                    isPresented: isLaunchIssuePresented,
+                    presenting: launchIssue
+                ) { _ in
+                    Button("Continue") {
+                        launchIssue = nil
+                    }
+                } message: { issue in
+                    Text(issue.message)
                 }
                 .task {
                     guard !hasPresentedLaunchIssue else { return }
