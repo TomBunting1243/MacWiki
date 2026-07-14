@@ -980,7 +980,7 @@ struct WebView: NSViewRepresentable {
 
                 let shouldBeEager = index < eagerImageCountForInitialLoad
                 let desiredLoadingValue = shouldBeEager ? "eager" : "lazy"
-                let desiredFetchPriority = shouldBeEager ? "high" : "low"
+                let desiredFetchPriority = shouldBeEager ? "high" : "auto"
                 var didMutate = false
 
                 if !containsHTMLAttribute("loading", in: tag) {

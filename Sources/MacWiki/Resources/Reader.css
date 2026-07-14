@@ -294,10 +294,6 @@ img[data-macwiki-image-transition="1"][data-macwiki-image-skeleton="1"][data-mac
     filter: saturate(0.92) contrast(0.96);
 }
 
-img[data-macwiki-image-transition="1"][data-macwiki-image-skeleton="0"][data-macwiki-image-state="loading"] {
-    opacity: 0;
-}
-
 img[data-macwiki-image-state="loading"] {
     border: 1px solid color-mix(in srgb, var(--border-color) 84%, transparent);
 }

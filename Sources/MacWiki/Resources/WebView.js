@@ -688,7 +688,6 @@ document.addEventListener('contextmenu', function (e) {
     var perfVelocitySamples = 0;
     var perfLongTaskCount = 0;
     var recentPressureScore = 0;
-    var largePageImageMode = false;
     var restoreTelemetryMode = false;
     var restoreTelemetryMutedUntil = 0;
     var lastScrollEventAt = 0;
@@ -807,34 +806,6 @@ document.addEventListener('contextmenu', function (e) {
         var isActiveUserScroll = (now - lastScrollEventAt) < 150;
         if (isActiveUserScroll && scrollVelocityPxPerMs > 0.15) return true;
         return false;
-    }
-
-    function currentScrollDirection(now) {
-        now = now || Date.now();
-        if ((now - lastScrollEventAt) > 420) return 0;
-        return scrollDirectionY;
-    }
-
-    function directionalDistanceToViewport(rect, direction) {
-        if (direction < 0) {
-            // Upward scrolling: images above viewport are "ahead".
-            return -rect.bottom;
-        }
-        if (direction > 0) {
-            // Downward scrolling: images below viewport are "ahead".
-            return rect.top;
-        }
-        // Neutral fallback.
-        return rect.top;
-    }
-
-    function directionalPrewarmScore(rect, direction) {
-        var directionalDistance = directionalDistanceToViewport(rect, direction);
-        if (directionalDistance >= 0) {
-            return directionalDistance;
-        }
-        // Opposite-direction images are heavily penalized.
-        return (Math.abs(directionalDistance) * 2.2) + (window.innerHeight * 0.55);
     }
 
     function setFastScrollVisualModeUntil(untilMs) {
@@ -1433,10 +1404,10 @@ document.addEventListener('contextmenu', function (e) {
         markMaxScrollDirty(22);
     }, true);
 
-    // Large-page image handling:
-    // 1) Early lightweight layout reservation (limits pop + reflow).
-    // 2) Bounded fade/listener prep to avoid startup spikes on image-heavy pages.
-    // 3) Heavier loading/fetchpriority tuning in idle budget.
+    // WebKit owns image scheduling through the native loading/decoding hints
+    // injected before document load. JavaScript only reserves a real aspect
+    // ratio when Wikipedia supplied dimensions and adds a bounded visual
+    // placeholder for those dimensionally stable images.
     function parsePositiveInt(value) {
         if (value === null || value === undefined) return 0;
         var n = parseInt(String(value), 10);
@@ -1458,8 +1429,9 @@ document.addEventListener('contextmenu', function (e) {
             // Skip tiny utility/media-control images to avoid visual noise.
             return (width * height) >= 12000;
         }
-        // When dimensions are unknown, default to skeleton for continuity.
-        return true;
+        // Unknown dimensions cannot reserve space, so a synthetic shimmer would
+        // still collapse and pop. Let WebKit reveal those images normally.
+        return false;
     }
 
     function reserveImageLayout(image) {
@@ -1490,9 +1462,10 @@ document.addEventListener('contextmenu', function (e) {
 
     function prepareImageFade(image) {
         if (!image || image.dataset.macwikiFadePrepared === '1') return;
+        if (!shouldUseImageSkeleton(image)) return;
         image.dataset.macwikiFadePrepared = '1';
         image.dataset.macwikiImageTransition = '1';
-        image.dataset.macwikiImageSkeleton = shouldUseImageSkeleton(image) ? '1' : '0';
+        image.dataset.macwikiImageSkeleton = '1';
 
         if (image.complete) {
             image.dataset.macwikiImageState = 'loaded';
@@ -1540,16 +1513,17 @@ document.addEventListener('contextmenu', function (e) {
         var images = document.images;
         if (!images || !images.length) return;
 
-        // Keep prep bounded while still covering long-form pages.
-        var maxPrepImages = Math.min(images.length, options.maxPrepImages || 640);
+        // Keep the DOM walk bounded. The first useful viewport is prepared
+        // immediately; remaining dimension metadata is applied in idle time.
+        var maxPrepImages = Math.min(images.length, options.maxPrepImages || 240);
         var maxFadePrepImages = Math.min(
             maxPrepImages,
-            options.maxFadePrepImages === undefined ? maxPrepImages : options.maxFadePrepImages
+            options.maxFadePrepImages === undefined ? 72 : options.maxFadePrepImages
         );
         var frameBudgetMs = options.frameBudgetMs || 8;
         var idleTimeout = options.idleTimeout || 280;
-        var syncFrontload = Math.min(options.syncFrontload || 0, maxPrepImages);
-        var startInIdle = options.startInIdle === true;
+        var syncFrontload = Math.min(options.syncFrontload || 3, maxPrepImages);
+        var startInIdle = options.startInIdle !== false;
         var index = 0;
 
         // Always reserve a small up-front set so above-the-fold layout is stable.
@@ -1604,373 +1578,29 @@ document.addEventListener('contextmenu', function (e) {
         }
     }
 
-    function applyImageHints() {
-        var images = document.images;
-        if (!images || !images.length) return;
-
-        var imageCount = images.length;
-        var heavyImageMode = largePageImageMode || imageCount > 180;
-
-        // Cap work on very image-heavy pages to avoid long main-thread tasks.
-        var maxImages = Math.min(images.length, heavyImageMode ? 240 : 360);
-        var eagerCount = heavyImageMode ? 8 : 12;
-        var highPriorityCount = heavyImageMode ? 3 : 4;
-        var prewarmObserveLimit = heavyImageMode ? 120 : maxImages;
-        var immediatePrewarmObserveLimit = heavyImageMode ? 42 : prewarmObserveLimit;
-        var nearPhaseLimit = Math.min(maxImages, heavyImageMode ? 104 : 168);
-        var fadePrepLimit = heavyImageMode ? 140 : maxImages;
-        var deepFadePrepLimit = heavyImageMode ? 128 : fadePrepLimit;
-
-        var observer = null;
-        var deferredPrewarmImages = [];
-        var prewarmCandidates = [];
-        var prewarmObserverSuspended = false;
-        var prewarmResumeTimer = null;
-        var prewarmResumeObserveLimit = heavyImageMode ? 56 : 92;
-
-        function shouldSuspendPrewarmObserver(now) {
-            now = now || Date.now();
-            if (isProgrammaticScrollMode(now)) return true;
-            if (now < trackpadBurstUntil) return true;
-
-            var isActiveUserScroll = (now - lastScrollEventAt) < 150;
-            if (!isActiveUserScroll) return false;
-
-            // Suspend only for genuinely high-velocity user movement; resume as
-            // soon as scroll settles so near-viewport images can load quickly.
-            var suspendVelocity = heavyImageMode ? 0.72 : 0.86;
-            return scrollVelocityPxPerMs > suspendVelocity;
-        }
-
-        function registerPrewarmCandidate(image) {
-            if (!image || image.dataset.macwikiPrewarmCandidate === '1') return;
-            image.dataset.macwikiPrewarmCandidate = '1';
-            image.dataset.macwikiPrewarmObserved = '0';
-            image.dataset.macwikiPrewarmPromoted = '0';
-            prewarmCandidates.push(image);
-        }
-
-        function markPrewarmObserved(image, observed) {
-            if (!image || image.dataset.macwikiPrewarmCandidate !== '1') return;
-            image.dataset.macwikiPrewarmObserved = observed ? '1' : '0';
-        }
-
-        function markPrewarmPromoted(image) {
-            if (!image || image.dataset.macwikiPrewarmCandidate !== '1') return;
-            image.dataset.macwikiPrewarmPromoted = '1';
-            image.dataset.macwikiPrewarmObserved = '0';
-        }
-
-        function observePrewarmCandidate(image) {
-            if (!observer || !image || prewarmObserverSuspended) return;
-            registerPrewarmCandidate(image);
-            if (image.dataset.macwikiPrewarmPromoted === '1') return;
-            if (image.dataset.macwikiPrewarmObserved === '1') return;
-            observer.observe(image);
-            markPrewarmObserved(image, true);
-        }
-
-        function schedulePrewarmObserverResume(extraDelayMs) {
-            if (!observer) return;
-            if (prewarmResumeTimer) {
-                clearTimeout(prewarmResumeTimer);
-                prewarmResumeTimer = null;
-            }
-            var now = Date.now();
-            var waitMs = Math.max(trackpadBurstUntil - now, 0) + Math.max(extraDelayMs || 140, 80);
-            prewarmResumeTimer = setTimeout(function () {
-                prewarmResumeTimer = null;
-                resumePrewarmObserverIfPossible();
-            }, waitMs);
-        }
-
-        function suspendPrewarmObserverIfNeeded(now) {
-            if (!observer) return;
-            now = now || Date.now();
-            if (!shouldSuspendPrewarmObserver(now)) return;
-            if (prewarmObserverSuspended) {
-                schedulePrewarmObserverResume(140);
-                return;
-            }
-
-            prewarmObserverSuspended = true;
-            observer.disconnect();
-            for (var idx = 0; idx < prewarmCandidates.length; idx += 1) {
-                var candidate = prewarmCandidates[idx];
-                if (!candidate || candidate.dataset.macwikiPrewarmPromoted === '1') continue;
-                markPrewarmObserved(candidate, false);
-            }
-            schedulePrewarmObserverResume(140);
-        }
-
-        function resumePrewarmObserverIfPossible() {
-            if (!observer || !prewarmObserverSuspended) return;
-            var now = Date.now();
-            if (shouldSuspendPrewarmObserver(now)) {
-                schedulePrewarmObserverResume(170);
-                return;
-            }
-
-            prewarmObserverSuspended = false;
-            var direction = currentScrollDirection(now);
-            var scored = [];
-            for (var idx = 0; idx < prewarmCandidates.length; idx += 1) {
-                var candidate = prewarmCandidates[idx];
-                if (!candidate || !candidate.isConnected) continue;
-                if (candidate.dataset.macwikiPrewarmPromoted === '1') continue;
-                if (candidate.complete) continue;
-                var rect = candidate.getBoundingClientRect();
-                scored.push({
-                    image: candidate,
-                    score: directionalPrewarmScore(rect, direction)
-                });
-            }
-
-            scored.sort(function (a, b) {
-                return a.score - b.score;
-            });
-
-            var observeLimit = Math.min(prewarmResumeObserveLimit, scored.length);
-            for (var i = 0; i < observeLimit; i += 1) {
-                observePrewarmCandidate(scored[i].image);
-            }
-        }
-
-        function monitorPrewarmObserverPressure() {
-            if (!observer) return;
-            var now = Date.now();
-            if (shouldSuspendPrewarmObserver(now)) {
-                suspendPrewarmObserverIfNeeded(now);
-            } else if (prewarmObserverSuspended) {
-                schedulePrewarmObserverResume(90);
-            }
-        }
-
-        if (window.IntersectionObserver) {
-            observer = new IntersectionObserver(function (entries, io) {
-                var now = Date.now();
-                if (shouldSuspendPrewarmObserver(now)) {
-                    suspendPrewarmObserverIfNeeded(now);
-                    return;
-                }
-                if (prewarmObserverSuspended) {
-                    return;
-                }
-                var inTrackpadBurst = now < trackpadBurstUntil;
-                // Reduce decode/network spikes while fast scrolling.
-                var maxPromotions = scrollVelocityPxPerMs > 1.15 ? 1 : 3;
-                var promoted = 0;
-                var direction = currentScrollDirection(now);
-                var nearViewportPx = window.innerHeight * (
-                    scrollVelocityPxPerMs > 1.15
-                        ? (heavyImageMode ? 0.82 : 0.96)
-                        : (heavyImageMode ? 1.16 : 1.32)
-                );
-                var behindViewportPx = window.innerHeight * (heavyImageMode ? 0.26 : 0.34);
-
-                if ((now - scrollDirectionChangedAt) < 180) {
-                    maxPromotions = Math.min(maxPromotions, 1);
-                    nearViewportPx *= 0.88;
-                    behindViewportPx *= 0.52;
-                }
-                if (inTrackpadBurst) {
-                    maxPromotions = Math.min(maxPromotions, 1);
-                    nearViewportPx *= 0.84;
-                    behindViewportPx *= 0.5;
-                }
-
-                for (var j = 0; j < entries.length; j += 1) {
-                    var entry = entries[j];
-                    if (!entry.isIntersecting) continue;
-                    if (promoted >= maxPromotions) break;
-                    var img = entry.target;
-
-                    if (direction !== 0) {
-                        var directionalDistance =
-                            directionalDistanceToViewport(entry.boundingClientRect, direction);
-                        if (directionalDistance >= 0) {
-                            if (directionalDistance > nearViewportPx) {
-                                // Keep observing until image is closer in current direction.
-                                continue;
-                            }
-                        } else if (Math.abs(directionalDistance) > behindViewportPx) {
-                            // Aggressively deprioritize opposite-direction work.
-                            continue;
-                        }
-                    } else {
-                        var neutralDistanceToViewport = Math.abs(entry.boundingClientRect.top);
-                        if (neutralDistanceToViewport > nearViewportPx) {
-                            continue;
-                        }
-                    }
-
-                    img.setAttribute('fetchpriority', 'high');
-                    if (img.getAttribute('loading') === 'lazy') {
-                        img.setAttribute('loading', 'eager');
-                    }
-                    io.unobserve(img);
-                    markPrewarmPromoted(img);
-                    promoted += 1;
-                }
-            }, {
-                root: null,
-                // Start warming images before they hit the viewport.
-                rootMargin: heavyImageMode ? '700px 0px' : '900px 0px',
-                threshold: 0.01
-            });
-            window.addEventListener('scroll', monitorPrewarmObserverPressure, { passive: true });
-        }
-
-        for (var i = 0; i < maxImages; i += 1) {
-            var image = images[i];
-            var isCriticalPhase = i < eagerCount;
-            var isNearPhase = i >= eagerCount && i < nearPhaseLimit;
-            var isDeepPhase = i >= nearPhaseLimit;
-            reserveImageLayout(image);
-            if (isCriticalPhase && i < fadePrepLimit) {
-                prepareImageFade(image);
-            } else if (isNearPhase && i < fadePrepLimit) {
-                prepareImageFade(image);
-            } else if (isDeepPhase && i < deepFadePrepLimit) {
-                prepareImageFade(image);
-            }
-            if (!heavyImageMode || !isDeepPhase) {
-                image.setAttribute('decoding', 'async');
-            }
-            if (i < eagerCount) {
-                image.setAttribute('loading', 'eager');
-                if (i < highPriorityCount) {
-                    image.setAttribute('fetchpriority', 'high');
-                } else if (!image.hasAttribute('fetchpriority')) {
-                    image.setAttribute('fetchpriority', 'auto');
-                }
-            } else {
-                if (!image.hasAttribute('loading')) {
-                    image.setAttribute('loading', 'lazy');
-                }
-                if (!image.hasAttribute('fetchpriority')) {
-                    image.setAttribute('fetchpriority', 'auto');
-                }
-                if (observer && i < prewarmObserveLimit) {
-                    registerPrewarmCandidate(image);
-                    if (isNearPhase && i < immediatePrewarmObserveLimit) {
-                        observePrewarmCandidate(image);
-                    } else {
-                        var initRect = image.getBoundingClientRect();
-                        var initDirection = currentScrollDirection(Date.now());
-                        deferredPrewarmImages.push({
-                            image: image,
-                            score: directionalPrewarmScore(initRect, initDirection)
-                        });
-                    }
-                }
-            }
-        }
-
-        if (observer && deferredPrewarmImages.length > 0) {
-            var didStartDeferredPrewarm = false;
-            var deferredIndex = 0;
-            deferredPrewarmImages.sort(function (a, b) {
-                return a.score - b.score;
-            });
-
-            function enrollDeferredPrewarmChunk(deadline) {
-                if (shouldDeferBackgroundWork(Date.now())) {
-                    if (window.requestIdleCallback) {
-                        window.requestIdleCallback(enrollDeferredPrewarmChunk, { timeout: heavyImageMode ? 620 : 420 });
-                    } else {
-                        setTimeout(enrollDeferredPrewarmChunk, heavyImageMode ? 120 : 80);
-                    }
-                    return;
-                }
-                var start = (window.performance && performance.now) ? performance.now() : 0;
-                var pressure = Math.max(
-                    recentPressureScore,
-                    scrollVelocityPxPerMs > 1.2 ? 0.55 : (scrollVelocityPxPerMs > 0.8 ? 0.3 : 0)
-                );
-                var frameBudgetMs = heavyImageMode ? 4 : 6;
-                var chunkCap = heavyImageMode ? 10 : 16;
-                var nextTimeoutMs = heavyImageMode ? 450 : 320;
-                if (pressure >= 0.95) {
-                    frameBudgetMs = heavyImageMode ? 2 : 3;
-                    chunkCap = heavyImageMode ? 4 : 6;
-                    nextTimeoutMs = heavyImageMode ? 620 : 470;
-                } else if (pressure >= 0.6) {
-                    frameBudgetMs = heavyImageMode ? 3 : 4;
-                    chunkCap = heavyImageMode ? 6 : 10;
-                    nextTimeoutMs = heavyImageMode ? 520 : 390;
-                }
-                var observedInChunk = 0;
-
-                while (deferredIndex < deferredPrewarmImages.length) {
-                    var deferredImage = deferredPrewarmImages[deferredIndex].image;
-                    deferredIndex += 1;
-                    observePrewarmCandidate(deferredImage);
-                    observedInChunk += 1;
-
-                    if (observedInChunk >= chunkCap) break;
-                    if (deadline && typeof deadline.timeRemaining === 'function') {
-                        if (deadline.timeRemaining() < 2) break;
-                    } else if ((window.performance && performance.now) && (performance.now() - start) > frameBudgetMs) {
-                        break;
-                    }
-                }
-
-                if (deferredIndex < deferredPrewarmImages.length) {
-                    if (window.requestIdleCallback) {
-                        window.requestIdleCallback(enrollDeferredPrewarmChunk, { timeout: nextTimeoutMs });
-                    } else {
-                        setTimeout(enrollDeferredPrewarmChunk, Math.min(nextTimeoutMs, 80));
-                    }
-                }
-            }
-
-            function startDeferredPrewarm() {
-                if (didStartDeferredPrewarm) return;
-                if (shouldDeferBackgroundWork(Date.now())) {
-                    setTimeout(startDeferredPrewarm, 180);
-                    return;
-                }
-                didStartDeferredPrewarm = true;
-
-                if (window.requestIdleCallback) {
-                    window.requestIdleCallback(enrollDeferredPrewarmChunk, { timeout: 260 });
-                } else {
-                    setTimeout(enrollDeferredPrewarmChunk, 24);
-                }
-            }
-
-            function maybeStartDeferredPrewarmOnUserScroll() {
-                if (shouldDeferBackgroundWork(Date.now())) return;
-                window.removeEventListener('scroll', maybeStartDeferredPrewarmOnUserScroll);
-                startDeferredPrewarm();
-            }
-
-            // Keep startup light, then broaden prewarm after first user interaction.
-            window.addEventListener('scroll', maybeStartDeferredPrewarmOnUserScroll, { passive: true });
-            // Fallback for no-scroll sessions so deep images still warm eventually.
-            setTimeout(startDeferredPrewarm, 1400);
-        }
-    }
-
     var didRunInitialImagePrep = false;
     function runInitialImagePrep() {
         if (didRunInitialImagePrep) return;
         didRunInitialImagePrep = true;
         var imageCount = (document.images && document.images.length) ? document.images.length : 0;
-        largePageImageMode = imageCount > 180;
+        var largePageImageMode = imageCount > 180;
 
         if (largePageImageMode) {
             prepareImagesForStableLayout({
                 maxPrepImages: 220,
-                maxFadePrepImages: 72,
-                frameBudgetMs: 5,
+                maxFadePrepImages: 48,
+                frameBudgetMs: 4,
                 idleTimeout: 160,
-                syncFrontload: 28,
+                syncFrontload: 3,
                 startInIdle: true
             });
         } else {
-            prepareImagesForStableLayout();
+            prepareImagesForStableLayout({
+                maxPrepImages: 240,
+                maxFadePrepImages: 72,
+                syncFrontload: 3,
+                startInIdle: true
+            });
         }
     }
 
@@ -1982,11 +1612,6 @@ document.addEventListener('contextmenu', function (e) {
 
     window.addEventListener('load', function () {
         runInitialImagePrep();
-        if (window.requestIdleCallback) {
-            window.requestIdleCallback(applyImageHints, { timeout: 750 });
-        } else {
-            setTimeout(applyImageHints, 24);
-        }
     });
 
     var scrollRestoreSequence = 0;
