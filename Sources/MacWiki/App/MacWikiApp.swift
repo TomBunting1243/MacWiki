@@ -180,11 +180,6 @@ struct MacWikiApp: App {
         }
     }
 
-    private static var launchWindowSize: CGSize {
-        let visibleFrame = NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
-        return CGSize(width: visibleFrame.width, height: visibleFrame.height)
-    }
-
     private func adjustReaderFontSize(by delta: Double) {
         let defaults = MacWikiDefaults.current
         let key = ReaderAppearanceStorageKey.fontSize
@@ -306,10 +301,9 @@ struct MacWikiApp: App {
         .restorationBehavior(.disabled)
         .windowBackgroundDragBehavior(.enabled)
         .windowToolbarStyle(.unifiedCompact(showsTitle: false))
-        .defaultSize(
-            width: Self.launchWindowSize.width,
-            height: Self.launchWindowSize.height
-        )
+        .defaultWindowPlacement { _, context in
+            WindowPlacement(.center, size: context.defaultDisplay.visibleRect.size)
+        }
         .defaultLaunchBehavior(.presented)
         .commands {
             MacWikiCommands(
@@ -339,10 +333,9 @@ struct MacWikiApp: App {
         .restorationBehavior(.disabled)
         .windowBackgroundDragBehavior(.enabled)
         .windowToolbarStyle(.unifiedCompact(showsTitle: false))
-        .defaultSize(
-            width: Self.launchWindowSize.width,
-            height: Self.launchWindowSize.height
-        )
+        .defaultWindowPlacement { _, context in
+            WindowPlacement(.center, size: context.defaultDisplay.visibleRect.size)
+        }
         .defaultLaunchBehavior(.suppressed)
         
         Settings {
