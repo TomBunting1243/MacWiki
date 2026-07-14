@@ -68,6 +68,36 @@ struct ArticleWordCountStoreTests {
         #expect(await recorder.titles() == ["Broken Article", "Working Article", "Broken Article"])
     }
 
+    @Test func explicitRefreshRetriesFailedTitlesWithoutDiscardingCachedCounts() async {
+        let recorder = RequestedTitleRecorder()
+        let store = ArticleWordCountStore(
+            pageMetadataLoader: { title in
+                await recorder.record(title)
+                if title == "Broken Article" {
+                    throw TestLoaderError.failed
+                }
+                return WikipediaService.PageMetadata(wordCount: 640)
+            },
+            batchSize: 1
+        )
+        let results = [
+            searchResult("Working Article"),
+            searchResult("Broken Article")
+        ]
+
+        store.queueLoad(results: results)
+        await waitUntilIdle(store)
+        store.queueLoad(results: results, retryFailed: true)
+        await waitUntilIdle(store)
+
+        #expect(
+            await recorder.titles()
+                == ["Working Article", "Broken Article", "Broken Article"]
+        )
+        #expect(store.wordCount(for: "Working Article") == 640)
+        #expect(store.wordCount(for: "Broken Article") == nil)
+    }
+
     private func searchResult(_ title: String) -> WikipediaService.SearchResult {
         WikipediaService.SearchResult(
             id: title,

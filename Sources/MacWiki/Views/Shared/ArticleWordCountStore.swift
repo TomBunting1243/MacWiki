@@ -31,7 +31,8 @@ final class ArticleWordCountStore {
     func queueLoad(
         results: [WikipediaService.SearchResult],
         limit: Int? = nil,
-        skippingTitles: Set<String> = []
+        skippingTitles: Set<String> = [],
+        retryFailed: Bool = false
     ) {
         loadGeneration += 1
         let generation = loadGeneration
@@ -48,6 +49,9 @@ final class ArticleWordCountStore {
         let validKeys = Set(targets.map(\.key))
         wordCountByTitleKey = wordCountByTitleKey.filter { validKeys.contains($0.key) }
         attemptedTitleKeys.formIntersection(validKeys)
+        if retryFailed {
+            attemptedTitleKeys.subtract(validKeys)
+        }
 
         let skippedKeys = Set(skippingTitles.map(Self.titleKey(for:))).intersection(validKeys)
         let maximumTargetCount = max(0, limit ?? Int.max)

@@ -105,6 +105,16 @@ struct DiscoverResponsiveLayoutProfile: Equatable, Sendable {
         return isCompact ? 22 : 26
     }
 
+    /// At this width Discovery has enough reading measure for a true editorial
+    /// spread instead of stretching every module into one tall card stack.
+    var prefersEditorialSpread: Bool {
+        isAtLeast(.from1240)
+    }
+
+    var editorialColumnSpacing: CGFloat {
+        isAtLeast(.from1540) ? 20 : 16
+    }
+
     var heroImageHeight: CGFloat {
         if isUltraCompact { return 172 }
         if isVeryCompact { return 190 }

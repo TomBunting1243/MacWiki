@@ -129,7 +129,7 @@ extension DiscoverFeedSections {
     }
 
     var allTimeMostReadLoadKey: String {
-        "\(allTimeMostReadLoadLimit)|most-read:\(isMostReadCollectionExpanded)|longest:\(isLongestReadsCollectionExpanded)"
+        "refresh:\(refreshGeneration)|\(allTimeMostReadLoadLimit)|most-read:\(isMostReadCollectionExpanded)|longest:\(isLongestReadsCollectionExpanded)"
     }
 
     var todayMostReadLoadKey: String {
@@ -142,6 +142,7 @@ extension DiscoverFeedSections {
             seeds: [
                 AnyHashable(feed.dateKey),
                 AnyHashable("today-most-read-pulse"),
+                AnyHashable(refreshGeneration),
                 AnyHashable(isTodayMostReadExpanded)
             ]
         )
@@ -153,6 +154,7 @@ extension DiscoverFeedSections {
             seeds: [
                 AnyHashable(feed.dateKey),
                 AnyHashable("playlist-most-read-pulse"),
+                AnyHashable(refreshGeneration),
                 AnyHashable(isMostReadCollectionExpanded)
             ]
         )
@@ -160,6 +162,10 @@ extension DiscoverFeedSections {
 
     var featuredArticleTitle: String? {
         feed.featuredArticle?.title
+    }
+
+    var featuredArticleLoadKey: String {
+        "refresh:\(refreshGeneration)|title:\(featuredArticleTitle ?? "")"
     }
 
     var featuredTeaserText: String? {
@@ -276,6 +282,7 @@ extension DiscoverFeedSections {
             longestReadCandidates.map(\.title),
             seeds: [
                 AnyHashable("longest-word-count"),
+                AnyHashable(refreshGeneration),
                 AnyHashable(isLongestReadsCollectionExpanded)
             ]
         )

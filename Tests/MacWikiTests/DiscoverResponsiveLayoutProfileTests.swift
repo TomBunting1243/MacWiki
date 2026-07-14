@@ -52,6 +52,28 @@ struct DiscoverResponsiveLayoutProfileTests {
         #expect(lower1200 == upper1200)
     }
 
+    @Test func wideLayoutsActivateTheNativeEditorialSpread() throws {
+        let compact = try #require(DiscoverResponsiveLayoutProfile(width: 1_239.999))
+        let wide = try #require(DiscoverResponsiveLayoutProfile(width: 1_240))
+        let expanded = try #require(DiscoverResponsiveLayoutProfile(width: 1_540))
+
+        #expect(!compact.prefersEditorialSpread)
+        #expect(wide.prefersEditorialSpread)
+        #expect(wide.editorialColumnSpacing == 16)
+        #expect(expanded.prefersEditorialSpread)
+        #expect(expanded.editorialColumnSpacing == 20)
+    }
+
+    @Test func discoveryUsesWideGridRailAndHorizontalMediaVariants() throws {
+        let stages = try repositorySource(
+            "Sources/MacWiki/Views/Home/Discover/DiscoverFeedCollectionStages.swift"
+        )
+
+        #expect(stages.contains("Grid(horizontalSpacing: responsiveLayout.editorialColumnSpacing"))
+        #expect(stages.contains("style: responsiveLayout.prefersEditorialSpread ? .rail : .standard"))
+        #expect(stages.contains("prefersHorizontalLayout: responsiveLayout.prefersEditorialSpread"))
+    }
+
     @Test func derivedLayoutValuesMatchThePreviousWidthFormulasAtEveryBoundary() throws {
         let boundaries: [CGFloat] = [720, 760, 820, 880, 940, 1120, 1200, 1240, 1320, 1540]
         var widths: [CGFloat] = [1, 1040, 2200]

@@ -83,6 +83,7 @@ struct DiscoverScreenModelTests {
         model.selectedDiscoverDate = calendar.date(from: DateComponents(year: 2026, month: 4, day: 9, hour: 8))!
         let skeletonTask = model.updateTimeTravelSkeletonVisibility(reduceMotion: true)
 
+        #expect(model.shouldQueueTimeTravelSkeleton == true)
         #expect(model.shouldShowDelayedTimeTravelSkeleton == false)
 
         await skeletonTask?.value
@@ -95,6 +96,15 @@ struct DiscoverScreenModelTests {
 
         #expect(model.shouldShowDelayedTimeTravelSkeleton == false)
         #expect(model.showsTimeTravelSkeleton == false)
+    }
+
+    @Test func timeMachineControlsUseImmediateScanningWithoutForcingTheSkeleton() throws {
+        let source = try repositorySource(
+            "Sources/MacWiki/Views/Home/Discover/DiscoverTimeMachineStageView.swift"
+        )
+
+        #expect(source.contains("isScanning: screenModel.shouldQueueTimeTravelSkeleton"))
+        #expect(source.contains("showsTimeTravelSkeleton: showsTimeTravelSkeleton"))
     }
 
     @Test func steppingForwardClampsToTodayAndPopoverDismissalIsScoped() {
@@ -123,6 +133,17 @@ struct DiscoverScreenModelTests {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(secondsFromGMT: 0)!
         return calendar
+    }
+
+    private func repositorySource(_ relativePath: String) throws -> String {
+        let repositoryRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        return try String(
+            contentsOf: repositoryRoot.appending(path: relativePath),
+            encoding: .utf8
+        )
     }
 
     private func discoverFeed(dateKey: String) -> WikipediaService.DiscoverFeed {

@@ -62,13 +62,14 @@ final class DiscoverEditionModel {
 
     func updateWordCounts(
         isExpanded: Bool,
-        results: [WikipediaService.SearchResult]
+        results: [WikipediaService.SearchResult],
+        retryFailed: Bool = false
     ) {
         guard isExpanded else {
             wordCounts.cancel()
             return
         }
-        wordCounts.queueLoad(results: results)
+        wordCounts.queueLoad(results: results, retryFailed: retryFailed)
     }
 
     func updateFeaturedArticle(title: String?) {

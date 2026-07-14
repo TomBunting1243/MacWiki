@@ -223,9 +223,21 @@ extension DiscoverFeedSections {
 
     @ViewBuilder
     var openingEditorialSpread: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            todayMostReadSection
-            newsBriefingSection
+        if responsiveLayout.prefersEditorialSpread {
+            Grid(horizontalSpacing: responsiveLayout.editorialColumnSpacing, verticalSpacing: 0) {
+                GridRow(alignment: .top) {
+                    todayMostReadSection
+                        .frame(maxWidth: .infinity, alignment: .topLeading)
+                    newsBriefingSection
+                        .frame(maxWidth: .infinity, alignment: .topLeading)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        } else {
+            VStack(alignment: .leading, spacing: 18) {
+                todayMostReadSection
+                newsBriefingSection
+            }
         }
     }
 
@@ -237,9 +249,21 @@ extension DiscoverFeedSections {
                 subtitle: DiscoverEditionCopy.collectionsSubtitle
             )
 
-            VStack(alignment: .leading, spacing: 16) {
-                mostReadCollectionModule
-                longestReadsCollectionModule
+            if responsiveLayout.prefersEditorialSpread {
+                Grid(horizontalSpacing: responsiveLayout.editorialColumnSpacing, verticalSpacing: 0) {
+                    GridRow(alignment: .top) {
+                        mostReadCollectionModule
+                            .frame(maxWidth: .infinity, alignment: .topLeading)
+                        longestReadsCollectionModule
+                            .frame(maxWidth: .infinity, alignment: .topLeading)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                VStack(alignment: .leading, spacing: 16) {
+                    mostReadCollectionModule
+                    longestReadsCollectionModule
+                }
             }
         }
     }
@@ -266,7 +290,7 @@ extension DiscoverFeedSections {
                     DiscoverSectionHeader(title: "Image of the Day", subtitle: DiscoverEditionCopy.imageOfTheDaySubtitle)
                     DiscoverFeaturedImageCard(
                         image: featuredImage,
-                        prefersHorizontalLayout: false
+                        prefersHorizontalLayout: responsiveLayout.prefersEditorialSpread
                     )
                 }
             }
@@ -279,10 +303,21 @@ extension DiscoverFeedSections {
             DiscoverEditorialPanel(accent: Color.red.opacity(0.78), tone: .notebook) {
                 VStack(alignment: .leading, spacing: 12) {
                     DiscoverSectionHeader(title: "In the News", subtitle: DiscoverEditionCopy.inTheNewsSubtitle)
-                    VStack(spacing: 10) {
+                    LazyVGrid(
+                        columns: Array(
+                            repeating: GridItem(.flexible(), spacing: 10, alignment: .top),
+                            count: responsiveLayout.prefersEditorialSpread ? 2 : 1
+                        ),
+                        alignment: .leading,
+                        spacing: 10
+                    ) {
                         ForEach(remainingNewsItems.prefix(inTheNewsRailLimit)) { result in
                             let rowKey = pageViewsRowKey(section: "in-news", result: result)
-                            DiscoverNewsCard(result: result, onOpen: onOpen)
+                            DiscoverNewsCard(
+                                result: result,
+                                style: responsiveLayout.prefersEditorialSpread ? .rail : .standard,
+                                onOpen: onOpen
+                            )
                                 .contextMenu {
                                     discoverContextMenu(for: result) {
                                         presentPageViewsPopover(for: result, rowKey: rowKey)

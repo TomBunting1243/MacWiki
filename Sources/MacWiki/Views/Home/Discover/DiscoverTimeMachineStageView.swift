@@ -21,7 +21,7 @@ struct DiscoverTimeMachineStageView: View {
                 screenModel: screenModel,
                 discoverFeedStore: discoverFeedStore,
                 responsiveLayout: responsiveLayout,
-                isScanning: showsTimeTravelSkeleton
+                isScanning: screenModel.shouldQueueTimeTravelSkeleton
             )
 
             DiscoverFeedSurface(

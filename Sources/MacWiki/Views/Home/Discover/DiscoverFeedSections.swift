@@ -92,10 +92,11 @@ struct DiscoverFeedSections: View {
         .task(id: wordCountLoadKey) {
             editionModel.updateWordCounts(
                 isExpanded: isLongestReadsCollectionExpanded,
-                results: longestReadCandidates
+                results: longestReadCandidates,
+                retryFailed: refreshGeneration > 0
             )
         }
-        .task(id: featuredArticleTitle) {
+        .task(id: featuredArticleLoadKey) {
             editionModel.updateFeaturedArticle(title: featuredArticleTitle)
         }
         .onDisappear {

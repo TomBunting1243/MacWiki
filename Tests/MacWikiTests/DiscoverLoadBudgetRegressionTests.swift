@@ -51,6 +51,25 @@ struct DiscoverLoadBudgetRegressionTests {
         #expect(trendingService.contains("let summaryFetchBatchSize = 6"))
     }
 
+    @Test func explicitRefreshRetriesEverySupplementalDiscoveryPipeline() throws {
+        let sections = try repositorySource(
+            "Sources/MacWiki/Views/Home/Discover/DiscoverFeedSections.swift"
+        )
+        let policy = try repositorySource(
+            "Sources/MacWiki/Views/Home/Discover/DiscoverFeedDataPolicy.swift"
+        )
+        let wordCounts = try repositorySource(
+            "Sources/MacWiki/Views/Shared/ArticleWordCountStore.swift"
+        )
+
+        #expect(sections.contains(".task(id: featuredArticleLoadKey)"))
+        #expect(sections.contains("retryFailed: refreshGeneration > 0"))
+        #expect(policy.contains("refresh:\\(refreshGeneration)"))
+        #expect(policy.components(separatedBy: "AnyHashable(refreshGeneration)").count >= 4)
+        #expect(wordCounts.contains("retryFailed: Bool = false"))
+        #expect(wordCounts.contains("attemptedTitleKeys.subtract(validKeys)"))
+    }
+
     private func repositorySource(_ relativePath: String) throws -> String {
         let repositoryRoot = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
