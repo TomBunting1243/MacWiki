@@ -196,7 +196,19 @@ struct NativeWorkspaceSplitView<Sidebar: View, Directory: View, Reader: View, In
                 return
             }
 
-            lastRequestedVisibility = visibility
+            if visibilityChanged {
+                // Visibility is state, not hosted content. Apply it synchronously
+                // so a later content revision cannot cancel a pane request that
+                // the coordinator has already recorded as delivered.
+                controller.setPaneVisibility(
+                    sidebarVisible: visibility.sidebarVisible,
+                    directoryVisible: visibility.directoryVisible,
+                    inspectorVisible: visibility.inspectorVisible,
+                    animated: animated
+                )
+                lastRequestedVisibility = visibility
+            }
+
             hostedContentUpdate?.cancel()
             hostedContentUpdate = Task { @MainActor [weak self] in
                 guard let self, !Task.isCancelled else { return }
@@ -215,14 +227,6 @@ struct NativeWorkspaceSplitView<Sidebar: View, Directory: View, Reader: View, In
                 if inspectorChanged {
                     lastInspectorRevision = inspectorRevision
                     inspectorBox.content = inspector
-                }
-                if visibilityChanged {
-                    controller.setPaneVisibility(
-                        sidebarVisible: visibility.sidebarVisible,
-                        directoryVisible: visibility.directoryVisible,
-                        inspectorVisible: visibility.inspectorVisible,
-                        animated: animated
-                    )
                 }
             }
         }

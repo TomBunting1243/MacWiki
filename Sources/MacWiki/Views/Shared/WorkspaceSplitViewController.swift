@@ -41,9 +41,11 @@ final class WorkspaceSplitViewController: NSSplitViewController {
     private var didRestoreSidebarWidth = false
     private var didRestoreDirectoryWidth = false
     private var didRestoreInspectorWidth = false
-    private var requestedVisibility: WorkspacePaneVisibility?
+    private var desiredVisibility: WorkspacePaneVisibility?
+    private var appliedVisibility: WorkspacePaneVisibility?
     private var lastReportedVisibility: WorkspacePaneVisibility?
     private var visibilityTransitionGeneration = 0
+    private var activeVisibilityAnimationGenerations: Set<Int> = []
     private var isApplyingRequestedVisibility = false
     private var pendingInitialWidthRestore: Task<Void, Never>?
     private var pendingWidthPersistence: Task<Void, Never>?
@@ -184,17 +186,30 @@ final class WorkspaceSplitViewController: NSSplitViewController {
             directoryVisible: directoryVisible,
             inspectorVisible: inspectorVisible
         )
-        requestedVisibility = target
+        if !isApplyingRequestedVisibility, appliedVisibility == target {
+            return
+        }
+        let previousDesiredVisibility = desiredVisibility ?? currentVisibility
+        if isApplyingRequestedVisibility, previousDesiredVisibility == target {
+            return
+        }
+
+        desiredVisibility = target
         visibilityTransitionGeneration &+= 1
         let generation = visibilityTransitionGeneration
 
-        let sidebarChanged = sidebarItem.isCollapsed == sidebarVisible
-        let directoryChanged = directoryItem.isCollapsed == directoryVisible
-        let inspectorChanged = inspectorItem.isCollapsed == inspectorVisible
+        let currentVisibility = currentVisibility
+        let sidebarChanged = currentVisibility.sidebarVisible != sidebarVisible
+            || previousDesiredVisibility.sidebarVisible != sidebarVisible
+        let directoryChanged = currentVisibility.directoryVisible != directoryVisible
+            || previousDesiredVisibility.directoryVisible != directoryVisible
+        let inspectorChanged = currentVisibility.inspectorVisible != inspectorVisible
+            || previousDesiredVisibility.inspectorVisible != inspectorVisible
         let visibilityChanged = sidebarChanged || directoryChanged || inspectorChanged
 
         guard visibilityChanged else {
-            isApplyingRequestedVisibility = false
+            appliedVisibility = target
+            isApplyingRequestedVisibility = !activeVisibilityAnimationGenerations.isEmpty
             lastReportedVisibility = target
             scheduleInitialWidthRestore(after: WidthPersistence.restoreDelay)
             return
@@ -215,12 +230,18 @@ final class WorkspaceSplitViewController: NSSplitViewController {
 
         guard animated, view.window != nil else {
             applyTarget()
-            finishVisibilityTransition(generation: generation, animated: false)
+            if activeVisibilityAnimationGenerations.isEmpty {
+                finishVisibilityTransition(generation: generation, animated: false)
+            }
             return
         }
 
+        activeVisibilityAnimationGenerations.insert(generation)
+        let isRetargetingActiveTransition = !activeVisibilityAnimationGenerations
+            .subtracting([generation])
+            .isEmpty
         NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.18
+            context.duration = isRetargetingActiveTransition ? 0.10 : 0.18
             context.allowsImplicitAnimation = true
             if sidebarChanged {
                 sidebarItem.animator().isCollapsed = !sidebarVisible
@@ -233,7 +254,7 @@ final class WorkspaceSplitViewController: NSSplitViewController {
             }
         } completionHandler: { [weak self] in
             Task { @MainActor in
-                self?.finishVisibilityTransition(generation: generation, animated: true)
+                self?.completeVisibilityAnimation(generation: generation)
             }
         }
     }
@@ -406,8 +427,15 @@ final class WorkspaceSplitViewController: NSSplitViewController {
 
     private func finishVisibilityTransition(generation: Int, animated: Bool) {
         guard visibilityTransitionGeneration == generation else { return }
+        if let desiredVisibility, currentVisibility != desiredVisibility {
+            sidebarItem.isCollapsed = !desiredVisibility.sidebarVisible
+            directoryItem.isCollapsed = !desiredVisibility.directoryVisible
+            inspectorItem.isCollapsed = !desiredVisibility.inspectorVisible
+            splitView.layoutSubtreeIfNeeded()
+        }
         isApplyingRequestedVisibility = false
-        lastReportedVisibility = currentVisibility
+        appliedVisibility = currentVisibility
+        lastReportedVisibility = appliedVisibility
         scheduleInitialWidthRestore(
             after: animated
                 ? WidthPersistence.animatedRestoreDelay
@@ -416,14 +444,25 @@ final class WorkspaceSplitViewController: NSSplitViewController {
         )
     }
 
+    private func completeVisibilityAnimation(generation: Int) {
+        activeVisibilityAnimationGenerations.remove(generation)
+        guard activeVisibilityAnimationGenerations.isEmpty else { return }
+        finishVisibilityTransition(
+            generation: visibilityTransitionGeneration,
+            animated: true
+        )
+    }
+
     private func reportUserDrivenVisibilityIfNeeded() {
         guard !isApplyingRequestedVisibility else { return }
         let visibility = currentVisibility
-        guard visibility != requestedVisibility else {
+        guard visibility != desiredVisibility else {
+            appliedVisibility = visibility
             lastReportedVisibility = visibility
             return
         }
-        requestedVisibility = visibility
+        desiredVisibility = visibility
+        appliedVisibility = visibility
         guard visibility != lastReportedVisibility else { return }
         lastReportedVisibility = visibility
         onPaneVisibilityChange?(visibility)

@@ -149,6 +149,46 @@ struct NativeWorkspaceSplitViewTests {
         #expect(!fixture.controller.splitViewItems[2].isCollapsed)
     }
 
+    @Test func rapidAnimatedCollapseReversalSettlesOnTheLatestVisibility() async throws {
+        let fixture = makeFixture(width: 1_700)
+        fixture.controller.setPaneVisibility(
+            sidebarVisible: true,
+            directoryVisible: true,
+            inspectorVisible: true,
+            animated: false
+        )
+        layout(fixture.controller, size: NSSize(width: 1_700, height: 800))
+
+        var reportedVisibility: WorkspacePaneVisibility?
+        fixture.controller.onPaneVisibilityChange = { reportedVisibility = $0 }
+
+        fixture.controller.setPaneVisibility(
+            sidebarVisible: false,
+            directoryVisible: false,
+            inspectorVisible: false,
+            animated: true
+        )
+        try await Task.sleep(for: .milliseconds(30))
+        fixture.controller.setPaneVisibility(
+            sidebarVisible: true,
+            directoryVisible: true,
+            inspectorVisible: true,
+            animated: true
+        )
+
+        try await waitUntil(timeout: .seconds(1)) {
+            !fixture.controller.splitViewItems[0].isCollapsed
+                && !fixture.controller.splitViewItems[1].isCollapsed
+                && !fixture.controller.splitViewItems[3].isCollapsed
+        }
+        try await Task.sleep(for: .milliseconds(250))
+
+        #expect(!fixture.controller.splitViewItems[0].isCollapsed)
+        #expect(!fixture.controller.splitViewItems[1].isCollapsed)
+        #expect(!fixture.controller.splitViewItems[3].isCollapsed)
+        #expect(reportedVisibility == nil)
+    }
+
     @Test func persistsUserResizedAuxiliaryWidthsAfterDebounce() async throws {
         let defaults = isolatedDefaults()
         defaults.set(220.0, forKey: AppStorageKey.MainWindow.sidebarWidth)

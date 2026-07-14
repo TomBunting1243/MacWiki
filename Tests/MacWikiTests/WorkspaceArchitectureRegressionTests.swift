@@ -58,6 +58,16 @@ struct WorkspaceArchitectureRegressionTests {
         #expect(split.contains("lastRequestedVisibility != visibility"))
     }
 
+    @Test func paneVisibilityCannotBeCancelledWithHostedContentWork() throws {
+        let split = try source("Sources/MacWiki/Views/Shared/NativeWorkspaceSplitView.swift")
+        let updateStart = try #require(split.range(of: "func updateWorkspace("))
+        let updateSource = String(split[updateStart.lowerBound...])
+        let visibilityApply = try #require(updateSource.range(of: "controller.setPaneVisibility("))
+        let deferredContentUpdate = try #require(updateSource.range(of: "hostedContentUpdate = Task"))
+
+        #expect(visibilityApply.lowerBound < deferredContentUpdate.lowerBound)
+    }
+
     private func source(_ relativePath: String) throws -> String {
         try String(
             contentsOf: repositoryRoot.appending(path: relativePath),
