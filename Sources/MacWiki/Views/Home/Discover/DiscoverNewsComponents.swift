@@ -123,60 +123,51 @@ struct DiscoverCompactArticleCard: View {
     let trendPulse: WikipediaService.TrendPulse?
     var onTrendTapped: ((WikipediaService.TrendPulse) -> Void)? = nil
     let onOpen: (WikipediaService.SearchResult, Bool) -> Void
-    @State private var suppressPrimaryTapFromTrend = false
 
     var body: some View {
-        Button {
-            if suppressPrimaryTapFromTrend {
-                suppressPrimaryTapFromTrend = false
-                return
-            }
-            onOpen(result, SystemBridge.isCommandPressed)
-        } label: {
-            HStack(spacing: 9) {
-                Text("\(rank)")
-                    .font(DiscoverTypography.compactRank)
-                    .foregroundStyle(.secondary)
-                    .frame(width: 26, alignment: .leading)
+        VStack(alignment: .leading, spacing: 6) {
+            Button {
+                onOpen(result, SystemBridge.isCommandPressed)
+            } label: {
+                HStack(spacing: 9) {
+                    Text("\(rank)")
+                        .font(DiscoverTypography.compactRank)
+                        .foregroundStyle(.secondary)
+                        .frame(width: 26, alignment: .leading)
 
-                DiscoverThumbnailSlot(
-                    thumbnailURL: result.thumbnailURL,
-                    size: 62,
-                    cornerRadius: 8,
-                    imagePadding: 4
-                )
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(result.title)
-                        .font(DiscoverTypography.compactTitle)
-                        .lineLimit(2)
-                        .lineSpacing(1.05)
-                    if let description = result.description {
-                        Text(description)
-                            .font(DiscoverTypography.compactDescription)
-                            .foregroundStyle(.secondary)
+                    DiscoverThumbnailSlot(
+                        thumbnailURL: result.thumbnailURL,
+                        size: 62,
+                        cornerRadius: 8,
+                        imagePadding: 4
+                    )
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(result.title)
+                            .font(DiscoverTypography.compactTitle)
                             .lineLimit(2)
-                            .lineSpacing(1.0)
+                            .lineSpacing(1.05)
+                        if let description = result.description {
+                            Text(description)
+                                .font(DiscoverTypography.compactDescription)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(2)
+                                .lineSpacing(1.0)
+                        }
                     }
-                    if let trendPulse {
-                        DiscoverTrendPulseBadge(
-                            pulse: trendPulse,
-                            onTap: {
-                                suppressPrimaryTapFromTrend = true
-                                onTrendTapped?(trendPulse)
-                                Task { @MainActor in
-                                    try? await Task.sleep(nanoseconds: 700_000_000)
-                                    suppressPrimaryTapFromTrend = false
-                                }
-                            }
-                        )
-                            .padding(.top, 2)
-                    }
+                    Spacer(minLength: 0)
                 }
-                Spacer(minLength: 0)
+            }
+            .buttonStyle(DiscoverInteractivePressStyle())
+            .accessibilityLabel(result.title)
+
+            if let trendPulse, let onTrendTapped {
+                DiscoverTrendPulseBadge(
+                    pulse: trendPulse,
+                    onTap: { onTrendTapped(trendPulse) }
+                )
+                .padding(.leading, 97)
             }
         }
-        .buttonStyle(DiscoverInteractivePressStyle())
-        .accessibilityLabel(result.title)
         .padding(9)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         .overlay {
@@ -189,7 +180,7 @@ struct DiscoverCompactArticleCard: View {
 
 struct DiscoverTrendPulseBadge: View {
     let pulse: WikipediaService.TrendPulse
-    var onTap: (() -> Void)? = nil
+    let onTap: () -> Void
 
     private var deltaFraction: Double? {
         guard let previous = pulse.previousViews, previous > 0 else { return nil }
@@ -220,44 +211,38 @@ struct DiscoverTrendPulseBadge: View {
     }
 
     var body: some View {
-        HStack(spacing: 6) {
-            Image(systemName: trendSymbol)
-                .font(.system(size: 9.5, weight: .semibold))
-                .foregroundStyle(trendColor)
+        Button(action: onTap) {
+            HStack(spacing: 6) {
+                Image(systemName: trendSymbol)
+                    .font(.system(size: 9.5, weight: .semibold))
+                    .foregroundStyle(trendColor)
 
-            DiscoverSparkline(points: pulse.points, tint: trendColor)
-                .frame(width: 54, height: 14)
+                DiscoverSparkline(points: pulse.points, tint: trendColor)
+                    .frame(width: 54, height: 14)
 
-            Text(deltaText)
-                .font(.system(size: 10.5, weight: .semibold, design: .rounded))
-                .foregroundStyle(trendColor)
-                .lineLimit(1)
+                Text(deltaText)
+                    .font(.system(size: 10.5, weight: .semibold, design: .rounded))
+                    .foregroundStyle(trendColor)
+                    .lineLimit(1)
 
-            Text("\(latestViewsText) views")
-                .font(.system(size: 10, weight: .medium))
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 3.5)
-        .background(trendColor.opacity(0.10), in: Capsule(style: .continuous))
-        .overlay {
-            Capsule(style: .continuous)
-                .strokeBorder(trendColor.opacity(0.18), lineWidth: 0.7)
-        }
-        .contentShape(Capsule())
-        .highPriorityGesture(
-            TapGesture().onEnded {
-                onTap?()
+                Text("\(latestViewsText) views")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
             }
-        )
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3.5)
+            .background(trendColor.opacity(0.10), in: Capsule(style: .continuous))
+            .overlay {
+                Capsule(style: .continuous)
+                    .strokeBorder(trendColor.opacity(0.18), lineWidth: 0.7)
+            }
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
         .accessibilityElement(children: .combine)
-        .accessibilityAddTraits(.isButton)
         .accessibilityLabel("\(deltaText), \(latestViewsText) views")
         .accessibilityHint("Show views details")
-        .accessibilityAction {
-            onTap?()
-        }
         .help("Show views details")
     }
 }

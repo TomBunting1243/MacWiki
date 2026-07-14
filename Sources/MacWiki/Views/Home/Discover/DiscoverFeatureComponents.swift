@@ -102,7 +102,6 @@ struct DiscoverFeatureCard: View {
     var showsSurface: Bool = true
     @Environment(\.macWikiAccessibilityPersonalization.reduceMotion) private var reduceMotion
     @State private var isHovered = false
-    @State private var suppressPrimaryTapFromTrend = false
 
     private var displayTitle: String {
         let trimmed = result.title.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -117,65 +116,65 @@ struct DiscoverFeatureCard: View {
     }
 
     var body: some View {
-        Button {
-            if suppressPrimaryTapFromTrend {
-                suppressPrimaryTapFromTrend = false
-                return
-            }
-            onOpen(result, SystemBridge.isCommandPressed)
-        } label: {
-            VStack(alignment: .leading, spacing: 0) {
-                featureImage
-                .frame(maxWidth: .infinity)
-                .frame(height: heroImageHeight)
-                .clipped()
-                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        VStack(alignment: .leading, spacing: 0) {
+            Button {
+                onOpen(result, SystemBridge.isCommandPressed)
+            } label: {
+                VStack(alignment: .leading, spacing: 0) {
+                    featureImage
+                        .frame(maxWidth: .infinity)
+                        .frame(height: heroImageHeight)
+                        .clipped()
+                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
 
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(DiscoverEditionCopy.leadKicker)
-                        .font(.system(size: 11, weight: .semibold, design: .rounded))
-                        .textCase(.uppercase)
-                        .foregroundStyle(.secondary)
-
-                    Text(displayTitle)
-                        .font(DiscoverTypography.featureTitle)
-                        .foregroundStyle(.primary)
-                        .lineLimit(titleLineLimit)
-                        .lineSpacing(2)
-
-                    if let displayDescription {
-                        Text(displayDescription)
-                            .font(DiscoverTypography.featureDescription)
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(DiscoverEditionCopy.leadKicker)
+                            .font(.system(size: 11, weight: .semibold, design: .rounded))
+                            .textCase(.uppercase)
                             .foregroundStyle(.secondary)
-                            .lineLimit(descriptionLineLimit)
-                            .lineSpacing(1.5)
-                    }
 
-                    featuredStats
+                        Text(displayTitle)
+                            .font(DiscoverTypography.featureTitle)
+                            .foregroundStyle(.primary)
+                            .lineLimit(titleLineLimit)
+                            .lineSpacing(2)
 
-                    if isTeaserLoading {
-                        AppLoadingInlineLabel(
-                            text: "Loading article teaser…",
-                            tone: .accent,
-                            font: .system(size: 11.5, weight: .medium)
-                        )
-                        .padding(.top, 2)
-                    } else if let teaserText, !teaserText.isEmpty {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(teaserText)
-                                .font(.system(size: 13.5, weight: .regular))
+                        if let displayDescription {
+                            Text(displayDescription)
+                                .font(DiscoverTypography.featureDescription)
                                 .foregroundStyle(.secondary)
-                                .lineLimit(9)
-                                .lineSpacing(1.45)
+                                .lineLimit(descriptionLineLimit)
+                                .lineSpacing(1.5)
                         }
-                        .padding(.top, 4)
+
+                        if isTeaserLoading {
+                            AppLoadingInlineLabel(
+                                text: "Loading article teaser…",
+                                tone: .accent,
+                                font: .system(size: 11.5, weight: .medium)
+                            )
+                            .padding(.top, 2)
+                        } else if let teaserText, !teaserText.isEmpty {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(teaserText)
+                                    .font(.system(size: 13.5, weight: .regular))
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(9)
+                                    .lineSpacing(1.45)
+                            }
+                            .padding(.top, 4)
+                        }
                     }
+                    .padding(16)
                 }
-                .padding(16)
             }
+            .buttonStyle(DiscoverInteractivePressStyle())
+            .accessibilityLabel(displayTitle)
+
+            featuredStats
+                .padding(.horizontal, 16)
+                .padding(.bottom, 16)
         }
-        .buttonStyle(DiscoverInteractivePressStyle())
-        .accessibilityLabel(displayTitle)
         .frame(minHeight: heroImageHeight + 72)
         .background(
             Group {
@@ -208,12 +207,7 @@ struct DiscoverFeatureCard: View {
             DiscoverTrendPulseBadge(
                 pulse: trendPulse,
                 onTap: {
-                    suppressPrimaryTapFromTrend = true
                     onTrendTapped(trendPulse)
-                    Task { @MainActor in
-                        try? await Task.sleep(nanoseconds: 700_000_000)
-                        suppressPrimaryTapFromTrend = false
-                    }
                 }
             )
             .padding(.top, 3)
