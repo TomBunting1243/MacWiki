@@ -152,6 +152,16 @@ struct MacWikiCommands: Commands {
         }
 
         CommandGroup(after: .toolbar) {
+            if supports(.workspaceNavigation) {
+                Button(appState.directoryColumnVisible ? "Hide List Contents" : "Show List Contents") {
+                    appState.toggleDirectoryColumnVisibility()
+                }
+                .keyboardShortcut("l", modifiers: [.command, .option])
+                .disabled(appState.isWikiHopNavigationLocked)
+
+                Divider()
+            }
+
             Button("Toggle Inspector") {
                 appState.toggleInspectorVisibility()
             }

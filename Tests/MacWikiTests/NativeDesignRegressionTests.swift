@@ -146,6 +146,9 @@ struct NativeDesignRegressionTests {
             #expect(commands.contains(action))
         }
         #expect(commands.contains("CommandGroup(after: .toolbar)"))
+        #expect(commands.contains("appState.directoryColumnVisible ? \"Hide List Contents\" : \"Show List Contents\""))
+        #expect(commands.contains("appState.toggleDirectoryColumnVisibility()"))
+        #expect(commands.contains(".keyboardShortcut(\"l\", modifiers: [.command, .option])"))
         #expect(commands.contains("CommandMenu(\"Article\")"))
         #expect(commands.contains("CommandMenu(\"Tabs\")"))
         #expect(!commands.contains("CommandGroup(after: .windowSize)"))

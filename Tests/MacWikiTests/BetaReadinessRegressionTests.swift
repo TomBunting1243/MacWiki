@@ -220,8 +220,10 @@ struct BetaReadinessRegressionTests {
         #expect(settingsControlsSource.contains("private struct AccessibleSettingsSlider: NSViewRepresentable"))
         #expect(settingsControlsSource.contains("slider.setAccessibilityTitle(title)"))
         #expect(settingsControlsSource.contains("slider.setAccessibilityLabel(title)"))
-        #expect(settingsControlsSource.contains("slider.setAccessibilityValue(valueText)"))
+        #expect(settingsControlsSource.contains("slider.setAccessibilityValue(value)"))
         #expect(settingsControlsSource.contains("slider.setAccessibilityValueDescription(valueText)"))
+        #expect(settingsControlsSource.contains("override func accessibilityPerformIncrement() -> Bool"))
+        #expect(settingsControlsSource.contains("override func accessibilityPerformDecrement() -> Bool"))
         #expect(!sliderRow.contains(".accessibilityElement(children: .ignore)"))
     }
 
@@ -637,6 +639,8 @@ struct BetaReadinessRegressionTests {
         #expect(toolbarSource.contains("snapshot.inspectorVisible ? \"Hide Inspector\" : \"Show Inspector\""))
         #expect(contentSource.contains(".focusedSceneValue(\\.macWikiInspectorCommandsAvailable, true)"))
         #expect(commandSource.contains("@FocusedValue(\\.macWikiInspectorCommandsAvailable)"))
+        #expect(commandSource.contains("appState.directoryColumnVisible ? \"Hide List Contents\" : \"Show List Contents\""))
+        #expect(commandSource.contains("appState.toggleDirectoryColumnVisibility()"))
         #expect(commandSource.contains("inspectorCommandsAvailable != true"))
         #expect(commandSource.contains("|| !supports(.inspector)"))
         #expect(toolbarPopoverSource.contains("SaveToListPopover(article: article)"))
