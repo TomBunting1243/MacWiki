@@ -183,11 +183,13 @@ struct TabBarView: View {
     private func nativeReorderableTabItemsStack(
         librarySnapshot: TabBarLibraryIndex.Snapshot
     ) -> some View {
-        HStack(spacing: tabSpacing) {
-            ForEach(Array(appState.openTabs.enumerated()), id: \.element.id) { index, tab in
+        let indexByID = tabIndexByID
+
+        return HStack(spacing: tabSpacing) {
+            ForEach(appState.openTabs) { tab in
                 tabItem(
                     tab,
-                    at: index,
+                    at: indexByID[tab.id] ?? 0,
                     librarySnapshot: librarySnapshot,
                     usesLegacyDrag: false
                 )
@@ -209,11 +211,13 @@ struct TabBarView: View {
     private func legacyReorderableTabItemsStack(
         librarySnapshot: TabBarLibraryIndex.Snapshot
     ) -> some View {
-        HStack(spacing: tabSpacing) {
-            ForEach(Array(appState.openTabs.enumerated()), id: \.element.id) { index, tab in
+        let indexByID = tabIndexByID
+
+        return HStack(spacing: tabSpacing) {
+            ForEach(appState.openTabs) { tab in
                 tabItem(
                     tab,
-                    at: index,
+                    at: indexByID[tab.id] ?? 0,
                     librarySnapshot: librarySnapshot,
                     usesLegacyDrag: true
                 )
@@ -277,7 +281,12 @@ struct TabBarView: View {
                 finalizeDrag()
             }
         )
-        .id(tab.id)
+    }
+
+    private var tabIndexByID: [UUID: Int] {
+        Dictionary(
+            uniqueKeysWithValues: appState.openTabs.enumerated().map { ($0.element.id, $0.offset) }
+        )
     }
 
     @ViewBuilder
