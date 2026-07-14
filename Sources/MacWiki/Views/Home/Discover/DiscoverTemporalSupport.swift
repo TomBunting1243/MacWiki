@@ -253,28 +253,15 @@ struct DiscoverOnThisDayRow: View {
     @State private var isHovered = false
 
     var body: some View {
-        Button {
+        Group {
             if let article = event.article {
-                onOpen(article, SystemBridge.isCommandPressed)
-            }
-        } label: {
-            HStack(alignment: .top, spacing: 10) {
-                Text(event.year)
-                    .font(.system(size: 12, weight: .bold, design: .rounded))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 58, alignment: .leading)
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(event.text)
-                        .font(.system(size: 13, weight: .medium))
-                        .lineLimit(3)
-                    if let article = event.article {
-                        Text(article.title)
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(Color.accentColor)
-                    }
+                Button {
+                    onOpen(article, SystemBridge.isCommandPressed)
+                } label: {
+                    rowContent
                 }
-                Spacer(minLength: 0)
+            } else {
+                rowContent
             }
         }
         .buttonStyle(DiscoverInteractivePressStyle())
@@ -296,8 +283,8 @@ struct DiscoverOnThisDayRow: View {
                 .strokeBorder(Color(nsColor: .separatorColor).opacity(isHovered ? 0.44 : 0.30), lineWidth: 0.7)
         }
         .contentShape(RoundedRectangle(cornerRadius: showsSurface ? 12 : 14, style: .continuous))
-        .discoverHoverEffect(.row, isActive: isHovered, reduceMotion: reduceMotion)
-        .onHover { isHovered = $0 }
+        .discoverHoverEffect(.row, isActive: isHovered && event.article != nil, reduceMotion: reduceMotion)
+        .onHover { isHovered = event.article != nil && $0 }
         .contextMenu {
             if let article = event.article {
                 ArticleQuickActionsMenuContent(
@@ -318,6 +305,27 @@ struct DiscoverOnThisDayRow: View {
         }
     }
 
+    private var rowContent: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Text(event.year)
+                .font(.system(size: 12, weight: .bold, design: .rounded))
+                .foregroundStyle(.secondary)
+                .frame(width: 58, alignment: .leading)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(event.text)
+                    .font(.system(size: 13, weight: .medium))
+                    .lineLimit(3)
+                if let article = event.article {
+                    Text(article.title)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(Color.accentColor)
+                }
+            }
+            Spacer(minLength: 0)
+        }
+    }
+
 }
 
 struct DiscoverDidYouKnowRow: View {
@@ -330,28 +338,15 @@ struct DiscoverDidYouKnowRow: View {
     @State private var isHovered = false
 
     var body: some View {
-        Button {
+        Group {
             if let article = fact.article {
-                onOpen(article, SystemBridge.isCommandPressed)
-            }
-        } label: {
-            HStack(alignment: .top, spacing: 8) {
-                Image(systemName: "lightbulb")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                    .padding(.top, 2)
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(fact.text)
-                        .font(.system(size: 13, weight: .medium))
-                        .lineLimit(3)
-                    if let article = fact.article {
-                        Text(article.title)
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(Color.accentColor)
-                    }
+                Button {
+                    onOpen(article, SystemBridge.isCommandPressed)
+                } label: {
+                    rowContent
                 }
-                Spacer(minLength: 0)
+            } else {
+                rowContent
             }
         }
         .buttonStyle(DiscoverInteractivePressStyle())
@@ -373,8 +368,8 @@ struct DiscoverDidYouKnowRow: View {
                 .strokeBorder(Color(nsColor: .separatorColor).opacity(isHovered ? 0.44 : 0.30), lineWidth: 0.7)
         }
         .contentShape(RoundedRectangle(cornerRadius: showsSurface ? 12 : 14, style: .continuous))
-        .discoverHoverEffect(.row, isActive: isHovered, reduceMotion: reduceMotion)
-        .onHover { isHovered = $0 }
+        .discoverHoverEffect(.row, isActive: isHovered && fact.article != nil, reduceMotion: reduceMotion)
+        .onHover { isHovered = fact.article != nil && $0 }
         .contextMenu {
             if let article = fact.article {
                 ArticleQuickActionsMenuContent(
@@ -392,6 +387,27 @@ struct DiscoverDidYouKnowRow: View {
                     referenceDate: referenceDate
                 )
             }
+        }
+    }
+
+    private var rowContent: some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: "lightbulb")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .padding(.top, 2)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(fact.text)
+                    .font(.system(size: 13, weight: .medium))
+                    .lineLimit(3)
+                if let article = fact.article {
+                    Text(article.title)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(Color.accentColor)
+                }
+            }
+            Spacer(minLength: 0)
         }
     }
 

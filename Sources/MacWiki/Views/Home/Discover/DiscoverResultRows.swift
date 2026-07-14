@@ -11,28 +11,15 @@ struct DiscoverHolidayRow: View {
     @State private var isHovered = false
 
     var body: some View {
-        Button {
+        Group {
             if let article = holiday.article {
-                onOpen(article, SystemBridge.isCommandPressed)
-            }
-        } label: {
-            HStack(alignment: .top, spacing: 8) {
-                Image(systemName: "calendar")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                    .padding(.top, 2)
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(holiday.text)
-                        .font(MacWikiTypography.compactRowBody)
-                        .lineLimit(3)
-                    if let article = holiday.article {
-                        Text(article.title)
-                            .font(MacWikiTypography.compactRowMetadata)
-                            .foregroundStyle(Color.accentColor)
-                    }
+                Button {
+                    onOpen(article, SystemBridge.isCommandPressed)
+                } label: {
+                    rowContent
                 }
-                Spacer(minLength: 0)
+            } else {
+                rowContent
             }
         }
         .buttonStyle(DiscoverInteractivePressStyle())
@@ -54,8 +41,8 @@ struct DiscoverHolidayRow: View {
                 .strokeBorder(Color(nsColor: .separatorColor).opacity(isHovered ? 0.44 : 0.30), lineWidth: 0.7)
         }
         .contentShape(RoundedRectangle(cornerRadius: showsSurface ? 12 : 14, style: .continuous))
-        .discoverHoverEffect(.row, isActive: isHovered, reduceMotion: reduceMotion)
-        .onHover { isHovered = $0 }
+        .discoverHoverEffect(.row, isActive: isHovered && holiday.article != nil, reduceMotion: reduceMotion)
+        .onHover { isHovered = holiday.article != nil && $0 }
         .contextMenu {
             if let article = holiday.article {
                 ArticleQuickActionsMenuContent(
@@ -73,6 +60,27 @@ struct DiscoverHolidayRow: View {
                     referenceDate: referenceDate
                 )
             }
+        }
+    }
+
+    private var rowContent: some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: "calendar")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .padding(.top, 2)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(holiday.text)
+                    .font(MacWikiTypography.compactRowBody)
+                    .lineLimit(3)
+                if let article = holiday.article {
+                    Text(article.title)
+                        .font(MacWikiTypography.compactRowMetadata)
+                        .foregroundStyle(Color.accentColor)
+                }
+            }
+            Spacer(minLength: 0)
         }
     }
 
@@ -126,6 +134,7 @@ struct DiscoverSearchResultRow: View {
         }
         .buttonStyle(DiscoverInteractivePressStyle())
         .accessibilityLabel(result.title)
+        .accessibilityValue(isSaved ? "Saved" : "Not Saved")
         .discoverHoverEffect(.row, isActive: isHovered, reduceMotion: reduceMotion)
         .onHover { isHovered = $0 }
         .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
