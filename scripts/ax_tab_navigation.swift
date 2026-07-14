@@ -9,6 +9,7 @@ enum TabNavigationError: LocalizedError {
     case accessibilityUnavailable
     case windowMissing
     case activationFailed
+    case tabBarMissing
     case tabCount(expected: Int, observed: Int)
     case activeTabMissing
     case selectionUnchanged
@@ -24,6 +25,8 @@ enum TabNavigationError: LocalizedError {
             "The exact process did not expose a window."
         case .activationFailed:
             "The exact process did not become frontmost."
+        case .tabBarMissing:
+            "The reader tab bar did not become ready."
         case let .tabCount(expected, observed):
             "Expected \(expected) tabs; observed \(observed)."
         case .activeTabMissing:
@@ -78,6 +81,29 @@ func tabElements(in application: AXUIElement) -> [AXUIElement] {
         }
         return leftPoint.x < rightPoint.x
     }
+}
+
+func hasNewTabControl(in application: AXUIElement) -> Bool {
+    flattenedElements(from: application).contains { element in
+        let role: String = attribute(kAXRoleAttribute as CFString, from: element) ?? ""
+        guard role == (kAXButtonRole as String) else { return false }
+        let title: String = attribute(kAXTitleAttribute as CFString, from: element) ?? ""
+        let description: String = attribute(kAXDescriptionAttribute as CFString, from: element) ?? ""
+        return title == "New Tab" || description == "New Tab"
+    }
+}
+
+func waitForTabBar(in application: AXUIElement, timeout: TimeInterval) throws {
+    // ContentView suppresses initial implicit layout work for 350 ms. Avoid a
+    // deep AX traversal while SwiftUI is still constructing the split-view
+    // graph, then require the tab bar's native creation control as readiness.
+    Thread.sleep(forTimeInterval: 0.6)
+    let deadline = Date().addingTimeInterval(timeout)
+    while Date() < deadline {
+        if hasNewTabControl(in: application) { return }
+        Thread.sleep(forTimeInterval: 0.1)
+    }
+    throw TabNavigationError.tabBarMissing
 }
 
 func activeIndex(in tabs: [AXUIElement]) -> Int? {
@@ -172,6 +198,7 @@ do {
 
     let application = AXUIElementCreateApplication(processID)
     try activateTarget(processID: processID, application: application)
+    try waitForTabBar(in: application, timeout: 6)
     let initialCount = tabElements(in: application).count
     for _ in 0..<3 {
         try pressKey(17, flags: .maskCommand)

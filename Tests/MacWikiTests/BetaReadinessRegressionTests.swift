@@ -1562,6 +1562,8 @@ struct BetaReadinessRegressionTests {
         #expect(driver.contains("NSRunningApplication(processIdentifier: processID)"))
         #expect(driver.contains("NSWorkspace.shared.frontmostApplication?.processIdentifier == processID"))
         #expect(driver.contains("kAXRaiseAction"))
+        #expect(driver.contains("waitForTabBar(in: application"))
+        #expect(driver.contains("description == \"New Tab\""))
     }
 
     @Test func tabReorderHarnessCoversLongTitleOverflowPersistenceAndCleanup() throws {
