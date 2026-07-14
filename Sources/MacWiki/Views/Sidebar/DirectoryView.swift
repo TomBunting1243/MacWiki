@@ -1480,52 +1480,24 @@ extension DirectoryView {
     }
 
     private var discoverTimeMachineCompactDateLabel: String {
-        Self.timeMachineCompactDateFormatter.string(from: discoverReferenceDate)
+        AppPresentationFormatting.abbreviatedMonthDay(discoverReferenceDate)
     }
 
     private var discoverTimeMachineHeaderDateLabel: String {
-        Self.timeMachineHeaderDateFormatter.string(from: discoverReferenceDate)
+        AppPresentationFormatting.longDate(discoverReferenceDate)
     }
 
     private var discoverTimeMachineLongDateLabel: String {
-        Self.timeMachineLongDateFormatter.string(from: discoverReferenceDate)
+        AppPresentationFormatting.longDate(discoverReferenceDate)
     }
 
     private var discoverTimeMachineMediumDateLabel: String {
-        Self.timeMachineMediumDateFormatter.string(from: discoverReferenceDate)
+        AppPresentationFormatting.abbreviatedDate(discoverReferenceDate)
     }
 
     private var isDiscoverDateToday: Bool {
         Calendar.current.isDate(discoverReferenceDate, inSameDayAs: Date())
     }
-
-    private static let timeMachineCompactDateFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.locale = Locale.autoupdatingCurrent
-        formatter.setLocalizedDateFormatFromTemplate("MMM d")
-        return formatter
-    }()
-
-    private static let timeMachineHeaderDateFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.locale = Locale.autoupdatingCurrent
-        formatter.setLocalizedDateFormatFromTemplate("MMMM d, yyyy")
-        return formatter
-    }()
-
-    private static let timeMachineLongDateFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.locale = Locale.autoupdatingCurrent
-        formatter.setLocalizedDateFormatFromTemplate("MMMM d, yyyy")
-        return formatter
-    }()
-
-    private static let timeMachineMediumDateFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.locale = Locale.autoupdatingCurrent
-        formatter.setLocalizedDateFormatFromTemplate("MMM d, yyyy")
-        return formatter
-    }()
 
     private enum SidebarTimeMachineQuickShortcut: Hashable {
         case today

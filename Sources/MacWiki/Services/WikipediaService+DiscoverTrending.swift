@@ -864,7 +864,12 @@ extension WikipediaService {
         guard let date = featuredFeedDateFormatter.date(from: dateKey) else {
             return dateKey
         }
-        return featuredFeedDisplayFormatter.string(from: date)
+        return AppPresentationFormatting.longDate(
+            date,
+            locale: .autoupdatingCurrent,
+            calendar: Calendar(identifier: .gregorian),
+            timeZone: .gmt
+        )
     }
 
     private struct OnThisDayCollections {

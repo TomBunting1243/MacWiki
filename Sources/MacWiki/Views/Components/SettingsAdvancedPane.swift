@@ -13,15 +13,6 @@ struct SettingsAdvancedPane: View {
     @State private var cacheStatusMessage: String?
     @State private var pendingCacheAction: SettingsStorageAction?
 
-    private static let cacheByteFormatter: ByteCountFormatter = {
-        let formatter = ByteCountFormatter()
-        formatter.allowedUnits = [.useKB, .useMB, .useGB]
-        formatter.countStyle = .file
-        formatter.includesUnit = true
-        formatter.isAdaptive = true
-        return formatter
-    }()
-
     var body: some View {
         let section = SettingsCatalog.section(.advanced)
 
@@ -304,7 +295,7 @@ struct SettingsAdvancedPane: View {
     }
 
     private func formatByteCount(_ bytes: Int) -> String {
-        Self.cacheByteFormatter.string(fromByteCount: Int64(max(bytes, 0)))
+        AppPresentationFormatting.storageByteCount(bytes)
     }
 
     private func entryCountLabel(_ count: Int) -> String {

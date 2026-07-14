@@ -12,7 +12,7 @@ struct DiscoverIntroLoadingView: View {
     @Environment(\.colorScheme) private var colorScheme
 
     private var dateLabel: String {
-        Self.dateFormatter.string(from: referenceDate)
+        AppPresentationFormatting.abbreviatedWeekdayMonthDay(referenceDate)
     }
 
     var body: some View {
@@ -63,13 +63,6 @@ struct DiscoverIntroLoadingView: View {
             shadowY: 6
         )
     }
-
-    private static let dateFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.locale = Locale.autoupdatingCurrent
-        formatter.setLocalizedDateFormatFromTemplate("EEE, MMM d")
-        return formatter
-    }()
 
     private var heroColumn: some View {
         VStack(alignment: .leading, spacing: 10) {

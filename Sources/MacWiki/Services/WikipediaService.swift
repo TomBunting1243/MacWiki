@@ -425,15 +425,6 @@ actor WikipediaService {
         return allowed
     }()
 
-    let featuredFeedDisplayFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.locale = Locale.current
-        formatter.timeZone = TimeZone(secondsFromGMT: 0)
-        formatter.timeStyle = .none
-        formatter.dateStyle = .long
-        return formatter
-    }()
-
     // MARK: - Search
 
     /// Search Wikipedia for articles matching a query

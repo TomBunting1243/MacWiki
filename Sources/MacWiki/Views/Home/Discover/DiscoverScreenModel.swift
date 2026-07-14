@@ -71,7 +71,7 @@ final class DiscoverScreenModel {
     }
 
     var discoverTimeMachineDateLabel: String {
-        Self.timeMachineCompactDateFormatter.string(from: discoverReferenceDate)
+        AppPresentationFormatting.abbreviatedMonthDay(discoverReferenceDate)
     }
 
     @discardableResult
@@ -174,10 +174,4 @@ final class DiscoverScreenModel {
         return formatter
     }()
 
-    private static let timeMachineCompactDateFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.locale = Locale.autoupdatingCurrent
-        formatter.setLocalizedDateFormatFromTemplate("MMM d")
-        return formatter
-    }()
 }
