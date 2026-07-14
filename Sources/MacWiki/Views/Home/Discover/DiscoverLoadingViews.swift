@@ -49,26 +49,18 @@ struct DiscoverIntroLoadingView: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            Color.accentColor.opacity(colorScheme == .dark ? 0.10 : 0.08),
-                            Color(nsColor: .controlBackgroundColor).opacity(colorScheme == .dark ? 0.04 : 0.14),
-                            .clear
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-        }
-        .overlay {
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .strokeBorder(Color.accentColor.opacity(colorScheme == .dark ? 0.18 : 0.14), lineWidth: 0.9)
-        }
-        .shadow(color: .black.opacity(colorScheme == .dark ? 0.22 : 0.08), radius: 18, y: 6)
+        .discoverSurfaceChrome(
+            cornerRadius: 20,
+            tintColors: [
+                Color.accentColor.opacity(colorScheme == .dark ? 0.10 : 0.08),
+                Color(nsColor: .controlBackgroundColor).opacity(colorScheme == .dark ? 0.04 : 0.14),
+                .clear
+            ],
+            borderOpacity: colorScheme == .dark ? 0.18 : 0.14,
+            shadowOpacity: colorScheme == .dark ? 0.22 : 0.08,
+            shadowRadius: 18,
+            shadowY: 6
+        )
     }
 
     private static let dateFormatter: DateFormatter = {
@@ -128,11 +120,11 @@ struct DiscoverIntroLoadingCard: View {
             AppLoadingSkeletonBar(width: 172, height: 10, cornerRadius: 5, tone: .neutral)
         }
         .padding(12)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.8)
-        }
+        .discoverSurfaceChrome(
+            cornerRadius: 16,
+            material: .regular,
+            borderOpacity: 0.12
+        )
     }
 }
 

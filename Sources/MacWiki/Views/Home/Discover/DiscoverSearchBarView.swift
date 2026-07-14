@@ -57,28 +57,15 @@ struct DiscoverSearchBarView: View {
         .padding(.horizontal, 13)
         .padding(.vertical, 9)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(searchGlassBackground)
-        .overlay {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(Color(nsColor: .separatorColor).opacity(0.38), lineWidth: 0.7)
-        }
-        .shadow(color: Color.black.opacity(0.035), radius: 6, y: 2)
-    }
-
-    @ViewBuilder
-    private var searchGlassBackground: some View {
-        let cornerRadius: CGFloat = 12
-        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-
-        if #available(macOS 26, *) {
-            shape
-                .fill(.clear)
-                .glassEffect(.regular, in: .rect(cornerRadius: cornerRadius))
-                .overlay {
-                    shape.fill(Color(nsColor: .windowBackgroundColor).opacity(colorScheme == .dark ? 0.018 : 0.055))
-                }
-        } else {
-            shape.fill(.thinMaterial)
-        }
+        .discoverSurfaceChrome(
+            cornerRadius: 12,
+            tintColors: [
+                Color(nsColor: .windowBackgroundColor).opacity(colorScheme == .dark ? 0.018 : 0.055)
+            ],
+            borderOpacity: 0.38,
+            shadowOpacity: 0.035,
+            shadowRadius: 6,
+            shadowY: 2
+        )
     }
 }

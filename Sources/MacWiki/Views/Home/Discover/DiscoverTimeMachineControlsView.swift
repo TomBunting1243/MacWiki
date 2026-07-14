@@ -122,11 +122,14 @@ struct DiscoverTimeMachineControlsView: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(timeMachineGlassBackground)
-        .overlay {
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .strokeBorder(Color(nsColor: .separatorColor).opacity(colorScheme == .dark ? 0.42 : 0.34), lineWidth: 0.7)
-        }
+        .discoverSurfaceChrome(
+            cornerRadius: 14,
+            tintColors: timeMachineTintColors,
+            borderOpacity: colorScheme == .dark ? 0.42 : 0.34,
+            shadowOpacity: colorScheme == .dark ? 0.16 : 0.04,
+            shadowRadius: 7,
+            shadowY: 2
+        )
         .overlay {
             if isScanning {
                 AppLoadingScanlineOverlay(lineOpacity: colorScheme == .dark ? 0.026 : 0.018)
@@ -136,36 +139,16 @@ struct DiscoverTimeMachineControlsView: View {
                     .allowsHitTesting(false)
             }
         }
-        .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.16 : 0.04), radius: 7, y: 2)
         .animation(reduceMotion ? nil : .easeOut(duration: 0.14), value: isScanning)
         .help("Temporal Lens: scrub day-by-day or jump to a specific date.")
     }
 
-    @ViewBuilder
-    private var timeMachineGlassBackground: some View {
-        let cornerRadius: CGFloat = 14
-        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-
-        if #available(macOS 26, *) {
-            shape
-                .fill(.clear)
-                .glassEffect(.regular, in: .rect(cornerRadius: cornerRadius))
-                .overlay {
-                    shape.fill(
-                        LinearGradient(
-                            colors: [
-                                Color.indigo.opacity(colorScheme == .dark ? 0.075 : 0.105),
-                                Color.accentColor.opacity(colorScheme == .dark ? 0.035 : 0.055),
-                                Color(nsColor: .windowBackgroundColor).opacity(colorScheme == .dark ? 0.018 : 0.052)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                }
-        } else {
-            shape.fill(.thinMaterial)
-        }
+    private var timeMachineTintColors: [Color] {
+        [
+            Color.indigo.opacity(colorScheme == .dark ? 0.075 : 0.105),
+            Color.accentColor.opacity(colorScheme == .dark ? 0.035 : 0.055),
+            Color(nsColor: .windowBackgroundColor).opacity(colorScheme == .dark ? 0.018 : 0.052)
+        ]
     }
 
     private var scanningBadge: some View {

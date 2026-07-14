@@ -30,11 +30,7 @@ struct DiscoverMasthead: View {
                         .foregroundStyle(.secondary)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 5)
-                        .background(.thinMaterial, in: Capsule())
-                        .overlay {
-                            Capsule()
-                                .strokeBorder(Color(nsColor: .separatorColor).opacity(0.35), lineWidth: 0.6)
-                        }
+                        .discoverCapsuleSurfaceChrome()
                         .multilineTextAlignment(.trailing)
                 }
             }
@@ -145,59 +141,30 @@ struct DiscoverEditorialPanel<Content: View>: View {
                 .padding(contentPadding)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background { editorialGlassBackground(cornerRadius: cornerRadius) }
+        .discoverSurfaceChrome(
+            cornerRadius: cornerRadius,
+            material: .regular,
+            tintColors: editorialTintColors,
+            borderOpacity: 0.34,
+            shadowOpacity: tone.shadowOpacity,
+            shadowRadius: 8,
+            shadowY: 3
+        )
         .overlay(alignment: .top) {
             Rectangle()
                 .fill(accent.opacity(0.30))
                 .frame(height: 2)
                 .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
         }
-        .overlay {
-            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                .strokeBorder(Color(nsColor: .separatorColor).opacity(0.34), lineWidth: 0.7)
-        }
-        .shadow(color: Color.black.opacity(tone.shadowOpacity), radius: 8, y: 3)
     }
 
-    @ViewBuilder
-    private func editorialGlassBackground(cornerRadius: CGFloat) -> some View {
-        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+    private var editorialTintColors: [Color] {
         let accentOpacity = colorScheme == .dark ? 0.055 : 0.078
-
-        if #available(macOS 26, *) {
-            shape
-                .fill(.clear)
-                .glassEffect(.regular, in: .rect(cornerRadius: cornerRadius))
-                .overlay {
-                    shape.fill(
-                        LinearGradient(
-                            colors: [
-                                accent.opacity(accentOpacity),
-                                Color(nsColor: .controlBackgroundColor).opacity(0.20),
-                                Color(nsColor: .windowBackgroundColor).opacity(colorScheme == .dark ? 0.035 : 0.10)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                }
-        } else {
-            shape
-                .fill(.regularMaterial)
-                .overlay {
-                    shape.fill(
-                        LinearGradient(
-                            colors: [
-                                accent.opacity(accentOpacity),
-                                Color(nsColor: .controlBackgroundColor).opacity(0.25),
-                                Color(nsColor: .windowBackgroundColor).opacity(0.14)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                }
-        }
+        return [
+            accent.opacity(accentOpacity),
+            Color(nsColor: .controlBackgroundColor).opacity(0.20),
+            Color(nsColor: .windowBackgroundColor).opacity(colorScheme == .dark ? 0.035 : 0.10)
+        ]
     }
 }
 
@@ -223,47 +190,14 @@ struct DiscoverInsetPanel<Content: View>: View {
                 .padding(contentPadding)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background { insetGlassBackground }
-        .overlay {
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .strokeBorder(Color(nsColor: .separatorColor).opacity(0.32), lineWidth: 0.7)
-        }
-    }
-
-    @ViewBuilder
-    private var insetGlassBackground: some View {
-        let cornerRadius: CGFloat = 14
-        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-
-        if #available(macOS 26, *) {
-            shape
-                .fill(.clear)
-                .glassEffect(.regular, in: .rect(cornerRadius: cornerRadius))
-                .overlay {
-                    shape.fill(
-                        LinearGradient(
-                            colors: [
-                                accent.opacity(colorScheme == .dark ? 0.045 : 0.07),
-                                Color.clear
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                }
-        } else {
-            shape
-                .fill(.thinMaterial)
-                .overlay {
-                    shape.fill(
-                        LinearGradient(
-                            colors: [accent.opacity(0.06), Color.clear],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                }
-        }
+        .discoverSurfaceChrome(
+            cornerRadius: 14,
+            tintColors: [
+                accent.opacity(colorScheme == .dark ? 0.045 : 0.07),
+                Color.clear
+            ],
+            borderOpacity: 0.32
+        )
     }
 }
 
