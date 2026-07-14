@@ -1,6 +1,14 @@
 import SwiftUI
 import SwiftData
 
+extension ArticleTab {
+    /// SwiftUI's SDK 27 reorder container currently trips over Foundation.UUID
+    /// metadata at runtime on macOS 27 beta. The explicit itemID overload is
+    /// designed for alternate stable identities, so keep persistence on UUID
+    /// while presenting one value-based string identity to the native container.
+    var reorderIdentifier: String { id.uuidString }
+}
+
 /// Horizontal scrollable tab bar for managing open articles
 struct TabBarView: View {
     @Environment(AppState.self) private var appState
@@ -145,7 +153,7 @@ struct TabBarView: View {
                 .onChange(of: pendingScrollTabId) { _, tabId in
                     guard let tabId else { return }
                     performAnimation(interactionProfile.dragAutoScroll) {
-                        proxy.scrollTo(tabId, anchor: .center)
+                        proxy.scrollTo(tabId.uuidString, anchor: .center)
                     }
                     pendingScrollTabId = nil
                 }
@@ -184,9 +192,10 @@ struct TabBarView: View {
         librarySnapshot: TabBarLibraryIndex.Snapshot
     ) -> some View {
         let indexByID = tabIndexByID
+        let idByReorderIdentifier = tabIDByReorderIdentifier
 
         return HStack(spacing: tabSpacing) {
-            ForEach(appState.openTabs) { tab in
+            ForEach(appState.openTabs, id: \.reorderIdentifier) { tab in
                 tabItem(
                     tab,
                     at: indexByID[tab.id] ?? 0,
@@ -196,15 +205,19 @@ struct TabBarView: View {
             }
             .reorderable()
         }
-        .reorderContainer(for: ArticleTab.self) { difference in
+        .reorderContainer(for: ArticleTab.self, itemID: \.reorderIdentifier) { difference in
+            let sourceIDs = difference.sources.compactMap { idByReorderIdentifier[$0] }
+            guard sourceIDs.count == difference.sources.count else { return }
+
             let destinationID: UUID?
             switch difference.destination.position {
             case .before(let id):
-                destinationID = id
+                guard let resolvedID = idByReorderIdentifier[id] else { return }
+                destinationID = resolvedID
             case .end:
                 destinationID = nil
             }
-            appState.reorderTabs(difference.sources, before: destinationID)
+            appState.reorderTabs(sourceIDs, before: destinationID)
         }
     }
 
@@ -214,7 +227,7 @@ struct TabBarView: View {
         let indexByID = tabIndexByID
 
         return HStack(spacing: tabSpacing) {
-            ForEach(appState.openTabs) { tab in
+            ForEach(appState.openTabs, id: \.reorderIdentifier) { tab in
                 tabItem(
                     tab,
                     at: indexByID[tab.id] ?? 0,
@@ -289,6 +302,12 @@ struct TabBarView: View {
         )
     }
 
+    private var tabIDByReorderIdentifier: [String: UUID] {
+        Dictionary(
+            uniqueKeysWithValues: appState.openTabs.map { ($0.reorderIdentifier, $0.id) }
+        )
+    }
+
     @ViewBuilder
     private var tabBarBackground: some View {
         ReaderTabLaneBackground()
@@ -312,10 +331,10 @@ struct TabBarView: View {
         guard let activeTabId = appState.activeTabId else { return }
         if animated {
             performAnimation(interactionProfile.tabSelect) {
-                proxy.scrollTo(activeTabId, anchor: .center)
+                proxy.scrollTo(activeTabId.uuidString, anchor: .center)
             }
         } else {
-            proxy.scrollTo(activeTabId, anchor: .center)
+            proxy.scrollTo(activeTabId.uuidString, anchor: .center)
         }
     }
     
