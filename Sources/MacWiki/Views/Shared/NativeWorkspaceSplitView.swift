@@ -112,6 +112,7 @@ struct NativeWorkspaceSplitView<Sidebar: View, Directory: View, Reader: View, In
         private var sidebarVisibility: Binding<Bool>
         private var directoryVisibility: Binding<Bool>
         private var inspectorVisibility: Binding<Bool>
+        private var paneVisibilityUpdate: Task<Void, Never>?
         private var hostedContentUpdate: Task<Void, Never>?
         private var nativeVisibilityUpdate: Task<Void, Never>?
         private var lastSidebarRevision: String
@@ -197,16 +198,25 @@ struct NativeWorkspaceSplitView<Sidebar: View, Directory: View, Reader: View, In
             }
 
             if visibilityChanged {
-                // Visibility is state, not hosted content. Apply it synchronously
-                // so a later content revision cannot cancel a pane request that
-                // the coordinator has already recorded as delivered.
-                controller.setPaneVisibility(
-                    sidebarVisible: visibility.sidebarVisible,
-                    directoryVisible: visibility.directoryVisible,
-                    inspectorVisible: visibility.inspectorVisible,
-                    animated: animated
-                )
+                // Starting an AppKit split animation inside a representable
+                // update can re-enter SwiftUI's layout graph. Publish the
+                // request on the next MainActor turn and keep it independent
+                // from hosted-content work so revisions cannot cancel it.
                 lastRequestedVisibility = visibility
+                paneVisibilityUpdate?.cancel()
+                paneVisibilityUpdate = Task { @MainActor [weak self, weak controller] in
+                    await Task.yield()
+                    guard let self, let controller, !Task.isCancelled,
+                          lastRequestedVisibility == visibility else {
+                        return
+                    }
+                    controller.setPaneVisibility(
+                        sidebarVisible: visibility.sidebarVisible,
+                        directoryVisible: visibility.directoryVisible,
+                        inspectorVisible: visibility.inspectorVisible,
+                        animated: animated
+                    )
+                }
             }
 
             hostedContentUpdate?.cancel()
@@ -252,6 +262,7 @@ struct NativeWorkspaceSplitView<Sidebar: View, Directory: View, Reader: View, In
         }
 
         deinit {
+            paneVisibilityUpdate?.cancel()
             hostedContentUpdate?.cancel()
             nativeVisibilityUpdate?.cancel()
         }
