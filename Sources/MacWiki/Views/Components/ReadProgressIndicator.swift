@@ -1,12 +1,8 @@
 import SwiftUI
 
+@Animatable
 private struct PieSlice: Shape {
     var progress: Double
-
-    var animatableData: Double {
-        get { progress }
-        set { progress = newValue }
-    }
 
     func path(in rect: CGRect) -> Path {
         var path = Path()
@@ -26,6 +22,8 @@ private struct PieSlice: Shape {
 }
 
 struct ReadProgressIndicator: View {
+    @Environment(\.macWikiAccessibilityPersonalization.reduceMotion) private var reduceMotion
+
     let progress: Double
     let isRead: Bool
     let tint: Color
@@ -38,13 +36,13 @@ struct ReadProgressIndicator: View {
         let fillProgress = isRead ? 1 : clamped
 
         ZStack {
-            Circle()
-                .stroke(trackColor, lineWidth: lineWidth)
-
             PieSlice(progress: fillProgress)
                 .fill(tint)
+
+            Circle()
+                .strokeBorder(trackColor, lineWidth: lineWidth)
         }
         .frame(width: size, height: size)
-        .animation(.easeInOut(duration: 0.15), value: fillProgress)
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.15), value: fillProgress)
     }
 }

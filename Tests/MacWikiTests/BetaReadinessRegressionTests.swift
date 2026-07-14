@@ -75,6 +75,12 @@ struct BetaReadinessRegressionTests {
         let progressSource = try source("Sources/MacWiki/Views/Components/ReadProgressIndicator.swift")
         #expect(progressSource.contains("PieSlice(progress: fillProgress)"))
         #expect(!progressSource.contains("if fillProgress"))
+        #expect(progressSource.contains("@Animatable\nprivate struct PieSlice: Shape"))
+        #expect(progressSource.contains("@Environment(\\.macWikiAccessibilityPersonalization.reduceMotion)"))
+        #expect(progressSource.contains(".animation(reduceMotion ? nil :"))
+        let fillIndex = try #require(progressSource.range(of: "PieSlice(progress: fillProgress)"))
+        let trackIndex = try #require(progressSource.range(of: ".strokeBorder(trackColor"))
+        #expect(fillIndex.lowerBound < trackIndex.lowerBound)
         #expect(progressSource.components(separatedBy: ".animation(").count == 2)
 
         let modelSource = try source("Sources/MacWiki/Views/Sidebar/Search/SidebarSearchSurfaceModel.swift")
