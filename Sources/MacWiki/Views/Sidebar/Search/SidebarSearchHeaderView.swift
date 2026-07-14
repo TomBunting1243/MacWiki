@@ -89,7 +89,10 @@ struct SidebarSearchHeaderView: View {
                 .accessibilityIdentifier("sidebar-search-field")
 
             if searchCoordinator.isLoading {
-                AppLoadingActivityMark(tone: .accent)
+                AppLoadingActivityMark(
+                    tone: .accent,
+                    accessibilityLabel: "Searching Wikipedia"
+                )
                     .frame(width: 13, height: 13)
             } else if searchCoordinator.hasInput {
                 Button("Clear Search", systemImage: "xmark.circle.fill") {

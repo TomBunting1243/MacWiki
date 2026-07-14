@@ -59,7 +59,10 @@ struct HighlightToastView: View {
     var body: some View {
         HStack(spacing: 8) {
             if showsSpinner {
-                AppLoadingActivityMark(tone: .accent)
+                AppLoadingActivityMark(
+                    tone: .accent,
+                    accessibilityLabel: "Updating highlights"
+                )
             } else {
                 Image(systemName: toast.isSuccess ? "checkmark.circle.fill" : "xmark.octagon.fill")
                     .font(.system(size: 12, weight: .semibold))

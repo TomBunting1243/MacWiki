@@ -100,7 +100,10 @@ struct SettingsAdvancedPane: View {
                 }
 
                 if isCacheActionRunning {
-                    AppLoadingActivityMark(tone: .accent)
+                    AppLoadingActivityMark(
+                        tone: .accent,
+                        accessibilityLabel: "Updating cache statistics"
+                    )
                 }
 
                 Spacer()

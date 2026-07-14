@@ -156,7 +156,11 @@ struct DiscoverExpandableCollectionCard<Content: View>: View {
     @ViewBuilder
     private var loadingIndicator: some View {
         if showsLoading {
-            AppLoadingActivityMark(tone: .accent, tint: tint)
+            AppLoadingActivityMark(
+                tone: .accent,
+                tint: tint,
+                accessibilityLabel: "Loading \(title)"
+            )
         }
     }
 

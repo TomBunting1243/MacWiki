@@ -6,6 +6,8 @@ struct HighlightRehydrateBarView: View {
     let onRefreshArticle: () -> Void
     let onArchiveMissing: () -> Void
 
+    @Environment(\.macWikiAccessibilityPersonalization) private var accessibilityPersonalization
+
     private var statusText: String {
         if isRefreshing {
             return "Refreshing article"
@@ -16,7 +18,10 @@ struct HighlightRehydrateBarView: View {
     var body: some View {
         HStack(spacing: 10) {
             if isRefreshing {
-                AppLoadingActivityMark(tone: .accent)
+                AppLoadingActivityMark(
+                    tone: .accent,
+                    accessibilityLabel: "Refreshing article highlights"
+                )
             } else {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .font(.system(size: 11, weight: .semibold))
@@ -50,27 +55,45 @@ struct HighlightRehydrateBarView: View {
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
         .background {
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(.regularMaterial)
-                .overlay {
-                    LinearGradient(
-                        colors: [
-                            Color.white.opacity(0.18),
-                            Color.white.opacity(0.02),
-                            Color.clear
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                    .blendMode(.screen)
-                }
+            if accessibilityPersonalization.reduceTransparency {
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(Color(nsColor: .controlBackgroundColor))
+            } else {
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(.regularMaterial)
+                    .overlay {
+                        LinearGradient(
+                            colors: [
+                                Color.white.opacity(0.18),
+                                Color.white.opacity(0.02),
+                                Color.clear
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        .blendMode(.screen)
+                    }
+            }
         }
         .overlay {
             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(Color.white.opacity(0.12), lineWidth: 0.8)
+                .strokeBorder(
+                    Color.primary.opacity(
+                        accessibilityPersonalization.colorSchemeContrast == .increased ? 0.28 : 0.12
+                    ),
+                    lineWidth: accessibilityPersonalization.colorSchemeContrast == .increased ? 1.2 : 0.8
+                )
         }
-        .shadow(color: .black.opacity(0.18), radius: 14, y: 6)
-        .shadow(color: .black.opacity(0.08), radius: 4, y: 2)
+        .shadow(
+            color: .black.opacity(accessibilityPersonalization.reduceTransparency ? 0 : 0.18),
+            radius: 14,
+            y: 6
+        )
+        .shadow(
+            color: .black.opacity(accessibilityPersonalization.reduceTransparency ? 0 : 0.08),
+            radius: 4,
+            y: 2
+        )
     }
 }

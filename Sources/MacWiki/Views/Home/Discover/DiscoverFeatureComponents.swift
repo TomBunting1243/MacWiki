@@ -222,7 +222,7 @@ struct DiscoverFeatureCard: View {
         } else if isTrendPulseLoading {
             AppLoadingInlineLabel(
                 text: "Loading page views…",
-                tone: .retro,
+                tone: .accent,
                 font: .system(size: 11.5, weight: .medium)
             )
             .padding(.top, 3)

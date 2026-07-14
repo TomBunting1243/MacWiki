@@ -21,17 +21,14 @@ struct DiscoverIntroLoadingView: View {
                 AppLoadingStatusCapsule(
                     title: "Discover",
                     detail: dateLabel,
-                    symbol: "newspaper.fill",
                     tone: .accent
                 )
 
                 Spacer(minLength: 0)
 
-                AppLoadingInlineLabel(
-                    text: "Warming featured stories",
-                    tone: .accent,
-                    font: .caption.weight(.semibold)
-                )
+                Text("Warming featured stories")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
             }
 
             ViewThatFits {

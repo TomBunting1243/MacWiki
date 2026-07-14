@@ -27,7 +27,10 @@ struct WikiHopLobbyView: View {
             } label: {
                 if isLoading {
                     HStack(spacing: 8) {
-                        AppLoadingActivityMark(tone: .accent)
+                        AppLoadingActivityMark(
+                            tone: .accent,
+                            accessibilityLabel: "Starting Wiki Hop"
+                        )
                         Text("Starting")
                     }
                     .frame(width: 100)

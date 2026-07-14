@@ -1,6 +1,22 @@
 import AppKit
 import SwiftUI
 
+enum ThumbnailLoadOutcome<Value> {
+    case cancelled
+    case failure
+    case success(Value)
+
+    static func resolve(_ value: Value?, isCancelled: Bool) -> Self {
+        if isCancelled {
+            return .cancelled
+        }
+        guard let value else {
+            return .failure
+        }
+        return .success(value)
+    }
+}
+
 struct CachedThumbnailImage<Content: View, Placeholder: View, Failure: View>: View {
     private struct LoadRequest: Hashable {
         let url: URL?
@@ -24,6 +40,7 @@ struct CachedThumbnailImage<Content: View, Placeholder: View, Failure: View>: Vi
     @Environment(\.macWikiAccessibilityPersonalization.reduceMotion) private var reduceMotion
     @Environment(\.displayScale) private var displayScale
     @State private var phase: Phase = .idle
+    @State private var activeLoadRequest: LoadRequest?
 
     init(
         url: URL?,
@@ -69,8 +86,17 @@ struct CachedThumbnailImage<Content: View, Placeholder: View, Failure: View>: Vi
     }
 
     private func loadCurrentURL() async {
+        let request = loadRequest
+        guard !Task.isCancelled else { return }
+        await MainActor.run {
+            guard !Task.isCancelled else { return }
+            activeLoadRequest = request
+        }
+        guard !Task.isCancelled else { return }
+
         guard let url else {
             await MainActor.run {
+                guard activeLoadRequest == request, !Task.isCancelled else { return }
                 phase = .failure
             }
             return
@@ -80,18 +106,34 @@ struct CachedThumbnailImage<Content: View, Placeholder: View, Failure: View>: Vi
         if let cachedImage = await MainActor.run(body: { DecodedThumbnailImageCache.shared.image(for: cacheKey) }) {
             guard !Task.isCancelled else { return }
             await MainActor.run {
+                guard activeLoadRequest == request, !Task.isCancelled else { return }
                 phase = .success(Image(nsImage: cachedImage))
             }
             return
         }
 
         await MainActor.run {
+            guard activeLoadRequest == request, !Task.isCancelled else { return }
             phase = .loading
         }
 
         let shouldAnimate = animatesNetworkSuccess && !reduceMotion
-        guard let result = await ThumbnailImagePipeline.shared.loadImageData(for: url), !Task.isCancelled else {
+        let pipelineOutcome = ThumbnailLoadOutcome.resolve(
+            await ThumbnailImagePipeline.shared.loadImageData(for: url),
+            isCancelled: Task.isCancelled
+        )
+        let result: ThumbnailImagePipeline.LoadResult
+        switch pipelineOutcome {
+        case .cancelled:
             return
+        case .failure:
+            await MainActor.run {
+                guard activeLoadRequest == request, !Task.isCancelled else { return }
+                phase = .failure
+            }
+            return
+        case .success(let loadedResult):
+            result = loadedResult
         }
         let pixelSize = maxPixelSize
         let imageData = result.data
@@ -101,6 +143,7 @@ struct CachedThumbnailImage<Content: View, Placeholder: View, Failure: View>: Vi
         guard let decodedImageBox, !Task.isCancelled else {
             if !Task.isCancelled {
                 await MainActor.run {
+                    guard activeLoadRequest == request, !Task.isCancelled else { return }
                     phase = .failure
                 }
             }
@@ -108,6 +151,7 @@ struct CachedThumbnailImage<Content: View, Placeholder: View, Failure: View>: Vi
         }
 
         await MainActor.run {
+            guard activeLoadRequest == request, !Task.isCancelled else { return }
             let decodedImage = NSImage(
                 cgImage: decodedImageBox.cgImage,
                 size: NSSize(

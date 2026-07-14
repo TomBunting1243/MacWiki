@@ -27,12 +27,18 @@ struct DiscoverSearchBarView: View {
                 .onSubmit(onOpenSelectedResult)
 
             if searchCoordinator.isLoading {
-                AppLoadingActivityMark(tone: .accent)
+                AppLoadingActivityMark(
+                    tone: .accent,
+                    accessibilityLabel: "Searching Discover"
+                )
             } else if !searchCoordinator.hasQuery {
                 Button(action: onRefreshDiscover) {
                     Group {
                         if discoverFeedStore.isLoading {
-                            AppLoadingActivityMark(tone: .accent)
+                            AppLoadingActivityMark(
+                                tone: .accent,
+                                accessibilityLabel: "Refreshing Discover"
+                            )
                         } else {
                             Image(systemName: "arrow.clockwise")
                                 .font(.system(size: 13, weight: .semibold))

@@ -33,7 +33,6 @@ struct DiscoverSearchResultsSurface: View {
                     title: "Searching Wikipedia",
                     message: "Matching titles, summaries, and context for \"\(searchCoordinator.searchText)\".",
                     detail: "Discover search",
-                    symbol: "magnifyingglass",
                     tone: .accent,
                     rowCount: 5
                 )

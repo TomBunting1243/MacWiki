@@ -14,14 +14,6 @@ struct ArticleLoadingSkeletonView: View {
             }
         }
 
-        var symbol: String {
-            switch self {
-            case .fetching:
-                return "bolt.horizontal.circle.fill"
-            case .rendering:
-                return "text.below.photo.fill"
-            }
-        }
     }
 
     let articleTitle: String
@@ -55,7 +47,6 @@ struct ArticleLoadingSkeletonView: View {
                     AppLoadingStatusCapsule(
                         title: phase.title,
                         detail: articleTitle,
-                        symbol: phase.symbol,
                         tone: .neutral
                     )
                     headerBlock(columnWidth: columnWidth)

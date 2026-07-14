@@ -1887,6 +1887,22 @@ struct BetaReadinessRegressionTests {
         #expect(!source.contains("suppressLoadingSkeletonForCurrentOpen"))
     }
 
+    @Test func loadingSurfacesUseNativeBoundedActivityAndAccessibleChrome() throws {
+        let loadingSource = try source("Sources/MacWiki/Views/Shared/AppLoadingSystem.swift")
+        let loadingStyleSource = try source("Sources/MacWiki/Views/Shared/AppLoadingStyle.swift")
+        let thumbnailSource = try source("Sources/MacWiki/Views/Shared/CachedThumbnailImage.swift")
+
+        #expect(loadingSource.contains("ProgressView()"))
+        #expect(!loadingSource.contains("TimelineView"))
+        #expect(!loadingSource.contains("AppLoadingBeacon"))
+        #expect(!loadingSource.contains("AppLoadingScanlineOverlay"))
+        #expect(loadingSource.contains("accessibilityPersonalization.reduceTransparency"))
+        #expect(loadingSource.contains("accessibilityPersonalization.colorSchemeContrast == .increased"))
+        #expect(!loadingStyleSource.contains("case retro"))
+        #expect(thumbnailSource.contains("case .failure:"))
+        #expect(thumbnailSource.contains("guard activeLoadRequest == request, !Task.isCancelled else { return }"))
+    }
+
     private func source(_ relativePath: String) throws -> String {
         try String(contentsOf: repositoryRoot().appendingPathComponent(relativePath), encoding: .utf8)
     }
