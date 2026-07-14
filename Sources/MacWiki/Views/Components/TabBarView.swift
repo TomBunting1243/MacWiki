@@ -138,9 +138,6 @@ struct TabBarView: View {
                 .onChange(of: appState.activeTabId) { _, _ in
                     scrollToActiveTab(with: proxy, animated: true)
                 }
-                .onChange(of: tabMembership) { _, _ in
-                    scrollToActiveTab(with: proxy, animated: true)
-                }
                 .onChange(of: pendingScrollTabId) { _, tabId in
                     guard let tabId else { return }
                     performAnimation(interactionProfile.dragAutoScroll) {
@@ -245,10 +242,6 @@ struct TabBarView: View {
         Dictionary(
             uniqueKeysWithValues: appState.openTabs.enumerated().map { ($0.element.id, $0.offset) }
         )
-    }
-
-    private var tabMembership: Set<UUID> {
-        Set(appState.openTabs.map(\.id))
     }
 
     @ViewBuilder
