@@ -283,6 +283,10 @@ do {
     } else {
         verificationEvidenceURL = nil
     }
+    let sameSlotProbe = ProcessInfo.processInfo.environment["MACWIKI_QA_TAB_DRAG_PROBE"] == "same-slot"
+    guard !sameSlotProbe || verificationEvidenceURL == nil else {
+        throw VerificationError.usage
+    }
     guard AXIsProcessTrusted() else { throw VerificationError.accessibilityUnavailable }
 
     let application = AXUIElementCreateApplication(processID)
@@ -335,25 +339,39 @@ do {
             throw VerificationError.missing("Could not resolve fresh visible source and destination tab frames.")
         }
 
+        let dragDestination = sameSlotProbe
+            ? CGPoint(
+                x: sourceFrame.midX + min(24, sourceFrame.width * 0.2),
+                y: sourceFrame.midY
+            )
+            : CGPoint(x: destinationFrame.midX, y: destinationFrame.midY)
         try drag(
             from: CGPoint(x: sourceFrame.midX, y: sourceFrame.midY),
-            to: CGPoint(x: destinationFrame.midX, y: destinationFrame.midY)
+            to: dragDestination
         )
 
-        guard wait(timeout: 12, condition: {
-            tabs(in: application).map(\.1.title) != before.map(\.title)
-        }) else {
-            throw VerificationError.missing(
-                "Tab drag did not publish a reordered accessibility sequence. " +
-                    "Source frame: \(sourceFrame); destination frame: \(destinationFrame)."
-            )
-        }
+        if sameSlotProbe {
+            Thread.sleep(forTimeInterval: 1)
+            after = tabs(in: application).map(\.1)
+            guard after.map(\.title) == before.map(\.title) else {
+                throw VerificationError.missing("Same-slot probe unexpectedly changed tab order.")
+            }
+        } else {
+            guard wait(timeout: 12, condition: {
+                tabs(in: application).map(\.1.title) != before.map(\.title)
+            }) else {
+                throw VerificationError.missing(
+                    "Tab drag did not publish a reordered accessibility sequence. " +
+                        "Source frame: \(sourceFrame); destination frame: \(destinationFrame)."
+                )
+            }
 
-        after = tabs(in: application).map(\.1)
-        guard after.count == expectedCount,
-              Set(after.map(\.title)) == Set(before.map(\.title)),
-              after.first?.title != sourceTitle else {
-            throw VerificationError.missing("Tab reorder changed membership or left the dragged tab at its source.")
+            after = tabs(in: application).map(\.1)
+            guard after.count == expectedCount,
+                  Set(after.map(\.title)) == Set(before.map(\.title)),
+                  after.first?.title != sourceTitle else {
+                throw VerificationError.missing("Tab reorder changed membership or left the dragged tab at its source.")
+            }
         }
     } else {
         after = before
@@ -388,7 +406,7 @@ do {
 
     Thread.sleep(forTimeInterval: 1.0)
     let result = VerificationResult(
-        mode: expectedResult == nil ? "reorder" : "verify-order",
+        mode: sameSlotProbe ? "same-slot" : (expectedResult == nil ? "reorder" : "verify-order"),
         before: before,
         after: after,
         draggedTitle: sourceTitle,

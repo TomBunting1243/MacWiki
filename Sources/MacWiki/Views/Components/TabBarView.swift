@@ -333,12 +333,14 @@ struct TabBarView: View {
             return
         }
 
-        // End the gesture event before changing the ForEach collection order. The
-        // neighboring rows already reached their final visual positions during the drag,
-        // so commit the model order and clear the temporary offsets atomically instead of
-        // starting a second layout animation that accessibility geometry can observe.
+        // Let AppKit finish mouse-up and SwiftUI tear down the active gesture
+        // before changing the ForEach collection order. One immediate yield is
+        // insufficient in optimized macOS 27 builds and creates an
+        // AttributeGraph cycle. The neighboring rows stay at their final visual
+        // positions during this sub-frame handoff, then the model order and
+        // temporary offsets commit atomically without a second layout animation.
         Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(1))
+            try? await Task.sleep(for: .milliseconds(48))
             var transaction = Transaction(animation: nil)
             transaction.disablesAnimations = true
             withTransaction(transaction) {
