@@ -161,8 +161,9 @@ if rg -ni 'fatal error|precondition failed|assertion failed' \
   exit 1
 fi
 : >"$OUTPUT_DIR/runtime-failures.txt"
-ATTRIBUTEGRAPH_CYCLE_COUNT="$(rg -c 'AttributeGraph: cycle detected' "$FIRST_LOG" "$RELAUNCH_LOG" \
-  | awk -F: '{ total += $NF } END { print total + 0 }')"
+ATTRIBUTEGRAPH_CYCLE_COUNT="$({
+  rg -c 'AttributeGraph: cycle detected' "$FIRST_LOG" "$RELAUNCH_LOG" || true
+} | awk -F: '{ total += $NF } END { print total + 0 }')"
 rg -n 'AttributeGraph: cycle detected' "$FIRST_LOG" "$RELAUNCH_LOG" \
   >"$OUTPUT_DIR/attributegraph-cycles.txt" || true
 if [[ "$ATTRIBUTEGRAPH_CYCLE_COUNT" != "0" ]]; then
