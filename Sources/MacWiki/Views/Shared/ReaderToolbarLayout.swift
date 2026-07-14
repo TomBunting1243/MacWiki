@@ -85,6 +85,23 @@ enum ReaderToolbarLayout {
         .flexibleSpace
     ]
 
+    /// AppKit overflows lower-priority items first. Pane controls and their
+    /// split-view boundaries stay reachable at narrow widths; article
+    /// luxuries yield before navigation and document actions.
+    static func visibilityPriority(
+        for identifier: NSToolbarItem.Identifier
+    ) -> NSToolbarItem.VisibilityPriority {
+        if fixedIdentifiers.contains(identifier) {
+            return .high
+        }
+        switch identifier {
+        case .macWikiStyle, .macWikiPageViews, .macWikiOpenInBrowser, .macWikiShare:
+            return .low
+        default:
+            return .standard
+        }
+    }
+
     static func canInsert(
         _ identifier: NSToolbarItem.Identifier,
         at index: Int,

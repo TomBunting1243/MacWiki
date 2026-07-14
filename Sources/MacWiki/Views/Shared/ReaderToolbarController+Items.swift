@@ -234,11 +234,13 @@ extension ReaderToolbarController {
         identifier: NSToolbarItem.Identifier,
         dividerIndex: Int
     ) -> NSToolbarItem {
-        NSTrackingSeparatorToolbarItem(
+        let item = NSTrackingSeparatorToolbarItem(
             identifier: identifier,
             splitView: splitController.splitView,
             dividerIndex: dividerIndex
         )
+        item.visibilityPriority = ReaderToolbarLayout.visibilityPriority(for: identifier)
+        return item
     }
 
     private func buttonItem(
@@ -254,6 +256,7 @@ extension ReaderToolbarController {
         item.image = symbolImage(named: symbol, accessibilityLabel: label)
         item.target = self
         item.action = action
+        item.visibilityPriority = ReaderToolbarLayout.visibilityPriority(for: identifier)
         return item
     }
 
@@ -279,6 +282,7 @@ extension ReaderToolbarController {
         item.paletteLabel = label
         item.toolTip = label
         item.controlRepresentation = .expanded
+        item.visibilityPriority = ReaderToolbarLayout.visibilityPriority(for: identifier)
         return item
     }
 
@@ -294,6 +298,7 @@ extension ReaderToolbarController {
             accessibilityLabel: "Share"
         )
         item.delegate = self
+        item.visibilityPriority = ReaderToolbarLayout.visibilityPriority(for: identifier)
         return item
     }
 

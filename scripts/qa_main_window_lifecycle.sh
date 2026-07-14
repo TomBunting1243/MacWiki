@@ -65,10 +65,10 @@ jq -e --argjson pid "$LIFECYCLE_PID" '
   and .stableSampleCount >= 20
   and .initialWindowCount == 1
   and .initialMainWindowCount == 1
-  and .initialToolbarCount == 0
+  and .initialToolbarCount == 1
   and .finalWindowCount == 1
   and .finalMainWindowCount == 1
-  and .finalToolbarCount == 0
+  and .finalToolbarCount == 1
   and .closeAudit.residencyObservationSeconds >= 2
   and .closeAudit.processTerminatedAfterClose == false
   and .closeAudit.processResidentAfterClose == true
@@ -76,7 +76,7 @@ jq -e --argjson pid "$LIFECYCLE_PID" '
   and .closeAudit.reopenedSamePID == true
   and .closeAudit.reopenedWindowCount == 1
   and .closeAudit.reopenedMainWindowCount == 1
-  and .closeAudit.reopenedToolbarCount == 0
+  and .closeAudit.reopenedToolbarCount == 1
   and .closeAudit.reopenedFramePreserved == true
   and (.cycles | length) == 5
   and all(.cycles[];
@@ -85,7 +85,7 @@ jq -e --argjson pid "$LIFECYCLE_PID" '
     and .framePreserved == true
     and .totalWindowCount == 1
     and .mainWindowCount == 1
-    and .toolbarCount == 0
+    and .toolbarCount == 1
     and .minimizeLatencyMilliseconds >= 0
     and .reopenLatencyMilliseconds >= 0
   )
@@ -117,9 +117,10 @@ MAX_REOPEN_LATENCY="$(jq -r '[.cycles[].reopenLatencyMilliseconds] | max' "$AX_R
     "$QA_XCODE_VERSION" "$QA_BINARY_MIN_OS" "$QA_BINARY_SDK"
   printf -- '- Exact lifecycle PID: `%s`\n' "$LIFECYCLE_PID"
   printf -- '- Isolated QA home: `%s`\n' "$QA_HOME"
-  printf -- '- Cold launch: one main window remained stable for more than three seconds with reader toolbar chrome absent outside article view\n'
-  printf -- '- Native lifecycle: five minimize and LaunchServices reopen cycles retained the same PID, AX window identity, frame, and article-only toolbar state\n'
+  printf -- '- Cold launch: one main window and one attached native toolbar remained stable for more than three seconds in the empty workspace\n'
+  printf -- '- Native lifecycle: five minimize and LaunchServices reopen cycles retained the same PID, AX window identity, frame, and attached toolbar structure\n'
   printf -- '- Red close: the app remained resident without windows for 2.5 seconds, then LaunchServices recreated one native main window in the same PID and frame\n'
+  printf -- '- Toolbar availability semantics: fixed workspace controls enabled and article-only controls disabled are guarded by `ReaderToolbarLayoutTests`; this lifecycle driver intentionally does not infer item enabled state from AppKit toolbar overflow descendants\n'
   printf -- '- Maximum minimize latency: `%s ms`\n' "$MAX_MINIMIZE_LATENCY"
   printf -- '- Maximum reopen latency: `%s ms`\n' "$MAX_REOPEN_LATENCY"
   printf -- '- AX evidence: `%s`\n' "$AX_RESULT"

@@ -278,16 +278,6 @@ struct MacWikiCommands: Commands {
                     || appState.isWikiHopNavigationLocked
             )
 
-            Button("Next Tab") {
-                appState.nextTab()
-            }
-            .keyboardShortcut(.rightArrow, modifiers: [.command, .option])
-            .disabled(
-                !supports(.tabs)
-                    || !appState.hasOpenTabs
-                    || appState.isWikiHopNavigationLocked
-            )
-
             Button("Previous Tab") {
                 appState.previousTab()
             }
@@ -298,15 +288,6 @@ struct MacWikiCommands: Commands {
                     || appState.isWikiHopNavigationLocked
             )
 
-            Button("Previous Tab") {
-                appState.previousTab()
-            }
-            .keyboardShortcut(.leftArrow, modifiers: [.command, .option])
-            .disabled(
-                !supports(.tabs)
-                    || !appState.hasOpenTabs
-                    || appState.isWikiHopNavigationLocked
-            )
         }
     }
 

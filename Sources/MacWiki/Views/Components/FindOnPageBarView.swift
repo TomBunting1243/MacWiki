@@ -132,10 +132,14 @@ struct FindOnPageBarView: View {
             y: 4
         )
         .frame(maxWidth: max(0, availableWidth), alignment: .trailing)
-        .onAppear {
-            DispatchQueue.main.async {
-                isFieldFocused = true
-            }
+        .task {
+            await Task.yield()
+            guard !Task.isCancelled else { return }
+            isFieldFocused = true
+        }
+        .onChange(of: appState.findOnPageFocusRequestID) { _, requestID in
+            guard requestID != nil else { return }
+            isFieldFocused = true
         }
         .onExitCommand {
             dismiss()

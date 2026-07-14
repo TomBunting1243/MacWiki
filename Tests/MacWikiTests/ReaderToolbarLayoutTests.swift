@@ -160,6 +160,32 @@ struct ReaderToolbarLayoutTests {
         #expect(item(.macWikiHistory, in: controller.toolbar) is NSToolbarItemGroup)
         #expect(item(.macWikiArticleState, in: controller.toolbar) is NSToolbarItemGroup)
         #expect(item(.macWikiShare, in: controller.toolbar) is NSSharingServicePickerToolbarItem)
+        for identifier in ReaderToolbarLayout.fixedIdentifiers {
+            #expect(
+                try #require(item(identifier, in: controller.toolbar))
+                    .visibilityPriority.rawValue
+                    >= NSToolbarItem.VisibilityPriority.high.rawValue
+            )
+        }
+        for identifier in [
+            NSToolbarItem.Identifier.macWikiStyle,
+            .macWikiPageViews,
+            .macWikiOpenInBrowser,
+            .macWikiShare
+        ] {
+            #expect(
+                try #require(item(identifier, in: controller.toolbar)).visibilityPriority == .low
+            )
+        }
+        for identifier in [
+            NSToolbarItem.Identifier.macWikiHistory,
+            .macWikiArticleState,
+            .macWikiFind
+        ] {
+            #expect(
+                try #require(item(identifier, in: controller.toolbar)).visibilityPriority == .standard
+            )
+        }
         #expect(
             controller.toolbarImmovableItemIdentifiers(controller.toolbar)
                 == ReaderToolbarLayout.fixedIdentifiers

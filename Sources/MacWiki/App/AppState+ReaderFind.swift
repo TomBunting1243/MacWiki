@@ -3,6 +3,7 @@ import Foundation
 extension AppState {
     func presentFindOnPage() {
         showFindOnPage = true
+        findOnPageFocusRequestID = UUID()
         findOnPageMatchFound = nil
     }
 
@@ -25,6 +26,7 @@ extension AppState {
 
     func dismissFindOnPage(activeTabID: UUID?, clearsWebSelection: Bool) {
         showFindOnPage = false
+        findOnPageFocusRequestID = nil
         findOnPageQuery = ""
         clearFindOnPageResults()
 
@@ -44,6 +46,7 @@ extension AppState {
 
     func resetFindOnPageState() {
         showFindOnPage = false
+        findOnPageFocusRequestID = nil
         findOnPageQuery = ""
         clearFindOnPageResults()
         pendingFindOnPageRequest = nil

@@ -106,6 +106,11 @@ final class AppState {
     /// Whether the in-page find UI is shown for the reader column.
     var showFindOnPage: Bool = false
 
+    /// Changes whenever a command asks the visible find field to become key.
+    /// Keeping focus intent separate from visibility lets repeated Command-F
+    /// recover focus without rebuilding the reader overlay.
+    var findOnPageFocusRequestID: UUID?
+
     /// Current find query for in-page search.
     var findOnPageQuery: String = ""
 

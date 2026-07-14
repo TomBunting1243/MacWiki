@@ -97,7 +97,7 @@ private struct WindowSnapshot {
     }
 
     var isReady: Bool {
-        windows.count == 1 && mainWindows.count == 1 && toolbarCount == 0
+        windows.count == 1 && mainWindows.count == 1 && toolbarCount == 1
     }
 }
 
@@ -383,7 +383,9 @@ private func run() throws {
                 && runningPIDs(bundleIdentifier: bundleIdentifier) == [pid]
         }
         guard settled else {
-            throw LifecycleError.failure("Cycle \(cycle) did not settle with one native window and article-only toolbar hidden.")
+            throw LifecycleError.failure(
+                "Cycle \(cycle) did not settle with one native window and one attached native toolbar."
+            )
         }
 
         cycleRecords.append(

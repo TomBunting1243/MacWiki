@@ -6,6 +6,23 @@ import Testing
 
 @MainActor
 struct AppStateBoundaryTests {
+    @Test func repeatedFindPresentationIssuesFreshFocusRequests() {
+        let appState = AppState(persistenceMode: .ephemeral)
+
+        appState.presentFindOnPage()
+        let firstRequest = appState.findOnPageFocusRequestID
+        appState.findOnPageMatchFound = true
+        appState.presentFindOnPage()
+
+        #expect(appState.showFindOnPage)
+        #expect(firstRequest != nil)
+        #expect(appState.findOnPageFocusRequestID != firstRequest)
+        #expect(appState.findOnPageMatchFound == nil)
+
+        appState.dismissFindOnPage(activeTabID: nil, clearsWebSelection: false)
+        #expect(appState.findOnPageFocusRequestID == nil)
+    }
+
     @Test func creationRequestsAreTypedSceneScopedAndRepeatable() {
         let appState = AppState(persistenceMode: .ephemeral)
         let savedArticle = SavedArticle(title: "Ada Lovelace")

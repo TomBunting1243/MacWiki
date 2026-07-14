@@ -131,6 +131,7 @@ struct NativeDesignRegressionTests {
         #expect(findBar.contains("Color(nsColor: accessibilityPersonalization.reduceTransparency ? .controlBackgroundColor : .windowBackgroundColor)"))
         #expect(findBar.contains("isKeyWindow && !accessibilityPersonalization.reduceTransparency"))
         #expect(findBar.contains("increasedContrast ? 1"))
+        #expect(findBar.contains(".onChange(of: appState.findOnPageFocusRequestID)"))
     }
 
     @Test func linkHoverPreviewUsesNativeGlassPolicyAndSolidAccessibilityFallback() throws {
@@ -169,6 +170,10 @@ struct NativeDesignRegressionTests {
         #expect(commands.contains(".keyboardShortcut(\"l\", modifiers: [.command, .option])"))
         #expect(commands.contains("CommandMenu(\"Article\")"))
         #expect(commands.contains("CommandMenu(\"Tabs\")"))
+        #expect(commands.components(separatedBy: "Button(\"Next Tab\")").count - 1 == 1)
+        #expect(commands.components(separatedBy: "Button(\"Previous Tab\")").count - 1 == 1)
+        #expect(commands.contains(".keyboardShortcut(.tab, modifiers: .control)"))
+        #expect(commands.contains(".keyboardShortcut(.tab, modifiers: [.control, .shift])"))
         #expect(!commands.contains("CommandGroup(after: .windowSize)"))
         #expect(articlePresenter.contains("window.toolbar?.visibleItems?"))
         #expect(articlePresenter.contains("presenter.showReaderStyle(in: window)"))
