@@ -5,13 +5,6 @@ import Testing
 
 @MainActor
 struct TabReorderTests {
-    @Test func reorderIdentifierPreservesThePersistedUUIDIdentity() {
-        let id = UUID(uuidString: "11111111-2222-3333-4444-555555555555")!
-        let tab = ArticleTab(id: id, content: .placeholder)
-
-        #expect(tab.reorderIdentifier == id.uuidString)
-    }
-
     @Test func moveTabLeftToRightAdjacent() {
         let appState = AppState(persistenceMode: .ephemeral)
         appState.openTabs = [

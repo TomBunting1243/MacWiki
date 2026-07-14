@@ -25,7 +25,6 @@ struct ReaderTabItemView: View {
     let showProgressTrack: Bool
     let showActiveDepth: Bool
     let reduceMotion: Bool
-    let usesLegacyDrag: Bool
     let onNewLabelWithArticle: (SavedArticle) -> Void
     let onClose: () -> Void
     let onSelect: () -> Void
@@ -214,8 +213,7 @@ struct ReaderTabItemView: View {
         .zIndex(isDragged ? 100 : 0)
         .compositingGroup()
         .modifier(
-            LegacyTabDragModifier(
-                isEnabled: usesLegacyDrag,
+            TabReorderDragModifier(
                 minimumDistance: interactionProfile.dragStartDistance,
                 onChanged: onDragChanged,
                 onEnded: onDragEnded

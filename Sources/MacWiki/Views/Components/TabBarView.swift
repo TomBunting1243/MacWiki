@@ -1,14 +1,6 @@
 import SwiftUI
 import SwiftData
 
-extension ArticleTab {
-    /// SwiftUI's SDK 27 reorder container currently trips over Foundation.UUID
-    /// metadata at runtime on macOS 27 beta. The explicit itemID overload is
-    /// designed for alternate stable identities, so keep persistence on UUID
-    /// while presenting one value-based string identity to the native container.
-    var reorderIdentifier: String { id.uuidString }
-}
-
 /// Horizontal scrollable tab bar for managing open articles
 struct TabBarView: View {
     @Environment(AppState.self) private var appState
@@ -153,7 +145,7 @@ struct TabBarView: View {
                 .onChange(of: pendingScrollTabId) { _, tabId in
                     guard let tabId else { return }
                     performAnimation(interactionProfile.dragAutoScroll) {
-                        proxy.scrollTo(tabId.uuidString, anchor: .center)
+                        proxy.scrollTo(tabId, anchor: .center)
                     }
                     pendingScrollTabId = nil
                 }
@@ -176,63 +168,19 @@ struct TabBarView: View {
     private func tabItemsStack(
         librarySnapshot: TabBarLibraryIndex.Snapshot
     ) -> some View {
-        if #available(macOS 27, *) {
-            nativeReorderableTabItemsStack(
-                librarySnapshot: librarySnapshot
-            )
-        } else {
-            legacyReorderableTabItemsStack(
-                librarySnapshot: librarySnapshot
-            )
-        }
-    }
-
-    @available(macOS 27, *)
-    private func nativeReorderableTabItemsStack(
-        librarySnapshot: TabBarLibraryIndex.Snapshot
-    ) -> some View {
         let indexByID = tabIndexByID
-        let idByReorderIdentifier = tabIDByReorderIdentifier
 
-        return HStack(spacing: tabSpacing) {
-            ForEach(appState.openTabs, id: \.reorderIdentifier) { tab in
+        // SDK 27's native reorder container fatals on the current macOS 27
+        // seed with "Unexpected identifier type" even when the ForEach and
+        // itemID key path use the same UUID or String type. Keep this bounded
+        // SwiftUI gesture path on both supported OS versions until a later seed
+        // passes the packaged drag, overflow, persistence, and relaunch gate.
+        HStack(spacing: tabSpacing) {
+            ForEach(appState.openTabs) { tab in
                 tabItem(
                     tab,
                     at: indexByID[tab.id] ?? 0,
-                    librarySnapshot: librarySnapshot,
-                    usesLegacyDrag: false
-                )
-            }
-            .reorderable()
-        }
-        .reorderContainer(for: ArticleTab.self, itemID: \.reorderIdentifier) { difference in
-            let sourceIDs = difference.sources.compactMap { idByReorderIdentifier[$0] }
-            guard sourceIDs.count == difference.sources.count else { return }
-
-            let destinationID: UUID?
-            switch difference.destination.position {
-            case .before(let id):
-                guard let resolvedID = idByReorderIdentifier[id] else { return }
-                destinationID = resolvedID
-            case .end:
-                destinationID = nil
-            }
-            appState.reorderTabs(sourceIDs, before: destinationID)
-        }
-    }
-
-    private func legacyReorderableTabItemsStack(
-        librarySnapshot: TabBarLibraryIndex.Snapshot
-    ) -> some View {
-        let indexByID = tabIndexByID
-
-        return HStack(spacing: tabSpacing) {
-            ForEach(appState.openTabs, id: \.reorderIdentifier) { tab in
-                tabItem(
-                    tab,
-                    at: indexByID[tab.id] ?? 0,
-                    librarySnapshot: librarySnapshot,
-                    usesLegacyDrag: true
+                    librarySnapshot: librarySnapshot
                 )
             }
         }
@@ -241,8 +189,7 @@ struct TabBarView: View {
     private func tabItem(
         _ tab: ArticleTab,
         at index: Int,
-        librarySnapshot: TabBarLibraryIndex.Snapshot,
-        usesLegacyDrag: Bool
+        librarySnapshot: TabBarLibraryIndex.Snapshot
     ) -> some View {
         ReaderTabItemView(
             tab: tab,
@@ -270,7 +217,6 @@ struct TabBarView: View {
             showProgressTrack: showTabProgressTrack,
             showActiveDepth: showTabActiveDepth,
             reduceMotion: reduceMotion,
-            usesLegacyDrag: usesLegacyDrag,
             onNewLabelWithArticle: onNewLabelWithArticle,
             onClose: {
                 performAnimation(interactionProfile.tabCreateClose) {
@@ -302,12 +248,6 @@ struct TabBarView: View {
         )
     }
 
-    private var tabIDByReorderIdentifier: [String: UUID] {
-        Dictionary(
-            uniqueKeysWithValues: appState.openTabs.map { ($0.reorderIdentifier, $0.id) }
-        )
-    }
-
     @ViewBuilder
     private var tabBarBackground: some View {
         ReaderTabLaneBackground()
@@ -331,10 +271,10 @@ struct TabBarView: View {
         guard let activeTabId = appState.activeTabId else { return }
         if animated {
             performAnimation(interactionProfile.tabSelect) {
-                proxy.scrollTo(activeTabId.uuidString, anchor: .center)
+                proxy.scrollTo(activeTabId, anchor: .center)
             }
         } else {
-            proxy.scrollTo(activeTabId.uuidString, anchor: .center)
+            proxy.scrollTo(activeTabId, anchor: .center)
         }
     }
     
