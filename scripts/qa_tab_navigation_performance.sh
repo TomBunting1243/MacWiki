@@ -10,8 +10,12 @@ APP_NAME="${APP_NAME:-MacWiki}"
 APP_BIN_DEFAULT="$REPO_ROOT/.build/arm64-apple-macosx/debug/MacWiki"
 APP_BIN_FALLBACK="$REPO_ROOT/.build/debug/MacWiki"
 APP_BIN="${APP_BIN:-$APP_BIN_DEFAULT}"
+APP_BUNDLE_PATH="${APP_BUNDLE_PATH:-${APP_BIN%/Contents/MacOS/*}}"
 OUTPUT_DIR="${1:-/tmp/macwiki-qa/tab-navigation-$(date +%Y%m%d_%H%M%S)}"
 QA_HOME="${QA_HOME:-/tmp/macwiki-qa/tab-navigation-home-$(date +%Y%m%d_%H%M%S)-$RANDOM}"
+BUILD_INFO_PLIST="$APP_BUNDLE_PATH/Contents/Resources/BuildInfo.plist"
+STATE_DIR="$QA_HOME/Library/Application Support/MacWiki"
+TAB_SNAPSHOT="$STATE_DIR/tab-session.json"
 
 if [[ ! -x "$APP_BIN" && -x "$APP_BIN_FALLBACK" ]]; then
   APP_BIN="$APP_BIN_FALLBACK"
@@ -20,6 +24,8 @@ if [[ ! -x "$APP_BIN" ]]; then
   echo "ERROR: App binary not found: $APP_BIN" >&2
   exit 1
 fi
+[[ -f "$BUILD_INFO_PLIST" ]] || { echo "Candidate BuildInfo.plist is missing: $BUILD_INFO_PLIST" >&2; exit 1; }
+qa_assert_candidate_manifest_matches_executable "$BUILD_INFO_PLIST"
 
 mkdir -p "$OUTPUT_DIR"
 qa_prepare_isolated_home
@@ -30,8 +36,15 @@ cleanup() {
 trap cleanup EXIT INT TERM
 qa_launch_candidate "$OUTPUT_DIR/launch.log"
 
+driver_status=0
 result_json="$(qa_run_command_with_timeout 30 swift "$SCRIPT_DIR/ax_tab_navigation.swift" "$QA_APP_PID" \
-  2>"$OUTPUT_DIR/automation-errors.log")"
+  2>"$OUTPUT_DIR/automation-errors.log")" || driver_status=$?
+if [[ -f "$TAB_SNAPSHOT" ]]; then
+  cp "$TAB_SNAPSHOT" "$OUTPUT_DIR/tab-session.json"
+fi
+if [[ "$driver_status" -ne 0 ]]; then
+  exit "$driver_status"
+fi
 
 printf '%s\n' "$result_json" >"$OUTPUT_DIR/result.json"
 {

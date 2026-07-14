@@ -1508,6 +1508,9 @@ struct BetaReadinessRegressionTests {
 
         #expect(script.contains("WIDTH_PRESETS_CSV=\"${WIDTH_PRESETS_CSV:-1040,1400,1760}\""))
         #expect(script.contains("performance-metrics.csv"))
+        #expect(script.contains("qa_assert_candidate_manifest_matches_executable"))
+        #expect(script.contains("tab-session.json"))
+        #expect(script.contains("driver_status"))
         #expect(script.contains("dump_performance_metrics.swift"))
         #expect(performanceDumpScript.contains("com.tombunting.MacWiki.qa."))
         #expect(performanceDumpScript.contains("sessionRestore"))
