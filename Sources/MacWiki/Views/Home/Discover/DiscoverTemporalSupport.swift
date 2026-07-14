@@ -144,7 +144,7 @@ struct DiscoverStoryLinkChip: View {
             onOpen(link, SystemBridge.isCommandPressed)
         } label: {
             Text(link.title)
-                .font(.system(size: 12, weight: .semibold))
+                .font(DiscoverTypography.controlAuxiliary.weight(.semibold))
                 .lineLimit(1)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
@@ -220,7 +220,7 @@ struct DiscoverOnThisDayFeatureCard: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .top, spacing: 12) {
                 Text(event.year)
-                    .font(.system(size: 28, weight: .semibold, design: .rounded))
+                    .font(.system(.title, design: .rounded, weight: .semibold))
                     .foregroundStyle(.primary)
                     .lineLimit(1)
 
@@ -228,7 +228,7 @@ struct DiscoverOnThisDayFeatureCard: View {
 
                 if let article = event.article {
                     Text(article.title)
-                        .font(.system(size: 10.5, weight: .semibold, design: .rounded))
+                        .font(DiscoverTypography.editorialKicker)
                         .foregroundStyle(accent)
                         .lineLimit(1)
                         .padding(.horizontal, 9)
@@ -238,7 +238,7 @@ struct DiscoverOnThisDayFeatureCard: View {
             }
 
             Text(event.text)
-                .font(.system(size: 15, weight: .medium))
+                .font(DiscoverTypography.cardBody.weight(.medium))
                 .foregroundStyle(.primary)
                 .lineLimit(4)
                 .multilineTextAlignment(.leading)
@@ -319,13 +319,13 @@ struct DiscoverOnThisDayRow: View {
     private var rowContent: some View {
         HStack(alignment: .top, spacing: 10) {
             Text(event.year)
-                .font(.system(size: 12, weight: .bold, design: .rounded))
+                .font(.system(.caption, design: .rounded, weight: .bold))
                 .foregroundStyle(.secondary)
                 .frame(width: 58, alignment: .leading)
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(event.text)
-                    .font(.system(size: 13, weight: .medium))
+                    .font(DiscoverTypography.cardBody.weight(.medium))
                     .lineLimit(3)
                 if let article = event.article {
                     Text(article.title)
@@ -412,7 +412,7 @@ struct DiscoverDidYouKnowRow: View {
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(fact.text)
-                    .font(.system(size: 13, weight: .medium))
+                    .font(DiscoverTypography.cardBody.weight(.medium))
                     .lineLimit(3)
                 if let article = fact.article {
                     Text(article.title)

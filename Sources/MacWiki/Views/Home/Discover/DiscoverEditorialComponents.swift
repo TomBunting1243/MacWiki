@@ -13,12 +13,12 @@ struct DiscoverMasthead: View {
             HStack(alignment: .firstTextBaseline, spacing: 12) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Today’s Edition")
-                        .font(.system(size: 11, weight: .semibold, design: .rounded))
+                        .font(DiscoverTypography.editorialKicker)
                         .textCase(.uppercase)
                         .foregroundStyle(.tertiary)
 
                     Text("Discover")
-                        .font(.system(size: isCompactLayout ? 30 : 36, weight: .semibold))
+                        .font(DiscoverTypography.mastheadTitle(isCompact: isCompactLayout))
                         .foregroundStyle(.primary)
                 }
 
@@ -26,7 +26,7 @@ struct DiscoverMasthead: View {
 
                 if !trimmedDateLabel.isEmpty {
                     Text(trimmedDateLabel)
-                        .font(.system(size: 11.5, weight: .medium, design: .rounded))
+                        .font(DiscoverTypography.editionDate)
                         .foregroundStyle(.secondary)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 5)
@@ -209,7 +209,7 @@ struct DiscoverTemporalSubsectionHeader: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             SwiftUI.Label(title, systemImage: systemImage)
-                .font(.system(size: 11.5, weight: .semibold, design: .rounded))
+                .font(DiscoverTypography.controlAuxiliary)
                 .foregroundStyle(.secondary)
 
             Rectangle()

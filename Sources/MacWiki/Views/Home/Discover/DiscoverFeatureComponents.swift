@@ -1,20 +1,34 @@
 import SwiftUI
 
 enum DiscoverTypography {
-    static let sectionTitle = Font.system(size: 20, weight: .semibold)
-    static let sectionSubtitle = Font.system(size: 10.5, weight: .semibold, design: .rounded)
-    static let featureTitle = Font.system(size: 29, weight: .semibold)
-    static let featureDescription = Font.system(size: 14, weight: .regular)
-    static let newsCardTitle = Font.system(size: 14.5, weight: .semibold)
-    static let newsRailTitle = Font.system(size: 15, weight: .semibold)
-    static let newsCardDescription = Font.system(size: 11.5, weight: .regular)
-    static let compactRank = Font.system(size: 14.5, weight: .semibold, design: .rounded)
-    static let compactTitle = Font.system(size: 12.5, weight: .medium)
-    static let compactDescription = Font.system(size: 11, weight: .regular)
-    static let storyBody = Font.system(size: 14, weight: .regular)
-    static let mediaTitle = Font.system(size: 16.5, weight: .semibold, design: .rounded)
-    static let mediaDescription = Font.system(size: 12.5, weight: .regular)
-    static let mediaMeta = Font.system(size: 11.5, weight: .medium)
+    static let editorialKicker = Font.system(.caption2, design: .rounded, weight: .semibold)
+    static let editionDate = Font.system(.caption, design: .rounded, weight: .medium)
+    static let sectionTitle = Font.title2.weight(.semibold)
+    static let sectionSubtitle = Font.system(.caption2, design: .rounded, weight: .semibold)
+    static let featureTitle = Font.largeTitle.weight(.semibold)
+    static let featureDescription = Font.body
+    static let featureTeaser = Font.callout
+    static let newsCardTitle = Font.headline
+    static let newsRailTitle = Font.title3.weight(.semibold)
+    static let newsCardDescription = Font.caption
+    static let compactRank = Font.system(.callout, design: .rounded, weight: .semibold)
+    static let compactTitle = Font.callout.weight(.medium)
+    static let compactDescription = Font.caption
+    static let storyBody = Font.body
+    static let mediaTitle = Font.title3.weight(.semibold)
+    static let mediaDescription = Font.callout
+    static let mediaMeta = Font.caption.weight(.medium)
+    static let cardTitle = Font.headline
+    static let cardBody = Font.callout
+    static let cardMetadata = Font.caption
+    static let controlLabel = Font.callout.weight(.semibold)
+    static let controlAuxiliary = Font.caption.weight(.medium)
+    static let statistic = Font.caption.weight(.semibold)
+    static let popoverTitle = Font.headline
+
+    static func mastheadTitle(isCompact: Bool) -> Font {
+        isCompact ? .title.weight(.semibold) : .largeTitle.weight(.semibold)
+    }
 }
 
 struct DiscoverFeatureModule: View {
@@ -72,7 +86,7 @@ struct DiscoverFeatureModule: View {
                     .padding(12)
                 } else {
                     Text(DiscoverEditionCopy.visualContextUnavailable)
-                        .font(.system(size: 12.5, weight: .medium))
+                        .font(DiscoverTypography.cardBody.weight(.medium))
                         .foregroundStyle(.secondary)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 10)
@@ -129,7 +143,7 @@ struct DiscoverFeatureCard: View {
 
                     VStack(alignment: .leading, spacing: 8) {
                         Text(DiscoverEditionCopy.leadKicker)
-                            .font(.system(size: 11, weight: .semibold, design: .rounded))
+                            .font(DiscoverTypography.editorialKicker)
                             .textCase(.uppercase)
                             .foregroundStyle(.secondary)
 
@@ -157,7 +171,7 @@ struct DiscoverFeatureCard: View {
                         } else if let teaserText, !teaserText.isEmpty {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(teaserText)
-                                    .font(.system(size: 13.5, weight: .regular))
+                                    .font(DiscoverTypography.featureTeaser)
                                     .foregroundStyle(.secondary)
                                     .lineLimit(9)
                                     .lineSpacing(1.45)

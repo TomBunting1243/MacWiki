@@ -22,7 +22,7 @@ struct DiscoverSearchBarView: View {
 
             TextField("Search Wikipedia", text: $searchCoordinator.searchText)
                 .textFieldStyle(.plain)
-                .font(.system(size: 15, weight: .medium))
+                .font(DiscoverTypography.cardBody.weight(.medium))
                 .focused($isSearchFocused)
                 .onSubmit(onOpenSelectedResult)
 

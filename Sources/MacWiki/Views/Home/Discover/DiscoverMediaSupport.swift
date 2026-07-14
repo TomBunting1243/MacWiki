@@ -15,9 +15,9 @@ struct DiscoverVisualContextStrip: View {
         let content = VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
                 Text(DiscoverEditionCopy.visualContextTitle)
-                    .font(.system(size: 13.5, weight: .semibold, design: .rounded))
+                    .font(DiscoverTypography.cardTitle)
                 Text(DiscoverEditionCopy.visualContextSubtitle)
-                    .font(.system(size: 11, weight: .medium))
+                    .font(DiscoverTypography.cardMetadata.weight(.medium))
                     .foregroundStyle(.secondary)
             }
 
@@ -120,12 +120,12 @@ struct DiscoverVisualContextCard: View {
             .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
 
             Text(displayTitle)
-                .font(.system(size: 11.5, weight: .semibold))
+                .font(DiscoverTypography.cardMetadata.weight(.semibold))
                 .lineLimit(2)
 
             if let caption = image.caption, !caption.isEmpty {
                 Text(caption)
-                    .font(.system(size: 10.5))
+                    .font(DiscoverTypography.cardMetadata)
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
             }
@@ -358,7 +358,7 @@ struct DiscoverFeaturedImageCard: View {
         VStack(alignment: .leading, spacing: prefersHorizontalLayout ? 10 : 6) {
             if prefersHorizontalLayout {
                 Text(DiscoverEditionCopy.commonsSpotlight)
-                    .font(.system(size: 10.5, weight: .semibold, design: .rounded))
+                    .font(DiscoverTypography.editorialKicker)
                     .textCase(.uppercase)
                     .foregroundStyle(.tertiary)
             }
@@ -395,7 +395,7 @@ struct DiscoverFeaturedImageCard: View {
                     } label: {
                         SwiftUI.Label("View on Commons", systemImage: "arrow.up.right.square")
                             .labelStyle(.titleAndIcon)
-                            .font(.system(size: 11.5, weight: .semibold))
+                            .font(DiscoverTypography.controlAuxiliary.weight(.semibold))
                             .foregroundStyle(.primary)
                             .padding(.horizontal, 10)
                             .padding(.vertical, 6)
@@ -406,7 +406,7 @@ struct DiscoverFeaturedImageCard: View {
 
                 if let licenseText {
                     Text(licenseText)
-                        .font(.system(size: 11, weight: .medium))
+                        .font(DiscoverTypography.controlAuxiliary)
                         .foregroundStyle(.secondary)
                         .padding(.horizontal, 9)
                         .padding(.vertical, 5)

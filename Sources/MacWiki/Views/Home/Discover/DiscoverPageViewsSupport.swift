@@ -62,15 +62,15 @@ struct DiscoverPageViewsPopoverContent: View {
             } else if isLoading {
                 VStack(alignment: .leading, spacing: 10) {
                     Text("Views")
-                        .font(.system(size: 11.5, weight: .semibold))
+                        .font(DiscoverTypography.controlAuxiliary.weight(.semibold))
                         .foregroundStyle(.secondary)
                     Text(title)
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(DiscoverTypography.popoverTitle)
                         .lineLimit(2)
                     AppLoadingInlineLabel(
                         text: "Loading page views…",
                         tone: .accent,
-                        font: .system(size: 12, weight: .medium)
+                        font: DiscoverTypography.cardMetadata.weight(.medium)
                     )
                 }
                 .padding(14)
@@ -78,13 +78,13 @@ struct DiscoverPageViewsPopoverContent: View {
             } else {
                 VStack(alignment: .leading, spacing: 10) {
                     Text("Views")
-                        .font(.system(size: 11.5, weight: .semibold))
+                        .font(DiscoverTypography.controlAuxiliary.weight(.semibold))
                         .foregroundStyle(.secondary)
                     Text(title)
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(DiscoverTypography.popoverTitle)
                         .lineLimit(2)
                     Text(didFailLoad ? "Page views are unavailable for this article right now." : "No pageview data yet.")
-                        .font(.system(size: 12, weight: .medium))
+                        .font(DiscoverTypography.cardMetadata.weight(.medium))
                         .foregroundStyle(.secondary)
                     Button("Retry") {
                         Task {

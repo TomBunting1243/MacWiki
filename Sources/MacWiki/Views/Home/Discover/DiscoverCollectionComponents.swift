@@ -138,15 +138,15 @@ struct DiscoverExpandableCollectionCard<Content: View>: View {
     private var collectionTitleBlock: some View {
         VStack(alignment: .leading, spacing: 3) {
             Text(title)
-                .font(.system(size: 17, weight: .semibold))
+                .font(DiscoverTypography.cardTitle)
                 .foregroundStyle(.primary)
             Text(subtitle)
-                .font(.system(size: 11.5, weight: .medium))
+                .font(DiscoverTypography.cardMetadata.weight(.medium))
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
             if let meta, !meta.isEmpty {
                 Text(meta)
-                    .font(.system(size: 10.5, weight: .medium, design: .rounded))
+                    .font(DiscoverTypography.editionDate)
                     .foregroundStyle(.tertiary)
                     .lineLimit(1)
             }
@@ -223,13 +223,13 @@ struct DiscoverExpandableCollectionCard<Content: View>: View {
             ForEach(Array(collapsedPreviewTitles.enumerated()), id: \.offset) { index, title in
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text("\(index + 1)")
-                        .font(.system(size: 10.5, weight: .semibold, design: .rounded))
+                        .font(DiscoverTypography.compactRank)
                         .foregroundStyle(tint)
                         .monospacedDigit()
                         .frame(width: 18, alignment: .leading)
 
                     Text(title)
-                        .font(.system(size: 12.5, weight: .medium))
+                        .font(DiscoverTypography.compactTitle)
                         .foregroundStyle(.primary.opacity(0.88))
                         .lineLimit(1)
 
@@ -255,7 +255,7 @@ struct DiscoverPlaylistPlaceholder: View {
 
     var body: some View {
         Text(text)
-            .font(.system(size: 12, weight: .medium))
+            .font(DiscoverTypography.cardMetadata.weight(.medium))
             .foregroundStyle(.secondary)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 10)
@@ -317,7 +317,7 @@ struct DiscoverPlaylistArticleRow: View {
         } label: {
             HStack(alignment: .top, spacing: 10) {
                 Text("\(rank)")
-                    .font(.system(size: 12.5, weight: .semibold, design: .rounded))
+                    .font(DiscoverTypography.compactRank)
                     .monospacedDigit()
                     .foregroundStyle(.secondary)
                     .frame(width: 18, alignment: .leading)

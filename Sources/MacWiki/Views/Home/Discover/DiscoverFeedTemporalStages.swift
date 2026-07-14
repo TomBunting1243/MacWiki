@@ -115,7 +115,7 @@ extension DiscoverFeedSections {
 
                         if !timeMachineDisplayDateLabel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                             Text(timeMachineDisplayDateLabel)
-                                .font(.system(size: 11, weight: .semibold, design: .rounded))
+                                .font(DiscoverTypography.editionDate.weight(.semibold))
                                 .foregroundStyle(.secondary)
                                 .lineLimit(1)
                                 .padding(.horizontal, 10)

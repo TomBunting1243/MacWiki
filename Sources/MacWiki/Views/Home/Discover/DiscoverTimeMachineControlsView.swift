@@ -30,7 +30,7 @@ struct DiscoverTimeMachineControlsView: View {
                     .frame(width: 20, height: 20)
 
                 Text("Time Machine")
-                    .font(.system(size: 12.5, weight: .semibold))
+                    .font(DiscoverTypography.controlLabel)
                     .foregroundStyle(.primary)
 
                 Spacer(minLength: 0)
@@ -45,7 +45,7 @@ struct DiscoverTimeMachineControlsView: View {
                 }
 
                 Text(discoverFeedStore.feed?.dateLabel ?? screenModel.discoverTimeMachineDateLabel)
-                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                    .font(DiscoverTypography.editionDate)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
@@ -156,7 +156,7 @@ struct DiscoverTimeMachineControlsView: View {
             AppLoadingActivityMark(tone: .retro)
 
             Text("SCANNING")
-                .font(.system(size: 10.5, weight: .semibold, design: .rounded))
+                .font(DiscoverTypography.editorialKicker)
                 .foregroundStyle(Color.accentColor)
                 .lineLimit(1)
         }
@@ -205,7 +205,7 @@ struct DiscoverTimeMachineControlsView: View {
                     .font(.system(size: 10.5, weight: .semibold))
 
                 Text(screenModel.discoverTimeMachineDateLabel)
-                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .font(DiscoverTypography.editionDate.weight(.semibold))
                     .monospacedDigit()
                     .lineLimit(1)
                     .minimumScaleFactor(0.86)
@@ -243,7 +243,7 @@ struct DiscoverTimeMachineControlsView: View {
                         screenModel.isTimeMachineDatePickerPresented = false
                     }
                 }
-                .font(.system(size: 11.5, weight: .semibold))
+                .font(DiscoverTypography.controlAuxiliary.weight(.semibold))
             }
             .padding(10)
             .frame(width: 250)
@@ -358,7 +358,7 @@ struct DiscoverTimeMachineControlsView: View {
     ) -> some View {
         Button(action: action) {
             Text(title)
-                .font(.system(size: 10.5, weight: .semibold, design: .rounded))
+                .font(DiscoverTypography.controlAuxiliary.weight(.semibold))
                 .monospacedDigit()
                 .padding(.horizontal, 9)
                 .frame(height: 22)

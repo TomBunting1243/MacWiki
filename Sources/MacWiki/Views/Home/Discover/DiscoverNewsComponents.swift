@@ -222,12 +222,12 @@ struct DiscoverTrendPulseBadge: View {
                     .frame(width: 54, height: 14)
 
                 Text(deltaText)
-                    .font(.system(size: 10.5, weight: .semibold, design: .rounded))
+                    .font(DiscoverTypography.statistic)
                     .foregroundStyle(trendColor)
                     .lineLimit(1)
 
                 Text("\(latestViewsText) views")
-                    .font(.system(size: 10, weight: .medium))
+                    .font(DiscoverTypography.cardMetadata.weight(.medium))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
