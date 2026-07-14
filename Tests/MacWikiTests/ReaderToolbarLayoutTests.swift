@@ -93,7 +93,7 @@ struct ReaderToolbarLayoutTests {
         #expect(!ReaderToolbarLayout.isStructurallyValid(fixedControlsReordered))
     }
 
-    @Test func productionControllerInstallsNativeBoundaryGroupsAndSharePicker() throws {
+    @Test func productionControllerKeepsNativeToolbarAvailableAcrossReaderStates() throws {
         let paneControllers = (0..<4).map { _ in NSViewController() }
         let splitController = WorkspaceSplitViewController(
             sidebarController: paneControllers[0],
@@ -125,13 +125,23 @@ struct ReaderToolbarLayoutTests {
         )
         controller.installIfPossible()
 
-        #expect(window.toolbar == nil)
+        #expect(window.toolbar === controller.toolbar)
+        #expect(controller.toolbar.isVisible)
+
+        try expectFixedWorkspaceControlsEnabled(in: controller.toolbar)
+        try expectArticleControlsDisabled(in: controller.toolbar)
 
         appState.openArticle(Article(id: "toolbar-article", title: "Toolbar Article"))
         let articleTabID = try #require(appState.activeTabId)
         controller.update(environment: environment)
         #expect(window.toolbar === controller.toolbar)
         #expect(controller.toolbar.isVisible)
+        #expect(try #require(item(.macWikiArticleState, in: controller.toolbar)).isEnabled)
+        #expect(try #require(item(.macWikiFind, in: controller.toolbar)).isEnabled)
+        #expect(try #require(item(.macWikiStyle, in: controller.toolbar)).isEnabled)
+        #expect(try #require(item(.macWikiPageViews, in: controller.toolbar)).isEnabled)
+        #expect(try #require(item(.macWikiOpenInBrowser, in: controller.toolbar)).isEnabled)
+        #expect(try #require(item(.macWikiShare, in: controller.toolbar)).isEnabled)
 
         #expect(controller.toolbar.identifier == .macWikiReaderScoped)
         #expect(controller.toolbar.displayMode == .iconOnly)
@@ -158,7 +168,10 @@ struct ReaderToolbarLayoutTests {
         controller.toolbar.isVisible = false
         appState.showDiscoverPage()
         controller.update(environment: environment)
-        #expect(window.toolbar == nil)
+        #expect(window.toolbar === controller.toolbar)
+        #expect(!controller.toolbar.isVisible)
+        try expectFixedWorkspaceControlsEnabled(in: controller.toolbar)
+        try expectArticleControlsDisabled(in: controller.toolbar)
 
         #expect(appState.selectTab(articleTabID))
         controller.update(environment: environment)
@@ -168,6 +181,30 @@ struct ReaderToolbarLayoutTests {
         controller.invalidate()
         #expect(window.toolbar == nil)
         #expect(controller.toolbar.delegate == nil)
+    }
+
+    private func expectFixedWorkspaceControlsEnabled(in toolbar: NSToolbar) throws {
+        for identifier in [
+            NSToolbarItem.Identifier.macWikiSidebarToggle,
+            .macWikiListContents,
+            .macWikiSearch,
+            .macWikiInspectorToggle
+        ] {
+            #expect(try #require(item(identifier, in: toolbar)).isEnabled)
+        }
+    }
+
+    private func expectArticleControlsDisabled(in toolbar: NSToolbar) throws {
+        for identifier in [
+            NSToolbarItem.Identifier.macWikiArticleState,
+            .macWikiFind,
+            .macWikiStyle,
+            .macWikiPageViews,
+            .macWikiOpenInBrowser,
+            .macWikiShare
+        ] {
+            #expect(!((try #require(item(identifier, in: toolbar))).isEnabled))
+        }
     }
 
     private func item(

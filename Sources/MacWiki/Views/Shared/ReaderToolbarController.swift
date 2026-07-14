@@ -43,7 +43,6 @@ final class ReaderToolbarController: NSObject,
     private weak var attachedWindow: NSWindow?
     private var lastSnapshot: Snapshot?
     private var lastAppliedItemIdentifiers: [NSToolbarItem.Identifier] = []
-    private var preferredArticleToolbarVisibility = true
     private var isInvalidated = false
 
     init(
@@ -93,6 +92,7 @@ final class ReaderToolbarController: NSObject,
             return
         }
 
+        let isInitialInstallation = attachedWindow == nil
         if attachedWindow !== window {
             if let previousWindow = attachedWindow,
                previousWindow.toolbar === toolbar {
@@ -105,6 +105,12 @@ final class ReaderToolbarController: NSObject,
         toolbar.allowsDisplayModeCustomization = false
         window.toolbarStyle = .unifiedCompact
         window.titleVisibility = .hidden
+        if window.toolbar !== toolbar {
+            window.toolbar = toolbar
+            if isInitialInstallation {
+                toolbar.isVisible = true
+            }
+        }
 
         repairStructureIfNeeded()
         refreshNow()
@@ -232,8 +238,6 @@ final class ReaderToolbarController: NSObject,
     }
 
     private func apply(_ snapshot: Snapshot) {
-        synchronizeToolbarAttachment(hasArticle: snapshot.articleID != nil)
-
         let itemIdentifiers = toolbar.items.map(\.itemIdentifier)
         guard snapshot != lastSnapshot
                 || itemIdentifiers != lastAppliedItemIdentifiers else {
@@ -346,26 +350,6 @@ final class ReaderToolbarController: NSObject,
         let identifiers = toolbar.items.map(\.itemIdentifier)
         guard !ReaderToolbarLayout.isStructurallyValid(identifiers) else { return }
         toolbar.itemIdentifiers = ReaderToolbarLayout.defaultIdentifiers
-    }
-
-    /// The customizable reader toolbar belongs to an article, not to the
-    /// window's empty or Discovery state. Detaching it also prevents AppKit's
-    /// standard Show Toolbar command from revealing reader controls when no
-    /// article is present. A user's explicit visibility choice is restored when
-    /// the next article becomes active.
-    private func synchronizeToolbarAttachment(hasArticle: Bool) {
-        guard let attachedWindow else { return }
-
-        if hasArticle {
-            guard attachedWindow.toolbar !== toolbar else { return }
-            attachedWindow.toolbar = toolbar
-            toolbar.isVisible = preferredArticleToolbarVisibility
-            return
-        }
-
-        guard attachedWindow.toolbar === toolbar else { return }
-        preferredArticleToolbarVisibility = toolbar.isVisible
-        attachedWindow.toolbar = nil
     }
 
 }

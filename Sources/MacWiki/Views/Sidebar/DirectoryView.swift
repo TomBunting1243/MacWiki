@@ -276,6 +276,14 @@ struct DirectoryView: View {
         return visibleFeed.dateKey != selectedDiscoverDateKey
     }
 
+    private var sidebarDiscoverFeedPresentation: SidebarDiscoverFeedPresentation {
+        SidebarDiscoverFeedPresentation(
+            hasVisibleFeed: discoverFeedStore.feed != nil,
+            isLoadingSelectedDate: isSidebarTimeTraveling,
+            errorMessage: discoverFeedStore.errorMessage
+        )
+    }
+
     private var discoverTrendReferenceDate: Date {
         guard let dateKey = discoverFeedStore.feed?.dateKey else {
             return discoverReferenceDate
@@ -1759,21 +1767,6 @@ extension DirectoryView {
         )
     }
 
-    private var timeMachineScanningBadge: some View {
-        HStack(spacing: 5) {
-            ProgressView()
-                .controlSize(.mini)
-
-            Text("Loading")
-                .font(.caption2.weight(.medium))
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-        }
-        .fixedSize()
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("Loading selected date")
-    }
-
     @ViewBuilder
     func discoverSections() -> some View {
         Section {
@@ -1835,11 +1828,6 @@ extension DirectoryView {
                             .layoutPriority(1)
 
                         Spacer(minLength: 0)
-
-                        if isSidebarTimeTraveling {
-                            timeMachineScanningBadge
-                                .transition(.opacity)
-                        }
                     }
 
                     HStack(spacing: 5) {
@@ -1892,6 +1880,15 @@ extension DirectoryView {
             }
         }
 
+        if sidebarDiscoverFeedPresentation.showsSelectedDateLoadingStatus {
+            Section {
+                SidebarDiscoverSelectedDateLoadingStatus(selectedDate: discoverReferenceDate)
+                    .padding(.vertical, 6)
+                    .listRowSeparator(.hidden)
+                    .listRowInsets(EdgeInsets(top: 3, leading: 10, bottom: 3, trailing: 10))
+            }
+        }
+
         if discoverFeedStore.isLoading && discoverFeedStore.feed == nil {
             Section {
                 AppLoadingInlineLabel(
@@ -1913,6 +1910,22 @@ extension DirectoryView {
                 .padding(.vertical, 6)
             }
         } else if let feed = discoverFeedStore.feed {
+            if sidebarDiscoverFeedPresentation.showsRetainedEditionWarning,
+               let discoverError = discoverFeedStore.errorMessage {
+                Section {
+                    SidebarDiscoverRetainedEditionWarning(
+                        editionDateLabel: feed.dateLabel,
+                        errorMessage: discoverError,
+                        onRetry: {
+                            queueDiscoverLoadDebounced(forceRefresh: true, delayNanoseconds: 0)
+                        }
+                    )
+                    .padding(.vertical, 4)
+                    .listRowSeparator(.hidden)
+                    .listRowInsets(EdgeInsets(top: 3, leading: 0, bottom: 3, trailing: 0))
+                }
+            }
+
             sidebarDiscoverFeedSections(feed)
                 .allowsHitTesting(!isSidebarTimeTraveling)
                 .accessibilityHidden(isSidebarTimeTraveling)

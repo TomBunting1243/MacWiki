@@ -599,9 +599,10 @@ struct BetaReadinessRegressionTests {
         #expect(toolbarItemsSource.contains("dividerIndex: 2"))
         #expect(toolbarSource.contains("toolbar.allowsUserCustomization = true"))
         #expect(toolbarSource.contains("toolbar.autosavesConfiguration = true"))
-        #expect(toolbarSource.contains("synchronizeToolbarAttachment(hasArticle: snapshot.articleID != nil)"))
-        #expect(toolbarSource.contains("preferredArticleToolbarVisibility = toolbar.isVisible"))
-        #expect(toolbarSource.contains("attachedWindow.toolbar = nil"))
+        #expect(toolbarSource.contains("if window.toolbar !== toolbar"))
+        #expect(toolbarSource.contains("window.toolbar = toolbar"))
+        #expect(!toolbarSource.contains("synchronizeToolbarAttachment"))
+        #expect(!toolbarSource.contains("preferredArticleToolbarVisibility"))
         #expect(toolbarSource.contains("toolbar.allowsDisplayModeCustomization = false"))
         #expect(toolbarSource.contains("toolbar.displayMode = .iconOnly"))
         #expect(toolbarSource.contains("toolbarImmovableItemIdentifiers"))
@@ -1844,17 +1845,22 @@ struct BetaReadinessRegressionTests {
     }
 
     @Test func discoverDirectoryPreservesTheVisibleEditionWhileTimeTravelLoads() throws {
-        let source = try source("Sources/MacWiki/Views/Sidebar/DirectoryView.swift")
+        let directorySource = try source("Sources/MacWiki/Views/Sidebar/DirectoryView.swift")
+        let stateViews = try source(
+            "Sources/MacWiki/Views/Sidebar/Directory/SidebarDiscoverFeedStateViews.swift"
+        )
 
-        #expect(source.contains("private var isSidebarTimeTraveling: Bool"))
-        #expect(source.contains("sidebarDiscoverFeedSections(feed)"))
-        #expect(source.contains(".allowsHitTesting(!isSidebarTimeTraveling)"))
-        #expect(source.contains(".accessibilityHidden(isSidebarTimeTraveling)"))
-        #expect(source.contains("ProgressView()"))
-        #expect(source.contains(".accessibilityLabel(\"Loading selected date\")"))
-        #expect(!source.contains("SidebarTimeTravelLoadingRow"))
-        #expect(!source.contains("SidebarGlitchScanlineOverlay"))
-        #expect(!source.contains("sidebarTimeTravelSkeletonDelay"))
+        #expect(directorySource.contains("private var isSidebarTimeTraveling: Bool"))
+        #expect(directorySource.contains("sidebarDiscoverFeedSections(feed)"))
+        #expect(directorySource.contains(".allowsHitTesting(!isSidebarTimeTraveling)"))
+        #expect(directorySource.contains(".accessibilityHidden(isSidebarTimeTraveling)"))
+        #expect(directorySource.contains("sidebarDiscoverFeedPresentation.showsSelectedDateLoadingStatus"))
+        #expect(stateViews.contains("ProgressView()"))
+        #expect(stateViews.contains(".accessibilityLabel(Text(\"Loading selected date\"))"))
+        #expect(stateViews.contains("Showing Last Available Edition"))
+        #expect(!directorySource.contains("SidebarTimeTravelLoadingRow"))
+        #expect(!directorySource.contains("SidebarGlitchScanlineOverlay"))
+        #expect(!directorySource.contains("sidebarTimeTravelSkeletonDelay"))
 
         let retiredSkeleton = repositoryRoot().appendingPathComponent(
             "Sources/MacWiki/Views/Sidebar/Directory/SidebarTimeTravelSkeletonViews.swift"
