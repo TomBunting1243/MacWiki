@@ -1,5 +1,14 @@
 import Foundation
 
+struct ReaderArticleLoadIdentity: Equatable, Sendable {
+    let tabID: UUID
+    let articleID: String
+
+    func matches(_ projection: ActiveReaderProjection) -> Bool {
+        projection.activeTabID == tabID && projection.article?.id == articleID
+    }
+}
+
 @MainActor
 final class ReaderArticleLoader {
     struct FastContent {

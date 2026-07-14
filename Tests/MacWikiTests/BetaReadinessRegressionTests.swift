@@ -1862,6 +1862,25 @@ struct BetaReadinessRegressionTests {
         #expect(!FileManager.default.fileExists(atPath: retiredSkeleton.path))
     }
 
+    @Test func readerLoadingPresentationUsesOneCancellableConcurrencyTask() throws {
+        let source = try source("Sources/MacWiki/Views/Reader/ReaderView.swift")
+        let loadingLifecycle = sourceSection(
+            source,
+            startingAt: "private func scheduleLoadingSkeletonAppearance(",
+            endingBefore: "private func cacheArticleHTMLSizeAware("
+        )
+
+        #expect(source.contains("@State private var loadingSkeletonTask: Task<Void, Never>?"))
+        #expect(source.contains("cancelLoadingSkeletonTask()\n            progressCoordinator.persistCurrentProgress"))
+        #expect(loadingLifecycle.contains("Task { @MainActor in"))
+        #expect(loadingLifecycle.contains("Task.sleep(for: delay)"))
+        #expect(loadingLifecycle.contains("Task.sleep(for: .seconds(remaining))"))
+        #expect(loadingLifecycle.contains("loadingSkeletonTask?.cancel()"))
+        #expect(!loadingLifecycle.contains("DispatchQueue.main.asyncAfter"))
+        #expect(!source.contains("skeletonVisibilityTicket"))
+        #expect(!source.contains("suppressLoadingSkeletonForCurrentOpen"))
+    }
+
     private func source(_ relativePath: String) throws -> String {
         try String(contentsOf: repositoryRoot().appendingPathComponent(relativePath), encoding: .utf8)
     }

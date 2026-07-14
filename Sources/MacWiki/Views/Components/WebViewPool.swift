@@ -35,8 +35,14 @@ final class WebViewPool {
         )
     }
 
-    func hasReusableWebView(for tabID: UUID) -> Bool {
-        entriesByTabID[tabID] != nil
+    func hasReusableWebView(
+        for tabID: UUID,
+        articleTitle: String,
+        contentRevision: UInt64
+    ) -> Bool {
+        guard let entry = entriesByTabID[tabID] else { return false }
+        return titleMatchKey(entry.lastLoadedArticleTitle) == titleMatchKey(articleTitle) &&
+            entry.lastLoadedHTMLSignature == contentRevision
     }
 
     func store(

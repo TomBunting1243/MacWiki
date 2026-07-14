@@ -297,10 +297,10 @@ struct ArticleView: View {
     @State private var hasPublishedLiveReadingProgressForCurrentOpen = false
     @State private var isLoadingSkeletonVisible = false
     @State private var loadingSkeletonShownAt: TimeInterval = 0
-    @State private var skeletonVisibilityTicket = UUID()
+    @State private var loadingSkeletonTask: Task<Void, Never>?
+    @State private var articleLoadGeneration = 0
     @State private var articleViewportWidth: CGFloat = 960
     @State private var topObscuredHeight: CGFloat = 38
-    @State private var suppressLoadingSkeletonForCurrentOpen = false
     @State private var errorMessage: String?
     @State private var preferImmediateWebReveal = false
     @State private var showMarkAsReadPrompt = false
@@ -433,7 +433,6 @@ struct ArticleView: View {
 
     private var shouldShowLoadingSkeleton: Bool {
         errorMessage == nil &&
-        !suppressLoadingSkeletonForCurrentOpen &&
         isLoadingSkeletonVisible &&
         (isLoading || !isWebContentReady)
     }
@@ -537,6 +536,7 @@ struct ArticleView: View {
             promptPolicy.resetForSession(startProgress: progressCoordinator.latestReadingProgress)
         }
         .onDisappear {
+            cancelLoadingSkeletonTask()
             progressCoordinator.persistCurrentProgress(for: article, in: modelContext, force: true)
             articleLoader.cancelPendingMetadataHydration()
             articleLoader.cancelPendingPinSync()
@@ -648,6 +648,7 @@ struct ArticleView: View {
                 },
                 onContentLoadFailure: { error in
                     guard appState.currentArticle?.title == article.title else { return }
+                    cancelLoadingSkeletonTask()
                     errorMessage = error.localizedDescription
                     isLoading = false
                     isWebContentReady = true
@@ -1045,16 +1046,27 @@ struct ArticleView: View {
     @discardableResult
     private func loadArticle(preloadedHTML: String? = nil, forceRefresh: Bool = false) async -> Bool {
         let resolvedPreloadedHTML = forceRefresh ? nil : preloadedHTML
-        let hasReusableWebSurface = !forceRefresh && WebViewPool.shared.hasReusableWebView(for: tabId)
+        let preloadedRevision = resolvedPreloadedHTML.map {
+            ReaderDocumentRevision.digest(for: $0)
+        }
+        let hasReusableWebSurface = preloadedRevision.map {
+            WebViewPool.shared.hasReusableWebView(
+                for: tabId,
+                articleTitle: article.title,
+                contentRevision: $0
+            )
+        } ?? false
+        articleLoadGeneration &+= 1
+        let loadGeneration = articleLoadGeneration
+        let loadIdentity = ReaderArticleLoadIdentity(tabID: tabId, articleID: article.id)
         let shouldPreserveVisibleContent =
             forceRefresh &&
             htmlContent != nil &&
             loadedArticleKey == article.id
 
+        cancelLoadingSkeletonTask()
         if shouldPreserveVisibleContent {
-            skeletonVisibilityTicket = UUID()
             isLoadingSkeletonVisible = false
-            suppressLoadingSkeletonForCurrentOpen = true
             isLoading = false
             isWebContentReady = true
         } else {
@@ -1062,7 +1074,6 @@ struct ArticleView: View {
             isWebContentReady = false
             hasPublishedLiveReadingProgressForCurrentOpen = false
             isLoadingSkeletonVisible = false
-            suppressLoadingSkeletonForCurrentOpen = hasReusableWebSurface
             openTimer.begin(title: article.title, preloaded: resolvedPreloadedHTML != nil)
             scheduleLoadingSkeletonAppearance(
                 preloaded: resolvedPreloadedHTML != nil,
@@ -1093,6 +1104,11 @@ struct ArticleView: View {
                 forTitle: article.title,
                 forceRefresh: forceRefresh
             )
+            try Task.checkCancellation()
+            guard loadGeneration == articleLoadGeneration,
+                  loadIdentity.matches(appState.activeReaderProjection) else {
+                return false
+            }
             openTimer.markFetchComplete(source: content.source)
             let shouldRevealImmediately = content.isWarmCacheHit || resolvedPreloadedHTML != nil
             if preferImmediateWebReveal != shouldRevealImmediately {
@@ -1146,11 +1162,16 @@ struct ArticleView: View {
                 return false
             }
             guard !Task.isCancelled else { return false }
+            guard loadGeneration == articleLoadGeneration,
+                  loadIdentity.matches(appState.activeReaderProjection) else {
+                return false
+            }
 
             if !shouldPreserveVisibleContent {
                 loadedArticleKey = nil
                 errorMessage = error.localizedDescription
             }
+            cancelLoadingSkeletonTask()
             preferImmediateWebReveal = false
             isLoading = false
             isWebContentReady = true
@@ -1189,38 +1210,45 @@ struct ArticleView: View {
     }
 
     private func scheduleLoadingSkeletonAppearance(preloaded: Bool, suppressed: Bool) {
-        if suppressed {
-            return
-        }
-        let ticket = UUID()
-        skeletonVisibilityTicket = ticket
-        let delay: TimeInterval = preloaded ? 0.26 : 0.16
+        guard !suppressed else { return }
+        let delay: Duration = preloaded ? .milliseconds(260) : .milliseconds(160)
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
-            guard skeletonVisibilityTicket == ticket else { return }
+        loadingSkeletonTask = Task { @MainActor in
+            try? await Task.sleep(for: delay)
+            guard !Task.isCancelled else { return }
             guard errorMessage == nil else { return }
             guard isLoading || !isWebContentReady else { return }
             loadingSkeletonShownAt = Date().timeIntervalSinceReferenceDate
             performSkeletonAnimation(duration: ReaderMotion.skeletonRevealDuration) {
                 isLoadingSkeletonVisible = true
             }
+            loadingSkeletonTask = nil
         }
     }
 
     private func hideLoadingSkeletonIfNeeded() {
+        cancelLoadingSkeletonTask()
         guard isLoadingSkeletonVisible else { return }
         let now = Date().timeIntervalSinceReferenceDate
         let minVisibleDuration = AppLoadingMotion.skeletonMinimumVisibleDuration
         let elapsed = now - loadingSkeletonShownAt
         let remaining = max(0, minVisibleDuration - elapsed)
-        let ticket = skeletonVisibilityTicket
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + remaining) {
-            guard skeletonVisibilityTicket == ticket else { return }
+        loadingSkeletonTask = Task { @MainActor in
+            if remaining > 0 {
+                try? await Task.sleep(for: .seconds(remaining))
+                guard !Task.isCancelled else { return }
+            }
             performSkeletonAnimation(duration: ReaderMotion.skeletonHideDuration) {
                 isLoadingSkeletonVisible = false
             }
+            loadingSkeletonTask = nil
         }
+    }
+
+    private func cancelLoadingSkeletonTask() {
+        loadingSkeletonTask?.cancel()
+        loadingSkeletonTask = nil
     }
     
     private func cacheArticleHTMLSizeAware(_ html: String, title: String) {
