@@ -9,6 +9,7 @@ import SwiftUI
 @MainActor
 final class ReaderToolbarController: NSObject,
     NSToolbarDelegate,
+    NSSearchFieldDelegate,
     NSSharingServicePickerToolbarItemDelegate
 {
     private struct Snapshot: Equatable {
@@ -20,6 +21,8 @@ final class ReaderToolbarController: NSObject,
         let navigationLocked: Bool
         let readerStylePresentationRequestID: UUID?
         let readerPageViewsPresentationRequestID: UUID?
+        let searchText: String
+        let searchVisible: Bool
         let sidebarVisible: Bool
         let directoryVisible: Bool
         let inspectorVisible: Bool
@@ -40,7 +43,7 @@ final class ReaderToolbarController: NSObject,
     unowned let splitController: WorkspaceSplitViewController
     var environment: ReaderToolbarEnvironment
     let popoverPresenter: ReaderToolbarPopoverPresenter
-    private weak var attachedWindow: NSWindow?
+    weak var attachedWindow: NSWindow?
     private var lastSnapshot: Snapshot?
     private var lastAppliedItemIdentifiers: [NSToolbarItem.Identifier] = []
     private var isInvalidated = false
@@ -103,7 +106,7 @@ final class ReaderToolbarController: NSObject,
 
         toolbar.displayMode = .iconOnly
         toolbar.allowsDisplayModeCustomization = false
-        window.toolbarStyle = .unifiedCompact
+        window.toolbarStyle = .unified
         window.titleVisibility = .hidden
         if window.toolbar !== toolbar {
             window.toolbar = toolbar
@@ -231,6 +234,8 @@ final class ReaderToolbarController: NSObject,
             navigationLocked: appState.isWikiHopNavigationLocked,
             readerStylePresentationRequestID: appState.readerStylePresentationRequestID,
             readerPageViewsPresentationRequestID: appState.readerPageViewsPresentationRequestID,
+            searchText: environment.sidebarSearchModel?.searchCoordinator.searchText ?? "",
+            searchVisible: appState.showSearch,
             sidebarVisible: appState.listsSidebarVisible,
             directoryVisible: appState.directoryColumnVisible,
             inspectorVisible: appState.inspectorVisible
@@ -248,10 +253,9 @@ final class ReaderToolbarController: NSObject,
         lastSnapshot = snapshot
         lastAppliedItemIdentifiers = itemIdentifiers
 
-        updateButton(
-            .macWikiSidebarToggle,
+        updateStandardToggle(
+            .toggleSidebar,
             label: snapshot.sidebarVisible ? "Hide Lists" : "Show Lists",
-            symbol: "sidebar.left",
             enabled: !snapshot.navigationLocked
         )
         updateButton(
@@ -260,12 +264,7 @@ final class ReaderToolbarController: NSObject,
             symbol: "sidebar.squares.leading",
             enabled: !snapshot.navigationLocked
         )
-        updateButton(
-            .macWikiSearch,
-            label: "Search Wikipedia",
-            symbol: "magnifyingglass",
-            enabled: !snapshot.navigationLocked
-        )
+        updateSearchItem(text: snapshot.searchText, enabled: !snapshot.navigationLocked)
         updateGroup(
             .macWikiHistory,
             segments: [
@@ -315,12 +314,16 @@ final class ReaderToolbarController: NSObject,
             enabled: canActOnArticle
         )
         activeItem(.macWikiShare)?.isEnabled = canActOnArticle
-        updateButton(
-            .macWikiInspectorToggle,
+        updateStandardToggle(
+            .toggleInspector,
             label: snapshot.inspectorVisible ? "Hide Inspector" : "Show Inspector",
-            symbol: "sidebar.trailing",
             enabled: true
         )
+
+        if snapshot.searchVisible,
+           previousSnapshot?.searchVisible != true {
+            focusSearchField()
+        }
 
         if articleChanged {
             popoverPresenter.closeArticlePopoverIfArticleChanged(to: snapshot.articleID)

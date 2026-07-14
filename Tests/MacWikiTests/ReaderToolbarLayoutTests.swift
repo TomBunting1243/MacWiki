@@ -21,8 +21,8 @@ struct ReaderToolbarLayoutTests {
         #expect(
             identifiers.filter { $0 == .macWikiReaderInspectorBoundary }.count == 1
         )
-        #expect(identifiers.first == .macWikiSidebarToggle)
-        #expect(identifiers.last == .macWikiInspectorToggle)
+        #expect(identifiers.first == .toggleSidebar)
+        #expect(identifiers.last == .toggleInspector)
     }
 
     @Test func onlyReaderItemsAndSpacesCanMoveInsideReaderBoundaries() {
@@ -113,11 +113,13 @@ struct ReaderToolbarLayoutTests {
         window.contentViewController = splitController
 
         let appState = AppState(persistenceMode: .ephemeral)
+        let sidebarSearchModel = SidebarSearchSurfaceModel()
         let environment = ReaderToolbarEnvironment(
             appState: appState,
             modelContext: try makeInMemoryModelContext(),
             openURL: OpenURLAction { _ in .handled },
-            accessibilityPersonalization: .standard
+            accessibilityPersonalization: .standard,
+            sidebarSearchModel: sidebarSearchModel
         )
         let controller = ReaderToolbarController(
             splitController: splitController,
@@ -127,6 +129,7 @@ struct ReaderToolbarLayoutTests {
 
         #expect(window.toolbar === controller.toolbar)
         #expect(controller.toolbar.isVisible)
+        #expect(window.toolbarStyle == .unified)
 
         try expectFixedWorkspaceControlsEnabled(in: controller.toolbar)
         try expectArticleControlsDisabled(in: controller.toolbar)
@@ -159,7 +162,32 @@ struct ReaderToolbarLayoutTests {
         }
         #expect(item(.macWikiHistory, in: controller.toolbar) is NSToolbarItemGroup)
         #expect(item(.macWikiArticleState, in: controller.toolbar) is NSToolbarItemGroup)
+        #expect(item(.macWikiSearch, in: controller.toolbar) is NSSearchToolbarItem)
+        #expect(item(.toggleSidebar, in: controller.toolbar)?.image != nil)
+        #expect(item(.toggleInspector, in: controller.toolbar)?.image != nil)
+        #expect(
+            (item(.macWikiHistory, in: controller.toolbar) as? NSToolbarItemGroup)?
+                .controlRepresentation == .automatic
+        )
+        #expect(
+            (item(.macWikiArticleState, in: controller.toolbar) as? NSToolbarItemGroup)?
+                .controlRepresentation == .automatic
+        )
         #expect(item(.macWikiShare, in: controller.toolbar) is NSSharingServicePickerToolbarItem)
+
+        let searchField = try #require(
+            (item(.macWikiSearch, in: controller.toolbar) as? NSSearchToolbarItem)?.searchField
+        )
+        searchField.stringValue = "Ada Lovelace"
+        controller.controlTextDidChange(Notification(
+            name: NSControl.textDidChangeNotification,
+            object: searchField
+        ))
+        #expect(sidebarSearchModel.searchCoordinator.searchText == "Ada Lovelace")
+        #expect(appState.showSearch)
+        sidebarSearchModel.searchCoordinator.clearSearch()
+        controller.update(environment: environment)
+        #expect(searchField.stringValue.isEmpty)
         for identifier in ReaderToolbarLayout.fixedIdentifiers {
             #expect(
                 try #require(item(identifier, in: controller.toolbar))
@@ -211,10 +239,10 @@ struct ReaderToolbarLayoutTests {
 
     private func expectFixedWorkspaceControlsEnabled(in toolbar: NSToolbar) throws {
         for identifier in [
-            NSToolbarItem.Identifier.macWikiSidebarToggle,
+            NSToolbarItem.Identifier.toggleSidebar,
             .macWikiListContents,
             .macWikiSearch,
-            .macWikiInspectorToggle
+            .toggleInspector
         ] {
             #expect(try #require(item(identifier, in: toolbar)).isEnabled)
         }

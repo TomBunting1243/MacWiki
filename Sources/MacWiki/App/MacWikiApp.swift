@@ -300,7 +300,6 @@ struct MacWikiApp: App {
         .modelContainer(bootstrap.modelContainer)
         .restorationBehavior(.disabled)
         .windowBackgroundDragBehavior(.enabled)
-        .windowToolbarStyle(.unifiedCompact(showsTitle: false))
         .defaultWindowPlacement { _, context in
             WindowPlacement(.center, size: context.defaultDisplay.visibleRect.size)
         }
@@ -332,7 +331,7 @@ struct MacWikiApp: App {
         .modelContainer(bootstrap.modelContainer)
         .restorationBehavior(.disabled)
         .windowBackgroundDragBehavior(.enabled)
-        .windowToolbarStyle(.unifiedCompact(showsTitle: false))
+        .windowToolbarStyle(.unified(showsTitle: false))
         .defaultWindowPlacement { _, context in
             WindowPlacement(.center, size: context.defaultDisplay.visibleRect.size)
         }

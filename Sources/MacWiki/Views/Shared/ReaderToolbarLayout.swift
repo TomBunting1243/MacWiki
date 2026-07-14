@@ -1,14 +1,13 @@
 import AppKit
 
 extension NSToolbar.Identifier {
-    /// Bumped when the four-pane, reader-scoped toolbar replaced the former
-    /// SwiftUI toolbar. A new identifier prevents an older saved layout from
-    /// restoring without the three structural tracking separators.
-    static let macWikiReaderScoped = Self("main-window-reader-scoped-toolbar-v15")
+    /// Bumped when native standard pane toggles and toolbar search replaced
+    /// their custom button predecessors. A new identifier prevents an older
+    /// saved layout from restoring incompatible fixed items.
+    static let macWikiReaderScoped = Self("main-window-reader-scoped-toolbar-v16")
 }
 
 extension NSToolbarItem.Identifier {
-    static let macWikiSidebarToggle = Self("macwiki.pane.sidebar")
     static let macWikiSidebarDirectoryBoundary = Self("macwiki.boundary.sidebar-directory")
     static let macWikiListContents = Self("macwiki.pane.list-contents")
     static let macWikiSearch = Self("macwiki.search")
@@ -21,20 +20,19 @@ extension NSToolbarItem.Identifier {
     static let macWikiOpenInBrowser = Self("reader.open-in-browser")
     static let macWikiShare = Self("reader.share")
     static let macWikiReaderInspectorBoundary = Self("macwiki.boundary.reader-inspector")
-    static let macWikiInspectorToggle = Self("macwiki.pane.inspector")
 }
 
 /// The toolbar is one native structure with three fixed pane boundaries. Only
 /// controls inside the article-reader zone may be customized by the user.
 enum ReaderToolbarLayout {
     static let fixedIdentifiers: Set<NSToolbarItem.Identifier> = [
-        .macWikiSidebarToggle,
+        .toggleSidebar,
         .macWikiSidebarDirectoryBoundary,
         .macWikiListContents,
         .macWikiSearch,
         .macWikiDirectoryReaderBoundary,
         .macWikiReaderInspectorBoundary,
-        .macWikiInspectorToggle
+        .toggleInspector
     ]
 
     static let readerIdentifiers: Set<NSToolbarItem.Identifier> = [
@@ -48,7 +46,7 @@ enum ReaderToolbarLayout {
     ]
 
     static let defaultIdentifiers: [NSToolbarItem.Identifier] = [
-        .macWikiSidebarToggle,
+        .toggleSidebar,
         .macWikiSidebarDirectoryBoundary,
         .macWikiListContents,
         .macWikiSearch,
@@ -63,11 +61,11 @@ enum ReaderToolbarLayout {
         .macWikiOpenInBrowser,
         .macWikiShare,
         .macWikiReaderInspectorBoundary,
-        .macWikiInspectorToggle
+        .toggleInspector
     ]
 
     static let allowedIdentifiers: [NSToolbarItem.Identifier] = [
-        .macWikiSidebarToggle,
+        .toggleSidebar,
         .macWikiSidebarDirectoryBoundary,
         .macWikiListContents,
         .macWikiSearch,
@@ -80,7 +78,7 @@ enum ReaderToolbarLayout {
         .macWikiOpenInBrowser,
         .macWikiShare,
         .macWikiReaderInspectorBoundary,
-        .macWikiInspectorToggle,
+        .toggleInspector,
         .space,
         .flexibleSpace
     ]
@@ -126,13 +124,13 @@ enum ReaderToolbarLayout {
         _ identifiers: [NSToolbarItem.Identifier]
     ) -> Bool {
         let requiredOrder: [NSToolbarItem.Identifier] = [
-            .macWikiSidebarToggle,
+            .toggleSidebar,
             .macWikiSidebarDirectoryBoundary,
             .macWikiListContents,
             .macWikiSearch,
             .macWikiDirectoryReaderBoundary,
             .macWikiReaderInspectorBoundary,
-            .macWikiInspectorToggle
+            .toggleInspector
         ]
         let requiredPositions = requiredOrder.compactMap { identifiers.firstIndex(of: $0) }
         guard requiredPositions.count == requiredOrder.count,

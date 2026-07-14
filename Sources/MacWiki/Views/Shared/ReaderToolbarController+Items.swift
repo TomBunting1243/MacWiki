@@ -13,11 +13,10 @@ extension ReaderToolbarController {
             trackingSeparator(identifier: identifier, dividerIndex: 1)
         case .macWikiReaderInspectorBoundary:
             trackingSeparator(identifier: identifier, dividerIndex: 2)
-        case .macWikiSidebarToggle:
-            buttonItem(
+        case .toggleSidebar:
+            standardToggleItem(
                 identifier: identifier,
                 label: "Lists",
-                symbol: "sidebar.left",
                 action: #selector(toggleSidebar(_:))
             )
         case .macWikiListContents:
@@ -28,12 +27,7 @@ extension ReaderToolbarController {
                 action: #selector(toggleListContents(_:))
             )
         case .macWikiSearch:
-            buttonItem(
-                identifier: identifier,
-                label: "Search Wikipedia",
-                symbol: "magnifyingglass",
-                action: #selector(searchWikipedia(_:))
-            )
+            searchToolbarItem(identifier: identifier)
         case .macWikiHistory:
             groupedItem(
                 identifier: identifier,
@@ -80,11 +74,10 @@ extension ReaderToolbarController {
             )
         case .macWikiShare:
             sharingItem(identifier: identifier)
-        case .macWikiInspectorToggle:
-            buttonItem(
+        case .toggleInspector:
+            standardToggleItem(
                 identifier: identifier,
                 label: "Inspector",
-                symbol: "sidebar.trailing",
                 action: #selector(toggleInspector(_:))
             )
         default:
@@ -108,11 +101,6 @@ extension ReaderToolbarController {
     @objc func toggleListContents(_ sender: Any?) {
         guard !environment.appState.isWikiHopNavigationLocked else { return }
         environment.appState.toggleDirectoryColumnVisibility()
-    }
-
-    @objc func searchWikipedia(_ sender: Any?) {
-        guard !environment.appState.isWikiHopNavigationLocked else { return }
-        environment.appState.startSearch(context: .navigation)
     }
 
     @objc func performHistoryAction(_ sender: Any?) {
@@ -205,6 +193,37 @@ extension ReaderToolbarController {
         item.isEnabled = enabled
     }
 
+    func updateStandardToggle(
+        _ identifier: NSToolbarItem.Identifier,
+        label: String,
+        enabled: Bool
+    ) {
+        guard let item = activeItem(identifier) else { return }
+        item.label = label
+        item.paletteLabel = label
+        item.toolTip = label
+        item.isEnabled = enabled
+    }
+
+    func updateSearchItem(text: String, enabled: Bool) {
+        guard let item = activeItem(.macWikiSearch) as? NSSearchToolbarItem else { return }
+        let searchField = item.searchField
+        if searchField.stringValue != text {
+            searchField.stringValue = text
+        }
+        item.isEnabled = enabled
+        searchField.isEnabled = enabled
+    }
+
+    func focusSearchField() {
+        guard let searchField = (activeItem(.macWikiSearch) as? NSSearchToolbarItem)?.searchField,
+              let attachedWindow else {
+            return
+        }
+        attachedWindow.makeFirstResponder(searchField)
+        searchField.selectText(nil)
+    }
+
     func updateGroup(
         _ identifier: NSToolbarItem.Identifier,
         segments: [(label: String, symbol: String, enabled: Bool)]
@@ -260,6 +279,42 @@ extension ReaderToolbarController {
         return item
     }
 
+    private func standardToggleItem(
+        identifier: NSToolbarItem.Identifier,
+        label: String,
+        action: Selector
+    ) -> NSToolbarItem {
+        let item = NSToolbarItem(itemIdentifier: identifier)
+        item.label = label
+        item.paletteLabel = label
+        item.toolTip = label
+        item.target = self
+        item.action = action
+        item.visibilityPriority = ReaderToolbarLayout.visibilityPriority(for: identifier)
+        return item
+    }
+
+    private func searchToolbarItem(
+        identifier: NSToolbarItem.Identifier
+    ) -> NSSearchToolbarItem {
+        let item = NSSearchToolbarItem(itemIdentifier: identifier)
+        item.label = "Search Wikipedia"
+        item.paletteLabel = "Search Wikipedia"
+        item.toolTip = "Search Wikipedia"
+        item.visibilityPriority = ReaderToolbarLayout.visibilityPriority(for: identifier)
+
+        let searchField = item.searchField
+        searchField.placeholderString = "Search Wikipedia"
+        searchField.sendsSearchStringImmediately = true
+        searchField.sendsWholeSearchString = false
+        searchField.delegate = self
+        searchField.target = self
+        searchField.action = #selector(searchFieldChanged(_:))
+        searchField.identifier = NSUserInterfaceItemIdentifier("sidebar-search-field")
+        searchField.setAccessibilityLabel("Search Wikipedia")
+        return item
+    }
+
     private func groupedItem(
         identifier: NSToolbarItem.Identifier,
         label: String,
@@ -281,7 +336,6 @@ extension ReaderToolbarController {
         item.label = label
         item.paletteLabel = label
         item.toolTip = label
-        item.controlRepresentation = .expanded
         item.visibilityPriority = ReaderToolbarLayout.visibilityPriority(for: identifier)
         return item
     }
@@ -320,5 +374,85 @@ extension ReaderToolbarController {
             systemSymbolName: symbol,
             accessibilityDescription: accessibilityLabel
         ) ?? NSImage(size: NSSize(width: 16, height: 16))
+    }
+
+    @objc private func searchFieldChanged(_ sender: NSSearchField) {
+        publishSearchText(sender.stringValue)
+    }
+
+    func controlTextDidBeginEditing(_ notification: Notification) {
+        guard notification.object is NSSearchField else { return }
+        revealSearchSurfaceIfNeeded()
+    }
+
+    func controlTextDidChange(_ notification: Notification) {
+        guard let searchField = notification.object as? NSSearchField else { return }
+        publishSearchText(searchField.stringValue)
+    }
+
+    func control(
+        _ control: NSControl,
+        textView: NSTextView,
+        doCommandBy commandSelector: Selector
+    ) -> Bool {
+        guard control is NSSearchField,
+              let model = environment.sidebarSearchModel else {
+            return false
+        }
+
+        switch commandSelector {
+        case #selector(NSResponder.moveDown(_:)):
+            model.moveSelectionDown()
+            return true
+        case #selector(NSResponder.moveUp(_:)):
+            model.moveSelectionUp()
+            return true
+        case #selector(NSResponder.insertNewline(_:)):
+            openSelectedSearchResult(using: model)
+            return true
+        case #selector(NSResponder.cancelOperation(_:)):
+            if model.searchCoordinator.hasInput {
+                model.searchCoordinator.clearSearch()
+            } else {
+                environment.appState.showSearch = false
+                attachedWindow?.makeFirstResponder(nil)
+            }
+            return true
+        default:
+            return false
+        }
+    }
+
+    private func publishSearchText(_ text: String) {
+        guard !environment.appState.isWikiHopNavigationLocked,
+              let searchCoordinator = environment.sidebarSearchModel?.searchCoordinator else {
+            return
+        }
+        revealSearchSurfaceIfNeeded()
+        if searchCoordinator.searchText != text {
+            searchCoordinator.searchText = text
+        }
+    }
+
+    private func revealSearchSurfaceIfNeeded() {
+        let appState = environment.appState
+        guard !appState.isWikiHopNavigationLocked,
+              !appState.showSearch else {
+            return
+        }
+        appState.startSearch(context: .navigation)
+    }
+
+    private func openSelectedSearchResult(using model: SidebarSearchSurfaceModel) {
+        guard let row = model.selectedRow else { return }
+        var inNewTab = environment.appState.searchContext == .newTab
+        if SystemBridge.isCommandPressed {
+            inNewTab.toggle()
+        }
+        if SystemBridge.isOptionPressed {
+            environment.appState.presentOptionClickSavePrompt(for: row.article)
+            return
+        }
+        environment.appState.openArticle(row.article, inNewTab: inNewTab)
     }
 }

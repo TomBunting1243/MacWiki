@@ -73,7 +73,8 @@ private struct MainWorkspaceShell: View {
                 appState: appState,
                 modelContext: modelContext,
                 openURL: openURL,
-                accessibilityPersonalization: accessibilityPersonalization
+                accessibilityPersonalization: accessibilityPersonalization,
+                sidebarSearchModel: sidebarSearchModel
             ),
             sidebar: workspaceEnvironment(
                 ListsColumnView(

@@ -14,7 +14,6 @@ struct SidebarSearchView: View {
     @Query(sort: \Highlight.createdAt, order: .reverse) private var highlights: [Highlight]
 
     let model: SidebarSearchSurfaceModel
-    @FocusState private var isSearchFieldFocused: Bool
 
     private var searchSurfaceFingerprint: Int {
         var hasher = Hasher()
@@ -73,8 +72,6 @@ struct SidebarSearchView: View {
             SidebarSearchHeaderView(
                 model: model,
                 allLists: allLists,
-                isSearchFieldFocused: $isSearchFieldFocused,
-                onSubmit: openSelectedRowFromKeyboard,
                 onClose: dismissSearch,
                 onMarkVisibleRead: { markVisibleRows(asRead: true) },
                 onMarkVisibleUnread: { markVisibleRows(asRead: false) },
@@ -96,9 +93,6 @@ struct SidebarSearchView: View {
         .onAppear {
             if let launchQuery = appState.consumeLaunchSidebarSearchQuery() {
                 model.searchCoordinator.searchText = launchQuery
-            }
-            DispatchQueue.main.async {
-                isSearchFieldFocused = true
             }
             model.searchCoordinator.loadTrendingIfNeeded()
         }
@@ -137,15 +131,6 @@ struct SidebarSearchView: View {
             appState: appState
         )
         model.reconcileSelection()
-    }
-
-    private func openSelectedRowFromKeyboard() {
-        guard let row = model.selectedRow else { return }
-        var inNewTab = appState.searchContext == .newTab
-        if SystemBridge.isCommandPressed {
-            inNewTab.toggle()
-        }
-        performOpen(row, inNewTab: inNewTab)
     }
 
     private func openRow(_ row: SidebarSearchRow, inNewTab: Bool) {
