@@ -1556,6 +1556,9 @@ struct BetaReadinessRegressionTests {
         #expect(driver.contains("CGEvent(keyboardEventSource:"))
         #expect(driver.contains("DispatchTime.now().uptimeNanoseconds"))
         #expect(driver.contains("for _ in 0..<3"))
+        #expect(driver.contains("NSRunningApplication(processIdentifier: processID)"))
+        #expect(driver.contains("NSWorkspace.shared.frontmostApplication?.processIdentifier == processID"))
+        #expect(driver.contains("kAXRaiseAction"))
     }
 
     @Test func tabReorderHarnessCoversLongTitleOverflowPersistenceAndCleanup() throws {

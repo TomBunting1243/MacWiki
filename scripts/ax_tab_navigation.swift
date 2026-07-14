@@ -1,12 +1,14 @@
 #!/usr/bin/env swift
 
 import ApplicationServices
+import AppKit
 import Foundation
 
 enum TabNavigationError: LocalizedError {
     case usage
     case accessibilityUnavailable
     case windowMissing
+    case activationFailed
     case tabCount(expected: Int, observed: Int)
     case activeTabMissing
     case selectionUnchanged
@@ -20,6 +22,8 @@ enum TabNavigationError: LocalizedError {
             "Accessibility access is unavailable."
         case .windowMissing:
             "The exact process did not expose a window."
+        case .activationFailed:
+            "The exact process did not become frontmost."
         case let .tabCount(expected, observed):
             "Expected \(expected) tabs; observed \(observed)."
         case .activeTabMissing:
@@ -93,6 +97,28 @@ func waitForWindows(in application: AXUIElement, timeout: TimeInterval) throws {
     throw TabNavigationError.windowMissing
 }
 
+func activateTarget(processID: pid_t, application: AXUIElement) throws {
+    guard let runningApplication = NSRunningApplication(processIdentifier: processID),
+          !runningApplication.isTerminated else {
+        throw TabNavigationError.activationFailed
+    }
+    _ = runningApplication.activate(options: [.activateAllWindows])
+    let windows: [AXUIElement] = attribute(kAXWindowsAttribute as CFString, from: application) ?? []
+    if let window = windows.first {
+        _ = AXUIElementPerformAction(window, kAXRaiseAction as CFString)
+    }
+    let deadline = Date().addingTimeInterval(8)
+    while Date() < deadline {
+        let frontmost: NSNumber? = attribute(kAXFrontmostAttribute as CFString, from: application)
+        if frontmost?.boolValue == true,
+           NSWorkspace.shared.frontmostApplication?.processIdentifier == processID {
+            return
+        }
+        Thread.sleep(forTimeInterval: 0.05)
+    }
+    throw TabNavigationError.activationFailed
+}
+
 func waitForTabCount(
     _ expected: Int,
     in application: AXUIElement,
@@ -145,6 +171,7 @@ do {
 
     let application = AXUIElementCreateApplication(processID)
     try waitForWindows(in: application, timeout: 6)
+    try activateTarget(processID: processID, application: application)
     let initialCount = tabElements(in: application).count
     for _ in 0..<3 {
         try pressKey(17, flags: .maskCommand)
