@@ -20,6 +20,10 @@ struct NativeWorkspaceSplitViewTests {
         #expect(fixture.controller.splitViewItems[1].canCollapse)
         #expect(!fixture.controller.splitViewItems[2].canCollapse)
         #expect(fixture.controller.splitViewItems[3].canCollapse)
+        #expect(fixture.controller.splitViewItems[0].canCollapseFromWindowResize)
+        #expect(!fixture.controller.splitViewItems[1].canCollapseFromWindowResize)
+        #expect(!fixture.controller.splitViewItems[3].canCollapseFromWindowResize)
+        #expect(fixture.controller.splitViewItems[2].minimumThickness == 300)
     }
 
     @Test func restoresAllAuxiliaryPaneWidthsInPoints() {
@@ -57,7 +61,7 @@ struct NativeWorkspaceSplitViewTests {
         #expect(fixture.reader.view.bounds.width > MainWindowLayout.minimumReaderWidth)
     }
 
-    @Test func adoptsValidAdaptiveWidthsWhenStoredWidthsCannotFit() {
+    @Test func adaptiveWidthsRemainValidWhenWindowExpands() {
         let fixture = makeFixture(width: 1_300)
         fixture.controller.setPaneVisibility(
             sidebarVisible: true,
@@ -75,24 +79,18 @@ struct NativeWorkspaceSplitViewTests {
         )
         #expect(fixture.reader.view.bounds.width > 0)
 
-        let adaptiveWidths = [
-            fixture.sidebar.view.bounds.width,
-            fixture.directory.view.bounds.width,
-            fixture.inspector.view.bounds.width
-        ]
-
         fixture.window.setContentSize(NSSize(width: 1_700, height: 800))
         layout(fixture.controller, size: NSSize(width: 1_700, height: 800))
         fixture.controller.restoreInitialVisibleWidthsIfFeasible()
         layout(fixture.controller, size: NSSize(width: 1_700, height: 800))
 
-        #expect(abs(fixture.sidebar.view.bounds.width - adaptiveWidths[0]) < 0.5)
-        #expect(abs(fixture.directory.view.bounds.width - adaptiveWidths[1]) < 0.5)
-        #expect(abs(fixture.inspector.view.bounds.width - adaptiveWidths[2]) < 0.5)
+        #expect(MainWindowColumnWidth.sidebarRange.contains(fixture.sidebar.view.bounds.width))
+        #expect(MainWindowColumnWidth.directoryRange.contains(fixture.directory.view.bounds.width))
+        #expect(MainWindowColumnWidth.inspectorRange.contains(fixture.inspector.view.bounds.width))
         #expect(fixture.reader.view.bounds.width >= MainWindowLayout.minimumReaderWidth)
     }
 
-    @Test func restoringPanesDoesNotResizeAnAlreadyNarrowWindow() {
+    @Test func restoringPanesInNarrowWindowYieldsSidebarBeforeReader() async throws {
         let fixture = makeFixture(width: 1_700)
         fixture.window.setContentSize(NSSize(width: 900, height: 800))
         fixture.controller.setPaneVisibility(
@@ -103,6 +101,8 @@ struct NativeWorkspaceSplitViewTests {
         )
         layout(fixture.controller, size: NSSize(width: 900, height: 800))
         let originalWindowWidth = fixture.window.frame.width
+        var reportedVisibility: WorkspacePaneVisibility?
+        fixture.controller.onPaneVisibilityChange = { reportedVisibility = $0 }
 
         fixture.controller.setPaneVisibility(
             sidebarVisible: true,
@@ -113,10 +113,17 @@ struct NativeWorkspaceSplitViewTests {
         layout(fixture.controller, size: NSSize(width: 900, height: 800))
 
         #expect(fixture.window.frame.width == originalWindowWidth)
-        #expect(!fixture.controller.splitViewItems[0].isCollapsed)
+        #expect(fixture.controller.splitViewItems[0].isCollapsed)
         #expect(!fixture.controller.splitViewItems[1].isCollapsed)
         #expect(!fixture.controller.splitViewItems[3].isCollapsed)
-        #expect(fixture.reader.view.bounds.width > 0)
+        #expect(fixture.reader.view.bounds.width >= 300)
+        try await waitUntil(timeout: .seconds(1)) {
+            reportedVisibility == WorkspacePaneVisibility(
+                sidebarVisible: false,
+                directoryVisible: true,
+                inspectorVisible: true
+            )
+        }
     }
 
     @Test func reportsNativeUserCollapseAcrossAllAuxiliaryPanes() {

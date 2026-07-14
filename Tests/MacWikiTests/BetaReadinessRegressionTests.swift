@@ -1504,7 +1504,7 @@ struct BetaReadinessRegressionTests {
         #expect(driver.contains("matchingElements("))
         #expect(driver.contains(".count == 1"))
         #expect(driver.contains("toolbar hidden → restored"))
-        #expect(driver.contains("900-point window and visible reader preserved while both auxiliary panes restored"))
+        #expect(driver.contains("900-point window preserved; Lists sidebar yielded while List Contents and Inspector restored around a usable reader"))
         #expect(driver.contains("Restoring panes resized the whole window"))
         #expect(driver.contains("for _ in 0..<8"))
         #expect(driver.contains("containsLabel(articleTitle, in: reader)"))

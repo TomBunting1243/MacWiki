@@ -20,9 +20,9 @@ final class WorkspaceSplitViewController: NSSplitViewController {
 
     private enum PaneLayout {
         /// The window-level content minimum preserves the normal 520-point
-        /// reading surface. This emergency split minimum prevents AppKit from
-        /// resizing an already-narrow window when the user restores a pane.
-        static let emergencyReaderMinimum: CGFloat = 1
+        /// reading surface. The native split keeps a compact emergency reading
+        /// surface while allowing its semantic sidebar to yield first.
+        static let emergencyReaderMinimum: CGFloat = 300
         static let auxiliaryHoldingPriority = NSLayoutConstraint.Priority(
             rawValue: NSLayoutConstraint.Priority.defaultLow.rawValue + 1
         )
@@ -49,6 +49,7 @@ final class WorkspaceSplitViewController: NSSplitViewController {
     private var isApplyingRequestedVisibility = false
     private var pendingInitialWidthRestore: Task<Void, Never>?
     private var pendingWidthPersistence: Task<Void, Never>?
+    private var pendingAdaptiveVisibilityReport: Task<Void, Never>?
     private var readerToolbarController: ReaderToolbarController?
 
     init(
@@ -109,9 +110,11 @@ final class WorkspaceSplitViewController: NSSplitViewController {
             maximum: MainWindowColumnWidth.inspectorRange.upperBound
         )
 
-        // Keep explicit user collapse available without letting a window resize
-        // silently rewrite the command-driven visibility model.
-        sidebarItem.canCollapseFromWindowResize = false
+        // Preserve the semantic sidebar's standard AppKit behavior: it yields
+        // when a narrow window cannot fit every requested pane. Content lists
+        // and inspectors stay explicit so the reader never collapses to a
+        // sliver merely to preserve the least-essential navigation column.
+        sidebarItem.canCollapseFromWindowResize = true
         directoryItem.canCollapseFromWindowResize = false
         inspectorItem.canCollapseFromWindowResize = false
         sidebarItem.allowsFullHeightLayout = true
@@ -131,6 +134,7 @@ final class WorkspaceSplitViewController: NSSplitViewController {
     deinit {
         pendingInitialWidthRestore?.cancel()
         pendingWidthPersistence?.cancel()
+        pendingAdaptiveVisibilityReport?.cancel()
     }
 
     override func viewDidLayout() {
@@ -181,11 +185,15 @@ final class WorkspaceSplitViewController: NSSplitViewController {
         inspectorVisible: Bool,
         animated: Bool
     ) {
-        let target = WorkspacePaneVisibility(
+        let requestedVisibility = WorkspacePaneVisibility(
             sidebarVisible: sidebarVisible,
             directoryVisible: directoryVisible,
             inspectorVisible: inspectorVisible
         )
+        let target = adaptiveVisibility(for: requestedVisibility)
+        if target != requestedVisibility {
+            reportAdaptiveVisibility(target)
+        }
         if !isApplyingRequestedVisibility, appliedVisibility == target {
             return
         }
@@ -199,12 +207,12 @@ final class WorkspaceSplitViewController: NSSplitViewController {
         let generation = visibilityTransitionGeneration
 
         let currentVisibility = currentVisibility
-        let sidebarChanged = currentVisibility.sidebarVisible != sidebarVisible
-            || previousDesiredVisibility.sidebarVisible != sidebarVisible
-        let directoryChanged = currentVisibility.directoryVisible != directoryVisible
-            || previousDesiredVisibility.directoryVisible != directoryVisible
-        let inspectorChanged = currentVisibility.inspectorVisible != inspectorVisible
-            || previousDesiredVisibility.inspectorVisible != inspectorVisible
+        let sidebarChanged = currentVisibility.sidebarVisible != target.sidebarVisible
+            || previousDesiredVisibility.sidebarVisible != target.sidebarVisible
+        let directoryChanged = currentVisibility.directoryVisible != target.directoryVisible
+            || previousDesiredVisibility.directoryVisible != target.directoryVisible
+        let inspectorChanged = currentVisibility.inspectorVisible != target.inspectorVisible
+            || previousDesiredVisibility.inspectorVisible != target.inspectorVisible
         let visibilityChanged = sidebarChanged || directoryChanged || inspectorChanged
 
         guard visibilityChanged else {
@@ -218,13 +226,13 @@ final class WorkspaceSplitViewController: NSSplitViewController {
         isApplyingRequestedVisibility = true
         let applyTarget = {
             if sidebarChanged {
-                self.sidebarItem.isCollapsed = !sidebarVisible
+                self.sidebarItem.isCollapsed = !target.sidebarVisible
             }
             if directoryChanged {
-                self.directoryItem.isCollapsed = !directoryVisible
+                self.directoryItem.isCollapsed = !target.directoryVisible
             }
             if inspectorChanged {
-                self.inspectorItem.isCollapsed = !inspectorVisible
+                self.inspectorItem.isCollapsed = !target.inspectorVisible
             }
         }
 
@@ -244,13 +252,13 @@ final class WorkspaceSplitViewController: NSSplitViewController {
             context.duration = isRetargetingActiveTransition ? 0.10 : 0.18
             context.allowsImplicitAnimation = true
             if sidebarChanged {
-                sidebarItem.animator().isCollapsed = !sidebarVisible
+                sidebarItem.animator().isCollapsed = !target.sidebarVisible
             }
             if directoryChanged {
-                directoryItem.animator().isCollapsed = !directoryVisible
+                directoryItem.animator().isCollapsed = !target.directoryVisible
             }
             if inspectorChanged {
-                inspectorItem.animator().isCollapsed = !inspectorVisible
+                inspectorItem.animator().isCollapsed = !target.inspectorVisible
             }
         } completionHandler: { [weak self] in
             Task { @MainActor in
@@ -332,6 +340,53 @@ final class WorkspaceSplitViewController: NSSplitViewController {
             directoryVisible: !directoryItem.isCollapsed,
             inspectorVisible: !inspectorItem.isCollapsed
         )
+    }
+
+    /// Keep the semantic reader usable when every auxiliary pane is requested
+    /// in a window that cannot fit their native minimums. AppKit sidebars are
+    /// specifically designed to yield during size changes; preserving the
+    /// explicit content-list and inspector requests is therefore the least
+    /// surprising native adaptation.
+    private func adaptiveVisibility(
+        for requested: WorkspacePaneVisibility
+    ) -> WorkspacePaneVisibility {
+        guard requested.sidebarVisible else { return requested }
+        let splitWidth = splitView.bounds.width
+        guard splitWidth.isFinite, splitWidth > 0 else { return requested }
+
+        let visibleAuxiliaryWidths = (requested.sidebarVisible
+            ? MainWindowColumnWidth.sidebarRange.lowerBound : 0)
+            + (requested.directoryVisible
+                ? MainWindowColumnWidth.directoryRange.lowerBound : 0)
+            + (requested.inspectorVisible
+                ? MainWindowColumnWidth.inspectorRange.lowerBound : 0)
+        let visibleAuxiliaryCount = [
+            requested.sidebarVisible,
+            requested.directoryVisible,
+            requested.inspectorVisible
+        ].filter { $0 }.count
+        let requiredWidth = PaneLayout.emergencyReaderMinimum
+            + visibleAuxiliaryWidths
+            + (CGFloat(visibleAuxiliaryCount) * splitView.dividerThickness)
+        guard splitWidth < requiredWidth else { return requested }
+
+        return WorkspacePaneVisibility(
+            sidebarVisible: false,
+            directoryVisible: requested.directoryVisible,
+            inspectorVisible: requested.inspectorVisible
+        )
+    }
+
+    private func reportAdaptiveVisibility(_ visibility: WorkspacePaneVisibility) {
+        pendingAdaptiveVisibilityReport?.cancel()
+        pendingAdaptiveVisibilityReport = Task { @MainActor [weak self] in
+            await Task.yield()
+            guard let self, !Task.isCancelled,
+                  desiredVisibility == nil || desiredVisibility == visibility else {
+                return
+            }
+            onPaneVisibilityChange?(visibility)
+        }
     }
 
     private static func clampedInitialWidth(

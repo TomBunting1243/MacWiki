@@ -697,10 +697,30 @@ do {
               abs(restoredWindowSize.width - narrowWidth) < 2 else {
             throw JourneyError.missing("Restoring panes resized the whole window instead of redistributing the native split.")
         }
-        guard let restoredReader = readerPane(in: contentWindow),
-              let restoredReaderSize = elementSize(restoredReader),
+        let restoredReader = readerPane(in: contentWindow)
+        let restoredReaderSize = restoredReader.flatMap(elementSize)
+        let restoredReaderContainsArticle = restoredReader.map {
+            containsLabel(articleTitle, in: $0)
+        } ?? false
+        guard restoredReader != nil,
+              let restoredReaderSize,
               restoredReaderSize.width >= 300,
-              containsLabel(articleTitle, in: restoredReader) else {
+              restoredReaderContainsArticle else {
+            let workspacePaneSizes = workspaceSplitGroup(in: contentWindow).map {
+                directChildren(of: $0)
+                    .filter { hasRole($0, kAXGroupRole as String) }
+                    .compactMap(elementSize)
+                    .map { "\(Int($0.width))x\(Int($0.height))" }
+                    .joined(separator: ", ")
+            } ?? "unavailable"
+            let readerGeometry = restoredReaderSize.map {
+                "\(Int($0.width))x\(Int($0.height))"
+            } ?? "unavailable"
+            trace(
+                "narrow restore geometry: window=\(Int(restoredWindowSize.width))x\(Int(restoredWindowSize.height)), "
+                    + "reader=\(readerGeometry), "
+                    + "article=\(restoredReaderContainsArticle), workspace panes=[\(workspacePaneSizes)]"
+            )
             throw JourneyError.missing("Restoring both panes left the reader collapsed or lost its article content.")
         }
         Thread.sleep(forTimeInterval: 0.12)
@@ -715,7 +735,7 @@ do {
         inspectorStates: inspectorStates,
         findBar: findBar,
         inspectorToggleCycle: "toolbar hidden → restored",
-        narrowPaneRestoreCycle: "900-point window and visible reader preserved while both auxiliary panes restored"
+        narrowPaneRestoreCycle: "900-point window preserved; Lists sidebar yielded while List Contents and Inspector restored around a usable reader"
     )
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.prettyPrinted, .sortedKeys]

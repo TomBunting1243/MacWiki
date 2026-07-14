@@ -122,7 +122,7 @@ fi
   printf -- '- Seeded public article: `%s`\n' "$ARTICLE_TITLE"
   printf -- '- Reader assertions: all twelve default customizable-toolbar controls, exactly one Find field, native Find actions, dismissal\n'
   printf -- '- Inspector assertions: native Info/Notes/References selection and content, 12 rapid pane cycles, toolbar hide/restore cycle\n'
-  printf -- '- Narrow-window assertion: restoring List Contents and Inspector preserves the 900-point window and a visible reader over a one-second stability sample\n'
+  printf -- '- Narrow-window assertion: restoring List Contents and Inspector preserves the 900-point window and a usable reader while the semantic Lists sidebar yields\n'
   printf -- '- AX evidence: `%s`\n' "$AX_RESULT"
   printf -- '- Production preferences/data touched: **No** — state, defaults, persistence, and caches were isolated.\n'
 } >"$REPORT_PATH"
