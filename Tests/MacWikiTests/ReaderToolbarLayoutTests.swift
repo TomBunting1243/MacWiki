@@ -112,18 +112,27 @@ struct ReaderToolbarLayoutTests {
         )
         window.contentViewController = splitController
 
+        let appState = AppState(persistenceMode: .ephemeral)
+        let environment = ReaderToolbarEnvironment(
+            appState: appState,
+            modelContext: try makeInMemoryModelContext(),
+            openURL: OpenURLAction { _ in .handled },
+            accessibilityPersonalization: .standard
+        )
         let controller = ReaderToolbarController(
             splitController: splitController,
-            environment: ReaderToolbarEnvironment(
-                appState: AppState(persistenceMode: .ephemeral),
-                modelContext: try makeInMemoryModelContext(),
-                openURL: OpenURLAction { _ in .handled },
-                accessibilityPersonalization: .standard
-            )
+            environment: environment
         )
         controller.installIfPossible()
 
+        #expect(window.toolbar == nil)
+
+        appState.openArticle(Article(id: "toolbar-article", title: "Toolbar Article"))
+        let articleTabID = try #require(appState.activeTabId)
+        controller.update(environment: environment)
         #expect(window.toolbar === controller.toolbar)
+        #expect(controller.toolbar.isVisible)
+
         #expect(controller.toolbar.identifier == .macWikiReaderScoped)
         #expect(controller.toolbar.displayMode == .iconOnly)
         #expect(controller.toolbar.allowsUserCustomization)
@@ -145,6 +154,16 @@ struct ReaderToolbarLayoutTests {
             controller.toolbarImmovableItemIdentifiers(controller.toolbar)
                 == ReaderToolbarLayout.fixedIdentifiers
         )
+
+        controller.toolbar.isVisible = false
+        appState.showDiscoverPage()
+        controller.update(environment: environment)
+        #expect(window.toolbar == nil)
+
+        #expect(appState.selectTab(articleTabID))
+        controller.update(environment: environment)
+        #expect(window.toolbar === controller.toolbar)
+        #expect(!controller.toolbar.isVisible)
 
         controller.invalidate()
         #expect(window.toolbar == nil)

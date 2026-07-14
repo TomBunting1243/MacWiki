@@ -43,6 +43,7 @@ final class ReaderToolbarController: NSObject,
     private weak var attachedWindow: NSWindow?
     private var lastSnapshot: Snapshot?
     private var lastAppliedItemIdentifiers: [NSToolbarItem.Identifier] = []
+    private var preferredArticleToolbarVisibility = true
     private var isInvalidated = false
 
     init(
@@ -102,14 +103,8 @@ final class ReaderToolbarController: NSObject,
 
         toolbar.displayMode = .iconOnly
         toolbar.allowsDisplayModeCustomization = false
-        if window.toolbar !== toolbar {
-            window.toolbar = toolbar
-        }
         window.toolbarStyle = .unifiedCompact
         window.titleVisibility = .hidden
-        if environment.appState.currentArticle == nil {
-            toolbar.isVisible = false
-        }
 
         repairStructureIfNeeded()
         refreshNow()
@@ -237,6 +232,8 @@ final class ReaderToolbarController: NSObject,
     }
 
     private func apply(_ snapshot: Snapshot) {
+        synchronizeToolbarAttachment(hasArticle: snapshot.articleID != nil)
+
         let itemIdentifiers = toolbar.items.map(\.itemIdentifier)
         guard snapshot != lastSnapshot
                 || itemIdentifiers != lastAppliedItemIdentifiers else {
@@ -244,14 +241,8 @@ final class ReaderToolbarController: NSObject,
         }
         let previousSnapshot = lastSnapshot
         let articleChanged = previousSnapshot?.articleID != snapshot.articleID
-        let articleVisibilityChanged = previousSnapshot == nil
-            || (previousSnapshot?.articleID == nil) != (snapshot.articleID == nil)
         lastSnapshot = snapshot
         lastAppliedItemIdentifiers = itemIdentifiers
-
-        if articleVisibilityChanged {
-            toolbar.isVisible = snapshot.articleID != nil
-        }
 
         updateButton(
             .macWikiSidebarToggle,
@@ -355,6 +346,26 @@ final class ReaderToolbarController: NSObject,
         let identifiers = toolbar.items.map(\.itemIdentifier)
         guard !ReaderToolbarLayout.isStructurallyValid(identifiers) else { return }
         toolbar.itemIdentifiers = ReaderToolbarLayout.defaultIdentifiers
+    }
+
+    /// The customizable reader toolbar belongs to an article, not to the
+    /// window's empty or Discovery state. Detaching it also prevents AppKit's
+    /// standard Show Toolbar command from revealing reader controls when no
+    /// article is present. A user's explicit visibility choice is restored when
+    /// the next article becomes active.
+    private func synchronizeToolbarAttachment(hasArticle: Bool) {
+        guard let attachedWindow else { return }
+
+        if hasArticle {
+            guard attachedWindow.toolbar !== toolbar else { return }
+            attachedWindow.toolbar = toolbar
+            toolbar.isVisible = preferredArticleToolbarVisibility
+            return
+        }
+
+        guard attachedWindow.toolbar === toolbar else { return }
+        preferredArticleToolbarVisibility = toolbar.isVisible
+        attachedWindow.toolbar = nil
     }
 
 }
