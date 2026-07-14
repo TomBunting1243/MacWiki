@@ -303,8 +303,13 @@ final class TabSessionStore {
               destinationIndex >= 0,
               destinationIndex <= openTabs.count else { return }
 
-        let tab = openTabs.remove(at: sourceIndex)
-        openTabs.insert(tab, at: max(0, min(destinationIndex, openTabs.count)))
+        // Publish one collection replacement. Mutating the observed array with
+        // remove/insert exposes a transient missing-tab state to SwiftUI's
+        // ForEach diff and can create an AttributeGraph cycle during drop.
+        var reordered = openTabs
+        let tab = reordered.remove(at: sourceIndex)
+        reordered.insert(tab, at: max(0, min(destinationIndex, reordered.count)))
+        openTabs = reordered
         requestSave()
     }
 

@@ -12,10 +12,13 @@ struct TabReorderTests {
             ArticleTab(article: Article(id: "b", title: "B")),
             ArticleTab(article: Article(id: "c", title: "C"))
         ]
+        let saveGeneration = appState.tabSessionStore.saveRequestGeneration
 
         appState.moveTab(from: 0, to: 1)
 
         #expect(appState.openTabs.map(\.article.title) == ["B", "A", "C"])
+        #expect(appState.tabSessionStore.saveRequestGeneration == saveGeneration + 1)
+        appState.tabSessionStore.cancelPendingSaveForTesting()
     }
 
     @Test func moveTabLeftToRightAcrossMultipleTabs() {

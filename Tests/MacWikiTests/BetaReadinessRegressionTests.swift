@@ -1559,6 +1559,7 @@ struct BetaReadinessRegressionTests {
 
     @Test func tabReorderHarnessCoversLongTitleOverflowPersistenceAndCleanup() throws {
         let tabBar = try source("Sources/MacWiki/Views/Components/TabBarView.swift")
+        let tabSessionStore = try source("Sources/MacWiki/App/TabSessionStore.swift")
         let tabItem = try source("Sources/MacWiki/Views/Components/ReaderTabItemView.swift")
         let tabAccessories = try source("Sources/MacWiki/Views/Components/ReaderTabAccessoryCluster.swift")
         let reorderDrag = try source("Sources/MacWiki/Views/Components/TabReorderDragModifier.swift")
@@ -1606,6 +1607,9 @@ struct BetaReadinessRegressionTests {
         #expect(tabBar.contains("withTransaction(transaction)"))
         #expect(tabBar.contains("Clear the transient drag graph first"))
         #expect(tabBar.contains("Set(appState.openTabs.map(\\.id))"))
+        #expect(tabSessionStore.contains("var reordered = openTabs"))
+        #expect(tabSessionStore.contains("openTabs = reordered"))
+        #expect(!tabSessionStore.contains("let tab = openTabs.remove(at: sourceIndex)"))
         #expect(!tabBar.contains(".animation(interactionProfile.neighborShift, value: shiftAmount)"))
         #expect(!tabBar.contains(".animation(interactionProfile.dragLift, value: isDragged)"))
         #expect(tabAccessories.components(separatedBy: ".accessibilityLabel(\"All Tabs\")").count >= 3)
