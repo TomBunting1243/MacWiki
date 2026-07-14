@@ -103,6 +103,7 @@ func activateTarget(processID: pid_t, application: AXUIElement) throws {
         throw TabNavigationError.activationFailed
     }
     _ = runningApplication.activate(options: [.activateAllWindows])
+    try waitForWindows(in: application, timeout: 8)
     let windows: [AXUIElement] = attribute(kAXWindowsAttribute as CFString, from: application) ?? []
     if let window = windows.first {
         _ = AXUIElementPerformAction(window, kAXRaiseAction as CFString)
@@ -170,7 +171,6 @@ do {
     guard AXIsProcessTrusted() else { throw TabNavigationError.accessibilityUnavailable }
 
     let application = AXUIElementCreateApplication(processID)
-    try waitForWindows(in: application, timeout: 6)
     try activateTarget(processID: processID, application: application)
     let initialCount = tabElements(in: application).count
     for _ in 0..<3 {
