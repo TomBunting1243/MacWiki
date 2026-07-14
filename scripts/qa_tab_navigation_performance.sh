@@ -13,9 +13,16 @@ APP_BIN="${APP_BIN:-$APP_BIN_DEFAULT}"
 APP_BUNDLE_PATH="${APP_BUNDLE_PATH:-${APP_BIN%/Contents/MacOS/*}}"
 OUTPUT_DIR="${1:-/tmp/macwiki-qa/tab-navigation-$(date +%Y%m%d_%H%M%S)}"
 QA_HOME="${QA_HOME:-/tmp/macwiki-qa/tab-navigation-home-$(date +%Y%m%d_%H%M%S)-$RANDOM}"
+ALLOW_GLOBAL_INPUT="${ALLOW_GLOBAL_INPUT:-0}"
 BUILD_INFO_PLIST="$APP_BUNDLE_PATH/Contents/Resources/BuildInfo.plist"
 STATE_DIR="$QA_HOME/Library/Application Support/MacWiki"
 TAB_SNAPSHOT="$STATE_DIR/tab-session.json"
+
+if [[ "$ALLOW_GLOBAL_INPUT" != "1" ]]; then
+  echo "ERROR: Tab-navigation QA is disabled by default because its CGEvent keyboard driver can affect another app." >&2
+  echo "Set ALLOW_GLOBAL_INPUT=1 only for an attended run with the candidate isolated and foreground." >&2
+  exit 2
+fi
 
 if [[ ! -x "$APP_BIN" && -x "$APP_BIN_FALLBACK" ]]; then
   APP_BIN="$APP_BIN_FALLBACK"

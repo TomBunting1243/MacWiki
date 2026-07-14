@@ -1526,9 +1526,6 @@ struct BetaReadinessRegressionTests {
 
         #expect(script.contains("WIDTH_PRESETS_CSV=\"${WIDTH_PRESETS_CSV:-1040,1400,1760}\""))
         #expect(script.contains("performance-metrics.csv"))
-        #expect(script.contains("qa_assert_candidate_manifest_matches_executable"))
-        #expect(script.contains("tab-session.json"))
-        #expect(script.contains("driver_status"))
         #expect(script.contains("dump_performance_metrics.swift"))
         #expect(performanceDumpScript.contains("com.tombunting.MacWiki.qa."))
         #expect(performanceDumpScript.contains("sessionRestore"))
@@ -1563,11 +1560,18 @@ struct BetaReadinessRegressionTests {
         #expect(!readerProfiler.contains("tell application (item 1 of argv) to activate"))
     }
 
-    @Test func tabNavigationHarnessUsesNativeCommandsAndExactAXState() throws {
+    @Test func globalTabNavigationHarnessRequiresAttendedOptInAndExactAXState() throws {
         let script = try source("scripts/qa_tab_navigation_performance.sh")
         let driver = try source("scripts/ax_tab_navigation.swift")
 
+        #expect(script.contains("ALLOW_GLOBAL_INPUT=\"${ALLOW_GLOBAL_INPUT:-0}\""))
+        #expect(script.contains("if [[ \"$ALLOW_GLOBAL_INPUT\" != \"1\" ]]"))
+        #expect(script.contains("can affect another app"))
+        #expect(script.contains("attended run"))
         #expect(script.contains("qa_launch_candidate"))
+        #expect(script.contains("qa_assert_candidate_manifest_matches_executable"))
+        #expect(script.contains("tab-session.json"))
+        #expect(script.contains("driver_status"))
         #expect(script.contains("qa_run_command_with_timeout 30 swift"))
         #expect(script.contains("ax_tab_navigation.swift"))
         #expect(script.contains("performance-metrics.csv"))
