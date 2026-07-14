@@ -13,15 +13,22 @@ enum SystemBridge {
         NSWorkspace.shared.open(url)
     }
 
-    static var isCommandPressed: Bool {
-        CGEvent(source: nil)?.flags.contains(.maskCommand) ?? false
+    @MainActor static var isCommandPressed: Bool {
+        currentModifierFlags.contains(.command)
     }
 
-    static var isShiftPressed: Bool {
-        CGEvent(source: nil)?.flags.contains(.maskShift) ?? false
+    @MainActor static var isShiftPressed: Bool {
+        currentModifierFlags.contains(.shift)
     }
 
-    static var isOptionPressed: Bool {
-        CGEvent(source: nil)?.flags.contains(.maskAlternate) ?? false
+    @MainActor static var isOptionPressed: Bool {
+        currentModifierFlags.contains(.option)
+    }
+
+    /// Prefer the event that triggered the current AppKit action. The static
+    /// fallback covers keyboard-driven actions without creating a global
+    /// Core Graphics event snapshot.
+    @MainActor private static var currentModifierFlags: NSEvent.ModifierFlags {
+        NSApp.currentEvent?.modifierFlags ?? NSEvent.modifierFlags
     }
 }

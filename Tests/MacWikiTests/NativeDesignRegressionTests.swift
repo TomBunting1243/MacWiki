@@ -172,6 +172,17 @@ struct NativeDesignRegressionTests {
         #expect(!MacWikiCommandCapabilities.articleWindow.contains(.libraryOrganization))
     }
 
+    @Test func clickModifiersComeFromTheCurrentNativeEvent() throws {
+        let bridge = try source("Sources/MacWiki/Utilities/SystemBridge.swift")
+
+        #expect(bridge.contains("@MainActor private static var currentModifierFlags"))
+        #expect(bridge.contains("NSApp.currentEvent?.modifierFlags ?? NSEvent.modifierFlags"))
+        #expect(bridge.contains("currentModifierFlags.contains(.command)"))
+        #expect(bridge.contains("currentModifierFlags.contains(.shift)"))
+        #expect(bridge.contains("currentModifierFlags.contains(.option)"))
+        #expect(!bridge.contains("CGEvent(source: nil)"))
+    }
+
     private func source(_ relativePath: String) throws -> String {
         try String(contentsOf: repositoryRoot().appendingPathComponent(relativePath), encoding: .utf8)
     }
