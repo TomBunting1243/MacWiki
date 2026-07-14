@@ -80,11 +80,11 @@ struct DiscoverFeatureModule: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(Color(nsColor: .separatorColor).opacity(0.34), lineWidth: 0.7)
-        }
+        .discoverSurfaceChrome(
+            cornerRadius: 16,
+            material: .regular,
+            borderOpacity: 0.34
+        )
     }
 }
 
@@ -176,22 +176,16 @@ struct DiscoverFeatureCard: View {
                 .padding(.bottom, 16)
         }
         .frame(minHeight: heroImageHeight + 72)
-        .background(
-            Group {
-                if showsSurface {
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(.regularMaterial)
-                } else {
-                    Color.clear
-                }
-            }
+        .discoverSurfaceChrome(
+            isEnabled: showsSurface,
+            cornerRadius: 14,
+            material: .regular,
+            borderOpacity: isHovered ? 0.46 : 0.32,
+            borderWidth: 0.8
         )
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay {
-            if showsSurface {
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .strokeBorder(Color(nsColor: .separatorColor).opacity(isHovered ? 0.46 : 0.32), lineWidth: 0.8)
-            } else {
+            if !showsSurface {
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
                     .strokeBorder(Color(nsColor: .separatorColor).opacity(isHovered ? 0.36 : 0.18), lineWidth: 0.7)
             }

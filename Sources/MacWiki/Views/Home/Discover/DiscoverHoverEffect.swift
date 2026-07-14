@@ -77,9 +77,10 @@ struct DiscoverHoverEffect: ViewModifier {
     let profile: Profile
     let isActive: Bool
     let reduceMotion: Bool
+    @Environment(\.macWikiAccessibilityPersonalization.reduceTransparency) private var reduceTransparency
 
     func body(content: Content) -> some View {
-        let shadowIsActive = isActive && !reduceMotion
+        let shadowIsActive = isActive && !reduceMotion && !reduceTransparency
 
         content
             .scaleEffect(reduceMotion ? 1 : (isActive ? profile.scale : 1))

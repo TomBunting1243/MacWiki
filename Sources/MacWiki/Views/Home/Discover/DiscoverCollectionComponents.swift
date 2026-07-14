@@ -21,6 +21,7 @@ struct DiscoverExpandableCollectionCard<Content: View>: View {
     let collapsedPreviewTitles: [String]
     let content: Content
     @Environment(\.macWikiAccessibilityPersonalization.reduceMotion) private var reduceMotion
+    @Environment(\.macWikiAccessibilityPersonalization.reduceTransparency) private var reduceTransparency
     @Environment(\.colorScheme) private var colorScheme
     @State private var isHovered = false
 
@@ -66,21 +67,19 @@ struct DiscoverExpandableCollectionCard<Content: View>: View {
         }
         .padding(15)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background { collectionGlassBackground(cornerRadius: cornerRadius) }
+        .discoverSurfaceChrome(
+            cornerRadius: cornerRadius,
+            material: .regular,
+            tintColors: collectionTintColors,
+            borderColor: isKeyboardFocused ? tint : Color(nsColor: .separatorColor),
+            borderOpacity: isKeyboardFocused ? 0.62 : (isHovered ? 0.48 : 0.30),
+            borderWidth: isKeyboardFocused ? 1.1 : 0.7
+        )
         .overlay(alignment: .leading) {
             RoundedRectangle(cornerRadius: 2, style: .continuous)
                 .fill(tint.opacity(isKeyboardFocused ? 0.80 : (isHovered ? 0.64 : 0.42)))
                 .frame(width: 3)
                 .padding(.vertical, 13)
-        }
-        .overlay {
-            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                .strokeBorder(
-                    isKeyboardFocused
-                        ? tint.opacity(0.62)
-                        : Color(nsColor: .separatorColor).opacity(isHovered ? 0.48 : 0.30),
-                    lineWidth: isKeyboardFocused ? 1.1 : 0.7
-                )
         }
         .discoverHoverEffect(.card, isActive: isHovered || isKeyboardFocused, reduceMotion: reduceMotion)
         .animation(hoverAnimation, value: isKeyboardFocused)
@@ -126,7 +125,13 @@ struct DiscoverExpandableCollectionCard<Content: View>: View {
                 ),
                 in: RoundedRectangle(cornerRadius: 10, style: .continuous)
             )
-            .shadow(color: tint.opacity(isHovered || isKeyboardFocused ? 0.22 : 0.12), radius: 8, y: 3)
+            .shadow(
+                color: tint.opacity(
+                    reduceTransparency ? 0 : (isHovered || isKeyboardFocused ? 0.22 : 0.12)
+                ),
+                radius: 8,
+                y: 3
+            )
             .symbolEffect(.bounce, value: reduceMotion ? false : isExpanded)
     }
 
@@ -160,11 +165,10 @@ struct DiscoverExpandableCollectionCard<Content: View>: View {
             .font(.system(size: 11.5, weight: .semibold))
             .foregroundStyle(isExpanded ? tint : Color.secondary.opacity(0.62))
             .frame(width: 28, height: 28)
-            .background(.thinMaterial, in: Circle())
-            .overlay {
-                Circle()
-                    .strokeBorder(tint.opacity(isExpanded ? 0.26 : 0.12), lineWidth: 0.7)
-            }
+            .discoverCircleSurfaceChrome(
+                borderColor: tint,
+                borderOpacity: isExpanded ? 0.26 : 0.12
+            )
             .rotationEffect(.degrees(isExpanded ? 0 : -90))
             .animation(expansionAnimation, value: isExpanded)
     }
@@ -205,75 +209,13 @@ struct DiscoverExpandableCollectionCard<Content: View>: View {
         .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
     }
 
-    @ViewBuilder
-    private func collectionGlassBackground(cornerRadius: CGFloat) -> some View {
-        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+    private var collectionTintColors: [Color] {
         let isActive = isHovered || isKeyboardFocused
-        let glowOpacity = isActive ? 0.18 : 0.11
-        let baseWash = colorScheme == .dark ? 0.42 : 0.82
-        let tintWash = colorScheme == .dark ? 0.045 : 0.060
-
-        if #available(macOS 26, *) {
-            shape
-                .fill(.regularMaterial)
-                .overlay {
-                    shape.fill(
-                        LinearGradient(
-                            colors: [
-                                tint.opacity(glowOpacity),
-                                tint.opacity(tintWash),
-                                Color.clear
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                }
-                .overlay {
-                    shape
-                        .inset(by: 0.5)
-                        .fill(Color(nsColor: .windowBackgroundColor).opacity(baseWash))
-                }
-                .overlay {
-                    shape
-                        .inset(by: 1)
-                        .fill(
-                        LinearGradient(
-                            colors: [
-                                Color.white.opacity(colorScheme == .dark ? 0.035 : 0.38),
-                                Color.white.opacity(colorScheme == .dark ? 0.012 : 0.10),
-                                tint.opacity(colorScheme == .dark ? 0.020 : 0.030)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                }
-                .overlay {
-                    shape
-                        .strokeBorder(Color.white.opacity(colorScheme == .dark ? 0.08 : 0.46), lineWidth: 0.8)
-                        .blendMode(.plusLighter)
-                }
-        } else {
-            shape
-                .fill(.regularMaterial)
-                .overlay {
-                    shape.fill(Color(nsColor: .windowBackgroundColor).opacity(baseWash))
-                }
-                .overlay {
-                    shape.fill(
-                        LinearGradient(
-                            colors: [
-                                tint.opacity(glowOpacity),
-                                tint.opacity(0.028),
-                                Color.clear
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                }
-        }
+        return [
+            tint.opacity(isActive ? 0.14 : 0.08),
+            Color(nsColor: .windowBackgroundColor).opacity(colorScheme == .dark ? 0.035 : 0.10),
+            Color.clear
+        ]
     }
 
     private var collapsedPreview: some View {

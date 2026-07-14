@@ -39,11 +39,7 @@ struct DiscoverVisualContextStrip: View {
         if showsSurface {
             content
                 .padding(12)
-                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .strokeBorder(Color(nsColor: .separatorColor).opacity(0.32), lineWidth: 0.7)
-                }
+                .discoverSurfaceChrome(cornerRadius: 14, borderOpacity: 0.32)
         } else {
             content
         }
@@ -74,61 +70,68 @@ struct DiscoverVisualContextCard: View {
     }
 
     var body: some View {
-        Button {
+        Group {
             if let filePageURL = image.filePageURL {
-                onOpenURL(filePageURL)
-            }
-        } label: {
-            VStack(alignment: .leading, spacing: 6) {
-                CachedThumbnailImage(
-                    url: image.thumbnailURL,
-                    targetSize: CGSize(width: 180, height: 108),
-                    animatesNetworkSuccess: !reduceMotion
-                ) { loadedImage in
-                    loadedImage
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                } placeholder: {
-                    AppLoadingThumbnailPlaceholder(
-                        width: 180,
-                        height: 108,
-                        cornerRadius: 10,
-                        tone: .accent
-                    )
-                } failure: {
-                    Rectangle()
-                        .fill(.quaternary)
-                        .overlay {
-                            Image(systemName: "photo")
-                                .foregroundStyle(.tertiary)
-                        }
+                Button {
+                    onOpenURL(filePageURL)
+                } label: {
+                    cardContent
                 }
-                .frame(height: 108)
-                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-
-                Text(displayTitle)
-                    .font(.system(size: 11.5, weight: .semibold))
-                    .lineLimit(2)
-
-                if let caption = image.caption, !caption.isEmpty {
-                    Text(caption)
-                        .font(.system(size: 10.5))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(2)
-                }
+            } else {
+                cardContent
             }
-            .padding(8)
-            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .buttonStyle(DiscoverInteractivePressStyle())
-        .disabled(image.filePageURL == nil)
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(Color(nsColor: .separatorColor).opacity(isHovered ? 0.42 : 0.30), lineWidth: 0.7)
+        .discoverSurfaceChrome(
+            cornerRadius: 12,
+            borderOpacity: isHovered ? 0.42 : 0.30
+        )
+        .discoverHoverEffect(.card, isActive: isHovered && image.filePageURL != nil, reduceMotion: reduceMotion)
+        .onHover { isHovered = image.filePageURL != nil && $0 }
+        .accessibilityLabel(displayTitle)
+    }
+
+    private var cardContent: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            CachedThumbnailImage(
+                url: image.thumbnailURL,
+                targetSize: CGSize(width: 180, height: 108),
+                animatesNetworkSuccess: !reduceMotion
+            ) { loadedImage in
+                loadedImage
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+            } placeholder: {
+                AppLoadingThumbnailPlaceholder(
+                    width: 180,
+                    height: 108,
+                    cornerRadius: 10,
+                    tone: .accent
+                )
+            } failure: {
+                Rectangle()
+                    .fill(.quaternary)
+                    .overlay {
+                        Image(systemName: "photo")
+                            .foregroundStyle(.tertiary)
+                    }
+            }
+            .frame(height: 108)
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+
+            Text(displayTitle)
+                .font(.system(size: 11.5, weight: .semibold))
+                .lineLimit(2)
+
+            if let caption = image.caption, !caption.isEmpty {
+                Text(caption)
+                    .font(.system(size: 10.5))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
         }
-        .discoverHoverEffect(.card, isActive: isHovered, reduceMotion: reduceMotion)
-        .onHover { isHovered = $0 }
+        .padding(8)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
@@ -279,11 +282,11 @@ struct DiscoverFeaturedImageCard: View {
         }
         .padding(prefersHorizontalLayout ? 16 : 12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(Color(nsColor: .separatorColor).opacity(isHovered ? 0.46 : 0.34), lineWidth: 0.7)
-        }
+        .discoverSurfaceChrome(
+            cornerRadius: 16,
+            material: .regular,
+            borderOpacity: isHovered ? 0.46 : 0.34
+        )
         .discoverHoverEffect(.card, isActive: isHovered, reduceMotion: reduceMotion)
         .onHover { isHovered = $0 }
         .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))

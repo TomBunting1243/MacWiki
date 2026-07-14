@@ -25,20 +25,22 @@ struct DiscoverHolidayRow: View {
         .buttonStyle(DiscoverInteractivePressStyle())
         .accessibilityLabel(holiday.article?.title ?? holiday.text)
         .padding(10)
-        .background(
-            Group {
-                if showsSurface {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(.thinMaterial)
-                } else {
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(Color.primary.opacity(isHovered ? 0.04 : 0.018))
-                }
-            }
+        .discoverSurfaceChrome(
+            isEnabled: showsSurface,
+            cornerRadius: 12,
+            borderOpacity: isHovered ? 0.44 : 0.30
         )
+        .background {
+            if !showsSurface {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(Color.primary.opacity(isHovered ? 0.04 : 0.018))
+            }
+        }
         .overlay {
-            RoundedRectangle(cornerRadius: showsSurface ? 12 : 14, style: .continuous)
-                .strokeBorder(Color(nsColor: .separatorColor).opacity(isHovered ? 0.44 : 0.30), lineWidth: 0.7)
+            if !showsSurface {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .strokeBorder(Color(nsColor: .separatorColor).opacity(isHovered ? 0.44 : 0.30), lineWidth: 0.7)
+            }
         }
         .contentShape(RoundedRectangle(cornerRadius: showsSurface ? 12 : 14, style: .continuous))
         .discoverHoverEffect(.row, isActive: isHovered && holiday.article != nil, reduceMotion: reduceMotion)
@@ -123,14 +125,10 @@ struct DiscoverSearchResultRow: View {
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
-            .background(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(.thinMaterial)
+            .discoverSurfaceChrome(
+                cornerRadius: 14,
+                borderOpacity: isHovered ? 0.46 : 0.32
             )
-            .overlay {
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .strokeBorder(Color(nsColor: .separatorColor).opacity(isHovered ? 0.46 : 0.32), lineWidth: 0.7)
-            }
         }
         .buttonStyle(DiscoverInteractivePressStyle())
         .accessibilityLabel(result.title)

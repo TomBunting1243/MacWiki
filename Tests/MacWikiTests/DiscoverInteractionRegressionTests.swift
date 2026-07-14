@@ -28,6 +28,9 @@ struct DiscoverInteractionRegressionTests {
         let temporalRows = try repositorySource(
             "Sources/MacWiki/Views/Home/Discover/DiscoverTemporalSupport.swift"
         )
+        let mediaRows = try repositorySource(
+            "Sources/MacWiki/Views/Home/Discover/DiscoverMediaSupport.swift"
+        )
 
         #expect(resultRows.contains("if let article = holiday.article"))
         #expect(resultRows.contains(".accessibilityValue(isSaved ? \"Saved\" : \"Not Saved\")"))
@@ -36,6 +39,8 @@ struct DiscoverInteractionRegressionTests {
         #expect(resultRows.contains("isHovered && holiday.article != nil"))
         #expect(temporalRows.contains("isHovered && event.article != nil"))
         #expect(temporalRows.contains("isHovered && fact.article != nil"))
+        #expect(!temporalRows.contains(".disabled(event.article == nil)"))
+        #expect(!mediaRows.contains(".disabled(image.filePageURL == nil)"))
     }
 
     private func repositorySource(_ relativePath: String) throws -> String {

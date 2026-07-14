@@ -57,6 +57,7 @@ struct DiscoverIntroLoadingView: View {
                 .clear
             ],
             borderOpacity: colorScheme == .dark ? 0.18 : 0.14,
+            borderWidth: 0.9,
             shadowOpacity: colorScheme == .dark ? 0.22 : 0.08,
             shadowRadius: 18,
             shadowY: 6

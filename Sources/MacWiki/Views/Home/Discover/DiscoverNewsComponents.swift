@@ -53,11 +53,10 @@ struct DiscoverNewsCard: View {
         .accessibilityLabel(result.title)
         .padding(style == .rail ? 10 : 11)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .strokeBorder(Color(nsColor: .separatorColor).opacity(isHovered ? 0.46 : 0.32), lineWidth: 0.7)
-        }
+        .discoverSurfaceChrome(
+            cornerRadius: 14,
+            borderOpacity: isHovered ? 0.46 : 0.32
+        )
         .discoverHoverEffect(.card, isActive: isHovered, reduceMotion: reduceMotion)
         .onHover { isHovered = $0 }
         .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
@@ -169,11 +168,13 @@ struct DiscoverCompactArticleCard: View {
             }
         }
         .padding(9)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(Color.primary.opacity(0.06), lineWidth: 0.8)
-        }
+        .discoverSurfaceChrome(
+            cornerRadius: 12,
+            material: .regular,
+            borderColor: Color.primary,
+            borderOpacity: 0.08,
+            borderWidth: 0.8
+        )
         .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 }
