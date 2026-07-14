@@ -44,7 +44,11 @@ struct DiscoverTimeMachineControlsView: View {
                         )
                 }
 
-                Text(discoverFeedStore.feed?.dateLabel ?? screenModel.discoverTimeMachineDateLabel)
+                Text(
+                    isScanning
+                        ? screenModel.discoverTimeMachineDateLabel
+                        : (discoverFeedStore.feed?.dateLabel ?? screenModel.discoverTimeMachineDateLabel)
+                )
                     .font(DiscoverTypography.editionDate)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
@@ -130,15 +134,6 @@ struct DiscoverTimeMachineControlsView: View {
             shadowRadius: 7,
             shadowY: 2
         )
-        .overlay {
-            if isScanning {
-                AppLoadingScanlineOverlay(lineOpacity: colorScheme == .dark ? 0.026 : 0.018)
-                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                    .blendMode(.screen)
-                    .opacity(reduceMotion ? 0.06 : 0.11)
-                    .allowsHitTesting(false)
-            }
-        }
         .animation(reduceMotion ? nil : .easeOut(duration: 0.14), value: isScanning)
         .help("Temporal Lens: scrub day-by-day or jump to a specific date.")
     }
@@ -153,17 +148,20 @@ struct DiscoverTimeMachineControlsView: View {
 
     private var scanningBadge: some View {
         HStack(spacing: 6) {
-            AppLoadingActivityMark(tone: .retro)
+            ProgressView()
+                .controlSize(.small)
 
-            Text("SCANNING")
-                .font(DiscoverTypography.editorialKicker)
-                .foregroundStyle(Color.accentColor)
+            Text("Loading")
+                .font(DiscoverTypography.controlAuxiliary.weight(.semibold))
+                .foregroundStyle(.secondary)
                 .lineLimit(1)
         }
         .fixedSize()
         .padding(.horizontal, 8)
         .padding(.vertical, 4)
-        .background(Color.accentColor.opacity(colorScheme == .dark ? 0.18 : 0.11), in: Capsule(style: .continuous))
+        .background(Color.primary.opacity(colorScheme == .dark ? 0.10 : 0.055), in: Capsule(style: .continuous))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Loading selected date")
     }
 
     @ViewBuilder

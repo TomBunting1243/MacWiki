@@ -9,8 +9,6 @@ struct DiscoverFeedSections: View {
     let allLists: [ReadingList]
     let allLabels: [Label]
     let allTags: [Tag]
-    let showsTimeTravelSkeleton: Bool
-    let timeMachineTargetDate: Date
     let onOpen: (WikipediaService.SearchResult, Bool) -> Void
     @Environment(\.openURL) var openURL
     @Environment(\.macWikiAccessibilityPersonalization.reduceMotion) var reduceMotion
@@ -26,14 +24,10 @@ struct DiscoverFeedSections: View {
 
     var body: some View {
         LazyVStack(alignment: .leading, spacing: sectionSpacing) {
-            if showsTimeTravelSkeleton {
-                timeMachineStage
-            } else {
-                leadEditionStage
-                collectionsStage
-                mediaSpotlightSection
-                temporalExplorationStage
-            }
+            leadEditionStage
+            collectionsStage
+            mediaSpotlightSection
+            temporalExplorationStage
         }
         .background {
             collectionsKeyboardShortcutHost

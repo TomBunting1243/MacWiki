@@ -104,15 +104,6 @@ extension DiscoverFeedSections {
 
                         Spacer(minLength: 0)
 
-                        if showsTimeTravelSkeleton {
-                            AppLoadingInlineLabel(
-                                text: "Scanning",
-                                tone: .retro,
-                                font: .caption.weight(.semibold)
-                            )
-                            .fixedSize()
-                        }
-
                         if !timeMachineDisplayDateLabel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                             Text(timeMachineDisplayDateLabel)
                                 .font(DiscoverTypography.editionDate.weight(.semibold))
@@ -124,16 +115,12 @@ extension DiscoverFeedSections {
                         }
                     }
 
-                    if showsTimeTravelSkeleton {
-                        DiscoverTimeMachineLoadingContent(isCompactLayout: isCompactLayout)
-                    } else {
-                        if !feed.onThisDayBirths.isEmpty || !feed.onThisDayDeaths.isEmpty {
-                            timeMachineBirthsModule
-                            timeMachineDeathsModule
-                        }
-
-                        timeMachineHolidaysModule
+                    if !feed.onThisDayBirths.isEmpty || !feed.onThisDayDeaths.isEmpty {
+                        timeMachineBirthsModule
+                        timeMachineDeathsModule
                     }
+
+                    timeMachineHolidaysModule
                 }
             }
         }

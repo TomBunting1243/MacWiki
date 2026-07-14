@@ -108,13 +108,6 @@ extension DiscoverFeedSections {
         return formatter
     }()
 
-    static let timeMachineTargetDateFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.locale = Locale.autoupdatingCurrent
-        formatter.setLocalizedDateFormatFromTemplate("EEE, MMM d")
-        return formatter
-    }()
-
     @ViewBuilder
     func discoverContextMenu(
         for result: WikipediaService.SearchResult,

@@ -129,12 +129,6 @@ extension DiscoverFeedSections {
     }
 
     func moveCollectionsFocus(_ direction: MoveCommandDirection) {
-        guard !showsTimeTravelSkeleton else {
-            applyCollectionsKeyboardState(
-                DiscoverCollectionsKeyboardCoordinator.deactivated(currentCollectionsKeyboardState())
-            )
-            return
-        }
         applyCollectionsKeyboardState(
             DiscoverCollectionsKeyboardCoordinator.moved(
                 currentCollectionsKeyboardState(),

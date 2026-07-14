@@ -11,7 +11,7 @@ struct DiscoverFeedSurface: View {
     let allTags: [Tag]
     let isAppeared: Bool
     let reduceMotion: Bool
-    let showsTimeTravelSkeleton: Bool
+    let isLoadingSelectedDate: Bool
     let onRetry: () -> Void
     let onOpen: (WikipediaService.SearchResult, Bool) -> Void
 
@@ -61,8 +61,6 @@ struct DiscoverFeedSurface: View {
                     allLists: allLists,
                     allLabels: allLabels,
                     allTags: allTags,
-                    showsTimeTravelSkeleton: showsTimeTravelSkeleton,
-                    timeMachineTargetDate: referenceDate,
                     onOpen: onOpen
                 )
                 .opacity(isAppeared ? 1 : 0)
@@ -70,7 +68,8 @@ struct DiscoverFeedSurface: View {
                 .animation(reduceMotion ? nil : .easeOut(duration: 0.22), value: isAppeared)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: showsTimeTravelSkeleton)
+            .allowsHitTesting(!isLoadingSelectedDate)
+            .accessibilityHidden(isLoadingSelectedDate)
         }
     }
 }

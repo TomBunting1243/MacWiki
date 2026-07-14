@@ -17,7 +17,6 @@ struct DiscoverScreenModelTests {
             calendar: calendar,
             now: { now },
             loadDebounceDelay: .milliseconds(5),
-            timeTravelSkeletonDelay: .milliseconds(5),
             sleep: { _ in },
             queueLoadAction: { referenceDate, forceRefresh in
                 queuedLoads.append((referenceDate, forceRefresh))
@@ -64,7 +63,7 @@ struct DiscoverScreenModelTests {
         )
     }
 
-    @Test func delayedSkeletonTracksStaleLoadingState() async {
+    @Test func selectedDateLoadingTracksOnlyStaleVisibleEditions() {
         let calendar = utcCalendar
         let now = calendar.date(from: DateComponents(year: 2026, month: 4, day: 9, hour: 11))!
         let store = DiscoverFeedStore()
@@ -74,37 +73,35 @@ struct DiscoverScreenModelTests {
         let model = DiscoverScreenModel(
             discoverFeedStore: store,
             calendar: calendar,
-            now: { now },
-            timeTravelSkeletonDelay: .milliseconds(5),
-            sleep: { _ in
-            }
+            now: { now }
         )
 
         model.selectedDiscoverDate = calendar.date(from: DateComponents(year: 2026, month: 4, day: 9, hour: 8))!
-        let skeletonTask = model.updateTimeTravelSkeletonVisibility(reduceMotion: true)
+        #expect(model.isLoadingSelectedDate == true)
 
-        #expect(model.shouldQueueTimeTravelSkeleton == true)
-        #expect(model.shouldShowDelayedTimeTravelSkeleton == false)
+        store.feed = discoverFeed(dateKey: "2026/04/09")
+        #expect(model.isLoadingSelectedDate == false)
 
-        await skeletonTask?.value
-
-        #expect(model.shouldShowDelayedTimeTravelSkeleton == true)
-        #expect(model.showsTimeTravelSkeleton == true)
-
+        store.feed = discoverFeed(dateKey: "2026/04/08")
         store.isLoading = false
-        model.updateTimeTravelSkeletonVisibility(reduceMotion: true)
-
-        #expect(model.shouldShowDelayedTimeTravelSkeleton == false)
-        #expect(model.showsTimeTravelSkeleton == false)
+        #expect(model.isLoadingSelectedDate == false)
     }
 
-    @Test func timeMachineControlsUseImmediateScanningWithoutForcingTheSkeleton() throws {
-        let source = try repositorySource(
+    @Test func timeMachineKeepsThePreviousEditionStableWhileLoading() throws {
+        let stageSource = try repositorySource(
             "Sources/MacWiki/Views/Home/Discover/DiscoverTimeMachineStageView.swift"
         )
+        let feedSource = try repositorySource(
+            "Sources/MacWiki/Views/Home/Discover/DiscoverFeedSurface.swift"
+        )
+        let loadingSource = try repositorySource(
+            "Sources/MacWiki/Views/Home/Discover/DiscoverLoadingViews.swift"
+        )
 
-        #expect(source.contains("isScanning: screenModel.shouldQueueTimeTravelSkeleton"))
-        #expect(source.contains("showsTimeTravelSkeleton: showsTimeTravelSkeleton"))
+        #expect(stageSource.contains("isScanning: screenModel.isLoadingSelectedDate"))
+        #expect(stageSource.contains("isLoadingSelectedDate: screenModel.isLoadingSelectedDate"))
+        #expect(feedSource.contains(".allowsHitTesting(!isLoadingSelectedDate)"))
+        #expect(!loadingSource.contains("DiscoverTimeMachineLoadingContent"))
     }
 
     @Test func steppingForwardClampsToTodayAndPopoverDismissalIsScoped() {

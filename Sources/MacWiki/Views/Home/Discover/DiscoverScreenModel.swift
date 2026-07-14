@@ -5,7 +5,6 @@ import SwiftUI
 @Observable @MainActor
 final class DiscoverScreenModel {
     static let defaultLoadDebounceDelay: Duration = .milliseconds(170)
-    static let defaultTimeTravelSkeletonDelay: Duration = .milliseconds(1600)
 
     let discoverFeedStore: DiscoverFeedStore
 
@@ -15,7 +14,6 @@ final class DiscoverScreenModel {
     var isTimeMachineDatePickerPresented = false
     var timeMachineLensLastDragX: CGFloat?
     var timeMachineLensDragAccumulatedX: CGFloat = 0
-    var shouldShowDelayedTimeTravelSkeleton = false
 
     private let calendar: Calendar
     private let now: @MainActor () -> Date
@@ -23,17 +21,14 @@ final class DiscoverScreenModel {
     private let queueLoadAction: @MainActor (Date, Bool) -> Void
     private let cancelAction: @MainActor () -> Void
     private let loadDebounceDelay: Duration
-    private let timeTravelSkeletonDelay: Duration
 
     @ObservationIgnored private var discoverDateLoadTask: Task<Void, Never>?
-    @ObservationIgnored private var timeTravelSkeletonDelayTask: Task<Void, Never>?
 
     init(
         discoverFeedStore: DiscoverFeedStore = DiscoverFeedStore(),
         calendar: Calendar = .current,
         now: @escaping @MainActor () -> Date = Date.init,
         loadDebounceDelay: Duration = DiscoverScreenModel.defaultLoadDebounceDelay,
-        timeTravelSkeletonDelay: Duration = DiscoverScreenModel.defaultTimeTravelSkeletonDelay,
         sleep: @escaping @Sendable (Duration) async -> Void = { duration in
             try? await Task.sleep(for: duration)
         },
@@ -44,7 +39,6 @@ final class DiscoverScreenModel {
         self.calendar = calendar
         self.now = now
         self.loadDebounceDelay = loadDebounceDelay
-        self.timeTravelSkeletonDelay = timeTravelSkeletonDelay
         self.sleep = sleep
         self.queueLoadAction = queueLoadAction ?? { referenceDate, forceRefresh in
             discoverFeedStore.queueLoad(referenceDate: referenceDate, forceRefresh: forceRefresh)
@@ -59,14 +53,13 @@ final class DiscoverScreenModel {
         calendar.startOfDay(for: selectedDiscoverDate)
     }
 
-    var shouldQueueTimeTravelSkeleton: Bool {
+    /// The selected date is loading while the last complete edition remains visible.
+    /// Keeping that edition mounted avoids collapsing the magazine into a synthetic
+    /// placeholder layout during an ordinary Time Machine navigation.
+    var isLoadingSelectedDate: Bool {
         guard discoverFeedStore.isLoading else { return false }
         guard let visibleFeed = discoverFeedStore.feed else { return false }
         return visibleFeed.dateKey != selectedDiscoverDateKey
-    }
-
-    var showsTimeTravelSkeleton: Bool {
-        shouldShowDelayedTimeTravelSkeleton && shouldQueueTimeTravelSkeleton
     }
 
     var canStepDiscoverDateForward: Bool {
@@ -117,47 +110,9 @@ final class DiscoverScreenModel {
         return task
     }
 
-    @discardableResult
-    func updateTimeTravelSkeletonVisibility(reduceMotion: Bool) -> Task<Void, Never>? {
-        timeTravelSkeletonDelayTask?.cancel()
-        timeTravelSkeletonDelayTask = nil
-
-        guard shouldQueueTimeTravelSkeleton else {
-            if shouldShowDelayedTimeTravelSkeleton {
-                withAnimation(reduceMotion ? nil : .easeOut(duration: 0.14)) {
-                    shouldShowDelayedTimeTravelSkeleton = false
-                }
-            } else {
-                shouldShowDelayedTimeTravelSkeleton = false
-            }
-            return nil
-        }
-
-        guard !shouldShowDelayedTimeTravelSkeleton else { return nil }
-        if timeTravelSkeletonDelay <= .zero {
-            withAnimation(reduceMotion ? nil : .easeOut(duration: 0.16)) {
-                shouldShowDelayedTimeTravelSkeleton = true
-            }
-            return nil
-        }
-        let task = Task { @MainActor in
-            await sleep(timeTravelSkeletonDelay)
-            guard !Task.isCancelled else { return }
-            guard shouldQueueTimeTravelSkeleton else { return }
-            withAnimation(reduceMotion ? nil : .easeOut(duration: 0.16)) {
-                shouldShowDelayedTimeTravelSkeleton = true
-            }
-        }
-        timeTravelSkeletonDelayTask = task
-        return task
-    }
-
     func handleDisappear() {
         discoverDateLoadTask?.cancel()
         discoverDateLoadTask = nil
-        timeTravelSkeletonDelayTask?.cancel()
-        timeTravelSkeletonDelayTask = nil
-        shouldShowDelayedTimeTravelSkeleton = false
         resetTimeMachineLensDrag()
         dismissSearchResultPageViewsPopover()
         cancelAction()

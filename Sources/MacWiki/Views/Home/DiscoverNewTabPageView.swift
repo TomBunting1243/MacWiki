@@ -31,14 +31,6 @@ struct DiscoverNewTabPageView: View {
         screenModel.discoverFeedStore
     }
 
-    private var shouldQueueTimeTravelSkeleton: Bool {
-        screenModel.shouldQueueTimeTravelSkeleton
-    }
-
-    private var showsTimeTravelSkeleton: Bool {
-        screenModel.showsTimeTravelSkeleton
-    }
-
     private var articleLookup: ArticleLookupIndex {
         articleLookupModel.index
     }
@@ -104,7 +96,6 @@ struct DiscoverNewTabPageView: View {
                             allTags: allTags,
                             isAppeared: isAppeared,
                             reduceMotion: reduceMotion,
-                            showsTimeTravelSkeleton: showsTimeTravelSkeleton,
                             onOpen: open
                         )
                     }
@@ -145,7 +136,6 @@ struct DiscoverNewTabPageView: View {
                 }
             }
             isSearchFocused = true
-            updateTimeTravelSkeletonVisibility()
         }
         .onDisappear {
             articleLookupModel.stop()
@@ -155,14 +145,10 @@ struct DiscoverNewTabPageView: View {
             searchCoordinator.cancel()
             screenModel.handleDisappear()
         }
-        .onChange(of: shouldQueueTimeTravelSkeleton) { _, _ in
-            updateTimeTravelSkeletonVisibility()
-        }
         .onChange(of: reduceMotion) { _, reduced in
             if reduced {
                 isAppeared = true
             }
-            updateTimeTravelSkeletonVisibility()
         }
         .onChange(of: screenModel.selectedDiscoverDate) { _, newDate in
             screenModel.handleSelectedDateChange(isSearchActive: searchCoordinator.hasQuery)
@@ -186,10 +172,6 @@ struct DiscoverNewTabPageView: View {
         .task {
             screenModel.queueInitialLoad()
         }
-    }
-
-    private func updateTimeTravelSkeletonVisibility() {
-        screenModel.updateTimeTravelSkeletonVisibility(reduceMotion: reduceMotion)
     }
 
     private func moveSearchSelection(_ direction: MoveCommandDirection) {

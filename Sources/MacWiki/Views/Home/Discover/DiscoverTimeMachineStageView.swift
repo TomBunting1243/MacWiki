@@ -12,7 +12,6 @@ struct DiscoverTimeMachineStageView: View {
     let allTags: [Tag]
     let isAppeared: Bool
     let reduceMotion: Bool
-    let showsTimeTravelSkeleton: Bool
     let onOpen: (WikipediaService.SearchResult, Bool) -> Void
 
     var body: some View {
@@ -21,7 +20,7 @@ struct DiscoverTimeMachineStageView: View {
                 screenModel: screenModel,
                 discoverFeedStore: discoverFeedStore,
                 responsiveLayout: responsiveLayout,
-                isScanning: screenModel.shouldQueueTimeTravelSkeleton
+                isScanning: screenModel.isLoadingSelectedDate
             )
 
             DiscoverFeedSurface(
@@ -35,7 +34,7 @@ struct DiscoverTimeMachineStageView: View {
                 allTags: allTags,
                 isAppeared: isAppeared,
                 reduceMotion: reduceMotion,
-                showsTimeTravelSkeleton: showsTimeTravelSkeleton,
+                isLoadingSelectedDate: screenModel.isLoadingSelectedDate,
                 onRetry: screenModel.refreshDiscover,
                 onOpen: onOpen
             )

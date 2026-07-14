@@ -186,9 +186,6 @@ extension DiscoverFeedSections {
     }
 
     var timeMachineDisplayDateLabel: String {
-        if showsTimeTravelSkeleton {
-            return Self.timeMachineTargetDateFormatter.string(from: timeMachineTargetDate)
-        }
         return feed.dateLabel
     }
 
@@ -270,7 +267,7 @@ extension DiscoverFeedSections {
     }
 
     var hasTimeMachineSurface: Bool {
-        showsTimeTravelSkeleton || hasTimeMachineDetails
+        hasTimeMachineDetails
     }
 
     var longestReadCandidates: [WikipediaService.SearchResult] {
@@ -358,7 +355,6 @@ extension DiscoverFeedSections {
     }
 
     var canOpenFocusedCollectionItem: Bool {
-        guard !showsTimeTravelSkeleton else { return false }
         guard currentCollectionsKeyboardState().isActive else { return false }
         return focusedCollectionResult != nil
     }
