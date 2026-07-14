@@ -3,6 +3,19 @@ import AppKit
 import WebKit
 import SwiftData
 
+enum ReaderDocumentRevision {
+    /// Deterministic full-document digest computed when article state is
+    /// published, outside scroll-driven `updateNSView` calls.
+    static func digest(for html: String) -> UInt64 {
+        var hash: UInt64 = 1469598103934665603
+        for byte in html.utf8 {
+            hash ^= UInt64(byte)
+            hash &*= 1099511628211
+        }
+        return hash
+    }
+}
+
 private enum ReaderChromeDefaults {
     static let defaultTopInset: CGFloat = 56
 }
@@ -15,6 +28,9 @@ struct WebView: NSViewRepresentable {
 
     /// HTML content to display
     let htmlContent: String
+
+    /// Full-document revision computed at the article load boundary.
+    let contentRevision: UInt64
 
     /// Article title for highlight association
     let articleTitle: String
@@ -117,40 +133,6 @@ struct WebView: NSViewRepresentable {
         "scrollPerfSnapshot",
         "scrollRestoreReady"
     ]
-
-    /// Lightweight content signature for reload detection.
-    /// Uses sampled prefix/suffix bytes plus total length to avoid expensive full-string comparisons.
-    private static func htmlReloadSignature(for html: String) -> UInt64 {
-        let utf8 = html.utf8
-        let byteCount = utf8.count
-        var hash: UInt64 = 1469598103934665603
-
-        @inline(__always)
-        func mix(_ byte: UInt8, into hash: inout UInt64) {
-            hash ^= UInt64(byte)
-            hash &*= 1099511628211
-        }
-
-        for byte in utf8.prefix(512) {
-            mix(byte, into: &hash)
-        }
-
-        if byteCount > 1024 {
-            mix(0xFF, into: &hash)
-            for byte in utf8.suffix(512) {
-                mix(byte, into: &hash)
-            }
-        }
-
-        var length = UInt64(byteCount)
-        withUnsafeBytes(of: &length) { bytes in
-            for byte in bytes {
-                mix(byte, into: &hash)
-            }
-        }
-
-        return hash
-    }
 
     /// Encodes a Swift string as a safe JavaScript string literal.
     static func javaScriptStringLiteral(_ value: String) -> String {
@@ -466,7 +448,7 @@ struct WebView: NSViewRepresentable {
         }
 
         // Only reload if document signature changed.
-        let htmlSignature = Self.htmlReloadSignature(for: htmlContent)
+        let htmlSignature = contentRevision
         let shouldReloadContent =
             context.coordinator.lastLoadedArticleTitle != articleTitle ||
             context.coordinator.lastLoadedHTMLSignature != htmlSignature
@@ -1057,6 +1039,7 @@ extension WebView {
     ) {
         self.tabID = tabID
         self.htmlContent = htmlContent
+        self.contentRevision = ReaderDocumentRevision.digest(for: htmlContent)
         self.articleTitle = articleTitle
         self.baseURL = baseURL
         self.onLinkTapped = onLinkTapped

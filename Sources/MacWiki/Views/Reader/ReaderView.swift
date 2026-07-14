@@ -290,6 +290,7 @@ struct ArticleView: View {
     @Query private var highlightsForArticle: [Highlight]
 
     @State private var htmlContent: String?
+    @State private var htmlContentRevision: UInt64?
     @State private var loadedArticleKey: String?
     @State private var isLoading = true
     @State private var isWebContentReady = false
@@ -581,10 +582,13 @@ struct ArticleView: View {
     private var content: some View {
         if let error = errorMessage {
             errorView(error)
-        } else if let html = htmlContent, loadedArticleKey == article.id {
+        } else if let html = htmlContent,
+                  let htmlRevision = htmlContentRevision,
+                  loadedArticleKey == article.id {
             let webView = WebView(
                 tabID: tabId,
                 htmlContent: html,
+                contentRevision: htmlRevision,
                 articleTitle: article.title,
                 baseURL: URL(string: "https://en.wikipedia.org/wiki/"),
                 onLinkTapped: { title in
@@ -1061,12 +1065,14 @@ struct ArticleView: View {
         }
         if let preloadedHTML = resolvedPreloadedHTML {
             htmlContent = preloadedHTML
+            htmlContentRevision = ReaderDocumentRevision.digest(for: preloadedHTML)
             loadedArticleKey = article.id
             preferImmediateWebReveal = true
             isLoading = false
             openTimer.markHTMLBound()
         } else if !shouldPreserveVisibleContent {
             htmlContent = nil
+            htmlContentRevision = nil
             preferImmediateWebReveal = false
             isLoading = true
         }
@@ -1090,6 +1096,7 @@ struct ArticleView: View {
             if forceRefresh {
                 if htmlContent != content.html {
                     htmlContent = content.html
+                    htmlContentRevision = ReaderDocumentRevision.digest(for: content.html)
                     loadedArticleKey = article.id
                     openTimer.markHTMLBound()
                     isWebContentReady = false
@@ -1099,6 +1106,7 @@ struct ArticleView: View {
                 }
             } else if htmlContent == nil {
                 htmlContent = content.html
+                htmlContentRevision = ReaderDocumentRevision.digest(for: content.html)
                 loadedArticleKey = article.id
                 openTimer.markHTMLBound()
             }
