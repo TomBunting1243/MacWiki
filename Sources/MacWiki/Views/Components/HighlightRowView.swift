@@ -313,11 +313,12 @@ struct HighlightRowView: View {
             .font(.system(size: 11, weight: .semibold))
             .foregroundStyle(isHovered ? .primary : .secondary)
             .frame(width: 22, height: 22)
-            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .strokeBorder(Color.white.opacity(0.12), lineWidth: 0.8)
-            }
+            .readerInspectorRoundedSurface(
+                cornerRadius: 6,
+                material: .thin,
+                baseBorderOpacity: 0.12,
+                baseBorderWidth: 0.8
+            )
             .buttonStyle(.plain)
 
             Button("Jump to Highlight", systemImage: "arrow.down.left") {
@@ -327,11 +328,12 @@ struct HighlightRowView: View {
             .font(.system(size: 11, weight: .semibold))
             .foregroundStyle(isHovered ? .primary : .secondary)
             .frame(width: 22, height: 22)
-            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .strokeBorder(Color.white.opacity(0.12), lineWidth: 0.8)
-            }
+            .readerInspectorRoundedSurface(
+                cornerRadius: 6,
+                material: .thin,
+                baseBorderOpacity: 0.12,
+                baseBorderWidth: 0.8
+            )
             .buttonStyle(.plain)
             .disabled(highlight.isArchived)
         }
@@ -426,12 +428,21 @@ struct HighlightRowView: View {
                     .accessibilityLabel("Highlight note")
                     .accessibilityIdentifier("highlight-note-editor")
             }
-            .background {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(Color.white.opacity(colorScheme == .dark ? 0.04 : 0.55))
-                    .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .stroke(isNoteEditorFocused ? Color.accentColor.opacity(0.5) : Color.white.opacity(0.08), lineWidth: 0.8)
+            .background(
+                Color.white.opacity(colorScheme == .dark ? 0.04 : 0.55),
+                in: RoundedRectangle(cornerRadius: 10, style: .continuous)
+            )
+            .readerInspectorRoundedSurface(
+                cornerRadius: 10,
+                material: .thin,
+                baseBorderOpacity: 0.08,
+                baseBorderWidth: 0.8
+            )
+            .overlay {
+                if isNoteEditorFocused {
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .strokeBorder(Color.accentColor.opacity(0.5), lineWidth: 0.8)
+                }
             }
             .onChange(of: editedNote) { _, newValue in
                 if newValue.count > 1000 {

@@ -215,15 +215,13 @@ struct HighlightListView: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
-        .background {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(.ultraThinMaterial)
-                .opacity(colorScheme == .dark ? 0.68 : 0.54)
-        }
-        .overlay {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.06 : 0.035), lineWidth: 0.5)
-        }
+        .readerInspectorRoundedSurface(
+            cornerRadius: 12,
+            material: .ultraThin,
+            materialOpacity: colorScheme == .dark ? 0.68 : 0.54,
+            baseBorderOpacity: colorScheme == .dark ? 0.06 : 0.035,
+            baseBorderWidth: 0.5
+        )
     }
 
     private var emptyState: some View {

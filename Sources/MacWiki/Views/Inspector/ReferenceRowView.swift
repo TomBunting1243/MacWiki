@@ -166,11 +166,12 @@ struct ReferenceRowView: View {
             .font(.system(size: 11, weight: .semibold))
             .foregroundStyle(hasOpenTarget ? .secondary : .tertiary)
             .frame(width: 22, height: 22)
-            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .strokeBorder(Color.white.opacity(0.12), lineWidth: 0.8)
-            }
+            .readerInspectorRoundedSurface(
+                cornerRadius: 6,
+                material: .thin,
+                baseBorderOpacity: 0.12,
+                baseBorderWidth: 0.8
+            )
             .buttonStyle(.plain)
             .disabled(!hasOpenTarget)
             .help(hasOpenTarget ? "Open source or search by title" : "No source text available")
@@ -182,11 +183,12 @@ struct ReferenceRowView: View {
             .font(.system(size: 11, weight: .semibold))
             .foregroundStyle(.secondary)
             .frame(width: 22, height: 22)
-            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .strokeBorder(Color.white.opacity(0.12), lineWidth: 0.8)
-            }
+            .readerInspectorRoundedSurface(
+                cornerRadius: 6,
+                material: .thin,
+                baseBorderOpacity: 0.12,
+                baseBorderWidth: 0.8
+            )
             .buttonStyle(.plain)
 
             Spacer(minLength: 0)

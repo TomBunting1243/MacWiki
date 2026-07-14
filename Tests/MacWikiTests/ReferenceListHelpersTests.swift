@@ -70,6 +70,89 @@ struct ReferenceListHelpersTests {
         #expect(visible.flatMap(\.items).map(\.id) == ["real"])
     }
 
+    @Test func presentationSanitizesInputOnceAndRetainsRowCountAndIdentity() {
+        let cssLeak = ArticleReferenceItem(
+            id: "css",
+            label: "1",
+            text: #".mw-parser-output cite.citation{font-style:inherit}.cs1-ws-icon a{background:url("//example.com/icon.svg")}"#,
+            html: nil,
+            links: [],
+            group: nil
+        )
+        let first = ArticleReferenceItem(
+            id: "first",
+            label: "2",
+            text: "First source",
+            html: nil,
+            links: [],
+            group: nil
+        )
+        let second = ArticleReferenceItem(
+            id: "second",
+            label: "3",
+            text: "Second source",
+            html: nil,
+            links: [],
+            group: nil
+        )
+
+        let presentation = ReferenceListHelpers.Presentation.make(
+            from: [
+                ArticleReferenceSection(id: "empty", title: "Empty", items: [cssLeak]),
+                ArticleReferenceSection(id: "sources", title: "Sources", items: [first, second])
+            ]
+        )
+
+        #expect(presentation.sections.map(\.id) == ["sources"])
+        #expect(presentation.sections.flatMap(\.items).map(\.id) == ["first", "second"])
+        #expect(presentation.referenceIDs == ["first", "second"])
+        #expect(presentation.totalCount == 2)
+    }
+
+    @Test func presentationFiltersExportsAgainstCurrentSelection() {
+        let first = ArticleReferenceItem(
+            id: "first",
+            label: nil,
+            text: "First source",
+            html: nil,
+            links: [],
+            group: nil
+        )
+        let second = ArticleReferenceItem(
+            id: "second",
+            label: nil,
+            text: "Second source",
+            html: nil,
+            links: [],
+            group: nil
+        )
+        let presentation = ReferenceListHelpers.Presentation.make(
+            from: [ArticleReferenceSection(id: "sources", title: "Sources", items: [first, second])]
+        )
+
+        let selected = presentation.selectedSections(for: ["second"])
+
+        #expect(selected.count == 1)
+        #expect(selected.first?.items.map(\.id) == ["second"])
+        #expect(presentation.selectedSections(for: []).isEmpty)
+    }
+
+    @Test func referenceListUsesUnarySectionsAndDirectStableEnumeratedRows() throws {
+        let repositoryRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let sourceURL = repositoryRoot.appending(
+            path: "Sources/MacWiki/Views/Inspector/ReferenceListView.swift"
+        )
+        let source = try String(contentsOf: sourceURL, encoding: .utf8)
+
+        #expect(source.contains("ReferenceSectionView("))
+        #expect(source.contains("ForEach(section.items.enumerated(), id: \\.element.id)"))
+        #expect(!source.contains("Array(section.items.enumerated())"))
+        #expect(!source.contains("ReferenceListHelpers.visibleSections(from: newValue)"))
+    }
+
     @Test func prefersExistingValidLinksOverFallbackSearch() {
         let item = ArticleReferenceItem(
             id: "web",

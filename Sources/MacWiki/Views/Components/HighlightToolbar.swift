@@ -96,7 +96,11 @@ struct HighlightToolbar: View {
                     .accessibilityValue(selectedColor == color ? "Selected" : "")
                     .accessibilityHint("Creates a \(color.rawValue.lowercased()) highlight")
                     .onHover { hovering in
-                        withAnimation(.easeOut(duration: 0.15)) {
+                        withAnimation(
+                            accessibilityPersonalization.reduceMotion
+                                ? nil
+                                : .easeOut(duration: 0.15)
+                        ) {
                             isHoveringColor = hovering ? color : nil
                         }
                     }
@@ -263,7 +267,11 @@ struct HighlightToolbar: View {
             .frame(width: Metrics.actionButtonSize, height: Metrics.actionButtonSize)
             .background(actionBackground(for: actionType))
             .onHover { hovering in
-                withAnimation(.easeOut(duration: 0.12)) {
+                withAnimation(
+                    accessibilityPersonalization.reduceMotion
+                        ? nil
+                        : .easeOut(duration: 0.12)
+                ) {
                     hoveredAction = hovering ? actionType : (hoveredAction == actionType ? nil : hoveredAction)
                 }
             }
@@ -334,6 +342,7 @@ struct HighlightToolbar: View {
 /// Overlay view that shows the highlight toolbar positioned near the selection
 struct HighlightToolbarOverlay: View {
     @Environment(AppState.self) private var appState
+    @Environment(\.macWikiAccessibilityPersonalization.reduceMotion) private var reduceMotion
     let articleTitle: String
 
     // Track toolbar size for better positioning
@@ -360,13 +369,20 @@ struct HighlightToolbarOverlay: View {
                     }
                 }
                 .position(toolbarPosition(for: selection, in: geometry))
-                .transition(.asymmetric(
-                    insertion: .opacity.combined(with: .scale(scale: 0.9)).combined(with: .offset(y: 8)),
-                    removal: .opacity.combined(with: .scale(scale: 0.95))
-                ))
+                .transition(
+                    reduceMotion
+                        ? .opacity
+                        : .asymmetric(
+                            insertion: .opacity.combined(with: .scale(scale: 0.9)).combined(with: .offset(y: 8)),
+                            removal: .opacity.combined(with: .scale(scale: 0.95))
+                        )
+                )
             }
         }
-        .animation(.spring(response: 0.3, dampingFraction: 0.75), value: appState.currentTextSelection != nil)
+        .animation(
+            reduceMotion ? nil : .spring(response: 0.3, dampingFraction: 0.75),
+            value: appState.currentTextSelection != nil
+        )
     }
 
     private func toolbarPosition(for selection: TextSelectionData, in geometry: GeometryProxy) -> CGPoint {

@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct InspectorTagEditor: View {
+    @Environment(\.macWikiAccessibilityPersonalization.reduceMotion) private var reduceMotion
+
     @Binding var newTagName: String
     var isFieldFocused: FocusState<Bool>.Binding
     let assignedTagIDs: Set<UUID>
@@ -42,7 +44,7 @@ struct InspectorTagEditor: View {
 
                 if !newTagName.isEmpty {
                     Button("Clear Tag Search", systemImage: "xmark.circle.fill") {
-                        withAnimation(.easeOut(duration: 0.15)) {
+                        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.15)) {
                             newTagName = ""
                         }
                     }
@@ -50,7 +52,11 @@ struct InspectorTagEditor: View {
                     .font(.system(size: 11))
                     .foregroundStyle(.tertiary)
                     .buttonStyle(.plain)
-                    .transition(.opacity.combined(with: .scale(scale: 0.8)))
+                    .transition(
+                        reduceMotion
+                            ? .opacity
+                            : .opacity.combined(with: .scale(scale: 0.8))
+                    )
                 }
             }
             .padding(.horizontal, 12)
@@ -85,7 +91,7 @@ struct InspectorTagEditor: View {
                     FlowLayout(spacing: 6) {
                         ForEach(suggestedTags) { tag in
                             Button {
-                                withAnimation(.easeInOut(duration: 0.15)) {
+                                withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.15)) {
                                     onAssign(tag)
                                 }
                             } label: {

@@ -331,6 +331,7 @@ struct LinkHoverPreviewPane: View {
 
 private struct LinkHoverActionIcon: View {
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.macWikiAccessibilityPersonalization.reduceMotion) private var reduceMotion
     @State private var isHovered = false
 
     let systemImage: String
@@ -352,7 +353,7 @@ private struct LinkHoverActionIcon: View {
             .frame(width: 28, height: 28)
             .background(iconBackground)
             .onHover { hovering in
-                withAnimation(.easeOut(duration: 0.12)) {
+                withAnimation(reduceMotion ? nil : .easeOut(duration: 0.12)) {
                     isHovered = hovering
                 }
             }

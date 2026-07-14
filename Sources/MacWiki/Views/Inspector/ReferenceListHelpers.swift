@@ -2,6 +2,41 @@ import SwiftUI
 
 @MainActor
 enum ReferenceListHelpers {
+    @MainActor
+    struct Presentation: Equatable {
+        static let empty = Presentation(
+            sections: [],
+            referenceIDs: [],
+            totalCount: 0
+        )
+
+        let sections: [ArticleReferenceSection]
+        let referenceIDs: Set<String>
+        let totalCount: Int
+
+        static func make(from sections: [ArticleReferenceSection]) -> Presentation {
+            let visibleSections = ReferenceListHelpers.visibleSections(from: sections)
+            var referenceIDs = Set<String>()
+            let totalCount = visibleSections.reduce(into: 0) { count, section in
+                count += section.items.count
+                referenceIDs.formUnion(section.items.lazy.map(\.id))
+            }
+            return Presentation(
+                sections: visibleSections,
+                referenceIDs: referenceIDs,
+                totalCount: totalCount
+            )
+        }
+
+        func selectedSections(for selection: Set<String>) -> [ArticleReferenceSection] {
+            guard !selection.isEmpty else { return [] }
+            return ReferenceListHelpers.filteredSections(
+                sections: sections,
+                selection: selection
+            )
+        }
+    }
+
     static func canOpen(_ item: ArticleReferenceItem) -> Bool {
         item.links.contains { validOpenURL(from: $0) != nil } || fallbackSearchURL(for: item) != nil
     }

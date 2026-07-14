@@ -49,7 +49,10 @@ struct InspectorTagStatusBox: View {
                         .foregroundStyle(.secondary)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
-                        .background(.thinMaterial, in: Capsule())
+                        .readerInspectorCapsuleSurface(
+                            material: .thin,
+                            baseBorderOpacity: 0.08
+                        )
                 }
 
                 Button(isExpanded ? "Collapse Tags" : "Add Tags", systemImage: "chevron.down") {

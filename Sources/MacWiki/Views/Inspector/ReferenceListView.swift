@@ -9,13 +9,15 @@ struct ReferenceListView: View {
     @Binding var selectedReferenceIds: Set<String>
 
     @State private var suppressNextReferenceScroll = false
+    @State private var presentation: ReferenceListHelpers.Presentation
 
-    private var visibleSections: [ArticleReferenceSection] {
-        ReferenceListHelpers.visibleSections(from: sections)
-    }
-
-    private var totalCount: Int {
-        visibleSections.reduce(0) { $0 + $1.items.count }
+    init(
+        sections: [ArticleReferenceSection],
+        selectedReferenceIds: Binding<Set<String>>
+    ) {
+        self.sections = sections
+        self._selectedReferenceIds = selectedReferenceIds
+        self.presentation = ReferenceListHelpers.Presentation.make(from: sections)
     }
 
     private var selectionCount: Int {
@@ -34,43 +36,12 @@ struct ReferenceListView: View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 16) {
-                    ForEach(visibleSections) { section in
-                        if !section.items.isEmpty {
-                            ReferenceSectionHeaderView(title: section.title)
-
-                            ForEach(Array(section.items.enumerated()), id: \.element.id) { index, item in
-                                ReferenceRowView(
-                                    item: item,
-                                    displayLabel: ReferenceListHelpers.displayLabel(for: item, index: index),
-                                    isSelected: selectedReferenceIds.contains(item.id),
-                                    isFocused: appState.selectedReferenceId == item.id,
-                                    hasOpenTarget: ReferenceListHelpers.canOpen(item),
-                                    onToggleSelection: {
-                                        toggleSelection(for: item.id)
-                                    },
-                                    onOpen: {
-                                        ReferenceListHelpers.openFirstLink(
-                                            appState: appState,
-                                            item: item
-                                        ) { url in
-                                            openURL(url)
-                                        }
-                                    },
-                                    onCopy: { format in
-                                        ReferenceListHelpers.copyReferences(
-                                            format: format,
-                                            sections: [ArticleReferenceSection(id: section.id, title: section.title, items: [item])],
-                                            includeSectionHeaders: false
-                                        )
-                                    },
-                                    onFocus: {
-                                        suppressNextReferenceScroll = appState.selectedReferenceId != item.id
-                                        appState.selectedReferenceId = item.id
-                                    }
-                                )
-                                .id(item.id)
-                            }
-                        }
+                    ForEach(presentation.sections) { section in
+                        ReferenceSectionView(
+                            section: section,
+                            selectedReferenceIds: $selectedReferenceIds,
+                            onFocus: focusReference
+                        )
                     }
                 }
                 .padding(.horizontal, Metrics.horizontalPadding)
@@ -101,15 +72,12 @@ struct ReferenceListView: View {
                 .padding(.top, Metrics.topPadding)
         }
         .safeAreaInset(edge: .bottom, spacing: Metrics.bottomChromeSpacing) {
-            if !visibleSections.isEmpty {
+            if !presentation.sections.isEmpty {
                 ReferenceExportBarView(
-                    totalCount: totalCount,
+                    totalCount: presentation.totalCount,
                     selectionCount: selectionCount,
-                    selectedSections: ReferenceListHelpers.filteredSections(
-                        sections: visibleSections,
-                        selection: selectedReferenceIds
-                    ),
-                    allSections: visibleSections,
+                    selectedSections: presentation.selectedSections(for: selectedReferenceIds),
+                    allSections: presentation.sections,
                     onClearSelection: {
                         selectedReferenceIds.removeAll()
                     }
@@ -123,9 +91,12 @@ struct ReferenceListView: View {
                 )
             }
         }
-        .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: visibleSections.isEmpty)
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: presentation.sections.isEmpty)
         .onChange(of: sections) { _, newValue in
-            reconcileSelection(with: ReferenceListHelpers.visibleSections(from: newValue))
+            let updatedPresentation = ReferenceListHelpers.Presentation.make(from: newValue)
+            guard updatedPresentation != presentation else { return }
+            presentation = updatedPresentation
+            reconcileSelection(with: updatedPresentation.referenceIDs)
         }
     }
 
@@ -140,7 +111,7 @@ struct ReferenceListView: View {
                 .foregroundStyle(.primary)
                 .lineLimit(1)
 
-            Text("\(totalCount)")
+            Text("\(presentation.totalCount)")
                 .font(MacWikiTypography.compactRowMetadata)
                 .foregroundStyle(.white)
                 .padding(.horizontal, 6)
@@ -160,34 +131,23 @@ struct ReferenceListView: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
-        .background {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(.ultraThinMaterial)
-                .opacity(0.58)
-        }
-        .overlay {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(Color.primary.opacity(0.04), lineWidth: 0.5)
-        }
+        .readerInspectorRoundedSurface(
+            cornerRadius: 12,
+            material: .ultraThin,
+            materialOpacity: 0.58,
+            baseBorderOpacity: 0.04,
+            baseBorderWidth: 0.5
+        )
     }
 }
 
 private extension ReferenceListView {
-    func toggleSelection(for id: String) {
-        if selectedReferenceIds.contains(id) {
-            selectedReferenceIds.remove(id)
-        } else {
-            selectedReferenceIds.insert(id)
-        }
-    }
-
-    func reconcileSelection(with newSections: [ArticleReferenceSection]) {
-        let validIds = Set(newSections.flatMap { $0.items.map(\.id) })
+    func reconcileSelection(with validIds: Set<String>) {
         selectedReferenceIds = selectedReferenceIds.intersection(validIds)
     }
 
     var visibleReferenceIds: Set<String> {
-        Set(visibleSections.flatMap { $0.items.map(\.id) })
+        presentation.referenceIDs
     }
 
     func scrollToSelectedReferenceIfPresent(with proxy: ScrollViewProxy, animated: Bool) {
@@ -205,4 +165,69 @@ private extension ReferenceListView {
         }
     }
 
+    func focusReference(_ id: String) {
+        suppressNextReferenceScroll = appState.selectedReferenceId != id
+        appState.selectedReferenceId = id
+    }
+
+}
+
+private struct ReferenceSectionView: View {
+    @Environment(AppState.self) private var appState
+    @Environment(\.openURL) private var openURL
+
+    let section: ArticleReferenceSection
+    @Binding var selectedReferenceIds: Set<String>
+    let onFocus: (String) -> Void
+
+    var body: some View {
+        LazyVStack(alignment: .leading, spacing: 16) {
+            ReferenceSectionHeaderView(title: section.title)
+
+            ForEach(section.items.enumerated(), id: \.element.id) { index, item in
+                ReferenceRowView(
+                    item: item,
+                    displayLabel: ReferenceListHelpers.displayLabel(for: item, index: index),
+                    isSelected: selectedReferenceIds.contains(item.id),
+                    isFocused: appState.selectedReferenceId == item.id,
+                    hasOpenTarget: ReferenceListHelpers.canOpen(item),
+                    onToggleSelection: {
+                        toggleSelection(for: item.id)
+                    },
+                    onOpen: {
+                        ReferenceListHelpers.openFirstLink(
+                            appState: appState,
+                            item: item,
+                            openExternalURL: { url in
+                                openURL(url)
+                            }
+                        )
+                    },
+                    onCopy: { format in
+                        ReferenceListHelpers.copyReferences(
+                            format: format,
+                            sections: [ArticleReferenceSection(
+                                id: section.id,
+                                title: section.title,
+                                items: [item]
+                            )],
+                            includeSectionHeaders: false
+                        )
+                    },
+                    onFocus: {
+                        onFocus(item.id)
+                    }
+                )
+                .id(item.id)
+            }
+        }
+    }
+
+    private func toggleSelection(for id: String) {
+        if selectedReferenceIds.contains(id) {
+            selectedReferenceIds.remove(id)
+        } else {
+            selectedReferenceIds.insert(id)
+        }
+    }
 }
