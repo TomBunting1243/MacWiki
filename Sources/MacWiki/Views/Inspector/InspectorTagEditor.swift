@@ -4,11 +4,11 @@ struct InspectorTagEditor: View {
     @Binding var newTagName: String
     var isFieldFocused: FocusState<Bool>.Binding
     let assignedTagIDs: Set<UUID>
-    let allTags: [Tag]
+    let allTags: [InspectorTagSnapshot]
     let onCreateOrAssign: () -> Void
-    let onAssign: (Tag) -> Void
+    let onAssign: (InspectorTagSnapshot) -> Void
 
-    private var suggestedTags: [Tag] {
+    private var suggestedTags: [InspectorTagSnapshot] {
         let trimmed = newTagName.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.isEmpty {
             return allTags.filter { !assignedTagIDs.contains($0.id) }

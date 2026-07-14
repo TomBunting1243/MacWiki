@@ -2,7 +2,7 @@ import SwiftUI
 import SwiftData
 
 struct HighlightRowView: View {
-    let highlight: Highlight
+    let highlight: InspectorHighlightSnapshot
     let onDelete: () -> Void
 
     @Environment(AppState.self) private var appState
@@ -234,8 +234,9 @@ struct HighlightRowView: View {
             ForEach(HighlightColor.allCases, id: \.self) { color in
                 Button {
                     withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2)) {
-                        highlight.color = color
-                        highlight.updatedAt = Date()
+                        guard let model = resolvedHighlight() else { return }
+                        model.color = color
+                        model.updatedAt = Date()
                         modelContext.saveReportingFailure(operation: #function)
                         appState.pendingHighlightColorChange = AppState.HighlightColorChangeRequest(
                             id: highlight.id,
@@ -451,8 +452,12 @@ struct HighlightRowView: View {
                 .foregroundStyle(.secondary)
 
                 Button("Save") {
-                    highlight.note = editedNote.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : editedNote
-                    highlight.updatedAt = Date()
+                    guard let model = resolvedHighlight() else {
+                        isEditing = false
+                        return
+                    }
+                    model.note = editedNote.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : editedNote
+                    model.updatedAt = Date()
                     modelContext.saveReportingFailure(operation: #function)
                     withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.15)) {
                         isEditing = false
@@ -465,8 +470,9 @@ struct HighlightRowView: View {
     }
 
     private func restoreHighlight() {
-        highlight.isArchived = false
-        highlight.updatedAt = Date()
+        guard let model = resolvedHighlight() else { return }
+        model.isArchived = false
+        model.updatedAt = Date()
         modelContext.saveReportingFailure(operation: #function)
     }
 
@@ -489,5 +495,9 @@ struct HighlightRowView: View {
         if appState.pendingHighlightNoteEditorRequest?.requestID == request.requestID {
             appState.pendingHighlightNoteEditorRequest = nil
         }
+    }
+
+    private func resolvedHighlight() -> Highlight? {
+        InspectorPersistentModelResolver.highlight(id: highlight.id, in: modelContext)
     }
 }

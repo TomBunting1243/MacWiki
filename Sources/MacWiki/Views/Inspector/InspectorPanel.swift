@@ -11,25 +11,30 @@ struct InspectorPanel: View {
     @Query(sort: \Label.sortOrder) private var allLabels: [Label]
     @Query(sort: \Tag.sortOrder) private var allTags: [Tag]
     @Query(sort: \Highlight.createdAt, order: .reverse) private var currentArticleHighlights: [Highlight]
+    @Query private var currentArticleStates: [ArticleState]
 
     @State private var rehydrateToast: HighlightRehydrateToast?
-    @State private var currentArticleState: ArticleState?
-    @State private var cachedCurrentArticleHighlights: [Highlight] = []
-    @State private var cachedCurrentArticleTags: [Tag] = []
+    @State private var articleSnapshot = InspectorArticleSnapshot.empty
     @State private var showStaleHighlights = true
     @State private var showArchivedHighlights = false
     @State private var selectedReferenceIDs: Set<String> = []
 
     init(
-        currentArticleTitle: String?
+        currentArticle: Article?
     ) {
-        let scopedTitle = currentArticleTitle ?? ""
+        let scopedTitle = currentArticle?.title ?? ""
+        let scopedURLString = currentArticle?.url.absoluteString ?? ""
         _currentArticleHighlights = Query(
             filter: #Predicate<Highlight> { highlight in
                 highlight.articleTitle == scopedTitle
             },
             sort: \Highlight.createdAt,
             order: .reverse
+        )
+        _currentArticleStates = Query(
+            filter: #Predicate<ArticleState> { state in
+                state.articleURLString == scopedURLString
+            }
         )
     }
 
@@ -67,16 +72,24 @@ struct InspectorPanel: View {
                 .combined(with: .scale(scale: 0.98))
     }
 
-    private var derivedArticleDataRefreshKey: String {
-        let title = appState.currentArticle?.title ?? ""
-        let highlightFingerprint = currentArticleHighlights.reduce(into: Hasher()) { hasher, highlight in
-            hasher.combine(highlight.id)
-            hasher.combine(highlight.updatedAt.timeIntervalSinceReferenceDate.bitPattern)
-            hasher.combine(stableTagFingerprint(for: highlight.tags))
-            hasher.combine(highlight.isArchivedRaw ?? false)
-        }.finalize()
-        let stateTagFingerprint = stableTagFingerprint(for: currentArticleState?.tags ?? [])
-        return "\(title)|\(highlightFingerprint)|\(stateTagFingerprint)"
+    private var currentArticleKey: InspectorArticleKey? {
+        appState.currentArticle.map(InspectorArticleKey.init)
+    }
+
+    private var displayedArticleSnapshot: InspectorArticleSnapshot {
+        guard articleSnapshot.articleKey == currentArticleKey else {
+            return .empty(for: currentArticleKey)
+        }
+        return articleSnapshot
+    }
+
+    private var derivedArticleDataRefreshKey: InspectorArticleSnapshotRefreshKey {
+        InspectorArticleSnapshotRefreshKey(
+            articleKey: currentArticleKey,
+            highlights: currentArticleHighlights,
+            articleStates: currentArticleStates,
+            tags: allTags
+        )
     }
 
     private var sectionFillOpacity: Double {
@@ -135,12 +148,7 @@ struct InspectorPanel: View {
         .task(id: derivedArticleDataRefreshKey) {
             await Task.yield()
             guard !Task.isCancelled else { return }
-            refreshCachedArticleDerivedData()
-        }
-        .task(id: appState.currentArticle?.title) {
-            await Task.yield()
-            guard !Task.isCancelled else { return }
-            await loadOrCreateArticleState()
+            await refreshArticleSnapshot()
         }
         .onChange(of: appState.currentArticle?.id) {
             selectedReferenceIDs.removeAll()
@@ -154,7 +162,7 @@ struct InspectorPanel: View {
             infoContent
         case .notes:
             InspectorNotesModeView(
-                highlights: cachedCurrentArticleHighlights,
+                highlights: displayedArticleSnapshot.highlights,
                 showStaleHighlights: $showStaleHighlights,
                 showArchivedHighlights: $showArchivedHighlights
             )
@@ -215,14 +223,14 @@ struct InspectorPanel: View {
 
             InspectorLabelSection(
                 article: article,
-                allLabels: allLabels
+                allLabels: allLabels.map(InspectorLabelSnapshot.init)
             )
 
             InspectorTagStatusBox(
                 article: article,
-                tags: cachedCurrentArticleTags,
-                allTags: allTags,
-                highlights: cachedCurrentArticleHighlights
+                tags: displayedArticleSnapshot.tags,
+                allTags: allTags.map(InspectorTagSnapshot.init),
+                highlightIDs: displayedArticleSnapshot.highlights.map(\.id)
             )
         }
     }
@@ -403,49 +411,35 @@ struct InspectorPanel: View {
             }
     }
 
-    private func refreshCachedArticleDerivedData() {
-        guard appState.currentArticle != nil else {
-            if !cachedCurrentArticleHighlights.isEmpty {
-                cachedCurrentArticleHighlights = []
-            }
-            if !cachedCurrentArticleTags.isEmpty {
-                cachedCurrentArticleTags = []
-            }
+    @MainActor
+    private func refreshArticleSnapshot() async {
+        guard let article = appState.currentArticle else {
+            articleSnapshot = .empty
             return
         }
+        let requestedKey = InspectorArticleKey(article: article)
+        let state = await loadOrCreateArticleState(for: article, requestedKey: requestedKey)
+        guard !Task.isCancelled, currentArticleKey == requestedKey else { return }
 
-        let matchingHighlights = currentArticleHighlights
-        if cachedCurrentArticleHighlights.map(\.id) != matchingHighlights.map(\.id) {
-            cachedCurrentArticleHighlights = matchingHighlights
-        }
-
-        var seen = Set<UUID>()
-        let articleTags = currentArticleState?.tags ?? []
-        let highlightTags = matchingHighlights.flatMap { $0.tags }
-        let mergedTags = (articleTags + highlightTags).filter { tag in
-            if seen.contains(tag.id) { return false }
-            seen.insert(tag.id)
-            return true
-        }
-        let sortedTags = mergedTags.sorted { $0.sortOrder < $1.sortOrder }
-        if cachedCurrentArticleTags.map(\.id) != sortedTags.map(\.id) {
-            cachedCurrentArticleTags = sortedTags
+        let refreshed = InspectorArticleSnapshot.make(
+            article: article,
+            articleState: state,
+            highlights: currentArticleHighlights
+        )
+        if articleSnapshot != refreshed {
+            articleSnapshot = refreshed
         }
     }
-    
+
     @MainActor
-    private func loadOrCreateArticleState() async {
-        guard let article = appState.currentArticle else {
-            currentArticleState = nil
-            return
-        }
+    private func loadOrCreateArticleState(
+        for article: Article,
+        requestedKey: InspectorArticleKey
+    ) async -> ArticleState? {
 
         if let existing = fetchArticleState(for: article) {
             // Check cancellation before writing — article may have changed
-            guard !Task.isCancelled, appState.currentArticle?.title == article.title else { return }
-            if currentArticleState?.id != existing.id {
-                currentArticleState = existing
-            }
+            guard !Task.isCancelled, currentArticleKey == requestedKey else { return nil }
             let didChangeSavedArticles = ReadStateSync.syncSavedArticles(
                 title: article.title,
                 isRead: existing.isRead,
@@ -455,13 +449,13 @@ struct InspectorPanel: View {
             if didChangeSavedArticles {
                 modelContext.saveReportingFailure(operation: #function)
             }
-            return
+            return existing
         }
 
         let resolvedReadState = ReadStateSync.resolveReadState(for: article, in: modelContext)
 
         // Check cancellation before inserting — a rapid tab switch could cause stale writes
-        guard !Task.isCancelled, appState.currentArticle?.title == article.title else { return }
+        guard !Task.isCancelled, currentArticleKey == requestedKey else { return nil }
 
         let newState = ArticleState(
             articleTitle: article.title,
@@ -470,8 +464,8 @@ struct InspectorPanel: View {
         )
         modelContext.insert(newState)
         modelContext.saveReportingFailure(operation: #function)
-        currentArticleState = newState
         appState.updateReadState(forTitle: article.title, isRead: resolvedReadState)
+        return newState
     }
 
     private func fetchArticleState(for article: Article) -> ArticleState? {

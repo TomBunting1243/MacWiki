@@ -80,17 +80,19 @@ extension WebView.Coordinator {
         guard let failedIds = data["failedIds"] as? [String] else { return }
         let failedSet = Set(failedIds.compactMap { UUID(uuidString: $0) })
         var didChange = false
+        let timestamp = Date()
 
         for highlight in highlights {
             let shouldBeStale = failedSet.contains(highlight.id)
             if highlight.isStale != shouldBeStale {
                 highlight.isStale = shouldBeStale
+                highlight.updatedAt = timestamp
                 didChange = true
             }
         }
 
         if didChange {
-            try? modelContext?.save()
+            modelContext?.saveReportingFailure(operation: #function)
         }
     }
 

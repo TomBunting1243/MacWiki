@@ -7,20 +7,20 @@ struct HighlightListView: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.macWikiAccessibilityPersonalization.reduceMotion) private var reduceMotion
 
-    let highlights: [Highlight]
+    let highlights: [InspectorHighlightSnapshot]
     @Binding var showStaleHighlights: Bool
     @Binding var showArchivedHighlights: Bool
     @State private var showArchiveMissingConfirmation = false
 
-    private var activeHighlights: [Highlight] {
+    private var activeHighlights: [InspectorHighlightSnapshot] {
         highlights.filter { !$0.isArchived }
     }
 
-    private var archivedHighlights: [Highlight] {
+    private var archivedHighlights: [InspectorHighlightSnapshot] {
         highlights.filter { $0.isArchived }
     }
 
-    private var staleHighlights: [Highlight] {
+    private var staleHighlights: [InspectorHighlightSnapshot] {
         activeHighlights.filter { $0.isStale }
     }
 
@@ -36,7 +36,7 @@ struct HighlightListView: View {
         staleHighlightCount > 0 || appState.isHighlightArticleRefreshInProgress
     }
 
-    private var visibleHighlights: [Highlight] {
+    private var visibleHighlights: [InspectorHighlightSnapshot] {
         HighlightDisplayFilter.visibleHighlights(
             from: highlights,
             showStaleHighlights: showStaleHighlights,
@@ -245,8 +245,12 @@ struct HighlightListView: View {
         .padding(.vertical, 16)
     }
 
-    private func deleteHighlight(_ highlight: Highlight) {
-        modelContext.delete(highlight)
+    private func deleteHighlight(_ highlight: InspectorHighlightSnapshot) {
+        guard let model = InspectorPersistentModelResolver.highlight(
+            id: highlight.id,
+            in: modelContext
+        ) else { return }
+        modelContext.delete(model)
         modelContext.saveReportingFailure(operation: #function)
     }
 
@@ -266,9 +270,14 @@ struct HighlightListView: View {
            staleIDs.contains(selectedId) {
             appState.selectedHighlightId = nil
         }
-        staleHighlights.forEach { highlight in
+        let now = Date()
+        staleHighlights.forEach { snapshot in
+            guard let highlight = InspectorPersistentModelResolver.highlight(
+                id: snapshot.id,
+                in: modelContext
+            ) else { return }
             highlight.isArchived = true
-            highlight.updatedAt = Date()
+            highlight.updatedAt = now
         }
         modelContext.saveReportingFailure(operation: #function)
     }

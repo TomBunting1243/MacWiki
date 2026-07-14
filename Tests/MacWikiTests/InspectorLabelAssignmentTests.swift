@@ -47,8 +47,8 @@ struct InspectorLabelAssignmentTests {
             in: modelContext
         )
 
-        #expect(Set(assignment.savedArticles.map(\.id)) == [spaced.id, underscored.id])
-        #expect(assignment.articleState === state)
+        #expect(Set(assignment.savedArticleIDs) == [spaced.id, underscored.id])
+        #expect(assignment.articleStateID == state.id)
         #expect(assignment.selectedLabelID == selectedLabelID)
     }
 
@@ -65,23 +65,17 @@ struct InspectorLabelAssignmentTests {
         let unlabeled = SavedArticle(title: article.title)
         modelContext.insert(state)
         modelContext.insert(unlabeled)
+        try modelContext.save()
 
-        let fallback = InspectorLabelAssignment(
-            articleKey: key,
-            savedArticles: [unlabeled],
-            articleState: state
-        )
+        let fallback = InspectorLabelAssignmentLoader.load(for: key, in: modelContext)
         #expect(fallback.selectedLabelID == fallbackLabelID)
 
-        let first = SavedArticle(title: article.title)
-        first.labelId = UUID()
+        unlabeled.labelId = UUID()
         let second = SavedArticle(title: article.title)
         second.labelId = UUID()
-        let conflicting = InspectorLabelAssignment(
-            articleKey: key,
-            savedArticles: [first, second],
-            articleState: state
-        )
+        modelContext.insert(second)
+        try modelContext.save()
+        let conflicting = InspectorLabelAssignmentLoader.load(for: key, in: modelContext)
         #expect(conflicting.selectedLabelID == nil)
     }
 
@@ -91,14 +85,14 @@ struct InspectorLabelAssignmentTests {
         let key = InspectorLabelArticleKey(article: article)
 
         let initial = InspectorLabelAssignmentLoader.load(for: key, in: modelContext)
-        #expect(initial.savedArticles.isEmpty)
+        #expect(initial.savedArticleIDs.isEmpty)
 
         let newlySaved = SavedArticle(title: "Grace_Hopper")
         modelContext.insert(newlySaved)
         try modelContext.save()
 
         let refreshed = InspectorLabelAssignmentLoader.load(for: key, in: modelContext)
-        #expect(refreshed.savedArticles.map(\.id) == [newlySaved.id])
+        #expect(refreshed.savedArticleIDs == [newlySaved.id])
     }
 
     @Test func refreshKeyChangesForExternalSavedOrStateLabelMutations() throws {

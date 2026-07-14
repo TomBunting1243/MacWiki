@@ -24,17 +24,11 @@ struct InspectorLabelArticleKey: Hashable {
     }
 }
 
-struct InspectorLabelAssignment {
+struct InspectorLabelAssignment: Equatable {
     let articleKey: InspectorLabelArticleKey
-    let savedArticles: [SavedArticle]
-    let articleState: ArticleState?
-
-    var selectedLabelID: UUID? {
-        let savedLabelIDs = Set(savedArticles.compactMap(\.labelId))
-        guard !savedArticles.isEmpty else { return articleState?.labelId }
-        if savedLabelIDs.count == 1 { return savedLabelIDs.first }
-        return savedLabelIDs.isEmpty ? articleState?.labelId : nil
-    }
+    let savedArticleIDs: [UUID]
+    let articleStateID: UUID?
+    let selectedLabelID: UUID?
 }
 
 struct InspectorLabelAssignmentRefreshKey: Hashable {
@@ -105,10 +99,20 @@ enum InspectorLabelAssignmentLoader {
             forURLString: articleKey.urlString,
             in: modelContext
         )
+        let savedLabelIDs = Set(matches.compactMap(\.labelId))
+        let selectedLabelID: UUID?
+        if matches.isEmpty {
+            selectedLabelID = state?.labelId
+        } else if savedLabelIDs.count == 1 {
+            selectedLabelID = savedLabelIDs.first
+        } else {
+            selectedLabelID = savedLabelIDs.isEmpty ? state?.labelId : nil
+        }
         return InspectorLabelAssignment(
             articleKey: articleKey,
-            savedArticles: matches,
-            articleState: state
+            savedArticleIDs: matches.map(\.id),
+            articleStateID: state?.id,
+            selectedLabelID: selectedLabelID
         )
     }
 }

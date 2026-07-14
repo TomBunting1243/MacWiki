@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 
 struct InspectorNotesModeView: View {
-    let highlights: [Highlight]
+    let highlights: [InspectorHighlightSnapshot]
     @Binding var showStaleHighlights: Bool
     @Binding var showArchivedHighlights: Bool
 

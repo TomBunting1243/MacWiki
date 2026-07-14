@@ -1,16 +1,37 @@
 import SwiftUI
 import SwiftData
 
+struct TagDetailSheetTarget: Equatable {
+    let id: UUID
+    let name: String
+
+    init(tag: Tag) {
+        id = tag.id
+        name = tag.name
+    }
+}
+
 struct TagDetailSheet: View {
     @Environment(\.modelContext) private var modelContext
     @Query private var tags: [Tag]
     @Binding var isPresented: Bool
 
-    var tagToEdit: Tag?
-    var onSave: ((Tag) -> Void)? = nil
+    private let target: TagDetailSheetTarget?
+    private let onSave: ((Tag) -> Void)?
 
     @State private var name = ""
+    @State private var isUnavailable = false
     @FocusState private var isNameFocused: Bool
+
+    init(
+        isPresented: Binding<Bool>,
+        tagToEdit: Tag?,
+        onSave: ((Tag) -> Void)? = nil
+    ) {
+        _isPresented = isPresented
+        target = tagToEdit.map(TagDetailSheetTarget.init)
+        self.onSave = onSave
+    }
 
     private var trimmedName: String {
         name.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -18,7 +39,7 @@ struct TagDetailSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text(tagToEdit == nil ? "New Tag" : "Edit Tag")
+            Text(target == nil ? "New Tag" : "Edit Tag")
                 .font(.headline)
 
             TextField("Tag Name", text: $name)
@@ -36,7 +57,7 @@ struct TagDetailSheet: View {
                 Spacer()
 
                 AccessibleActionButton(
-                    tagToEdit == nil ? "Create" : "Save",
+                    target == nil ? "Create" : "Save",
                     isEnabled: !trimmedName.isEmpty,
                     keyEquivalent: "\r"
                 ) {
@@ -48,26 +69,44 @@ struct TagDetailSheet: View {
         .padding(20)
         .frame(width: 280)
         .onAppear {
-            if let tag = tagToEdit {
-                name = tag.name
+            if let target {
+                name = target.name
             }
             isNameFocused = true
+        }
+        .alert("Tag No Longer Available", isPresented: $isUnavailable) {
+            Button("OK") {
+                isPresented = false
+            }
+        } message: {
+            Text("The tag was removed in another window.")
         }
     }
 
     private func save() {
         guard !trimmedName.isEmpty else { return }
 
-        if let tag = tagToEdit {
+        let savedTag: Tag
+        if let target {
+            let targetID = target.id
+            let descriptor = FetchDescriptor<Tag>(
+                predicate: #Predicate { $0.id == targetID }
+            )
+            guard let tag = try? modelContext.fetch(descriptor).first else {
+                isUnavailable = true
+                return
+            }
             tag.name = trimmedName
-            onSave?(tag)
+            savedTag = tag
         } else {
             let tag = Tag(name: trimmedName)
             tag.sortOrder = SortOrderAllocator.next(for: tags.map(\.sortOrder))
             modelContext.insert(tag)
-            onSave?(tag)
+            savedTag = tag
         }
-        modelContext.saveReportingFailure(operation: #function)
+
+        guard modelContext.saveReportingFailure(operation: #function) else { return }
+        onSave?(savedTag)
         isPresented = false
     }
 }

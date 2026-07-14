@@ -5,7 +5,7 @@ struct InspectorColumnView: View {
 
     var body: some View {
         InspectorPanel(
-            currentArticleTitle: appState.currentArticle?.title
+            currentArticle: appState.currentArticle
         )
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .ignoresSafeArea(.container, edges: .top)

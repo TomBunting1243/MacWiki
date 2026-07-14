@@ -29,4 +29,14 @@ extension AppState.HighlightRehydrateRequest {
             contextAfter: highlight.contextAfter ?? ""
         )
     }
+
+    init(highlight: InspectorHighlightSnapshot) {
+        self.init(
+            id: highlight.id,
+            text: highlight.text,
+            cssColor: highlight.color.cssColor,
+            contextBefore: highlight.contextBefore ?? "",
+            contextAfter: highlight.contextAfter ?? ""
+        )
+    }
 }

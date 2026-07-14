@@ -8,23 +8,22 @@ struct InspectorTagStatusBox: View {
     @Environment(\.macWikiAccessibilityPersonalization.reduceMotion) private var reduceMotion
 
     let article: Article
-    let tags: [Tag]
-    let allTags: [Tag]
-    let highlights: [Highlight]
+    let tags: [InspectorTagSnapshot]
+    let allTags: [InspectorTagSnapshot]
+    let highlightIDs: [UUID]
 
-    @State private var articleState: ArticleState?
     @State private var newTagName = ""
     @State private var isExpanded = false
     @State private var tagMarkedForRemoval: UUID?
-    @State private var editingTag: Tag?
+    @State private var editingTagID: UUID?
     @FocusState private var isFieldFocused: Bool
 
     private var editingTagSheetBinding: Binding<Bool> {
         Binding(
-            get: { editingTag != nil },
+            get: { editingTagID != nil },
             set: { isPresented in
                 if !isPresented {
-                    editingTag = nil
+                    editingTagID = nil
                 }
             }
         )
@@ -84,7 +83,7 @@ struct InspectorTagStatusBox: View {
                             withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.15)) {
                                 if tagMarkedForRemoval == tag.id {
                                     // Second tap on marked tag → remove it
-                                    removeTag(tag)
+                                    removeTag(id: tag.id)
                                     tagMarkedForRemoval = nil
                                 } else {
                                     // First tap → mark for removal (red + X)
@@ -94,7 +93,7 @@ struct InspectorTagStatusBox: View {
                         }
                         .contextMenu {
                             Button {
-                                editingTag = tag
+                                editingTagID = tag.id
                             } label: {
                                 SwiftUI.Label("Rename", systemImage: "pencil")
                             }
@@ -103,7 +102,7 @@ struct InspectorTagStatusBox: View {
 
                             Button(role: .destructive) {
                                 withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.25)) {
-                                    removeTag(tag)
+                                    removeTag(id: tag.id)
                                 }
                             } label: {
                                 SwiftUI.Label("Remove \"\(tag.name)\"", systemImage: "minus.circle")
@@ -136,27 +135,36 @@ struct InspectorTagStatusBox: View {
                 tagMarkedForRemoval = nil
             }
         }
-        .onAppear {
-            articleState = ReadStateSync.fetchArticleState(
-                forURLString: article.url.absoluteString, in: modelContext
-            )
-        }
-        .onChange(of: article.title) {
+        .onChange(of: InspectorArticleKey(article: article)) {
             // Collapse editor and reset state when navigating to a different article
             withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.15)) {
                 isExpanded = false
                 newTagName = ""
                 tagMarkedForRemoval = nil
+                editingTagID = nil
             }
-            articleState = ReadStateSync.fetchArticleState(
-                forURLString: article.url.absoluteString, in: modelContext
-            )
         }
-        .sheet(item: $editingTag) { tag in
-            TagDetailSheet(
-                isPresented: editingTagSheetBinding,
-                tagToEdit: tag
-            )
+        .sheet(isPresented: editingTagSheetBinding) {
+            if let editingTagID,
+               let tag = InspectorPersistentModelResolver.tag(
+                    id: editingTagID,
+                    in: modelContext
+               ) {
+                TagDetailSheet(
+                    isPresented: editingTagSheetBinding,
+                    tagToEdit: tag
+                )
+            } else {
+                ContentUnavailableView(
+                    "Tag No Longer Available",
+                    systemImage: "tag.slash",
+                    description: Text("The tag was removed in another window.")
+                )
+                .frame(width: 320, height: 180)
+                .task {
+                    editingTagID = nil
+                }
+            }
         }
     }
 
@@ -199,11 +207,19 @@ struct InspectorTagStatusBox: View {
         let newTag = Tag(name: trimmed)
         newTag.sortOrder = SortOrderAllocator.next(for: allTags.map(\.sortOrder))
         modelContext.insert(newTag)
-        assignTag(newTag)
+        assignTagModel(newTag)
         newTagName = ""
     }
 
-    private func assignTag(_ tag: Tag) {
+    private func assignTag(_ tag: InspectorTagSnapshot) {
+        guard let model = InspectorPersistentModelResolver.tag(
+            id: tag.id,
+            in: modelContext
+        ) else { return }
+        assignTagModel(model)
+    }
+
+    private func assignTagModel(_ tag: Tag) {
         let state = ensureArticleState()
         guard let state else { return }
         if state.tags.contains(where: { $0.id == tag.id }) { return }
@@ -212,17 +228,21 @@ struct InspectorTagStatusBox: View {
         modelContext.saveReportingFailure(operation: #function)
     }
 
-    private func removeTag(_ tag: Tag) {
+    private func removeTag(id tagID: UUID) {
         guard let state = ensureArticleState() else { return }
-        state.tags.removeAll { $0.id == tag.id }
+        state.tags.removeAll { $0.id == tagID }
         state.updatedAt = Date()
 
-        for highlight in highlights where highlight.tags.contains(where: { $0.id == tag.id }) {
-            highlight.tags.removeAll { $0.id == tag.id }
+        for highlightID in highlightIDs {
+            guard let highlight = InspectorPersistentModelResolver.highlight(
+                id: highlightID,
+                in: modelContext
+            ), highlight.tags.contains(where: { $0.id == tagID }) else { continue }
+            highlight.tags.removeAll { $0.id == tagID }
             highlight.updatedAt = Date()
         }
 
-        if appState.highlightTagFilterId == tag.id {
+        if appState.highlightTagFilterId == tagID {
             appState.highlightTagFilterId = nil
         }
 
@@ -230,9 +250,6 @@ struct InspectorTagStatusBox: View {
     }
 
     private func ensureArticleState() -> ArticleState? {
-        if let state = articleState { return state }
-        let state = ReadStateSync.ensureArticleState(for: article, in: modelContext)
-        articleState = state
-        return state
+        ReadStateSync.ensureArticleState(for: article, in: modelContext)
     }
 }

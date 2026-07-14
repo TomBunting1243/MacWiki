@@ -791,8 +791,11 @@ struct BetaReadinessRegressionTests {
         #expect(modeViewsSource.contains("@Binding var showStaleHighlights: Bool"))
         #expect(modeViewsSource.contains("@Binding var showArchivedHighlights: Bool"))
         #expect(modeViewsSource.contains("@Binding var selectedReferenceIDs: Set<String>"))
-        #expect(inspectorSource.components(separatedBy: ".task(id: appState.currentArticle?.title)").count - 1 == 1)
-        #expect(inspectorSource.firstRange(of: ".task(id: appState.currentArticle?.title)")!.lowerBound < inspectorSource.firstRange(of: "private var infoContent")!.lowerBound)
+        #expect(inspectorSource.components(separatedBy: ".task(id: derivedArticleDataRefreshKey)").count - 1 == 1)
+        let refreshTask = try #require(inspectorSource.firstRange(of: ".task(id: derivedArticleDataRefreshKey)"))
+        let infoContent = try #require(inspectorSource.firstRange(of: "private var infoContent"))
+        #expect(refreshTask.lowerBound < infoContent.lowerBound)
+        #expect(inspectorSource.contains("@State private var articleSnapshot = InspectorArticleSnapshot.empty"))
         #expect(!inspectorSource.contains("InfoTopContentHeightPreferenceKey"))
         #expect(!inspectorSource.contains("infoTopContentHeight"))
 

@@ -9,14 +9,14 @@ struct InspectorLabelSection: View {
     @Query private var matchingArticleStates: [ArticleState]
 
     let article: Article
-    let allLabels: [Label]
+    let allLabels: [InspectorLabelSnapshot]
 
     @State private var showNewLabelSheet = false
-    @State private var pendingNewLabel: Label?
+    @State private var pendingNewLabel: InspectorLabelSnapshot?
     @State private var isHovered = false
     @State private var assignment: InspectorLabelAssignment?
 
-    init(article: Article, allLabels: [Label]) {
+    init(article: Article, allLabels: [InspectorLabelSnapshot]) {
         self.article = article
         self.allLabels = allLabels
 
@@ -60,7 +60,7 @@ struct InspectorLabelSection: View {
         currentAssignment?.selectedLabelID
     }
 
-    private var currentLabel: Label? {
+    private var currentLabel: InspectorLabelSnapshot? {
         guard let id = selectedLabelId else { return nil }
         if let modelLabel = allLabels.first(where: { $0.id == id }) {
             return modelLabel
@@ -90,8 +90,9 @@ struct InspectorLabelSection: View {
         }
         .sheet(isPresented: $showNewLabelSheet) {
             LabelDetailSheet(isPresented: $showNewLabelSheet, labelToEdit: nil) { label in
-                pendingNewLabel = label
-                applyLabel(label)
+                let snapshot = InspectorLabelSnapshot(label: label)
+                pendingNewLabel = snapshot
+                applyLabel(snapshot)
             }
         }
         .onChange(of: selectedLabelId) { _, newValue in
@@ -200,18 +201,36 @@ struct InspectorLabelSection: View {
 
     // MARK: - Actions
 
-    private func applyLabel(_ label: Label?) {
-        let resolvedAssignment = assignmentForMutation()
-        let state = resolvedAssignment.articleState ?? ensureArticleState()
-        state?.labelId = label?.id
-        state?.updatedAt = Date()
-
-        var savedArticles = resolvedAssignment.savedArticles
-        for saved in savedArticles {
-            saved.labelId = label?.id
+    private func applyLabel(_ label: InspectorLabelSnapshot?) {
+        let resolvedLabelID: UUID?
+        if let label {
+            guard InspectorPersistentModelResolver.label(
+                id: label.id,
+                in: modelContext
+            ) != nil else {
+                pendingNewLabel = nil
+                return
+            }
+            resolvedLabelID = label.id
+        } else {
+            resolvedLabelID = nil
         }
 
-        if let label, savedArticles.isEmpty {
+        let resolvedAssignment = assignmentForMutation()
+        let state = resolvedAssignment.articleStateID.flatMap {
+            InspectorPersistentModelResolver.articleState(id: $0, in: modelContext)
+        } ?? ensureArticleState()
+        state?.labelId = resolvedLabelID
+        state?.updatedAt = Date()
+
+        var savedArticles = resolvedAssignment.savedArticleIDs.compactMap {
+            InspectorPersistentModelResolver.savedArticle(id: $0, in: modelContext)
+        }
+        for saved in savedArticles {
+            saved.labelId = resolvedLabelID
+        }
+
+        if let resolvedLabelID, savedArticles.isEmpty {
             let saved = SavedArticle(
                 title: article.title,
                 description: article.description,
@@ -219,7 +238,7 @@ struct InspectorLabelSection: View {
                 thumbnailURL: article.thumbnailURL,
                 wordCount: article.wordCount
             )
-            saved.labelId = label.id
+            saved.labelId = resolvedLabelID
             saved.isRead = state?.isRead ?? false
 
             if let list = allLists.first(where: { $0.name == "Inbox" }) ?? allLists.first {
@@ -236,8 +255,9 @@ struct InspectorLabelSection: View {
 
         assignment = InspectorLabelAssignment(
             articleKey: articleKey,
-            savedArticles: savedArticles,
-            articleState: state
+            savedArticleIDs: savedArticles.map(\.id),
+            articleStateID: state?.id,
+            selectedLabelID: resolvedLabelID
         )
         modelContext.saveReportingFailure(operation: #function)
     }

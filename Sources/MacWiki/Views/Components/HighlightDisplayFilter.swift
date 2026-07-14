@@ -18,6 +18,26 @@ enum HighlightDisplayFilter {
         }
     }
 
+    static func visibleHighlights(
+        from highlights: [InspectorHighlightSnapshot],
+        showStaleHighlights: Bool,
+        showArchivedHighlights: Bool
+    ) -> [InspectorHighlightSnapshot] {
+        highlights.filter { highlight in
+            guard !isCitationNoise(
+                text: highlight.text,
+                sectionTitle: highlight.sectionTitle
+            ) else { return false }
+            if highlight.isArchived {
+                return showArchivedHighlights
+            }
+            if !showStaleHighlights && highlight.isStale {
+                return false
+            }
+            return true
+        }
+    }
+
     static func isCitationNoise(_ highlight: Highlight) -> Bool {
         isCitationNoise(text: highlight.text, sectionTitle: highlight.sectionTitle)
     }
