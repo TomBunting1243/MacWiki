@@ -1,5 +1,6 @@
 #!/usr/bin/env swift
 
+import AppKit
 import ApplicationServices
 import Foundation
 
@@ -13,7 +14,7 @@ private enum VerificationError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .usage:
-            "Usage: ax_tab_reorder.swift <pid> <expected tab count>"
+            "Usage: ax_tab_reorder.swift <pid> <expected tab count> [verify-order <first-result.json>]"
         case .accessibilityUnavailable:
             "Accessibility access is unavailable."
         case .missing(let description):
@@ -33,6 +34,7 @@ private struct TabEvidence: Codable, Equatable {
 }
 
 private struct VerificationResult: Codable {
+    let mode: String
     let before: [TabEvidence]
     let after: [TabEvidence]
     let draggedTitle: String
@@ -174,9 +176,22 @@ private func drag(from start: CGPoint, to end: CGPoint) throws {
     guard let source = CGEventSource(stateID: .combinedSessionState) else {
         throw VerificationError.eventCreationFailed
     }
+    let originalPointer = CGEvent(source: nil)?.location
+    var latestPoint = start
+    var isLeftMouseDown = false
+    defer {
+        if isLeftMouseDown {
+            try? postMouseEvent(.leftMouseUp, at: latestPoint, source: source)
+        }
+        if let originalPointer {
+            try? postMouseEvent(.mouseMoved, at: originalPointer, source: source)
+        }
+    }
+
     try postMouseEvent(.mouseMoved, at: start, source: source)
     Thread.sleep(forTimeInterval: 0.10)
     try postMouseEvent(.leftMouseDown, at: start, source: source)
+    isLeftMouseDown = true
 
     let steps = 42
     for step in 1...steps {
@@ -185,10 +200,12 @@ private func drag(from start: CGPoint, to end: CGPoint) throws {
             x: start.x + ((end.x - start.x) * progress),
             y: start.y + ((end.y - start.y) * progress)
         )
+        latestPoint = point
         try postMouseEvent(.leftMouseDragged, at: point, source: source)
         Thread.sleep(forTimeInterval: 0.012)
     }
     try postMouseEvent(.leftMouseUp, at: end, source: source)
+    isLeftMouseDown = false
 }
 
 private func pressEscape() throws {
@@ -209,6 +226,38 @@ private func overflowButton(in application: AXUIElement) -> AXUIElement? {
     }
 }
 
+private func mainWindow(in application: AXUIElement) -> AXUIElement? {
+    let windows = attributeValue(kAXWindowsAttribute as CFString, from: application) as? [AXUIElement] ?? []
+    return windows.first { !tabs(in: $0).isEmpty }
+}
+
+private func isFrontmost(_ application: AXUIElement) -> Bool {
+    (attributeValue(kAXFrontmostAttribute as CFString, from: application) as? NSNumber)?
+        .boolValue == true
+}
+
+private func activateTarget(
+    pid: pid_t,
+    application: AXUIElement,
+    window: AXUIElement,
+    raiseWindow: Bool = true
+) throws {
+    guard let runningApplication = NSRunningApplication(processIdentifier: pid),
+          !runningApplication.isTerminated else {
+        throw VerificationError.missing("The exact MacWiki candidate process exited.")
+    }
+    _ = runningApplication.activate(options: [.activateAllWindows])
+    if raiseWindow {
+        _ = AXUIElementPerformAction(window, kAXRaiseAction as CFString)
+    }
+    guard wait(timeout: 8, condition: {
+        isFrontmost(application)
+            && NSWorkspace.shared.frontmostApplication?.processIdentifier == pid
+    }) else {
+        throw VerificationError.missing("The exact MacWiki candidate did not become frontmost.")
+    }
+}
+
 private func visibleMenuTitles(in application: AXUIElement) -> [String] {
     elements(in: application).compactMap { element in
         guard stringAttribute(kAXRoleAttribute as CFString, from: element) == kAXMenuItemRole as String else {
@@ -220,61 +269,97 @@ private func visibleMenuTitles(in application: AXUIElement) -> [String] {
 }
 
 do {
-    guard CommandLine.arguments.count == 3,
-          let processID = pid_t(CommandLine.arguments[1]),
-          let expectedCount = Int(CommandLine.arguments[2]),
+    let arguments = CommandLine.arguments
+    guard (arguments.count == 3 || arguments.count == 5),
+          let processID = pid_t(arguments[1]),
+          let expectedCount = Int(arguments[2]),
           expectedCount >= 4 else {
         throw VerificationError.usage
+    }
+    let verificationEvidenceURL: URL?
+    if arguments.count == 5 {
+        guard arguments[3] == "verify-order" else { throw VerificationError.usage }
+        verificationEvidenceURL = URL(fileURLWithPath: arguments[4])
+    } else {
+        verificationEvidenceURL = nil
     }
     guard AXIsProcessTrusted() else { throw VerificationError.accessibilityUnavailable }
 
     let application = AXUIElementCreateApplication(processID)
-    guard wait(timeout: 20, condition: { tabs(in: application).count == expectedCount }) else {
+    guard wait(timeout: 20, condition: { tabs(in: application).count == expectedCount }),
+          let window = mainWindow(in: application) else {
         throw VerificationError.missing(
-            "Expected \(expectedCount) semantic tabs; observed \(tabs(in: application).count). " +
-                "Candidates: \(tabCandidateDiagnostics(in: application).prefix(24).joined(separator: " | "))"
+            "Expected \(expectedCount) semantic tabs in one exact candidate window; observed " +
+                "\(tabs(in: application).count). Candidates: " +
+                tabCandidateDiagnostics(in: application).prefix(24).joined(separator: " | ")
         )
     }
+    try activateTarget(pid: processID, application: application, window: window)
 
-    let initialTabs = tabs(in: application)
-    let before = initialTabs.map(\.1)
-    guard Set(before.map(\.title)).count == expectedCount,
+    let before = tabs(in: application).map(\.1)
+    guard before.count == expectedCount,
+          Set(before.map(\.title)).count == expectedCount,
           before.allSatisfy({ $0.value.hasPrefix("Active tab") || $0.value.hasPrefix("Inactive tab") }) else {
         throw VerificationError.missing("Tabs did not expose unique titles and active/inactive values.")
     }
 
-    let sourceTitle = before[0].title
-    let destinationTitle = before[2].title
-    guard let source = tabs(in: application).first(where: { $0.1.title == sourceTitle }),
-          let destination = tabs(in: application).first(where: { $0.1.title == destinationTitle }),
-          let sourceFrame = frame(of: source.0),
-          let destinationFrame = frame(of: destination.0),
-          sourceFrame.width > 20,
-          destinationFrame.width > 20 else {
-        throw VerificationError.missing("Could not resolve visible source and destination tab frames.")
-    }
-
-    try drag(
-        from: CGPoint(x: sourceFrame.midX, y: sourceFrame.midY),
-        to: CGPoint(x: destinationFrame.midX, y: destinationFrame.midY)
-    )
-
-    guard wait(timeout: 12, condition: {
-        tabs(in: application).map(\.1.title) != before.map(\.title)
-    }) else {
-        throw VerificationError.missing(
-            "Tab drag did not publish a reordered accessibility sequence. " +
-                "Source frame: \(sourceFrame); destination frame: \(destinationFrame)."
+    let expectedResult: VerificationResult?
+    if let verificationEvidenceURL {
+        expectedResult = try JSONDecoder().decode(
+            VerificationResult.self,
+            from: Data(contentsOf: verificationEvidenceURL)
         )
+        guard before.map(\.title) == expectedResult?.after.map(\.title) else {
+            throw VerificationError.missing(
+                "Relaunched tab order did not match the committed first-run order."
+            )
+        }
+    } else {
+        expectedResult = nil
     }
 
-    let after = tabs(in: application).map(\.1)
-    guard after.count == expectedCount,
-          Set(after.map(\.title)) == Set(before.map(\.title)),
-          after.first?.title != sourceTitle else {
-        throw VerificationError.missing("Tab reorder changed membership or left the dragged tab at its source.")
+    let sourceTitle = expectedResult?.draggedTitle ?? before[0].title
+    let destinationTitle = expectedResult?.destinationTitle ?? before[2].title
+    let after: [TabEvidence]
+
+    if expectedResult == nil {
+        // Re-activate before global input, then resolve fresh frames so no
+        // stale geometry or focus transition can retarget the pointer drag.
+        try activateTarget(pid: processID, application: application, window: window)
+        guard let source = tabs(in: application).first(where: { $0.1.title == sourceTitle }),
+              let destination = tabs(in: application).first(where: { $0.1.title == destinationTitle }),
+              let sourceFrame = frame(of: source.0),
+              let destinationFrame = frame(of: destination.0),
+              sourceFrame.width > 20,
+              destinationFrame.width > 20 else {
+            throw VerificationError.missing("Could not resolve fresh visible source and destination tab frames.")
+        }
+
+        try drag(
+            from: CGPoint(x: sourceFrame.midX, y: sourceFrame.midY),
+            to: CGPoint(x: destinationFrame.midX, y: destinationFrame.midY)
+        )
+
+        guard wait(timeout: 12, condition: {
+            tabs(in: application).map(\.1.title) != before.map(\.title)
+        }) else {
+            throw VerificationError.missing(
+                "Tab drag did not publish a reordered accessibility sequence. " +
+                    "Source frame: \(sourceFrame); destination frame: \(destinationFrame)."
+            )
+        }
+
+        after = tabs(in: application).map(\.1)
+        guard after.count == expectedCount,
+              Set(after.map(\.title)) == Set(before.map(\.title)),
+              after.first?.title != sourceTitle else {
+            throw VerificationError.missing("Tab reorder changed membership or left the dragged tab at its source.")
+        }
+    } else {
+        after = before
     }
 
+    try activateTarget(pid: processID, application: application, window: window)
     guard let overflow = overflowButton(in: application) else {
         throw VerificationError.missing(
             "The constrained tab lane did not expose All Tabs overflow. Controls: " +
@@ -290,17 +375,29 @@ do {
     }
     let visibleOverflowTitleSet = Set(visibleMenuTitles(in: application))
     let overflowMenuTitles = after.map(\.title).filter(visibleOverflowTitleSet.contains)
+
+    // Escape is a global keyboard event. Reassert exact PID focus immediately
+    // before posting it, without raising the window and dismissing the menu.
+    try activateTarget(
+        pid: processID,
+        application: application,
+        window: window,
+        raiseWindow: false
+    )
     try pressEscape()
 
     Thread.sleep(forTimeInterval: 1.0)
     let result = VerificationResult(
+        mode: expectedResult == nil ? "reorder" : "verify-order",
         before: before,
         after: after,
         draggedTitle: sourceTitle,
         destinationTitle: destinationTitle,
         overflowMenuTitles: overflowMenuTitles
     )
-    FileHandle.standardOutput.write(try JSONEncoder().encode(result))
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+    FileHandle.standardOutput.write(try encoder.encode(result))
     print()
 } catch {
     fputs("ax_tab_reorder: \(error.localizedDescription)\n", stderr)

@@ -281,6 +281,7 @@ struct ArticleView: View {
     @Binding var scrollPosition: CGFloat
     @Environment(AppState.self) private var appState
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.workspaceOpenWindowHandler) private var workspaceOpenWindowHandler
     @Environment(\.modelContext) private var modelContext
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.macWikiAccessibilityPersonalization.reduceMotion) private var reduceMotion
@@ -414,17 +415,6 @@ struct ArticleView: View {
         return max(10, resolvedTopObscuredHeight + 10) + compactWidthBoost
     }
 
-    private var usesNativeFindNavigator: Bool {
-        return false
-    }
-
-    private var findNavigatorPresentedBinding: Binding<Bool> {
-        Binding(
-            get: { appState.showFindOnPage },
-            set: { appState.showFindOnPage = $0 }
-        )
-    }
-
     private var shouldShowLoadingSkeleton: Bool {
         errorMessage == nil &&
         !suppressLoadingSkeletonForCurrentOpen &&
@@ -463,15 +453,15 @@ struct ArticleView: View {
         .background {
             GeometryReader { proxy in
                 Color.clear
-                    .onAppear {
+                    .task(id: proxy.size.width) {
+                        try? await Task.sleep(for: .milliseconds(20))
+                        guard !Task.isCancelled else { return }
                         updateArticleViewportWidth(proxy.size.width)
+                    }
+                    .task(id: proxy.safeAreaInsets.top) {
+                        try? await Task.sleep(for: .milliseconds(20))
+                        guard !Task.isCancelled else { return }
                         updateTopObscuredHeight(proxy.safeAreaInsets.top)
-                    }
-                    .onChange(of: proxy.size.width) { _, newWidth in
-                        updateArticleViewportWidth(newWidth)
-                    }
-                    .onChange(of: proxy.safeAreaInsets.top) { _, newTopInset in
-                        updateTopObscuredHeight(newTopInset)
                     }
             }
         }
@@ -482,7 +472,7 @@ struct ArticleView: View {
             }
         }
         .overlay(alignment: .topTrailing) {
-            if !usesNativeFindNavigator && appState.showFindOnPage {
+            if appState.showFindOnPage {
                 FindOnPageBarView(
                     tabID: tabId,
                     availableWidth: max(articleViewportWidth - 32, 0)
@@ -586,7 +576,7 @@ struct ArticleView: View {
                     openLinkedArticle(title: title)
                 },
                 onOpenArticleInNewWindow: { article in
-                    openWindow(value: article)
+                    openArticleWindow(article)
                 },
                 onTextSelected: { selectionData in
                     appState.currentTextSelection = selectionData
@@ -654,7 +644,7 @@ struct ArticleView: View {
                 appState: appState,
                 inspectorVisible: appState.inspectorVisible,
                 inspectorMode: appState.inspectorMode,
-                findOnPageRequestID: usesNativeFindNavigator ? nil : appState.pendingFindOnPageRequest?.requestID
+                findOnPageRequestID: appState.pendingFindOnPageRequest?.requestID
             )
             .id(tabId)
             .clipped()
@@ -691,12 +681,7 @@ struct ArticleView: View {
                 HighlightToolbarOverlay(articleTitle: article.title)
             }
 
-            if #available(macOS 26, *) {
-                webView
-                    .findNavigator(isPresented: findNavigatorPresentedBinding)
-            } else {
-                webView
-            }
+            webView
         } else if isLoading {
             Color.clear
         } else {
@@ -937,8 +922,9 @@ struct ArticleView: View {
         if let existing = ReadStateSync.fetchArticleState(forURLString: article.url.absoluteString, in: modelContext) {
             let existingProgress = existing.readingProgress ?? 0
             progressCoordinator.bootstrapFromPersisted(existingProgress, articleTitle: article.title, appState: appState, now: now)
-            ReadStateSync.syncSavedArticles(title: article.title, isRead: existing.isRead, in: modelContext)
-            modelContext.saveReportingFailure(operation: #function)
+            if ReadStateSync.syncSavedArticles(title: article.title, isRead: existing.isRead, in: modelContext) {
+                modelContext.saveReportingFailure(operation: #function)
+            }
         } else {
             progressCoordinator.bootstrapWithoutPersistedState(articleTitle: article.title, appState: appState, now: now)
         }
@@ -1221,7 +1207,13 @@ struct ArticleView: View {
             return
         }
 
-        openWindow(value: article)
+        openArticleWindow(article)
+    }
+
+    private func openArticleWindow(_ article: Article) {
+        if workspaceOpenWindowHandler?.open(article) != true {
+            openWindow(value: article)
+        }
     }
 
     private func saveLinkHoverPreview(_ request: WebViewLinkHoverRequest) {

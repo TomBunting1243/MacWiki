@@ -3,6 +3,7 @@ import WebKit
 
 extension WebView.Coordinator {
     func publishTableOfContents(from webView: WKWebView) {
+        guard !isContentLoadInFlight, canRunDocumentJavaScript(on: webView) else { return }
         guard inspectorPublisher.beginTableOfContentsPublish() else { return }
         webView.evaluateJavaScript("window.extractTableOfContents();") { [weak self] result, error in
             guard let self else { return }
@@ -36,6 +37,7 @@ extension WebView.Coordinator {
     }
 
     func publishReferences(from webView: WKWebView) {
+        guard !isContentLoadInFlight, canRunDocumentJavaScript(on: webView) else { return }
         guard inspectorPublisher.beginReferencesPublish() else { return }
         webView.evaluateJavaScript("window.extractReferences ? window.extractReferences() : [];") { [weak self] result, error in
             guard let self else { return }
@@ -86,6 +88,7 @@ extension WebView.Coordinator {
     }
 
     func publishVisibleSection(from webView: WKWebView, force: Bool = false) {
+        guard !isContentLoadInFlight, canRunDocumentJavaScript(on: webView) else { return }
         webView.evaluateJavaScript("window.currentVisibleSectionId ? window.currentVisibleSectionId() : null;") { [weak self] result, _ in
             guard let self else { return }
             let sectionId = result as? String
@@ -97,7 +100,7 @@ extension WebView.Coordinator {
     }
 
     func refreshDeferredInspectorContentIfNeeded(on webView: WKWebView) {
-        guard !isContentLoadInFlight else { return }
+        guard !isContentLoadInFlight, canRunDocumentJavaScript(on: webView) else { return }
 
         if isSectionTrackingRequested, inspectorPublisher.lastTOCPublishedForTitle != articleTitle {
             inspectorPublisher.lastTOCPublishedForTitle = articleTitle

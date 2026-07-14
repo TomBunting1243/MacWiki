@@ -711,7 +711,6 @@ document.addEventListener('contextmenu', function (e) {
     var maxScrollDirty = true;
     var maxScrollRecomputeScheduled = false;
     var smoothScrollSequence = 0;
-    var nativeStageTimer = null;
     var sectionEndDebounceTimer = null;
 
     if (window.PerformanceObserver) {
@@ -936,58 +935,6 @@ document.addEventListener('contextmenu', function (e) {
         return tagName === 'input' || tagName === 'textarea' || tagName === 'select';
     }
 
-    function keyboardPageStepDistance(key) {
-        var viewportHeight = Math.max(window.innerHeight || 0, 0);
-        if (viewportHeight <= 0) return 0;
-        var stepRatio = key === ' ' ? 0.95 : 0.9;
-        return Math.max(viewportHeight * stepRatio, 180);
-    }
-
-    function handleKeyboardPageScroll(e) {
-        if (!e || e.defaultPrevented) return false;
-        if (e.metaKey || e.ctrlKey || e.altKey) return false;
-        if (isEditableElement(e.target)) return false;
-
-        var key = e.key;
-        var direction = 0;
-        if (key === ' ') {
-            direction = e.shiftKey ? -1 : 1;
-        } else if (key === 'PageDown') {
-            direction = 1;
-        } else if (key === 'PageUp') {
-            direction = -1;
-        } else {
-            return false;
-        }
-
-        var stepDistance = keyboardPageStepDistance(key);
-        if (stepDistance <= 0) return false;
-
-        var currentY = currentScrollY();
-        var targetY = currentY + (direction * stepDistance);
-        var maxScroll = getMaxScroll(true);
-        var clampedTarget = clamp(targetY, 0, maxScroll);
-        if (Math.abs(clampedTarget - currentY) < 1.5) {
-            return false;
-        }
-
-        e.preventDefault();
-        noteUserScrollIntent();
-        keyboardPagingUntil = Date.now() + 320;
-
-        // Keep keyboard paging as a single fluid movement.
-        var stageMaxDistance = Math.max((window.innerHeight || 0) * 2.2, 960);
-        smoothScrollToY(clampedTarget, {
-            durationMs: 220,
-            minDurationMs: 160,
-            maxDurationMs: 320,
-            pixelsPerMs: 4.4,
-            nativeStageMaxDistance: stageMaxDistance,
-            nativeStageHandoffRatio: 0.9
-        });
-        return true;
-    }
-
     function currentProgress(y) {
         var maxScroll = getMaxScroll(false);
         if (maxScroll <= 0) return 1;
@@ -1000,6 +947,12 @@ document.addEventListener('contextmenu', function (e) {
 
     function noteUserScrollIntent() {
         lastUserScrollIntentAt = Date.now();
+        cancelSmoothScrollAnimation();
+        programmaticScrollModeUntil = 0;
+        if (programmaticScrollForcePostTimer) {
+            clearTimeout(programmaticScrollForcePostTimer);
+            programmaticScrollForcePostTimer = null;
+        }
     }
 
     function isProgrammaticScrollMode(now) {
@@ -1020,23 +973,12 @@ document.addEventListener('contextmenu', function (e) {
         }, windowMs + 90);
     }
 
-    function cubicEaseInOut(t) {
-        if (t < 0.5) {
-            return 4 * t * t * t;
-        }
-        return 1 - Math.pow(-2 * t + 2, 3) / 2;
-    }
-
     function easeInOutSine(t) {
         return -(Math.cos(Math.PI * t) - 1) / 2;
     }
 
     function cancelSmoothScrollAnimation() {
         smoothScrollSequence += 1;
-        if (nativeStageTimer) {
-            clearTimeout(nativeStageTimer);
-            nativeStageTimer = null;
-        }
         if (window._macwikiSmoothScrollRAF) {
             cancelAnimationFrame(window._macwikiSmoothScrollRAF);
             window._macwikiSmoothScrollRAF = null;
@@ -1090,60 +1032,6 @@ document.addEventListener('contextmenu', function (e) {
         }
 
         window._macwikiSmoothScrollRAF = requestAnimationFrame(step);
-    }
-
-    function runNativeStagedSmoothScroll(startY, targetY, durationMs, options) {
-        options = options || {};
-        var sequenceId = options.sequenceId;
-        var distance = targetY - startY;
-        var distanceAbs = Math.abs(distance);
-        var stageMaxDistance = Number(options.nativeStageMaxDistance);
-        var stageCount = 1;
-        if (Number.isFinite(stageMaxDistance) && stageMaxDistance > 0) {
-            stageCount = clamp(Math.ceil(distanceAbs / stageMaxDistance), 1, 4);
-        }
-        var stageDurationMs = clamp(durationMs / stageCount, 260, 900);
-        var handoffRatio = Number(options.nativeStageHandoffRatio);
-        if (!Number.isFinite(handoffRatio)) handoffRatio = 0.7;
-        handoffRatio = clamp(handoffRatio, 0.55, 0.88);
-
-        function scheduleNextStage(index) {
-            if (nativeStageTimer) {
-                clearTimeout(nativeStageTimer);
-                nativeStageTimer = null;
-            }
-            var handoffMs = Math.round(stageDurationMs * handoffRatio);
-            nativeStageTimer = setTimeout(function () {
-                nativeStageTimer = null;
-                if (sequenceId !== undefined && sequenceId !== smoothScrollSequence) {
-                    return;
-                }
-                runStage(index + 1);
-            }, handoffMs);
-        }
-
-        function runStage(index) {
-            if (sequenceId !== undefined && sequenceId !== smoothScrollSequence) {
-                return;
-            }
-            var stageProgress = (index + 1) / stageCount;
-            var stageTarget = startY + (distance * stageProgress);
-            var isFinalStage = index >= (stageCount - 1);
-
-            setProgrammaticScrollMode(stageDurationMs + 260);
-            window.scrollTo({ top: stageTarget, behavior: 'smooth' });
-
-            if (isFinalStage) {
-                monitorProgrammaticScroll(stageTarget, stageDurationMs + 180, {
-                    emitPost: true,
-                    sequenceId: sequenceId
-                });
-            } else {
-                scheduleNextStage(index);
-            }
-        }
-
-        runStage(0);
     }
 
     function supportsNativeSmoothScroll() {
@@ -1212,10 +1100,11 @@ document.addEventListener('contextmenu', function (e) {
 
         var nativeSmoothEnabled = options.nativeSmooth !== false;
         if (nativeSmoothEnabled && supportsNativeSmoothScroll()) {
-            var nativeOptions = Object.assign({}, options, {
+            window.scrollTo({ top: clampedTarget, behavior: 'smooth' });
+            monitorProgrammaticScroll(clampedTarget, durationMs, {
+                emitPost: true,
                 sequenceId: sequenceId
             });
-            runNativeStagedSmoothScroll(startY, clampedTarget, durationMs, nativeOptions);
             return true;
         }
 
@@ -1497,9 +1386,6 @@ document.addEventListener('contextmenu', function (e) {
         noteUserScrollIntent();
     }, { passive: true });
     window.addEventListener('keydown', function (e) {
-        if (handleKeyboardPageScroll(e)) {
-            return;
-        }
         var key = e.key;
         if (
             key === 'ArrowDown' ||
@@ -1510,24 +1396,32 @@ document.addEventListener('contextmenu', function (e) {
             key === 'End' ||
             key === ' '
         ) {
+            if (
+                !e.defaultPrevented &&
+                !e.metaKey &&
+                !e.ctrlKey &&
+                !e.altKey &&
+                !isEditableElement(e.target) &&
+                (key === 'PageDown' || key === 'PageUp' || key === ' ')
+            ) {
+                // WebKit owns native keyboard paging. This marker only keeps
+                // telemetry from misclassifying its velocity as a trackpad burst.
+                keyboardPagingUntil = Date.now() + 500;
+            }
             noteUserScrollIntent();
         }
     }, true);
-    function preserveProgressAcrossResize() {
-        var progressBeforeResize = currentProgress(currentScrollY());
+    function refreshScrollMetricsAfterResize() {
         markMaxScrollDirty(30);
 
         setTimeout(function () {
-            var maxScroll = getMaxScroll(true);
-            if (maxScroll > 0 && progressBeforeResize > 0) {
-                window.scrollTo(0, Math.round(maxScroll * progressBeforeResize));
-            }
+            getMaxScroll(true);
             schedulePostScroll(true);
-        }, 60);
+        }, 80);
     }
 
     window.addEventListener('resize', function () {
-        preserveProgressAcrossResize();
+        refreshScrollMetricsAfterResize();
     });
     window.addEventListener('load', function () {
         markMaxScrollDirty(45);
@@ -2277,6 +2171,18 @@ document.addEventListener('contextmenu', function (e) {
             schedulePostScroll(true);
         }
     };
+
+    window._macwikiInvalidateReaderLayoutMetrics = function () {
+        markMaxScrollDirty(0);
+        if (window._invalidateHeadingCache) {
+            window._invalidateHeadingCache();
+        }
+        requestAnimationFrame(function () {
+            markMaxScrollDirty(0);
+            getMaxScroll(true);
+            schedulePostScroll(true);
+        });
+    };
 })();
 
 // Text Selection Detection
@@ -2476,6 +2382,10 @@ window.setReaderAppearance = function (options) {
     applyOption('contentWidth', '--reader-max-width');
     applyOption('inlinePadding', '--reader-inline-padding');
     applyOption('headingScale', '--reader-heading-scale');
+
+    if (window._macwikiInvalidateReaderLayoutMetrics) {
+        window._macwikiInvalidateReaderLayoutMetrics();
+    }
 
     return true;
 };
@@ -3106,7 +3016,25 @@ window.scrollToHighlight = function (id) {
     if (!rect) return false;
 
     var target = rect.top + window.scrollY - 120;
-    window.scrollTo({ top: target, behavior: 'smooth' });
+    if (window._macwikiSmoothScrollToY) {
+        return window._macwikiSmoothScrollToY(target, {
+            reason: 'highlight',
+            nativeSmooth: true,
+            pixelsPerMs: 2.4,
+            minDurationMs: 240,
+            maxDurationMs: 900
+        });
+    }
+
+    var prefersReducedMotion = false;
+    try {
+        prefersReducedMotion =
+            !!window.matchMedia &&
+            !!window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    } catch (_) {
+        prefersReducedMotion = false;
+    }
+    window.scrollTo({ top: target, behavior: prefersReducedMotion ? 'auto' : 'smooth' });
     return true;
 };
 

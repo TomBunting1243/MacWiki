@@ -1,0 +1,238 @@
+import SwiftUI
+import SwiftData
+
+struct InspectorTagStatusBox: View {
+    @Environment(AppState.self) private var appState
+    @Environment(\.modelContext) private var modelContext
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.macWikiAccessibilityPersonalization.reduceMotion) private var reduceMotion
+
+    let article: Article
+    let tags: [Tag]
+    let allTags: [Tag]
+    let highlights: [Highlight]
+
+    @State private var articleState: ArticleState?
+    @State private var newTagName = ""
+    @State private var isExpanded = false
+    @State private var tagMarkedForRemoval: UUID?
+    @State private var editingTag: Tag?
+    @FocusState private var isFieldFocused: Bool
+
+    private var editingTagSheetBinding: Binding<Bool> {
+        Binding(
+            get: { editingTag != nil },
+            set: { isPresented in
+                if !isPresented {
+                    editingTag = nil
+                }
+            }
+        )
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            // Header
+            HStack(spacing: 8) {
+                Image(systemName: "tag")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(Color.accentColor.opacity(0.9))
+
+                Text("Tags")
+                    .font(MacWikiTypography.inspectorSectionLabel)
+                    .foregroundStyle(.primary)
+
+                Spacer()
+
+                if !tags.isEmpty {
+                    Text("\(tags.count)")
+                        .font(MacWikiTypography.compactRowMetadata)
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(.thinMaterial, in: Capsule())
+                }
+
+                Button(isExpanded ? "Collapse Tags" : "Add Tags", systemImage: "chevron.down") {
+                    withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.25)) {
+                        isExpanded.toggle()
+                        tagMarkedForRemoval = nil
+                        if isExpanded {
+                            isFieldFocused = true
+                        }
+                    }
+                }
+                .labelStyle(.iconOnly)
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .frame(width: 20, height: 20)
+                .rotationEffect(.degrees(isExpanded ? -180 : 0))
+                .buttonStyle(.plain)
+                .help(isExpanded ? "Collapse" : "Add Tags")
+            }
+
+            // Assigned tag chips
+            if !tags.isEmpty {
+                FlowLayout(spacing: 6) {
+                    ForEach(tags) { tag in
+                        TagChipView(
+                            title: tag.name,
+                            isSelected: appState.highlightTagFilterId == tag.id,
+                            isMarkedForRemoval: tagMarkedForRemoval == tag.id,
+                            showsIcon: true
+                        ) {
+                            withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.15)) {
+                                if tagMarkedForRemoval == tag.id {
+                                    // Second tap on marked tag → remove it
+                                    removeTag(tag)
+                                    tagMarkedForRemoval = nil
+                                } else {
+                                    // First tap → mark for removal (red + X)
+                                    tagMarkedForRemoval = tag.id
+                                }
+                            }
+                        }
+                        .contextMenu {
+                            Button {
+                                editingTag = tag
+                            } label: {
+                                SwiftUI.Label("Rename", systemImage: "pencil")
+                            }
+
+                            Divider()
+
+                            Button(role: .destructive) {
+                                withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.25)) {
+                                    removeTag(tag)
+                                }
+                            } label: {
+                                SwiftUI.Label("Remove \"\(tag.name)\"", systemImage: "minus.circle")
+                            }
+                        }
+                    }
+                }
+            } else if !isExpanded {
+                Text("No tags yet")
+                    .font(MacWikiTypography.settingsHelp)
+                    .foregroundStyle(.secondary)
+                    .padding(.vertical, 2)
+            }
+
+            // Inline tag editor
+            if isExpanded {
+                tagEditor
+                    .transition(
+                        reduceMotion
+                            ? .opacity
+                            : .opacity.combined(with: .scale(scale: 0.96, anchor: .top))
+                    )
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(tagModuleBackground)
+        .onTapGesture {
+            withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.15)) {
+                tagMarkedForRemoval = nil
+            }
+        }
+        .onAppear {
+            articleState = ReadStateSync.fetchArticleState(
+                forURLString: article.url.absoluteString, in: modelContext
+            )
+        }
+        .onChange(of: article.title) {
+            // Collapse editor and reset state when navigating to a different article
+            withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.15)) {
+                isExpanded = false
+                newTagName = ""
+                tagMarkedForRemoval = nil
+            }
+            articleState = ReadStateSync.fetchArticleState(
+                forURLString: article.url.absoluteString, in: modelContext
+            )
+        }
+        .sheet(item: $editingTag) { tag in
+            TagDetailSheet(
+                isPresented: editingTagSheetBinding,
+                tagToEdit: tag
+            )
+        }
+    }
+
+    // MARK: - Tag Editor
+
+    private var tagEditor: some View {
+        InspectorTagEditor(
+            newTagName: $newTagName,
+            isFieldFocused: $isFieldFocused,
+            assignedTagIDs: Set(tags.map(\.id)),
+            allTags: allTags,
+            onCreateOrAssign: addOrAssignTag,
+            onAssign: assignTag
+        )
+    }
+
+    private var tagModuleBackground: some View {
+        let shape = RoundedRectangle(cornerRadius: 14, style: .continuous)
+
+        return shape
+            .fill(.quaternary.opacity(colorScheme == .dark ? 0.22 : 0.30))
+            .overlay {
+                shape.strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.10 : 0.08), lineWidth: 0.8)
+            }
+    }
+
+    // MARK: - Tag Actions
+
+    private func addOrAssignTag() {
+        let trimmed = newTagName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+
+        let normalized = trimmed.lowercased()
+        if let existing = allTags.first(where: { $0.name.lowercased() == normalized }) {
+            assignTag(existing)
+            newTagName = ""
+            return
+        }
+
+        let newTag = Tag(name: trimmed)
+        newTag.sortOrder = SortOrderAllocator.next(for: allTags.map(\.sortOrder))
+        modelContext.insert(newTag)
+        assignTag(newTag)
+        newTagName = ""
+    }
+
+    private func assignTag(_ tag: Tag) {
+        let state = ensureArticleState()
+        guard let state else { return }
+        if state.tags.contains(where: { $0.id == tag.id }) { return }
+        state.tags.append(tag)
+        state.updatedAt = Date()
+        modelContext.saveReportingFailure(operation: #function)
+    }
+
+    private func removeTag(_ tag: Tag) {
+        guard let state = ensureArticleState() else { return }
+        state.tags.removeAll { $0.id == tag.id }
+        state.updatedAt = Date()
+
+        for highlight in highlights where highlight.tags.contains(where: { $0.id == tag.id }) {
+            highlight.tags.removeAll { $0.id == tag.id }
+            highlight.updatedAt = Date()
+        }
+
+        if appState.highlightTagFilterId == tag.id {
+            appState.highlightTagFilterId = nil
+        }
+
+        modelContext.saveReportingFailure(operation: #function)
+    }
+
+    private func ensureArticleState() -> ArticleState? {
+        if let state = articleState { return state }
+        let state = ReadStateSync.ensureArticleState(for: article, in: modelContext)
+        articleState = state
+        return state
+    }
+}

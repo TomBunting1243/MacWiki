@@ -3,6 +3,8 @@ import SwiftUI
 struct FindOnPageBarView: View {
     @Environment(AppState.self) private var appState
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.controlActiveState) private var controlActiveState
+    @Environment(\.macWikiAccessibilityPersonalization) private var accessibilityPersonalization
     @AppStorage(AppStorageKey.Chrome.liquidGlassChrome) private var liquidGlassChrome = true
     @AppStorage(MacWikiGlassRuntime.forceLegacyFallbackKey) private var forceLegacyGlassFallback = false
     let tabID: UUID
@@ -74,7 +76,15 @@ struct FindOnPageBarView: View {
         MacWikiGlassRuntime.usesNativeGlass(
             isEnabled: liquidGlassChrome,
             forceLegacyFallback: forceLegacyGlassFallback
-        )
+        ) && !accessibilityPersonalization.reduceTransparency
+    }
+
+    private var increasedContrast: Bool {
+        accessibilityPersonalization.colorSchemeContrast == .increased
+    }
+
+    private var isKeyWindow: Bool {
+        controlActiveState == .key
     }
 
     @ViewBuilder
@@ -113,7 +123,16 @@ struct FindOnPageBarView: View {
             .padding(.vertical, Metrics.verticalPadding)
             .background(findBarBackground)
         }
-        .shadow(color: .black.opacity(colorScheme == .dark ? 0.16 : 0.06), radius: 10, x: 0, y: 4)
+        .shadow(
+            color: .black.opacity(
+                isKeyWindow && !accessibilityPersonalization.reduceTransparency
+                    ? (colorScheme == .dark ? 0.16 : 0.06)
+                    : 0
+            ),
+            radius: 10,
+            x: 0,
+            y: 4
+        )
         .frame(maxWidth: max(0, availableWidth), alignment: .trailing)
         .onAppear {
             DispatchQueue.main.async {
@@ -201,7 +220,16 @@ struct FindOnPageBarView: View {
     @ViewBuilder
     private var findBarBackground: some View {
         let shape = RoundedRectangle(cornerRadius: Metrics.cornerRadius, style: .continuous)
-        if #available(macOS 26, *), usesNativeGlass {
+        if accessibilityPersonalization.reduceTransparency {
+            shape
+                .fill(Color(nsColor: .windowBackgroundColor))
+                .overlay {
+                    shape.strokeBorder(
+                        Color.primary.opacity(increasedContrast ? 0.34 : 0.14),
+                        lineWidth: increasedContrast ? 1 : 0.6
+                    )
+                }
+        } else if #available(macOS 26, *), usesNativeGlass {
             shape
                 .fill(.clear)
                 .glassEffect(.regular, in: .rect(cornerRadius: Metrics.cornerRadius))
@@ -209,7 +237,12 @@ struct FindOnPageBarView: View {
                     shape.fill(Color(nsColor: .windowBackgroundColor).opacity(colorScheme == .dark ? 0.022 : 0.014))
                 }
                 .overlay {
-                    shape.strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.070 : 0.046), lineWidth: 0.52)
+                    shape.strokeBorder(
+                        Color.primary.opacity(
+                            (colorScheme == .dark ? 0.070 : 0.046) + (increasedContrast ? 0.14 : 0)
+                        ),
+                        lineWidth: increasedContrast ? 1 : 0.52
+                    )
                 }
         } else {
             shape
@@ -218,26 +251,43 @@ struct FindOnPageBarView: View {
                     shape.fill(Color(nsColor: .windowBackgroundColor).opacity(colorScheme == .dark ? 0.10 : 0.06))
                 }
                 .overlay {
-                    shape.strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.09 : 0.055), lineWidth: 0.52)
+                    shape.strokeBorder(
+                        Color.primary.opacity(
+                            (colorScheme == .dark ? 0.09 : 0.055) + (increasedContrast ? 0.14 : 0)
+                        ),
+                        lineWidth: increasedContrast ? 1 : 0.52
+                    )
                 }
         }
     }
 
     private var searchFieldBackground: some View {
         RoundedRectangle(cornerRadius: Metrics.fieldCornerRadius, style: .continuous)
-            .fill(Color(nsColor: .windowBackgroundColor).opacity(colorScheme == .dark ? 0.12 : 0.065))
+            .fill(
+                Color(nsColor: accessibilityPersonalization.reduceTransparency ? .controlBackgroundColor : .windowBackgroundColor)
+                    .opacity(accessibilityPersonalization.reduceTransparency ? 1 : (colorScheme == .dark ? 0.12 : 0.065))
+            )
             .overlay {
                 RoundedRectangle(cornerRadius: Metrics.fieldCornerRadius, style: .continuous)
-                    .strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.050 : 0.032), lineWidth: 0.45)
+                    .strokeBorder(
+                        Color.primary.opacity(increasedContrast ? 0.24 : (colorScheme == .dark ? 0.050 : 0.032)),
+                        lineWidth: increasedContrast ? 1 : 0.45
+                    )
             }
     }
 
     private var actionGroupBackground: some View {
         RoundedRectangle(cornerRadius: Metrics.groupCornerRadius, style: .continuous)
-            .fill(Color(nsColor: .windowBackgroundColor).opacity(colorScheme == .dark ? 0.10 : 0.055))
+            .fill(
+                Color(nsColor: accessibilityPersonalization.reduceTransparency ? .controlBackgroundColor : .windowBackgroundColor)
+                    .opacity(accessibilityPersonalization.reduceTransparency ? 1 : (colorScheme == .dark ? 0.10 : 0.055))
+            )
             .overlay {
                 RoundedRectangle(cornerRadius: Metrics.groupCornerRadius, style: .continuous)
-                    .strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.048 : 0.030), lineWidth: 0.45)
+                    .strokeBorder(
+                        Color.primary.opacity(increasedContrast ? 0.24 : (colorScheme == .dark ? 0.048 : 0.030)),
+                        lineWidth: increasedContrast ? 1 : 0.45
+                    )
             }
     }
 
@@ -258,7 +308,7 @@ struct FindOnPageBarView: View {
                 RoundedRectangle(cornerRadius: 6, style: .continuous)
                     .strokeBorder(
                         statusChipStrokeColor,
-                        lineWidth: 0.45
+                        lineWidth: increasedContrast ? 1 : 0.45
                     )
             }
     }

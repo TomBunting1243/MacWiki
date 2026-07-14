@@ -12,10 +12,11 @@ struct ReferenceRowView: View {
     let onFocus: () -> Void
 
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.macWikiAccessibilityPersonalization.reduceMotion) private var reduceMotion
     @State private var isHovered = false
     @State private var isExpanded = false
     @State private var focusPulse = false
-    @State private var pulseResetWorkItem: DispatchWorkItem?
+    @State private var pulseResetTask: Task<Void, Never>?
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
@@ -33,7 +34,7 @@ struct ReferenceRowView: View {
             VStack(alignment: .leading, spacing: 8) {
                 Button {
                     onFocus()
-                    withAnimation(.spring(response: 0.24, dampingFraction: 0.84)) {
+                    withAnimation(reduceMotion ? nil : .spring(response: 0.24, dampingFraction: 0.84)) {
                         isExpanded.toggle()
                     }
                 } label: {
@@ -77,24 +78,24 @@ struct ReferenceRowView: View {
                 .scaleEffect(focusPulse ? 1.02 : 0.98)
         }
         .onHover { hovering in
-            withAnimation(.easeOut(duration: 0.12)) {
+            withAnimation(reduceMotion ? nil : .easeOut(duration: 0.12)) {
                 isHovered = hovering
             }
         }
         .onChange(of: isFocused) { _, newValue in
             if newValue {
-                withAnimation(.spring(response: 0.24, dampingFraction: 0.84)) {
+                withAnimation(reduceMotion ? nil : .spring(response: 0.24, dampingFraction: 0.84)) {
                     isExpanded = true
                 }
                 triggerFocusPulse()
             } else {
-                pulseResetWorkItem?.cancel()
+                pulseResetTask?.cancel()
                 focusPulse = false
             }
         }
         .onDisappear {
-            pulseResetWorkItem?.cancel()
-            pulseResetWorkItem = nil
+            pulseResetTask?.cancel()
+            pulseResetTask = nil
         }
         .contextMenu {
             Button {
@@ -200,18 +201,19 @@ struct ReferenceRowView: View {
     }
 
     private func triggerFocusPulse() {
-        pulseResetWorkItem?.cancel()
+        pulseResetTask?.cancel()
         focusPulse = false
+        guard !reduceMotion else { return }
         withAnimation(.easeOut(duration: 0.12)) {
             focusPulse = true
         }
 
-        let workItem = DispatchWorkItem {
+        pulseResetTask = Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(280))
+            guard !Task.isCancelled else { return }
             withAnimation(.easeOut(duration: 0.25)) {
                 focusPulse = false
             }
         }
-        pulseResetWorkItem = workItem
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.28, execute: workItem)
     }
 }

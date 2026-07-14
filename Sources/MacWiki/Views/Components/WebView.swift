@@ -151,11 +151,7 @@ struct WebView: NSViewRepresentable {
 
     /// Encodes a Swift string as a safe JavaScript string literal.
     static func javaScriptStringLiteral(_ value: String) -> String {
-        guard let data = try? JSONEncoder().encode(value),
-              let encoded = String(data: data, encoding: .utf8) else {
-            return "\"\""
-        }
-        return encoded
+        WebViewJavaScript.stringLiteral(value)
     }
 
 
@@ -219,547 +215,15 @@ struct WebView: NSViewRepresentable {
         webView.configuration.userContentController.addUserScript(linkPreviewImmediateModifierBootstrapScript)
         context.coordinator.bootstrapAppearance = readerAppearance
 
-        // Inject custom CSS for native reader aesthetic
-        let css = """
-        :root {
-            color-scheme: light dark;
-            --text-primary: #1d1d1f;
-            --text-secondary: #6e6e73;
-            --link-color: #0066cc;
-            --bg-subtle: rgba(0, 0, 0, 0.03);
-            --border-color: rgba(0, 0, 0, 0.08);
-            --table-surface: rgba(0, 0, 0, 0.02);
-            --table-header-surface: rgba(0, 0, 0, 0.05);
-            --table-row-stripe: rgba(0, 0, 0, 0.03);
-            --reader-surface: #ffffff;
-            --reader-body-font: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', sans-serif;
-            --reader-heading-font: -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif;
-            --reader-font-size: 17px;
-            --reader-line-height: 1.65;
-            --reader-paragraph-spacing: 16px;
-            --reader-max-width: 920px;
-            --reader-inline-padding: 40px;
-            --reader-inline-padding-safe: min(
-                var(--reader-inline-padding),
-                max(12px, calc((100vw - \(Int(ReaderAppearance.minimumReadableColumnWidth.rounded()))px) / 2))
-            );
-            --reader-heading-scale: 1;
-            --reader-top-inset: \(Int(readerTopInset.rounded()))px;
-        }
-
-        @media (prefers-color-scheme: dark) {
-            :root {
-                --text-primary: #f5f5f7;
-                --text-secondary: #a1a1a6;
-                --link-color: #6cb4ff;
-                --bg-subtle: rgba(255, 255, 255, 0.05);
-                --border-color: rgba(255, 255, 255, 0.1);
-                --table-surface: rgba(255, 255, 255, 0.04);
-                --table-header-surface: rgba(255, 255, 255, 0.09);
-                --table-row-stripe: rgba(255, 255, 255, 0.06);
-                --reader-surface: #1e2434;
-                --chart-axis-text: rgba(234, 237, 245, 0.88);
-                --chart-line-strong: rgba(255, 255, 255, 0.50);
-                --chart-line-grid: rgba(255, 255, 255, 0.26);
-                /* Bridge Wikimedia PCS tokens to MacWiki palette for dark mode. */
-                --background-color-base: var(--reader-surface);
-                --background-color-neutral-subtle: var(--table-surface);
-                --background-color-neutral: color-mix(in srgb, var(--reader-surface) 84%, white 16%);
-                --color-base: var(--text-primary);
-                --color-emphasized: var(--text-primary);
-                --color-subtle: var(--text-secondary);
-                --color-progressive: var(--link-color);
-                --border-color-base: var(--border-color);
-                --border-color-subtle: var(--border-color);
-                --box-shadow-collapse-table: none;
-            }
-
-            /* Force readable text when source HTML hardcodes dark text colors. */
-            body,
-            .pcs-document,
-            .pcs-section,
-            .pcs-section-block,
-            .mw-parser-output,
-            p, li, dd, dt, blockquote, td, th, caption, figcaption, span {
-                color: var(--text-primary) !important;
-            }
-
-            [style*="color:#202122"],
-            [style*="color: #202122"],
-            [style*="color:rgb(32,33,34)"],
-            [style*="color: rgb(32, 33, 34)"],
-            [style*="color:#000"],
-            [style*="color: #000"],
-            [style*="color:black"],
-            [style*="color: black"] {
-                color: var(--text-primary) !important;
-            }
-
-            a, a * {
-                color: var(--link-color) !important;
-            }
-
-            /* Override light inline table backgrounds that wash out in dark mode. */
-            table {
-                background-color: var(--table-surface) !important;
-                border-color: var(--border-color) !important;
-                color: var(--text-primary) !important;
-            }
-
-            table thead,
-            table tbody,
-            table tfoot,
-            table caption,
-            table colgroup,
-            table col,
-            table tr,
-            table td,
-            table th {
-                background-color: var(--table-surface) !important;
-                background-image: none !important;
-                border-color: var(--border-color) !important;
-                color: var(--text-primary) !important;
-            }
-
-            table th {
-                background-color: var(--table-header-surface) !important;
-            }
-
-            table.wikitable,
-            .wikitable,
-            table.wikitable tr,
-            table.wikitable td,
-            table.wikitable th {
-                background-color: var(--table-surface) !important;
-            }
-
-            table.infobox,
-            .infobox,
-            .infobox-full-data {
-                background-color: var(--bg-subtle) !important;
-            }
-
-            table tbody tr:nth-child(even) td,
-            table tbody tr:nth-child(even) th {
-                background-color: var(--table-row-stripe) !important;
-            }
-
-            /* Remap common Wikipedia light table colors to dark-friendly surfaces. */
-            table [style*="background:#fff"],
-            table [style*="background: #fff"],
-            table [style*="background-color:#fff"],
-            table [style*="background-color: #fff"],
-            table [style*="background:#ffffff"],
-            table [style*="background: #ffffff"],
-            table [style*="background-color:#ffffff"],
-            table [style*="background-color: #ffffff"],
-            table [style*="background:rgb(255,255,255)"],
-            table [style*="background: rgb(255, 255, 255)"],
-            table [style*="background-color:rgb(255,255,255)"],
-            table [style*="background-color: rgb(255, 255, 255)"],
-            table [style*="background:#f8f9fa"],
-            table [style*="background: #f8f9fa"],
-            table [style*="background-color:#f8f9fa"],
-            table [style*="background-color: #f8f9fa"],
-            table [style*="background:#eaecf0"],
-            table [style*="background: #eaecf0"],
-            table [style*="background-color:#eaecf0"],
-            table [style*="background-color: #eaecf0"] {
-                background-color: var(--table-surface) !important;
-            }
-
-            table th[style*="background:#eaecf0"],
-            table th[style*="background: #eaecf0"],
-            table th[style*="background-color:#eaecf0"],
-            table th[style*="background-color: #eaecf0"] {
-                background-color: var(--table-header-surface) !important;
-            }
-
-            table td a,
-            table th a {
-                color: var(--link-color) !important;
-            }
-
-            /*
-             Improve readability for embedded Wikipedia SVG charts/timelines.
-             Some charts hardcode dark fills (black/#000), which disappear on dark surfaces.
-             Keep authored non-dark colors intact, only remap near-black text/strokes.
-            */
-            svg text[fill="#000"],
-            svg text[fill="#000000"],
-            svg text[fill="black"],
-            svg text[style*="fill:#000"],
-            svg text[style*="fill: #000"],
-            svg text[style*="fill:black"],
-            svg text[style*="fill: black"] {
-                fill: var(--chart-axis-text) !important;
-            }
-
-            svg text[stroke="#000"],
-            svg text[stroke="#000000"],
-            svg text[stroke="black"],
-            svg text[style*="stroke:#000"],
-            svg text[style*="stroke: #000"],
-            svg text[style*="stroke:black"],
-            svg text[style*="stroke: black"] {
-                stroke: transparent !important;
-            }
-
-            svg line[stroke="#000"],
-            svg line[stroke="#000000"],
-            svg line[stroke="black"],
-            svg path[stroke="#000"],
-            svg path[stroke="#000000"],
-            svg path[stroke="black"],
-            svg polyline[stroke="#000"],
-            svg polyline[stroke="#000000"],
-            svg polyline[stroke="black"],
-            svg g[style*="stroke:#000"],
-            svg g[style*="stroke: #000"],
-            svg g[style*="stroke:black"],
-            svg g[style*="stroke: black"] {
-                stroke: var(--chart-line-strong) !important;
-            }
-
-            svg [class*="grid"][stroke="#000"],
-            svg [class*="grid"][stroke="#000000"],
-            svg [class*="grid"][stroke="black"],
-            svg [class*="tick"][stroke="#000"],
-            svg [class*="tick"][stroke="#000000"],
-            svg [class*="tick"][stroke="black"],
-            svg [class*="grid"][style*="stroke:#000"],
-            svg [class*="grid"][style*="stroke: #000"],
-            svg [class*="grid"][style*="stroke:black"],
-            svg [class*="grid"][style*="stroke: black"],
-            svg [class*="tick"][style*="stroke:#000"],
-            svg [class*="tick"][style*="stroke: #000"],
-            svg [class*="tick"][style*="stroke:black"],
-            svg [class*="tick"][style*="stroke: black"] {
-                stroke: var(--chart-line-grid) !important;
-            }
-        }
-
-        * {
-            box-sizing: border-box;
-        }
-
-        html {
-            background-color: var(--reader-surface) !important;
-        }
-
-        body,
-        .pcs-document,
-        .mw-parser-output {
-            color: var(--text-primary) !important;
-            background-color: var(--reader-surface) !important;
-        }
-
-        body {
-            font-family: var(--reader-body-font);
-            font-size: var(--reader-font-size);
-            line-height: var(--reader-line-height);
-            color: var(--text-primary) !important;
-            background: var(--reader-surface) !important;
-            width: min(var(--reader-max-width), calc(100% - (var(--reader-inline-padding-safe) * 2)));
-            max-width: 100%;
-            padding: var(--reader-top-inset) 0 60px;
-            margin: 0 auto;
-            -webkit-font-smoothing: antialiased;
-            text-rendering: auto;
-        }
-
-        /* Hide Wikipedia chrome */
-        .mw-footer, .pcs-footer-container, .pcs-edit-section-link,
-        .mw-ref-link, .sistersitebox, .navbox, .ambox, .mbox-small,
-        .metadata, .hatnote, .noprint, .mw-editsection {
-            display: none !important;
-        }
-
-        /* CRITICAL: Expand all collapsed sections (Wikipedia mobile-html) */
-        .pcs-section-block, .pcs-collapse-block, section {
-            display: block !important;
-            max-height: none !important;
-            overflow: visible !important;
-        }
-
-        /* Ensure collapsed content is visible */
-        [hidden], .pcs-hidden, .collapsed {
-            display: block !important;
-            visibility: visible !important;
-        }
-
-        /* Expand section content */
-        .pcs-section-content {
-            display: block !important;
-            height: auto !important;
-            max-height: none !important;
-        }
-
-        /* Typography */
-        h1 {
-            font-family: var(--reader-heading-font);
-            font-size: calc(34px * var(--reader-heading-scale));
-            font-weight: 700;
-            line-height: 1.2;
-            letter-spacing: -0.5px;
-            margin: 0 0 8px 0;
-        }
-
-        h2 {
-            font-family: var(--reader-heading-font);
-            font-size: calc(24px * var(--reader-heading-scale));
-            font-weight: 600;
-            line-height: 1.3;
-            margin: 32px 0 12px 0;
-            padding-bottom: 8px;
-            border-bottom: 1px solid var(--border-color);
-        }
-
-        h3 {
-            font-family: var(--reader-heading-font);
-            font-size: calc(20px * var(--reader-heading-scale));
-            font-weight: 600;
-            margin: 24px 0 8px 0;
-        }
-
-        p, .pcs-section p, .pcs-section-block p, .mw-parser-output p {
-            margin-top: 0 !important;
-            margin-bottom: var(--reader-paragraph-spacing) !important;
-        }
-
-        /* Links */
-        a {
-            color: var(--link-color) !important;
-            text-decoration: none;
-            transition: opacity 0.15s ease;
-        }
-
-        a:hover {
-            opacity: 0.8;
-        }
-
-        /* Images */
-        @keyframes macwiki-image-skeleton-shimmer {
-            0% { background-position: 0% 0; }
-            100% { background-position: 200% 0; }
-        }
-
-        img {
-            max-width: 100%;
-            height: auto;
-            border-radius: 8px;
-            margin: 16px 0;
-            background-color: var(--bg-subtle);
-        }
-
-        img[data-macwiki-image-transition="1"] {
-            opacity: 1;
-            transition: opacity 0.22s ease-out, filter 0.22s ease-out;
-        }
-
-        html.macwiki-fast-scroll img[data-macwiki-image-transition="1"] {
-            transition: none !important;
-        }
-
-        img[data-macwiki-image-transition="1"][data-macwiki-image-skeleton="1"][data-macwiki-image-state="loading"] {
-            opacity: 1;
-            background-image: linear-gradient(
-                100deg,
-                color-mix(in srgb, var(--bg-subtle) 86%, transparent) 0%,
-                color-mix(in srgb, white 18%, var(--bg-subtle) 82%) 38%,
-                color-mix(in srgb, var(--bg-subtle) 86%, transparent) 72%
-            );
-            background-size: 220% 100%;
-            animation: macwiki-image-skeleton-shimmer 1.25s linear infinite;
-            filter: saturate(0.92) contrast(0.96);
-        }
-
-        img[data-macwiki-image-transition="1"][data-macwiki-image-skeleton="0"][data-macwiki-image-state="loading"] {
-            opacity: 0;
-        }
-
-        img[data-macwiki-image-state="loading"] {
-            border: 1px solid color-mix(in srgb, var(--border-color) 84%, transparent);
-        }
-
-        img[data-macwiki-image-state="loaded"] {
-            opacity: 1;
-            filter: none;
-            animation: none;
-        }
-
-        html.macwiki-fast-scroll img[data-macwiki-image-transition="1"][data-macwiki-image-skeleton="1"][data-macwiki-image-state="loading"] {
-            animation: none !important;
-            background-position: 50% 0;
-            filter: none;
-        }
-
-        @media (prefers-reduced-motion: reduce) {
-            img[data-macwiki-image-transition="1"] {
-                transition: none;
-            }
-            img[data-macwiki-image-transition="1"][data-macwiki-image-skeleton="1"][data-macwiki-image-state="loading"] {
-                animation: none;
-            }
-        }
-
-        figure {
-            margin: 24px 0;
-            padding: 0;
-        }
-
-        figcaption {
-            font-size: 14px;
-            color: var(--text-secondary);
-            margin-top: 8px;
-            line-height: 1.4;
-        }
-
-        /* Infobox styling */
-        .infobox, .infobox-full-data, table.infobox {
-            background: var(--bg-subtle);
-            border-radius: 12px;
-            padding: 16px;
-            border: 1px solid var(--border-color) !important;
-            margin: 0 0 24px 24px;
-            float: right;
-            max-width: 300px;
-        }
-
-        .infobox th, .infobox td {
-            border: none !important;
-            padding: 4px 8px;
-        }
-
-        /* Block quotes */
-        blockquote {
-            margin: 24px 0;
-            padding: 16px 24px;
-            background: var(--bg-subtle);
-            border-left: 3px solid var(--link-color);
-            border-radius: 0 8px 8px 0;
-            font-style: italic;
-        }
-
-        /* Lists */
-        ul, ol {
-            margin: 16px 0;
-            padding-left: 24px;
-        }
-
-        li {
-            margin: 8px 0;
-        }
-
-        /* Hide reference sections in reader — surfaced in Inspector instead */
-        html.macwiki-hide-reference-sections section.macwiki-reference-section {
-            display: none !important;
-        }
-
-        html.macwiki-hide-reference-sections .mw-references-wrap {
-            display: none !important;
-        }
-
-        /* Tables */
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 24px 0;
-            font-size: 15px;
-            background: var(--table-surface);
-        }
-
-        th, td {
-            padding: 12px;
-            text-align: left;
-            border-bottom: 1px solid var(--border-color);
-        }
-
-        th {
-            font-weight: 600;
-            background: var(--table-header-surface);
-        }
-
-        /* Collapsible tables (Wikipedia mobile PCS) */
-        .pcs-collapse-table-container {
-            background: var(--table-surface) !important;
-            border: 1px solid var(--border-color) !important;
-            border-radius: 12px;
-            box-shadow: none !important;
-            overflow: hidden;
-        }
-
-        .pcs-collapse-table-collapsed-container,
-        .pcs-collapse-table-collapsed-bottom {
-            background: var(--table-surface) !important;
-            color: var(--text-secondary) !important;
-        }
-
-        .pcs-collapse-table-collapsed-container {
-            border-bottom: 1px solid color-mix(in srgb, var(--border-color) 70%, transparent);
-        }
-
-        .pcs-collapse-table-collapse-text {
-            color: var(--text-secondary) !important;
-        }
-
-        .pcs-table-other,
-        .pcs-table-infobox {
-            color: var(--text-primary) !important;
-            font-weight: 600;
-        }
-
-        .pcs-collapse-table-content {
-            background: var(--table-surface) !important;
-        }
-
-        .pcs-collapse-table-container table {
-            margin: 0 !important;
-            background: transparent !important;
-        }
-
-        /* Code */
-        code, pre {
-            font-family: 'SF Mono', Menlo, Consolas, monospace;
-            font-size: 14px;
-            background: var(--bg-subtle);
-            border-radius: 4px;
-        }
-
-        code {
-            padding: 2px 6px;
-        }
-
-        pre {
-            padding: 16px;
-            overflow-x: auto;
-        }
-        """
-
-        let script = WKUserScript(
-            source: """
-            function appendToDocumentHead(node) {
-                if (document.head) {
-                    document.head.appendChild(node);
-                } else if (document.documentElement) {
-                    document.documentElement.appendChild(node);
-                }
-            }
-
-            var style = document.createElement('style');
-            style.textContent = `\(css)`;
-            appendToDocumentHead(style);
-
-            var meta = document.createElement('meta');
-            meta.name = 'viewport';
-            meta.content = 'width=device-width, initial-scale=1';
-            appendToDocumentHead(meta);
-            """,
+        let readerDocumentScript = WKUserScript(
+            source: ReaderDocumentStyle.makeInjectionScript(
+                minimumReadableColumnWidth: ReaderAppearance.minimumReadableColumnWidth,
+                readerTopInset: readerTopInset
+            ),
             injectionTime: .atDocumentEnd,
             forMainFrameOnly: true
         )
-
-        webView.configuration.userContentController.addUserScript(script)
+        webView.configuration.userContentController.addUserScript(readerDocumentScript)
 
         let webViewScript = WKUserScript(
             source: WebViewResources.scriptSource,
@@ -813,7 +277,9 @@ struct WebView: NSViewRepresentable {
         var didProcessPendingAction = false
 
         // Apply a color selected from the native highlight popover to the current WebView selection.
-        if let pending = appState?.pendingImmediateHighlight {
+        if let pending = appState?.pendingImmediateHighlight,
+           !context.coordinator.isContentLoadInFlight,
+           context.coordinator.canRunDocumentJavaScript(on: webView) {
             let script = "window.highlightCurrentSelection('\(pending.id.uuidString)', '\(pending.cssColor)');"
             webView.evaluateJavaScript(script)
             DispatchQueue.main.async {
@@ -824,7 +290,9 @@ struct WebView: NSViewRepresentable {
         }
 
         // Apply pending highlight color change in WebView
-        if let pending = appState?.pendingHighlightColorChange {
+        if let pending = appState?.pendingHighlightColorChange,
+           !context.coordinator.isContentLoadInFlight,
+           context.coordinator.canRunDocumentJavaScript(on: webView) {
             let script = "window.updateHighlightColor('\(pending.id.uuidString)', '\(pending.cssColor)');"
             webView.evaluateJavaScript(script)
             DispatchQueue.main.async {
@@ -834,7 +302,9 @@ struct WebView: NSViewRepresentable {
         }
 
         // Scroll to a specific highlight
-        if let pending = appState?.pendingHighlightScroll {
+        if let pending = appState?.pendingHighlightScroll,
+           !context.coordinator.isContentLoadInFlight,
+           context.coordinator.canRunDocumentJavaScript(on: webView) {
             let script = "window.scrollToHighlight('\(pending.uuidString)');"
             webView.evaluateJavaScript(script)
             DispatchQueue.main.async {
@@ -844,7 +314,9 @@ struct WebView: NSViewRepresentable {
         }
 
         // Scroll to a specific heading from Table of Contents
-        if let sectionId = appState?.pendingTableOfContentsScrollTarget {
+        if let sectionId = appState?.pendingTableOfContentsScrollTarget,
+           !context.coordinator.isContentLoadInFlight,
+           context.coordinator.canRunDocumentJavaScript(on: webView) {
             let script = "window.scrollToSection('\(sectionId)');"
             webView.evaluateJavaScript(script)
             DispatchQueue.main.async {
@@ -950,7 +422,9 @@ struct WebView: NSViewRepresentable {
         if didProcessPendingAction && !hasPendingRehydrate { return }
 
         // Retry rehydrating a stale highlight
-        if let pending = appState?.pendingHighlightRehydrate {
+        if let pending = appState?.pendingHighlightRehydrate,
+           !context.coordinator.isContentLoadInFlight,
+           context.coordinator.canRunDocumentJavaScript(on: webView) {
             let payload: [String: Any] = [
                 "id": pending.id.uuidString,
                 "text": pending.text,
@@ -1020,6 +494,12 @@ struct WebView: NSViewRepresentable {
                 baseURL: baseURL
             )
         } else {
+            // SwiftUI can update the representable repeatedly while WebKit is
+            // replacing its document. Document-end bridge functions do not
+            // exist yet, so retrying them on every update can monopolize the
+            // main thread and starve AppKit layout/accessibility work.
+            guard !context.coordinator.isContentLoadInFlight,
+                  context.coordinator.canRunDocumentJavaScript(on: webView) else { return }
             context.coordinator.restoreScrollPositionIfNeeded(on: webView, desiredY: scrollPosition)
             context.coordinator.applyReaderAppearance(to: webView)
             context.coordinator.syncScrollTelemetryMode(on: webView)
@@ -1116,6 +596,10 @@ struct WebView: NSViewRepresentable {
         var linkPreviewImmediateModifier: ReaderLinkPreviewImmediateModifier
         var nativeHighlightingMenuEnabled: Bool
         var openTimer: Binding<ArticleOpenTimer>?
+
+        func canRunDocumentJavaScript(on webView: WKWebView) -> Bool {
+            !webView.isLoading && !contentLoadFailed
+        }
         var lastAppliedReaderAppearance: ReaderAppearance?
         var lastAppliedReaderTopInset: CGFloat = -1
         var lastAppliedLinkPreviewImmediateModifier: ReaderLinkPreviewImmediateModifier?
@@ -1147,7 +631,6 @@ struct WebView: NSViewRepresentable {
         var pendingPostRevealTasks: [() -> Void] = []
         var lastSaveRequestTimestamp: TimeInterval = 0
         var lastScrollPositionPublishTimestamp: TimeInterval = 0
-        var lastVisibleSectionPollTimestamp: TimeInterval = 0
         var lastHandledLinkSignature: String?
         var lastHandledLinkTimestamp: TimeInterval = 0
         var lastHandledAnyLinkTimestamp: TimeInterval = 0
@@ -1156,8 +639,6 @@ struct WebView: NSViewRepresentable {
         var adaptiveProgressDeltaThreshold: Double = 0.045
         var adaptiveProgressTimeGate: TimeInterval = 1.6
         var adaptiveSaveRequestInterval: TimeInterval = 3.4
-        var adaptiveFallbackDeltaThreshold: CGFloat = 14
-        var adaptiveFallbackTimeGate: TimeInterval = 1.4
         var currentScrollProfile: ScrollProfile = .balanced
         var isFindRequestInFlight = false
         var activeFindRequestID: UUID?
@@ -1238,7 +719,6 @@ struct WebView: NSViewRepresentable {
             activeRestoreSessionID = nil
             pendingPostRevealTasks.removeAll(keepingCapacity: false)
             self.webView = webView
-            setupScrollObserver(for: webView)
             syncScrollTelemetryMode(on: webView, force: true)
             syncRestoreTelemetryMode(on: webView, force: true)
             if webView.alphaValue < 1 {
@@ -1382,16 +862,10 @@ struct WebView: NSViewRepresentable {
             return nil
         }
 
-        var scrollObserver: NSObjectProtocol?
-
         func cleanup() {
             findRequestTimeoutWorkItem?.cancel()
             findRequestTimeoutWorkItem = nil
             dismissLinkHoverPreview(immediate: true)
-            if let observer = scrollObserver {
-                NotificationCenter.default.removeObserver(observer)
-                scrollObserver = nil
-            }
         }
 
         func shouldDeferFindRequest(on webView: WKWebView) -> Bool {
@@ -1635,34 +1109,6 @@ extension WebView {
             }, { once: true });
         })();
         """
-    }
-}
-
-private enum WebViewResources {
-    static let scriptSource: String = {
-        guard let url = resolvedScriptURL(),
-              let data = try? Data(contentsOf: url),
-              let script = String(data: data, encoding: .utf8) else {
-            assertionFailure("Missing WebView.js in bundle")
-            return ""
-        }
-        return script
-    }()
-
-    private static func resolvedScriptURL() -> URL? {
-        if let directMainURL = Bundle.main.url(forResource: "WebView", withExtension: "js") {
-            return directMainURL
-        }
-
-        if let moduleSubdirectoryURL = Bundle.main.url(
-            forResource: "WebView",
-            withExtension: "js",
-            subdirectory: "MacWiki_MacWiki.bundle"
-        ) {
-            return moduleSubdirectoryURL
-        }
-
-        return Bundle.module.url(forResource: "WebView", withExtension: "js")
     }
 }
 

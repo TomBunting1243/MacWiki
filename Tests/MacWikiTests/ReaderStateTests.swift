@@ -125,6 +125,33 @@ struct ReaderStateTests {
         #expect(approximatelyEqual(appState.liveReadingProgress(forTitle: article.title), 1))
     }
 
+    @Test func savedArticleReadStateSyncReportsOnlyRealMutations() throws {
+        let modelContext = try makeInMemoryModelContext()
+        let list = ReadingList(name: "Inbox")
+        let savedArticle = SavedArticle(title: "Ada Lovelace", list: list)
+        savedArticle.isRead = false
+        list.articles = [savedArticle]
+        modelContext.insert(list)
+        modelContext.insert(savedArticle)
+
+        #expect(!ReadStateSync.syncSavedArticles(
+            title: savedArticle.title,
+            isRead: false,
+            in: modelContext
+        ))
+        #expect(ReadStateSync.syncSavedArticles(
+            title: savedArticle.title,
+            isRead: true,
+            in: modelContext
+        ))
+        #expect(savedArticle.isRead)
+        #expect(!ReadStateSync.syncSavedArticles(
+            title: savedArticle.title,
+            isRead: true,
+            in: modelContext
+        ))
+    }
+
     private func makeInMemoryModelContext() throws -> ModelContext {
         let configuration = ModelConfiguration(isStoredInMemoryOnly: true)
         let container = try ModelContainer(

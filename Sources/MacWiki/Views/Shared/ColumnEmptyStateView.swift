@@ -1,63 +1,72 @@
 import SwiftUI
 
-/// Shared centered empty state used by column surfaces (sidebar, inspector).
-struct ColumnEmptyStateView: View {
-    enum Style {
-        case standard
-        case quiet
-    }
+enum ColumnEmptyStateStyle {
+    case standard
+    case quiet
 
-    let title: String
+    fileprivate var maximumContentWidth: CGFloat {
+        switch self {
+        case .standard:
+            360
+        case .quiet:
+            320
+        }
+    }
+}
+
+/// Native unavailable-state presentation shared by column surfaces.
+struct ColumnEmptyStateView<Actions: View>: View {
+    let title: Text
     let systemImage: String
-    let description: String
-    let style: Style
+    let description: Text
+    let style: ColumnEmptyStateStyle
+    let actions: Actions
 
     init(
-        title: String,
+        title: Text,
         systemImage: String,
-        description: String,
-        style: Style = .standard
+        description: Text,
+        style: ColumnEmptyStateStyle = .standard,
+        @ViewBuilder actions: () -> Actions
     ) {
         self.title = title
         self.systemImage = systemImage
         self.description = description
         self.style = style
+        self.actions = actions()
     }
 
     var body: some View {
-        VStack(spacing: style == .quiet ? 12 : 14) {
-            if style == .quiet {
+        ContentUnavailableView {
+            SwiftUI.Label {
+                title
+            } icon: {
                 Image(systemName: systemImage)
-                    .font(.system(size: 40, weight: .regular))
-                    .symbolRenderingMode(.hierarchical)
-                    .foregroundStyle(.tertiary)
-            } else {
-                Image(systemName: systemImage)
-                    .font(.system(size: 36, weight: .regular))
-                    .symbolRenderingMode(.hierarchical)
-                    .foregroundStyle(.secondary)
-                    .frame(width: 64, height: 64)
-                    .background(
-                        Circle()
-                            .fill(Color.primary.opacity(0.06))
-                    )
             }
-
-            Text(title)
-                .font(style == .quiet ? .headline : .system(size: 17, weight: .semibold))
-                .foregroundStyle(.primary)
-                .multilineTextAlignment(.center)
-
-            Text(description)
-                .font(style == .quiet ? MacWikiTypography.settingsHelp : MacWikiTypography.emptyStateDescription)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .fixedSize(horizontal: false, vertical: true)
+        } description: {
+            description
+        } actions: {
+            actions
         }
-        .padding(.horizontal, style == .quiet ? 20 : 22)
-        .padding(.vertical, style == .quiet ? 16 : 20)
-        .frame(maxWidth: 360)
+        .symbolRenderingMode(.hierarchical)
+        .frame(maxWidth: style.maximumContentWidth)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-        .accessibilityElement(children: .combine)
+    }
+}
+
+extension ColumnEmptyStateView where Actions == EmptyView {
+    init(
+        title: LocalizedStringResource,
+        systemImage: String,
+        description: LocalizedStringResource,
+        style: ColumnEmptyStateStyle = .standard
+    ) {
+        self.init(
+            title: Text(title),
+            systemImage: systemImage,
+            description: Text(description),
+            style: style,
+            actions: EmptyView.init
+        )
     }
 }

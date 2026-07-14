@@ -22,7 +22,7 @@ enum SidebarRowMetrics {
 }
 
 enum SidebarRowSelectionVisuals {
-    static let tint = Color(red: 0.22, green: 0.50, blue: 0.88)
+    static let tint = Color.accentColor
 
     static func primaryForeground(isSelected: Bool, isHighlighted: Bool = false) -> Color {
         if isHighlighted {
@@ -96,6 +96,8 @@ private struct SidebarListRowModifier: ViewModifier {
 
 struct SidebarRowContainer<Content: View>: View {
     @Environment(\.macWikiAccessibilityPersonalization.reduceMotion) private var reduceMotion
+    @Environment(\.macWikiAccessibilityPersonalization.differentiateWithoutColor) private var differentiateWithoutColor
+    @Environment(\.macWikiAccessibilityPersonalization.colorSchemeContrast) private var colorSchemeContrast
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.controlActiveState) private var controlActiveState
     @Environment(\.sidebarRowLayoutMetrics) private var layoutMetrics
@@ -132,6 +134,9 @@ struct SidebarRowContainer<Content: View>: View {
     }
 
     private var selectedStroke: Color {
+        if emphasizesSelectionWithoutColor {
+            return Color.primary.opacity(isKeyWindow ? 0.42 : 0.26)
+        }
         if colorScheme == .dark {
             return SidebarRowSelectionVisuals.tint.opacity(isHovered ? 0.28 : 0.18)
         }
@@ -166,7 +171,12 @@ struct SidebarRowContainer<Content: View>: View {
     }
 
     private var strokeLineWidth: CGFloat {
-        isSelected ? 0.5 : 0
+        guard isSelected else { return 0 }
+        return emphasizesSelectionWithoutColor ? 1 : 0.5
+    }
+
+    private var emphasizesSelectionWithoutColor: Bool {
+        differentiateWithoutColor || colorSchemeContrast == .increased
     }
 
     var body: some View {

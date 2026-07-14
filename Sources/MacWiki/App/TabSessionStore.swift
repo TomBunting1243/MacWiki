@@ -137,6 +137,17 @@ final class TabSessionStore {
         currentTab?.currentArticle
     }
 
+    @discardableResult
+    func selectTab(id: UUID) -> Bool {
+        guard id != activeTabId,
+              openTabs.contains(where: { $0.id == id }) else {
+            return false
+        }
+        activeTabId = id
+        requestSave()
+        return true
+    }
+
     func openArticle(
         _ article: Article,
         inNewTab: Bool = false,
@@ -295,6 +306,33 @@ final class TabSessionStore {
         let tab = openTabs.remove(at: sourceIndex)
         openTabs.insert(tab, at: max(0, min(destinationIndex, openTabs.count)))
         requestSave()
+    }
+
+    /// Applies an identity-based reorder emitted by SwiftUI's native reorder
+    /// container. Identity keeps the mutation stable if the visible order
+    /// changes between drag recognition and drop delivery.
+    @discardableResult
+    func reorderTabs(_ sourceIDs: [UUID], before destinationID: UUID?) -> Bool {
+        let sourceSet = Set(sourceIDs)
+        guard !sourceSet.isEmpty else { return false }
+
+        let movedTabs = openTabs.filter { sourceSet.contains($0.id) }
+        guard movedTabs.count == sourceSet.count else { return false }
+
+        var reordered = openTabs.filter { !sourceSet.contains($0.id) }
+        let insertionIndex: Int
+        if let destinationID,
+           let destinationIndex = reordered.firstIndex(where: { $0.id == destinationID }) {
+            insertionIndex = destinationIndex
+        } else {
+            insertionIndex = reordered.endIndex
+        }
+        reordered.insert(contentsOf: movedTabs, at: insertionIndex)
+
+        guard reordered.map(\.id) != openTabs.map(\.id) else { return false }
+        openTabs = reordered
+        requestSave()
+        return true
     }
 
     @discardableResult

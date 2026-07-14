@@ -74,13 +74,9 @@ extension WebView.Coordinator {
 
         runAfterReveal { [weak self, weak webView] in
             guard let self, let webView else { return }
-            self.setupScrollObserver(for: webView)
 
             self.scheduleForCurrentWebView(after: 0.04, webView: webView) { [weak self, weak webView] in
                 guard let self, let webView else { return }
-                if let scrollView = self.findScrollView(in: webView) {
-                    self.reportScrollProgress(from: scrollView, force: true)
-                }
                 if self.isSectionTrackingRequested {
                     self.publishVisibleSection(from: webView, force: true)
                 }

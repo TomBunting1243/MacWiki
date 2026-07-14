@@ -49,4 +49,21 @@ extension AppState {
         pendingFindOnPageRequest = nil
         currentFindOnPageRequestID = nil
     }
+
+    /// Find belongs to the article that created it. Closing the presentation
+    /// and targeting the old tab with a clear request prevents query/results
+    /// from appearing over the next tab while allowing a pooled old web view
+    /// to clear its native selection when it next processes messages.
+    func resetFindOnPageForTabChange(from oldTabID: UUID?, to newTabID: UUID?) {
+        guard oldTabID != newTabID else { return }
+        let hasFindState = showFindOnPage
+            || !findOnPageQuery.isEmpty
+            || pendingFindOnPageRequest != nil
+            || currentFindOnPageRequestID != nil
+        guard hasFindState else { return }
+        dismissFindOnPage(
+            activeTabID: oldTabID,
+            clearsWebSelection: oldTabID != nil
+        )
+    }
 }

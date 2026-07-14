@@ -18,8 +18,10 @@ QA_HOME="${QA_HOME:-/tmp/macwiki-qa/tab-reorder-home-$(date +%Y%m%d_%H%M%S)-$RAN
 STATE_DIR="$QA_HOME/Library/Application Support/MacWiki"
 LEGACY_STATE="$STATE_DIR/state.json"
 TAB_SNAPSHOT="$STATE_DIR/tab-session.json"
-APP_LOG="$OUTPUT_DIR/app.log"
-RESULT_JSON="$OUTPUT_DIR/result.json"
+FIRST_LOG="$OUTPUT_DIR/first-run.log"
+RELAUNCH_LOG="$OUTPUT_DIR/relaunch.log"
+RESULT_JSON="$OUTPUT_DIR/first-result.json"
+RELAUNCH_RESULT_JSON="$OUTPUT_DIR/relaunch-result.json"
 DRIVER_LOG="$OUTPUT_DIR/driver.log"
 TAB_COUNT=16
 INFO_PLIST="$APP_BUNDLE_PATH/Contents/Info.plist"
@@ -40,9 +42,11 @@ TRACE_DIRTY="$(plutil -extract GitDirty raw "$BUILD_INFO_PLIST")"
 [[ "$VERSION" == 1.0* ]] || { echo "Candidate is not on the 1.0 line: $VERSION" >&2; exit 1; }
 [[ "$TRACE_DIRTY" == "false" ]] || { echo "BuildInfo says candidate source was dirty" >&2; exit 1; }
 [[ "$TRACE_COMMIT" =~ ^[0-9a-f]{40}$ ]] || { echo "BuildInfo commit is invalid" >&2; exit 1; }
+qa_assert_candidate_manifest_matches_executable "$BUILD_INFO_PLIST"
 
 mkdir -p "$OUTPUT_DIR"
-: >"$APP_LOG"
+: >"$FIRST_LOG"
+: >"$RELAUNCH_LOG"
 : >"$DRIVER_LOG"
 qa_prepare_isolated_home
 qa_assert_isolated_path "$STATE_DIR" "$QA_HOME"
@@ -97,23 +101,11 @@ jq -n \
   --arg activeTabId "$active_tab_id" \
   '{openTabs: $openTabs, activeTabId: $activeTabId}' >"$LEGACY_STATE"
 
-qa_launch_candidate "$APP_LOG"
+qa_launch_candidate "$FIRST_LOG"
+FIRST_PID="$QA_APP_PID"
 qa_run_command_with_timeout 90 swift "$SCRIPT_DIR/ax_tab_reorder.swift" \
   "$QA_APP_PID" "$TAB_COUNT" >"$RESULT_JSON" 2>"$DRIVER_LOG"
 kill -0 "$QA_APP_PID"
-
-if rg -ni 'fatal error|precondition failed|assertion failed' "$APP_LOG" >"$OUTPUT_DIR/runtime-failures.txt"; then
-  echo "ERROR: Runtime diagnostics contained a fatal, assertion, or precondition failure." >&2
-  exit 1
-fi
-: >"$OUTPUT_DIR/runtime-failures.txt"
-ATTRIBUTEGRAPH_CYCLE_COUNT="$(rg -c 'AttributeGraph: cycle detected' "$APP_LOG" || true)"
-ATTRIBUTEGRAPH_CYCLE_COUNT="${ATTRIBUTEGRAPH_CYCLE_COUNT:-0}"
-rg -n 'AttributeGraph: cycle detected' "$APP_LOG" >"$OUTPUT_DIR/attributegraph-cycles.txt" || true
-if [[ "$ATTRIBUTEGRAPH_CYCLE_COUNT" != "0" ]]; then
-  echo "ERROR: Tab reorder journey emitted $ATTRIBUTEGRAPH_CYCLE_COUNT AttributeGraph cycles." >&2
-  exit 1
-fi
 
 for _ in $(seq 1 50); do
   [[ -f "$TAB_SNAPSHOT" ]] && break
@@ -134,7 +126,47 @@ fi
 
 qa_stop_exact
 if qa_exact_binary_pids | grep -q .; then
-  echo "ERROR: Exact candidate process remained after tab reorder QA." >&2
+  echo "ERROR: Exact candidate process remained after the first tab reorder run." >&2
+  exit 1
+fi
+
+qa_launch_candidate "$RELAUNCH_LOG"
+RELAUNCH_PID="$QA_APP_PID"
+qa_run_command_with_timeout 90 swift "$SCRIPT_DIR/ax_tab_reorder.swift" \
+  "$QA_APP_PID" "$TAB_COUNT" verify-order "$RESULT_JSON" \
+  >"$RELAUNCH_RESULT_JSON" 2>>"$DRIVER_LOG"
+kill -0 "$QA_APP_PID"
+
+relaunch_titles="$(jq -c '[.after[].title]' "$RELAUNCH_RESULT_JSON")"
+relaunch_overflow_count="$(jq -r '.overflowMenuTitles | length' "$RELAUNCH_RESULT_JSON")"
+if [[ "$relaunch_titles" != "$after_titles" ]]; then
+  echo "ERROR: Relaunched rendered tab order does not match the committed first-run order." >&2
+  printf 'First run: %s\nRelaunch:  %s\n' "$after_titles" "$relaunch_titles" >&2
+  exit 1
+fi
+if [[ "$relaunch_overflow_count" != "$TAB_COUNT" ]]; then
+  echo "ERROR: Relaunched All Tabs overflow omitted seeded titles." >&2
+  exit 1
+fi
+
+qa_stop_exact
+if qa_exact_binary_pids | grep -q .; then
+  echo "ERROR: Exact candidate process remained after tab reorder relaunch QA." >&2
+  exit 1
+fi
+
+if rg -ni 'fatal error|precondition failed|assertion failed' \
+  "$FIRST_LOG" "$RELAUNCH_LOG" >"$OUTPUT_DIR/runtime-failures.txt"; then
+  echo "ERROR: Runtime diagnostics contained a fatal, assertion, or precondition failure." >&2
+  exit 1
+fi
+: >"$OUTPUT_DIR/runtime-failures.txt"
+ATTRIBUTEGRAPH_CYCLE_COUNT="$(rg -c 'AttributeGraph: cycle detected' "$FIRST_LOG" "$RELAUNCH_LOG" \
+  | awk -F: '{ total += $NF } END { print total + 0 }')"
+rg -n 'AttributeGraph: cycle detected' "$FIRST_LOG" "$RELAUNCH_LOG" \
+  >"$OUTPUT_DIR/attributegraph-cycles.txt" || true
+if [[ "$ATTRIBUTEGRAPH_CYCLE_COUNT" != "0" ]]; then
+  echo "ERROR: Tab reorder journey emitted $ATTRIBUTEGRAPH_CYCLE_COUNT AttributeGraph cycles." >&2
   exit 1
 fi
 
@@ -148,16 +180,24 @@ overflow_count="$(jq -r '.overflowMenuTitles | length' "$RESULT_JSON")"
   printf -- '- Version/build: `%s (%s)`\n' "$VERSION" "$BUILD"
   printf -- '- BuildInfo commit: `%s`\n' "$TRACE_COMMIT"
   printf -- '- BuildInfo dirty: `%s`\n' "$TRACE_DIRTY"
+  printf -- '- Package manifest: `%s`\n' "$QA_PACKAGE_MANIFEST_PATH"
+  printf -- '- Packaged executable SHA-256: `%s`\n' "$QA_PACKAGED_EXECUTABLE_SHA256"
+  printf -- '- App tree SHA-256: `%s`\n' "$QA_APP_TREE_SHA256"
+  printf -- '- Toolchain: `%s`; Mach-O minOS/SDK: `%s / %s`\n' \
+    "$QA_XCODE_VERSION" "$QA_BINARY_MIN_OS" "$QA_BINARY_SDK"
+  printf -- '- First-run PID: `%s`; relaunch PID: `%s`\n' "$FIRST_PID" "$RELAUNCH_PID"
   printf -- '- Seeded unique long-title tabs: `%s`\n' "$TAB_COUNT"
   printf -- '- All Tabs overflow entries: `%s`\n' "$overflow_count"
   printf -- '- Dragged title: `%s`\n' "$before_first"
   printf -- '- Persisted destination index: `%s`\n' "$after_index"
   printf -- '- Rendered and persisted tab orders: `MATCH`\n'
+  printf -- '- Relaunched rendered order and overflow membership: `MATCH`\n'
   printf -- '- Runtime failures: no fatal, assertion, or precondition messages\n'
   printf -- '- AttributeGraph cycles: `%s`\n' "$ATTRIBUTEGRAPH_CYCLE_COUNT"
   printf -- '- Exact process cleanup: `PASS`\n'
   printf -- '- AX evidence: `%s`\n' "$RESULT_JSON"
+  printf -- '- Relaunch AX evidence: `%s`\n' "$RELAUNCH_RESULT_JSON"
 } >"$OUTPUT_DIR/report.md"
 
-echo "PASS: tab reorder, overflow, persistence, and cleanup verified."
+echo "PASS: tab reorder, overflow, persistence, relaunch, and cleanup verified."
 echo "Report: $OUTPUT_DIR/report.md"

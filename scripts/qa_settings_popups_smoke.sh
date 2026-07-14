@@ -7,16 +7,38 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 source "$SCRIPT_DIR/lib/qa_process_safety.sh"
 APP_BIN="${APP_BIN:-}"
+APP_BUNDLE_PATH="${APP_BUNDLE_PATH:-${APP_BIN%/Contents/MacOS/*}}"
 QA_HOME="${QA_HOME:-/tmp/macwiki-qa/settings-popups-home-$(date +%Y%m%d_%H%M%S)-$RANDOM}"
+INFO_PLIST="$APP_BUNDLE_PATH/Contents/Info.plist"
+BUILD_INFO_PLIST="$APP_BUNDLE_PATH/Contents/Resources/BuildInfo.plist"
 
 if [[ -z "$APP_BIN" || ! -x "$APP_BIN" ]]; then
   echo "ERROR: Set APP_BIN to an executable inside the exact packaged candidate." >&2
   exit 1
 fi
 
+[[ -f "$INFO_PLIST" ]] || { echo "Candidate Info.plist is missing: $INFO_PLIST" >&2; exit 1; }
+[[ -f "$BUILD_INFO_PLIST" ]] || { echo "Candidate BuildInfo.plist is missing: $BUILD_INFO_PLIST" >&2; exit 1; }
+
+VERSION="$(plutil -extract CFBundleShortVersionString raw "$INFO_PLIST")"
+BUILD="$(plutil -extract CFBundleVersion raw "$INFO_PLIST")"
+TRACE_VERSION="$(plutil -extract Version raw "$BUILD_INFO_PLIST")"
+TRACE_BUILD="$(plutil -extract BuildNumber raw "$BUILD_INFO_PLIST")"
+TRACE_COMMIT="$(plutil -extract GitCommit raw "$BUILD_INFO_PLIST")"
+TRACE_DIRTY="$(plutil -extract GitDirty raw "$BUILD_INFO_PLIST")"
+
+[[ "$VERSION" == 1.0* ]] || { echo "Candidate is not on the 1.0 line: $VERSION" >&2; exit 1; }
+[[ "$TRACE_VERSION" == "$VERSION" ]] || { echo "BuildInfo version does not match Info.plist" >&2; exit 1; }
+[[ "$TRACE_BUILD" == "$BUILD" ]] || { echo "BuildInfo build does not match Info.plist" >&2; exit 1; }
+[[ "$TRACE_DIRTY" == "false" ]] || { echo "BuildInfo says candidate source was dirty" >&2; exit 1; }
+[[ "$TRACE_COMMIT" =~ ^[0-9a-f]{40}$ ]] || { echo "BuildInfo commit is invalid" >&2; exit 1; }
+qa_assert_candidate_manifest_matches_executable "$BUILD_INFO_PLIST"
+
 qa_prepare_isolated_home
+qa_assert_no_conflicting_processes
 cleanup() {
   qa_stop_exact
+  qa_stop_matching_exact
   qa_remove_isolated_home
 }
 trap cleanup EXIT INT TERM
@@ -39,6 +61,31 @@ if (matchingProcesses.length !== 1) {
 }
 const app = matchingProcesses[0];
 
+function assertExactTargetFrontmost(targetWindow = null) {
+  const exactProcesses = se.processes.whose({ unixId: appPid })();
+  if (exactProcesses.length !== 1) {
+    throw new Error(`verified app PID disappeared before global input: ${appPid}`);
+  }
+  app.frontmost = true;
+  if (targetWindow) {
+    try { targetWindow.actions.byName('AXRaise').perform(); } catch (e) {}
+  }
+  delay(0.08);
+  if (!Boolean(app.frontmost())) {
+    throw new Error(`verified app PID is not frontmost before global input: ${appPid}`);
+  }
+}
+
+function exactKeyCode(keyCode, targetWindow = null) {
+  assertExactTargetFrontmost(targetWindow);
+  se.keyCode(keyCode);
+}
+
+function exactKeystroke(character, modifiers, targetWindow = null) {
+  assertExactTargetFrontmost(targetWindow);
+  se.keystroke(character, modifiers);
+}
+
 function settingsWindow() {
   const windows = app.windows();
   for (const w of windows) {
@@ -60,6 +107,79 @@ function settingsWindow() {
     return windows[0];
   }
   return null;
+}
+
+function commandMenuItem(title) {
+  const menuBars = app.menuBars();
+  if (menuBars.length === 0) return null;
+  const menuBarItems = menuBars[0].menuBarItems();
+  for (const menuBarItem of menuBarItems) {
+    let menus = [];
+    try { menus = menuBarItem.menus(); } catch (e) { menus = []; }
+    for (const menu of menus) {
+      let items = [];
+      try { items = menu.menuItems(); } catch (e) { items = []; }
+      for (const item of items) {
+        try {
+          if (String(item.name()) === title) return item;
+        } catch (e) {}
+      }
+    }
+  }
+  return null;
+}
+
+function assertDocumentCommandsUnavailableInSettings() {
+  const requiredReaderTitles = new Set([
+    'Back',
+    'Forward',
+    'Reader Style…',
+    'Page Views…',
+    'Open in Browser',
+    'Share…'
+  ]);
+  const titles = [
+    'Search Wikipedia',
+    'Find in Page',
+    'New Reading List',
+    'New Folder',
+    'New Tab',
+    'Close Tab',
+    'Reopen Closed Tab',
+    'Save Article...',
+    'Add to List...',
+    'Toggle Inspector',
+    ...requiredReaderTitles,
+    'Next Tab',
+    'Previous Tab',
+    'Increase Reader Font Size',
+    'Decrease Reader Font Size',
+    'Reset Reader Font Size'
+  ];
+  for (const title of titles) {
+    const item = commandMenuItem(title);
+    if (!item) {
+      if (requiredReaderTitles.has(title)) {
+        throw new Error(`${title} was missing while Settings was frontmost`);
+      }
+      continue;
+    }
+    let enabled = false;
+    try { enabled = Boolean(item.enabled()); } catch (e) {}
+    if (enabled) throw new Error(`${title} stayed enabled while Settings was frontmost`);
+  }
+
+  const readStateItems = ['Mark as Read', 'Mark as Unread']
+    .map(commandMenuItem)
+    .filter(item => item !== null);
+  if (readStateItems.length !== 1) {
+    throw new Error('Settings must expose exactly one disabled Mark as Read/Unread command');
+  }
+  let readStateEnabled = false;
+  try { readStateEnabled = Boolean(readStateItems[0].enabled()); } catch (e) {}
+  if (readStateEnabled) {
+    throw new Error('Mark as Read/Unread stayed enabled while Settings was frontmost');
+  }
 }
 
 function collectPopups(el, out) {
@@ -158,8 +278,7 @@ function auditSettingsPane(title, expectedStrings) {
     if (!currentWindow) {
       missingWindowPasses += 1;
       if (missingWindowPasses % 10 === 0) {
-        app.frontmost = true;
-        se.keystroke(',', { using: 'command down' });
+        exactKeystroke(',', { using: 'command down' });
       }
       delay(0.2);
       continue;
@@ -213,7 +332,7 @@ function auditSettingsPane(title, expectedStrings) {
         scrolled = true;
       } catch (e) {}
     }
-    if (!scrolled) se.keyCode(121); // Page Down
+    if (!scrolled) exactKeyCode(121, currentWindow); // Page Down
     delay(0.15);
   }
   let visibleText = [...observedStrings].join('\n');
@@ -292,7 +411,7 @@ function selectPopupItem(popupIndex, fallback, acceptsName) {
         }
       } catch (e) {}
     }
-    se.keyCode(53);
+    exactKeyCode(53, settingsWindow());
     delay(0.1);
   }
   return { selected: false, candidates: [...observedCandidates] };
@@ -321,8 +440,7 @@ app.frontmost = true;
 let win = settingsWindow();
 if (!win) {
   for (let commandAttempt = 0; commandAttempt < 4 && !win; commandAttempt += 1) {
-    app.frontmost = true;
-    se.keystroke(',', { using: 'command down' });
+    exactKeystroke(',', { using: 'command down' });
     for (let readinessAttempt = 0; readinessAttempt < 12 && !win; readinessAttempt += 1) {
       delay(0.25);
       win = settingsWindow();
@@ -337,6 +455,7 @@ if (!win) {
   console.log('ERROR: settings window not found');
   throw new Error('settings window missing');
 }
+assertDocumentCommandsUnavailableInSettings();
 
 try {
   const currentPosition = win.position();
@@ -493,7 +612,7 @@ function findAdvancedButton(title) {
       // lazily exposed content. A real pointer scroll keeps this deterministic.
       scrolled = cgScrollArea(scrollArea, -8) || scrolled;
     }
-    if (!scrolled) se.keyCode(121);
+    if (!scrolled) exactKeyCode(121, currentWindow);
     delay(0.25);
   }
   throw new Error(`Advanced action button not found: ${title}; observed buttons: ${[...observedButtons].join(' | ')}`);
@@ -524,7 +643,7 @@ function verifyDestructiveCancel(buttonTitle, confirmationTitle, requiredMessage
     throw new Error(`Incomplete confirmation semantics for ${buttonTitle}: ${alertText}`);
   }
 
-  se.keyCode(53); // Escape must choose the safe cancel path.
+  exactKeyCode(53, settingsWindow()); // Escape must choose the safe cancel path.
   for (let attempt = 0; attempt < 40; attempt += 1) {
     delay(0.1);
     if (!processText().includes(confirmationTitle)) {
@@ -557,5 +676,18 @@ verifyDestructiveCancel(
   'Reset'
 );
 
-console.log(`PASS: ${paneContracts.length} Settings panes exposed expected semantics; ${sliders.length} native sliders exposed labels/values; ${popups.length} popup controls changed/restored; both destructive confirmations exposed complete semantics and cancelled with Escape.`);
+win = settingsWindow();
+if (!win) throw new Error('Settings disappeared before the close-window check');
+try { win.actions.byName('AXRaise').perform(); } catch (e) {}
+delay(0.15);
+exactKeystroke('w', { using: 'command down' }, win);
+for (let attempt = 0; attempt < 30 && settingsWindow(); attempt += 1) delay(0.1);
+if (settingsWindow()) throw new Error('Command-W did not close the separate Settings window');
+if (!app.windows().some(window => {
+  try { return String(window.name()) === 'MacWiki'; } catch (e) { return false; }
+})) {
+  throw new Error('Closing Settings also closed or replaced the main MacWiki window');
+}
+
+console.log(`PASS: ${paneContracts.length} Settings panes exposed expected semantics; document commands were unavailable there; Command-W closed only Settings; ${sliders.length} native sliders exposed labels/values; ${popups.length} popup controls changed/restored; both destructive confirmations exposed complete semantics and cancelled with Escape.`);
 JXA

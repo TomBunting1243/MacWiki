@@ -4,6 +4,7 @@ import SwiftUI
 struct SidebarSearchView: View {
     @Environment(AppState.self) private var appState
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.macWikiAccessibilityPersonalization.reduceMotion) private var reduceMotion
 
     @Query(sort: \ReadingList.updatedAt, order: .reverse) private var allLists: [ReadingList]
     @Query(sort: \Label.sortOrder) private var allLabels: [Label]
@@ -91,8 +92,7 @@ struct SidebarSearchView: View {
             )
         }
         .safeAreaPadding(.top)
-        .padding(.top, TabBarChromeStyle.strip.height)
-        .background(Color(nsColor: .textBackgroundColor))
+        .padding(.top, ReaderTabLaneMetrics.height)
         .onAppear {
             if let launchQuery = appState.consumeLaunchSidebarSearchQuery() {
                 model.searchCoordinator.searchText = launchQuery
@@ -191,7 +191,7 @@ struct SidebarSearchView: View {
     }
 
     private func dismissSearch() {
-        withAnimation(ColumnMotion.sidebarVisibility) {
+        withAnimation(reduceMotion ? nil : ColumnMotion.sidebarVisibility) {
             appState.showSearch = false
         }
     }

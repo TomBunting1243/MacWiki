@@ -63,12 +63,16 @@ enum ReadStateSync {
         return newState
     }
 
-    static func syncSavedArticles(title: String, isRead: Bool, in context: ModelContext) {
+    @discardableResult
+    static func syncSavedArticles(title: String, isRead: Bool, in context: ModelContext) -> Bool {
         let savedArticles = fetchSavedArticles(for: title, in: context)
-        guard !savedArticles.isEmpty else { return }
+        var didChange = false
         for saved in savedArticles {
+            guard saved.isRead != isRead else { continue }
             saved.isRead = isRead
+            didChange = true
         }
+        return didChange
     }
 
     @discardableResult

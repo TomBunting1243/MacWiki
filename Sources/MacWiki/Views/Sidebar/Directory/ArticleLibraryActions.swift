@@ -300,6 +300,30 @@ enum ArticleLibraryActions {
         modelContext.saveReportingFailure(operation: #function)
     }
 
+    /// Removes every saved representation of a title in one transaction.
+    ///
+    /// Older stores can contain normalized-title duplicates from releases that
+    /// predate the current save-time guard. Membership toggles must clear the
+    /// entire logical membership instead of exposing a still-saved duplicate.
+    @discardableResult
+    static func removeAllFromList(
+        withTitle title: String,
+        list: ReadingList,
+        modelContext: ModelContext
+    ) -> Int {
+        let normalizedTitle = ReadStateSync.normalizedTitle(title)
+        let originalCount = list.articles.count
+        list.articles.removeAll {
+            ReadStateSync.normalizedTitle($0.title) == normalizedTitle
+        }
+        let removedCount = originalCount - list.articles.count
+        guard removedCount > 0 else { return 0 }
+
+        list.updatedAt = Date()
+        modelContext.saveReportingFailure(operation: #function)
+        return removedCount
+    }
+
     static func removeSavedArticle(
         _ article: SavedArticle,
         modelContext: ModelContext

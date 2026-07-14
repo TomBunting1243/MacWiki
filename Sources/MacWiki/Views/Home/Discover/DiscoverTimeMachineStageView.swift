@@ -4,7 +4,7 @@ import SwiftUI
 struct DiscoverTimeMachineStageView: View {
     let screenModel: DiscoverScreenModel
     let discoverFeedStore: DiscoverFeedStore
-    let discoverContentWidth: CGFloat
+    let responsiveLayout: DiscoverResponsiveLayoutProfile
     let isSearchFieldFocused: Bool
     let refreshGeneration: Int
     let allLists: [ReadingList]
@@ -15,23 +15,19 @@ struct DiscoverTimeMachineStageView: View {
     let showsTimeTravelSkeleton: Bool
     let onOpen: (WikipediaService.SearchResult, Bool) -> Void
 
-    private var stageSpacing: CGFloat {
-        discoverContentWidth < 820 ? 18 : 22
-    }
-
     var body: some View {
-        VStack(alignment: .leading, spacing: stageSpacing) {
+        VStack(alignment: .leading, spacing: responsiveLayout.timeMachineStageSpacing) {
             DiscoverTimeMachineControlsView(
                 screenModel: screenModel,
                 discoverFeedStore: discoverFeedStore,
-                discoverContentWidth: discoverContentWidth,
+                responsiveLayout: responsiveLayout,
                 isScanning: showsTimeTravelSkeleton
             )
 
             DiscoverFeedSurface(
                 discoverFeedStore: discoverFeedStore,
                 referenceDate: screenModel.discoverReferenceDate,
-                availableWidth: discoverContentWidth,
+                responsiveLayout: responsiveLayout,
                 isSearchFieldFocused: isSearchFieldFocused,
                 refreshGeneration: refreshGeneration,
                 allLists: allLists,

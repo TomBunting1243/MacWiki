@@ -22,10 +22,12 @@ struct ReaderStylePopover: View {
                         }
                     }
                 } label: {
-                    Image(systemName: "slider.horizontal.3")
+                    SwiftUI.Label("Apply Preset", systemImage: "slider.horizontal.3")
+                        .labelStyle(.iconOnly)
                 }
                 .menuStyle(.borderlessButton)
                 .help("Apply Preset")
+                .accessibilityLabel("Apply Reader Preset")
             }
 
             Picker("Font", selection: $readerFontPreset) {
@@ -99,6 +101,8 @@ struct ReaderStylePopover: View {
                     .foregroundStyle(.secondary)
             }
             Slider(value: value, in: range, step: step)
+                .accessibilityLabel(Text(title))
+                .accessibilityValue(Text(valueText))
         }
     }
 

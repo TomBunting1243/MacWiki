@@ -44,40 +44,64 @@ struct AppStateBoundaryTests {
 
     @Test func listContentsTogglePreservesListsSidebarVisibility() {
         let appState = AppState(persistenceMode: .ephemeral)
-        appState.navigationSplitViewVisibility = .all
-        appState.listContentsColumnVisible = true
+        appState.listsSidebarVisible = true
+        appState.directoryColumnVisible = true
 
         appState.toggleDirectoryColumnVisibility()
 
         #expect(appState.listsSidebarVisible == true)
         #expect(appState.directoryColumnVisible == false)
-        #expect(appState.listContentsColumnVisible == false)
-        #expect(appState.navigationSplitViewVisibility == .all)
 
         appState.toggleDirectoryColumnVisibility()
 
         #expect(appState.listsSidebarVisible == true)
         #expect(appState.directoryColumnVisible == true)
-        #expect(appState.listContentsColumnVisible == true)
-        #expect(appState.navigationSplitViewVisibility == .all)
     }
 
     @Test func nativeSidebarVisibilityIsIndependentFromListContents() {
         let appState = AppState(persistenceMode: .ephemeral)
-        appState.navigationSplitViewVisibility = .all
-        appState.listContentsColumnVisible = true
+        appState.listsSidebarVisible = true
+        appState.directoryColumnVisible = true
 
         appState.toggleListsSidebarVisibility()
 
         #expect(appState.listsSidebarVisible == false)
         #expect(appState.directoryColumnVisible == true)
-        #expect(appState.navigationSplitViewVisibility == .detailOnly)
 
         appState.toggleListsSidebarVisibility()
 
         #expect(appState.listsSidebarVisible == true)
         #expect(appState.directoryColumnVisible == true)
-        #expect(appState.navigationSplitViewVisibility == .all)
+    }
+
+    @Test func readerPresentationRequestsRequireAnUnlockedArticle() {
+        let appState = AppState(persistenceMode: .ephemeral)
+
+        appState.requestReaderStylePresentation()
+        appState.requestReaderPageViewsPresentation()
+
+        #expect(appState.readerStylePresentationRequestID == nil)
+        #expect(appState.readerPageViewsPresentationRequestID == nil)
+
+        appState.openArticle(Article(id: "swift", title: "Swift"))
+        appState.requestReaderStylePresentation()
+        appState.requestReaderPageViewsPresentation()
+
+        let unlockedStyleRequest = appState.readerStylePresentationRequestID
+        let unlockedPageViewsRequest = appState.readerPageViewsPresentationRequestID
+        #expect(unlockedStyleRequest != nil)
+        #expect(unlockedPageViewsRequest != nil)
+
+        appState.startWikiHop(
+            mode: .chill,
+            start: Article(id: "swift", title: "Swift"),
+            target: Article(id: "objective-c", title: "Objective-C")
+        )
+        appState.requestReaderStylePresentation()
+        appState.requestReaderPageViewsPresentation()
+
+        #expect(appState.readerStylePresentationRequestID == unlockedStyleRequest)
+        #expect(appState.readerPageViewsPresentationRequestID == unlockedPageViewsRequest)
     }
 
     @Test func dismissFindOnPageInvalidatesQueryResultsAndQueuesLegacyClearRequest() {
@@ -105,6 +129,41 @@ struct AppStateBoundaryTests {
         #expect(appState.pendingFindOnPageRequest?.tabID == tabID)
         #expect(appState.pendingFindOnPageRequest?.query == "")
         #expect(appState.currentFindOnPageRequestID == appState.pendingFindOnPageRequest?.requestID)
+    }
+
+    @Test func changingTabsDismissesFindAndTargetsTheOutgoingTabForSelectionClear() {
+        let appState = AppState(persistenceMode: .ephemeral)
+        let outgoingTabID = UUID()
+        let incomingTabID = UUID()
+        appState.showFindOnPage = true
+        appState.findOnPageQuery = "architecture"
+        appState.findOnPageMatchFound = true
+        appState.findOnPageMatchCount = 3
+
+        appState.resetFindOnPageForTabChange(
+            from: outgoingTabID,
+            to: incomingTabID
+        )
+
+        #expect(!appState.showFindOnPage)
+        #expect(appState.findOnPageQuery.isEmpty)
+        #expect(appState.findOnPageMatchFound == nil)
+        #expect(appState.findOnPageMatchCount == nil)
+        #expect(appState.pendingFindOnPageRequest?.tabID == outgoingTabID)
+        #expect(appState.pendingFindOnPageRequest?.query.isEmpty == true)
+    }
+
+    @Test func unchangedTabPreservesFindPresentation() {
+        let appState = AppState(persistenceMode: .ephemeral)
+        let tabID = UUID()
+        appState.showFindOnPage = true
+        appState.findOnPageQuery = "reader"
+
+        appState.resetFindOnPageForTabChange(from: tabID, to: tabID)
+
+        #expect(appState.showFindOnPage)
+        #expect(appState.findOnPageQuery == "reader")
+        #expect(appState.pendingFindOnPageRequest == nil)
     }
 
     @Test func resetHighlightWorkflowClearsPendingTransitions() {

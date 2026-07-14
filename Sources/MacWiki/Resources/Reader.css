@@ -1,0 +1,581 @@
+:root {
+    color-scheme: light dark;
+    --text-primary: #1d1d1f;
+    --text-secondary: #6e6e73;
+    --link-color: #0066cc;
+    --bg-subtle: rgba(0, 0, 0, 0.03);
+    --border-color: rgba(0, 0, 0, 0.08);
+    --table-surface: rgba(0, 0, 0, 0.02);
+    --table-header-surface: rgba(0, 0, 0, 0.05);
+    --table-row-stripe: rgba(0, 0, 0, 0.03);
+    --reader-surface: #ffffff;
+    --reader-body-font: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', sans-serif;
+    --reader-heading-font: -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif;
+    --reader-font-size: 17px;
+    --reader-line-height: 1.65;
+    --reader-paragraph-spacing: 16px;
+    --reader-max-width: 920px;
+    --reader-inline-padding: 40px;
+    --reader-inline-padding-safe: min(
+        var(--reader-inline-padding),
+        max(12px, calc((100vw - __MACWIKI_MINIMUM_READABLE_COLUMN_WIDTH_PX__px) / 2))
+    );
+    --reader-heading-scale: 1;
+    --reader-top-inset: __MACWIKI_READER_TOP_INSET_PX__px;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --text-primary: #f5f5f7;
+        --text-secondary: #a1a1a6;
+        --link-color: #6cb4ff;
+        --bg-subtle: rgba(255, 255, 255, 0.05);
+        --border-color: rgba(255, 255, 255, 0.1);
+        --table-surface: rgba(255, 255, 255, 0.04);
+        --table-header-surface: rgba(255, 255, 255, 0.09);
+        --table-row-stripe: rgba(255, 255, 255, 0.06);
+        --reader-surface: #1e2434;
+        --chart-axis-text: rgba(234, 237, 245, 0.88);
+        --chart-line-strong: rgba(255, 255, 255, 0.50);
+        --chart-line-grid: rgba(255, 255, 255, 0.26);
+        /* Bridge Wikimedia PCS tokens to MacWiki palette for dark mode. */
+        --background-color-base: var(--reader-surface);
+        --background-color-neutral-subtle: var(--table-surface);
+        --background-color-neutral: color-mix(in srgb, var(--reader-surface) 84%, white 16%);
+        --color-base: var(--text-primary);
+        --color-emphasized: var(--text-primary);
+        --color-subtle: var(--text-secondary);
+        --color-progressive: var(--link-color);
+        --border-color-base: var(--border-color);
+        --border-color-subtle: var(--border-color);
+        --box-shadow-collapse-table: none;
+    }
+
+    /* Let table cells keep authored semantic colors; unstyled cells inherit these tokens. */
+    body,
+    .pcs-document,
+    .pcs-section,
+    .pcs-section-block,
+    .mw-parser-output {
+        color: var(--text-primary) !important;
+    }
+
+    [style*="color:#202122"]:not(table):not(table *),
+    [style*="color: #202122"]:not(table):not(table *),
+    [style*="color:rgb(32,33,34)"]:not(table):not(table *),
+    [style*="color: rgb(32, 33, 34)"]:not(table):not(table *),
+    [style*="color:#000"]:not(table):not(table *),
+    [style*="color: #000"]:not(table):not(table *),
+    [style*="color:black"]:not(table):not(table *),
+    [style*="color: black"]:not(table):not(table *) {
+        color: var(--text-primary) !important;
+    }
+
+    a, a * {
+        color: var(--link-color) !important;
+    }
+
+    :where(table.macwiki-reader-data-table) {
+        background-color: var(--table-surface);
+        border-color: var(--border-color);
+        color: var(--text-primary);
+    }
+
+    :where(table.macwiki-reader-data-table thead) {
+        background-color: var(--table-header-surface);
+    }
+
+    :where(table.macwiki-reader-data-table tbody > tr:nth-child(even):not([class]):not([style])) {
+        background-color: var(--table-row-stripe);
+    }
+
+    table.infobox,
+    .infobox,
+    .infobox-full-data {
+        background-color: var(--bg-subtle) !important;
+    }
+
+    table td a,
+    table th a {
+        color: var(--link-color) !important;
+    }
+
+    /*
+     Improve readability for embedded Wikipedia SVG charts/timelines.
+     Some charts hardcode dark fills (black/#000), which disappear on dark surfaces.
+     Keep authored non-dark colors intact, only remap near-black text/strokes.
+    */
+    svg text[fill="#000"],
+    svg text[fill="#000000"],
+    svg text[fill="black"],
+    svg text[style*="fill:#000"],
+    svg text[style*="fill: #000"],
+    svg text[style*="fill:black"],
+    svg text[style*="fill: black"] {
+        fill: var(--chart-axis-text) !important;
+    }
+
+    svg text[stroke="#000"],
+    svg text[stroke="#000000"],
+    svg text[stroke="black"],
+    svg text[style*="stroke:#000"],
+    svg text[style*="stroke: #000"],
+    svg text[style*="stroke:black"],
+    svg text[style*="stroke: black"] {
+        stroke: transparent !important;
+    }
+
+    svg line[stroke="#000"],
+    svg line[stroke="#000000"],
+    svg line[stroke="black"],
+    svg path[stroke="#000"],
+    svg path[stroke="#000000"],
+    svg path[stroke="black"],
+    svg polyline[stroke="#000"],
+    svg polyline[stroke="#000000"],
+    svg polyline[stroke="black"],
+    svg g[style*="stroke:#000"],
+    svg g[style*="stroke: #000"],
+    svg g[style*="stroke:black"],
+    svg g[style*="stroke: black"] {
+        stroke: var(--chart-line-strong) !important;
+    }
+
+    svg [class*="grid"][stroke="#000"],
+    svg [class*="grid"][stroke="#000000"],
+    svg [class*="grid"][stroke="black"],
+    svg [class*="tick"][stroke="#000"],
+    svg [class*="tick"][stroke="#000000"],
+    svg [class*="tick"][stroke="black"],
+    svg [class*="grid"][style*="stroke:#000"],
+    svg [class*="grid"][style*="stroke: #000"],
+    svg [class*="grid"][style*="stroke:black"],
+    svg [class*="grid"][style*="stroke: black"],
+    svg [class*="tick"][style*="stroke:#000"],
+    svg [class*="tick"][style*="stroke: #000"],
+    svg [class*="tick"][style*="stroke:black"],
+    svg [class*="tick"][style*="stroke: black"] {
+        stroke: var(--chart-line-grid) !important;
+    }
+}
+
+* {
+    box-sizing: border-box;
+}
+
+html {
+    background-color: var(--reader-surface) !important;
+}
+
+body,
+.pcs-document,
+.mw-parser-output {
+    color: var(--text-primary) !important;
+    background-color: var(--reader-surface) !important;
+}
+
+body {
+    font-family: var(--reader-body-font);
+    font-size: var(--reader-font-size);
+    line-height: var(--reader-line-height);
+    color: var(--text-primary) !important;
+    background: var(--reader-surface) !important;
+    width: min(var(--reader-max-width), calc(100% - (var(--reader-inline-padding-safe) * 2)));
+    max-width: 100%;
+    padding: var(--reader-top-inset) 0 60px;
+    margin: 0 auto;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: auto;
+}
+
+/* Hide Wikipedia chrome */
+.mw-footer, .pcs-footer-container, .pcs-edit-section-link,
+.mw-ref-link, .sistersitebox, .navbox, .ambox, .mbox-small,
+.metadata, .hatnote, .noprint, .mw-editsection {
+    display: none !important;
+}
+
+/* CRITICAL: Expand all collapsed sections (Wikipedia mobile-html) */
+.pcs-section-block, .pcs-collapse-block, section {
+    display: block !important;
+    max-height: none !important;
+    overflow: visible !important;
+}
+
+/* Ensure collapsed content is visible */
+[hidden], .pcs-hidden, .collapsed {
+    display: block !important;
+    visibility: visible !important;
+}
+
+/* Expand section content */
+.pcs-section-content {
+    display: block !important;
+    height: auto !important;
+    max-height: none !important;
+}
+
+/* Typography */
+h1 {
+    font-family: var(--reader-heading-font);
+    font-size: calc(34px * var(--reader-heading-scale));
+    font-weight: 700;
+    line-height: 1.2;
+    letter-spacing: -0.5px;
+    margin: 0 0 8px 0;
+}
+
+h2 {
+    font-family: var(--reader-heading-font);
+    font-size: calc(24px * var(--reader-heading-scale));
+    font-weight: 600;
+    line-height: 1.3;
+    margin: 32px 0 12px 0;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+h3 {
+    font-family: var(--reader-heading-font);
+    font-size: calc(20px * var(--reader-heading-scale));
+    font-weight: 600;
+    margin: 24px 0 8px 0;
+}
+
+p, .pcs-section p, .pcs-section-block p, .mw-parser-output p {
+    margin-top: 0 !important;
+    margin-bottom: var(--reader-paragraph-spacing) !important;
+}
+
+/* Links */
+a {
+    color: var(--link-color) !important;
+    text-decoration: none;
+    transition: opacity 0.15s ease;
+}
+
+a:hover {
+    opacity: 0.8;
+}
+
+/* Images */
+@keyframes macwiki-image-skeleton-shimmer {
+    0% { background-position: 0% 0; }
+    100% { background-position: 200% 0; }
+}
+
+img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 8px;
+    margin: 16px 0;
+    background-color: var(--bg-subtle);
+}
+
+img[data-macwiki-image-transition="1"] {
+    opacity: 1;
+    transition: opacity 0.22s ease-out, filter 0.22s ease-out;
+}
+
+html.macwiki-fast-scroll img[data-macwiki-image-transition="1"] {
+    transition: none !important;
+}
+
+img[data-macwiki-image-transition="1"][data-macwiki-image-skeleton="1"][data-macwiki-image-state="loading"] {
+    opacity: 1;
+    background-image: linear-gradient(
+        100deg,
+        color-mix(in srgb, var(--bg-subtle) 86%, transparent) 0%,
+        color-mix(in srgb, white 18%, var(--bg-subtle) 82%) 38%,
+        color-mix(in srgb, var(--bg-subtle) 86%, transparent) 72%
+    );
+    background-size: 220% 100%;
+    animation: macwiki-image-skeleton-shimmer 1.25s linear infinite;
+    filter: saturate(0.92) contrast(0.96);
+}
+
+img[data-macwiki-image-transition="1"][data-macwiki-image-skeleton="0"][data-macwiki-image-state="loading"] {
+    opacity: 0;
+}
+
+img[data-macwiki-image-state="loading"] {
+    border: 1px solid color-mix(in srgb, var(--border-color) 84%, transparent);
+}
+
+img[data-macwiki-image-state="loaded"] {
+    opacity: 1;
+    filter: none;
+    animation: none;
+}
+
+html.macwiki-fast-scroll img[data-macwiki-image-transition="1"][data-macwiki-image-skeleton="1"][data-macwiki-image-state="loading"] {
+    animation: none !important;
+    background-position: 50% 0;
+    filter: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    img[data-macwiki-image-transition="1"] {
+        transition: none;
+    }
+    img[data-macwiki-image-transition="1"][data-macwiki-image-skeleton="1"][data-macwiki-image-state="loading"] {
+        animation: none;
+    }
+}
+
+figure {
+    margin: 24px 0;
+    padding: 0;
+}
+
+figcaption {
+    font-size: 14px;
+    color: var(--text-secondary);
+    margin-top: 8px;
+    line-height: 1.4;
+}
+
+/* Infobox styling */
+.infobox, .infobox-full-data, table.infobox {
+    background: var(--bg-subtle);
+    border-radius: 12px;
+    padding: 16px;
+    border: 1px solid var(--border-color) !important;
+    margin-block: 0 24px;
+    margin-inline: 24px 0;
+    float: right;
+    float: inline-end;
+    max-width: 300px;
+}
+
+.infobox th, .infobox td {
+    border: none !important;
+    padding: 4px 8px;
+}
+
+/* Block quotes */
+blockquote {
+    margin: 24px 0;
+    padding: 16px 24px;
+    background: var(--bg-subtle);
+    border-left: 3px solid var(--link-color);
+    border-radius: 0 8px 8px 0;
+    font-style: italic;
+}
+
+/* Lists */
+ul, ol {
+    margin: 16px 0;
+    padding-left: 24px;
+}
+
+li {
+    margin: 8px 0;
+}
+
+/* Hide reference sections in reader — surfaced in Inspector instead */
+html.macwiki-hide-reference-sections section.macwiki-reference-section {
+    display: none !important;
+}
+
+html.macwiki-hide-reference-sections .mw-references-wrap {
+    display: none !important;
+}
+
+/* Tables retain their semantic DOM and authored alignment/color rules. */
+.macwiki-table-scroll {
+    max-width: 100%;
+    margin-block: 1.5em;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    background: var(--table-surface);
+    -webkit-overflow-scrolling: touch;
+}
+
+.macwiki-table-scroll--overflowing {
+    scrollbar-gutter: stable;
+}
+
+.macwiki-table-scroll:focus-visible {
+    outline: 2px solid var(--link-color);
+    outline-offset: 2px;
+}
+
+.macwiki-table-scroll > table {
+    width: auto;
+    min-width: 100%;
+    max-width: none;
+    margin: 0;
+}
+
+:where(table.macwiki-reader-data-table) {
+    border-collapse: collapse;
+    margin-block: 1.5em;
+    font-size: 0.88em;
+    line-height: 1.45;
+    background: var(--table-surface);
+}
+
+:where(table.macwiki-reader-data-table caption) {
+    caption-side: top;
+    padding-block: 0 0.65em;
+    padding-inline: 0.1em;
+    color: var(--text-secondary);
+    font-size: 0.9em;
+    font-weight: 600;
+    line-height: 1.35;
+    text-align: start;
+}
+
+:where(table.macwiki-reader-data-table :is(th, td)) {
+    padding-block: 0.58em;
+    padding-inline: 0.72em;
+    border-block-end: 1px solid var(--border-color);
+}
+
+:where(table.macwiki-reader-data-table th) {
+    font-weight: 600;
+}
+
+:where(table.macwiki-reader-data-table thead) {
+    background: var(--table-header-surface);
+}
+
+:where(table.macwiki-reader-data-table tbody > tr:nth-child(even):not([class]):not([style])) {
+    background: var(--table-row-stripe);
+}
+
+:where(table.macwiki-reader-data-table tbody > tr:last-child > :is(th, td)) {
+    border-block-end-color: transparent;
+}
+
+/* Collapsible tables (Wikipedia mobile PCS) */
+.pcs-collapse-table-container {
+    background: var(--table-surface) !important;
+    border: 1px solid var(--border-color) !important;
+    border-radius: 12px;
+    box-shadow: none !important;
+    overflow: visible;
+}
+
+.pcs-collapse-table-collapsed-container,
+.pcs-collapse-table-collapsed-bottom {
+    background: var(--table-surface) !important;
+    color: var(--text-secondary) !important;
+}
+
+.pcs-collapse-table-collapsed-container {
+    border-bottom: 1px solid color-mix(in srgb, var(--border-color) 70%, transparent);
+}
+
+.pcs-collapse-table-collapse-text {
+    color: var(--text-secondary) !important;
+}
+
+.pcs-table-other,
+.pcs-table-infobox {
+    color: var(--text-primary) !important;
+    font-weight: 600;
+}
+
+.pcs-collapse-table-content {
+    background: var(--table-surface) !important;
+    max-width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+}
+
+.pcs-collapse-table-container table {
+    margin: 0 !important;
+    min-width: 100%;
+    max-width: none;
+    background: transparent !important;
+}
+
+@media (max-width: 620px) {
+    .infobox, .infobox-full-data, table.infobox {
+        float: none;
+        width: 100% !important;
+        max-width: none;
+        margin-block: 0 1.25em;
+        margin-inline: 0;
+    }
+
+    .macwiki-table-scroll {
+        margin-inline: calc(var(--reader-inline-padding-safe) * -0.35);
+        border-radius: 8px;
+    }
+
+    :where(table.macwiki-reader-data-table :is(th, td)) {
+        padding-block: 0.52em;
+        padding-inline: 0.62em;
+    }
+}
+
+@media (prefers-contrast: more) {
+    :root {
+        --border-color: color-mix(in srgb, currentColor 42%, transparent);
+        --table-header-surface: color-mix(in srgb, currentColor 13%, transparent);
+        --table-row-stripe: color-mix(in srgb, currentColor 8%, transparent);
+    }
+
+    .macwiki-table-scroll,
+    .pcs-collapse-table-container {
+        border-width: 2px !important;
+    }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+    :root {
+        --table-surface: #f7f7f8;
+        --table-header-surface: #e9e9ec;
+        --table-row-stripe: #f0f0f2;
+    }
+}
+
+@media (prefers-reduced-transparency: reduce) and (prefers-color-scheme: dark) {
+    :root {
+        --table-surface: #282e3d;
+        --table-header-surface: #343b4c;
+        --table-row-stripe: #2e3545;
+    }
+}
+
+@media (forced-colors: active) {
+    .macwiki-table-scroll,
+    .pcs-collapse-table-container {
+        background: Canvas;
+        border-color: CanvasText !important;
+        forced-color-adjust: auto;
+    }
+
+    :where(table.macwiki-reader-data-table),
+    :where(table.macwiki-reader-data-table :is(th, td)) {
+        color: CanvasText;
+        background: Canvas;
+        border-color: CanvasText;
+    }
+
+    .macwiki-table-scroll:focus-visible {
+        outline-color: Highlight;
+    }
+}
+
+/* Code */
+code, pre {
+    font-family: 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 14px;
+    background: var(--bg-subtle);
+    border-radius: 4px;
+}
+
+code {
+    padding: 2px 6px;
+}
+
+pre {
+    padding: 16px;
+    overflow-x: auto;
+}

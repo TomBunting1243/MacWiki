@@ -3,7 +3,7 @@ import SwiftUI
 struct DiscoverFeedSurface: View {
     let discoverFeedStore: DiscoverFeedStore
     let referenceDate: Date
-    let availableWidth: CGFloat
+    let responsiveLayout: DiscoverResponsiveLayoutProfile
     let isSearchFieldFocused: Bool
     let refreshGeneration: Int
     let allLists: [ReadingList]
@@ -20,23 +20,42 @@ struct DiscoverFeedSurface: View {
             DiscoverIntroLoadingView(referenceDate: referenceDate)
                 .frame(maxWidth: .infinity, minHeight: 260)
         } else if let discoverError = discoverFeedStore.errorMessage, discoverFeedStore.feed == nil {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Discover feed unavailable")
-                    .font(.headline)
-                Text(discoverError)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+            ColumnEmptyStateView(
+                title: Text("Discover Unavailable"),
+                systemImage: "wifi.exclamationmark",
+                description: Text(verbatim: discoverError)
+            ) {
                 Button("Try Again", systemImage: "arrow.clockwise", action: onRetry)
                     .keyboardShortcut(.defaultAction)
-                    .padding(.top, 4)
             }
-            .padding(18)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .frame(minHeight: 260)
         } else if let feed = discoverFeedStore.feed {
-            ZStack(alignment: .topLeading) {
+            VStack(alignment: .leading, spacing: 12) {
+                if let discoverError = discoverFeedStore.errorMessage {
+                    GroupBox {
+                        HStack(alignment: .firstTextBaseline, spacing: 12) {
+                            Text(verbatim: discoverError)
+                                .font(.callout)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(2)
+
+                            Spacer(minLength: 12)
+
+                            Button("Try Again", systemImage: "arrow.clockwise", action: onRetry)
+                                .controlSize(.small)
+                        }
+                    } label: {
+                        SwiftUI.Label(
+                            "Showing the Last Available Edition",
+                            systemImage: "exclamationmark.triangle"
+                        )
+                    }
+                    .accessibilityElement(children: .contain)
+                }
+
                 DiscoverFeedSections(
                     feed: feed,
-                    availableWidth: availableWidth,
+                    responsiveLayout: responsiveLayout,
                     isSearchFieldFocused: isSearchFieldFocused,
                     refreshGeneration: refreshGeneration,
                     allLists: allLists,

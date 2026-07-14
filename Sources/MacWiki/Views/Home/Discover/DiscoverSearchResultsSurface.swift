@@ -22,13 +22,28 @@ struct DiscoverSearchResultsSurface: View {
                     tone: .accent,
                     rowCount: 5
                 )
+            } else if let searchError = searchCoordinator.errorMessage,
+                      searchCoordinator.searchResults.isEmpty {
+                ColumnEmptyStateView(
+                    title: Text("Search Unavailable"),
+                    systemImage: "wifi.exclamationmark",
+                    description: Text(verbatim: searchError),
+                    style: .quiet
+                ) {
+                    Button("Try Again", systemImage: "arrow.clockwise") {
+                        searchCoordinator.retrySearch()
+                    }
+                    .keyboardShortcut(.defaultAction)
+                }
+                .frame(minHeight: 220)
             } else if searchCoordinator.searchResults.isEmpty && !searchCoordinator.isLoading {
-                Text("No matching articles")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(14)
-                    .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                ColumnEmptyStateView(
+                    title: "No Matching Articles",
+                    systemImage: "magnifyingglass",
+                    description: "Try another title, topic, or spelling.",
+                    style: .quiet
+                )
+                .frame(minHeight: 220)
             } else {
                 VStack(spacing: 8) {
                     ForEach(searchCoordinator.searchResults.prefix(20)) { result in

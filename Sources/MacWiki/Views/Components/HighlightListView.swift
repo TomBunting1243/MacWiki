@@ -5,10 +5,11 @@ struct HighlightListView: View {
     @Environment(AppState.self) private var appState
     @Environment(\.modelContext) private var modelContext
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.macWikiAccessibilityPersonalization.reduceMotion) private var reduceMotion
 
     let highlights: [Highlight]
-    @State private var showStaleHighlights = true
-    @State private var showArchivedHighlights = false
+    @Binding var showStaleHighlights: Bool
+    @Binding var showArchivedHighlights: Bool
     @State private var showArchiveMissingConfirmation = false
 
     private var activeHighlights: [Highlight] {
@@ -44,16 +45,15 @@ struct HighlightListView: View {
     }
 
     private enum Metrics {
-        static let topChromeReservation: CGFloat = 58
         static let horizontalPadding: CGFloat = 16
         static let topPadding: CGFloat = 8
+        static let topChromeSpacing: CGFloat = 12
     }
 
     var body: some View {
-        ZStack(alignment: .top) {
+        Group {
             if visibleHighlights.isEmpty {
                 emptyState
-                    .padding(.top, Metrics.topChromeReservation)
                     .padding(.horizontal, Metrics.horizontalPadding)
             } else {
                 ScrollViewReader { proxy in
@@ -63,7 +63,7 @@ struct HighlightListView: View {
                                 HighlightRowView(
                                     highlight: highlight,
                                     onDelete: {
-                                        withAnimation(.easeOut(duration: 0.2)) {
+                                        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2)) {
                                             deleteHighlight(highlight)
                                         }
                                     }
@@ -71,7 +71,6 @@ struct HighlightListView: View {
                                 .id(highlight.id)
                             }
                         }
-                        .padding(.top, Metrics.topChromeReservation)
                         .padding(.horizontal, Metrics.horizontalPadding)
                         .padding(.bottom, 12)
                     }
@@ -80,20 +79,20 @@ struct HighlightListView: View {
                               let targetId = UUID(uuidString: newValue) else {
                             return
                         }
-                        withAnimation(.easeOut(duration: 0.2)) {
+                        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2)) {
                             proxy.scrollTo(targetId, anchor: .center)
                         }
                     }
                 }
             }
-
-            header
-                .padding(.horizontal, Metrics.horizontalPadding)
-                .padding(.top, Metrics.topPadding)
-                .zIndex(1)
         }
         .padding(.bottom, 12)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .safeAreaInset(edge: .top, spacing: Metrics.topChromeSpacing) {
+            header
+                .padding(.horizontal, Metrics.horizontalPadding)
+                .padding(.top, Metrics.topPadding)
+        }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if showsRehydrateBar {
                 HighlightRehydrateBarView(
@@ -106,10 +105,14 @@ struct HighlightListView: View {
                 )
                 .padding(.horizontal, 16)
                 .padding(.bottom, 14)
-                .transition(.opacity.combined(with: .move(edge: .bottom)))
+                .transition(
+                    reduceMotion
+                        ? .opacity
+                        : .opacity.combined(with: .move(edge: .bottom))
+                )
             }
         }
-        .animation(.easeOut(duration: 0.2), value: showsRehydrateBar)
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: showsRehydrateBar)
         .confirmationDialog(
             "Archive stale highlights?",
             isPresented: $showArchiveMissingConfirmation,
@@ -149,7 +152,7 @@ struct HighlightListView: View {
 
             if !staleHighlights.isEmpty {
                 Button {
-                    withAnimation(.easeInOut(duration: 0.15)) {
+                    withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.15)) {
                         showStaleHighlights.toggle()
                     }
                 } label: {
@@ -184,7 +187,7 @@ struct HighlightListView: View {
 
             if archivedHighlightCount > 0 {
                 Button {
-                    withAnimation(.easeInOut(duration: 0.15)) {
+                    withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.15)) {
                         showArchivedHighlights.toggle()
                     }
                 } label: {

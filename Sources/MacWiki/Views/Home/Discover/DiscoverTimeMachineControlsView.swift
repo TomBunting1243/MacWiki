@@ -4,18 +4,18 @@ import SwiftUI
 struct DiscoverTimeMachineControlsView: View {
     let screenModel: DiscoverScreenModel
     let discoverFeedStore: DiscoverFeedStore
-    let discoverContentWidth: CGFloat
+    let responsiveLayout: DiscoverResponsiveLayoutProfile
     var isScanning = false
 
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.macWikiAccessibilityPersonalization.reduceMotion) private var reduceMotion
 
     private var prefersWideTimeMachineControls: Bool {
-        discoverContentWidth >= 760
+        responsiveLayout.prefersWideTimeMachineControls
     }
 
     private var showsInlineTimeMachineQuickJumps: Bool {
-        discoverContentWidth >= 880
+        responsiveLayout.showsInlineTimeMachineQuickJumps
     }
 
     var body: some View {
@@ -37,7 +37,11 @@ struct DiscoverTimeMachineControlsView: View {
 
                 if isScanning {
                     scanningBadge
-                        .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .trailing)))
+                        .transition(
+                            reduceMotion
+                                ? .opacity
+                                : .opacity.combined(with: .scale(scale: 0.96, anchor: .trailing))
+                        )
                 }
 
                 Text(discoverFeedStore.feed?.dateLabel ?? screenModel.discoverTimeMachineDateLabel)
@@ -48,7 +52,11 @@ struct DiscoverTimeMachineControlsView: View {
 
             if prefersWideTimeMachineControls {
                 HStack(spacing: 6) {
-                    stepButton("chevron.left") {
+                    stepButton(
+                        "chevron.left",
+                        accessibilityLabel: "Previous Day",
+                        help: "Show the previous day"
+                    ) {
                         screenModel.shiftDiscoverDate(days: -1)
                     }
 
@@ -56,7 +64,12 @@ struct DiscoverTimeMachineControlsView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .layoutPriority(1)
 
-                    stepButton("chevron.right", disabled: !screenModel.canStepDiscoverDateForward) {
+                    stepButton(
+                        "chevron.right",
+                        accessibilityLabel: "Next Day",
+                        help: "Show the next day",
+                        disabled: !screenModel.canStepDiscoverDateForward
+                    ) {
                         screenModel.shiftDiscoverDate(days: 1)
                     }
 
@@ -68,18 +81,31 @@ struct DiscoverTimeMachineControlsView: View {
 
                 if showsInlineTimeMachineQuickJumps {
                     quickJumpRow
-                        .transition(.opacity.combined(with: .scale(scale: 0.985, anchor: .leading)))
+                        .transition(
+                            reduceMotion
+                                ? .opacity
+                                : .opacity.combined(with: .scale(scale: 0.985, anchor: .leading))
+                        )
                 }
             } else {
                 HStack(spacing: 6) {
-                    stepButton("chevron.left") {
+                    stepButton(
+                        "chevron.left",
+                        accessibilityLabel: "Previous Day",
+                        help: "Show the previous day"
+                    ) {
                         screenModel.shiftDiscoverDate(days: -1)
                     }
 
                     temporalLensButton
                         .layoutPriority(1)
 
-                    stepButton("chevron.right", disabled: !screenModel.canStepDiscoverDateForward) {
+                    stepButton(
+                        "chevron.right",
+                        accessibilityLabel: "Next Day",
+                        help: "Show the next day",
+                        disabled: !screenModel.canStepDiscoverDateForward
+                    ) {
                         screenModel.shiftDiscoverDate(days: 1)
                     }
                 }
@@ -123,7 +149,7 @@ struct DiscoverTimeMachineControlsView: View {
         if #available(macOS 26, *) {
             shape
                 .fill(.clear)
-                .glassEffect(.regular.interactive(), in: .rect(cornerRadius: cornerRadius))
+                .glassEffect(.regular, in: .rect(cornerRadius: cornerRadius))
                 .overlay {
                     shape.fill(
                         LinearGradient(
@@ -271,6 +297,8 @@ struct DiscoverTimeMachineControlsView: View {
                 .strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.16 : 0.10), lineWidth: 0.6)
         )
         .disabled(discoverFeedStore.isLoading)
+        .accessibilityLabel("Refresh Discover")
+        .accessibilityValue(discoverFeedStore.isLoading ? "Refreshing" : "Ready")
         .help("Refresh Discover")
     }
 
@@ -309,11 +337,16 @@ struct DiscoverTimeMachineControlsView: View {
             RoundedRectangle(cornerRadius: 7, style: .continuous)
                 .strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.16 : 0.10), lineWidth: 0.6)
         )
+        .accessibilityLabel("Jump to Date")
+        .accessibilityValue(Text(screenModel.discoverTimeMachineDateLabel))
+        .help("Jump to a relative date")
     }
 
     @ViewBuilder
     private func stepButton(
         _ symbol: String,
+        accessibilityLabel: LocalizedStringKey,
+        help: LocalizedStringKey,
         disabled: Bool = false,
         action: @escaping () -> Void
     ) -> some View {
@@ -330,6 +363,8 @@ struct DiscoverTimeMachineControlsView: View {
             RoundedRectangle(cornerRadius: 7, style: .continuous)
                 .strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.16 : 0.10), lineWidth: 0.6)
         )
+        .accessibilityLabel(Text(accessibilityLabel))
+        .help(Text(help))
     }
 
     @ViewBuilder

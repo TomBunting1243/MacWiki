@@ -1,4 +1,3 @@
-import AppKit
 import Foundation
 import WebKit
 
@@ -148,64 +147,6 @@ extension WebView.Coordinator {
         applyScrollProfile(targetProfile)
     }
 
-    func setupScrollObserver(for webView: WKWebView) {
-        guard let scrollView = findScrollView(in: webView) else { return }
-
-        cleanup()
-
-        scrollView.contentView.postsBoundsChangedNotifications = true
-
-        scrollObserver = NotificationCenter.default.addObserver(
-            forName: NSView.boundsDidChangeNotification,
-            object: scrollView.contentView,
-            queue: .main
-        ) { [weak self, weak webView] _ in
-            guard let self = self else { return }
-            MainActor.assumeIsolated {
-                let now = Date().timeIntervalSinceReferenceDate
-                if now - self.lastJSTelemetryTimestamp < 0.95 {
-                    return
-                }
-                if self.isContentLoadInFlight {
-                    return
-                }
-                if self.isProgrammaticScrollActive(now: now) {
-                    return
-                }
-                if now < self.highVelocityUserScrollUntil {
-                    return
-                }
-
-                let currentY = scrollView.contentView.bounds.origin.y
-                if self.shouldIgnoreInitialTopTelemetry(y: currentY, progress: nil, now: now) {
-                    return
-                }
-                self.lastKnownScrollY = currentY
-
-                let delta = abs(self.scrollPosition.wrappedValue - currentY)
-                let shouldPublishScrollPosition =
-                    delta > self.adaptiveFallbackDeltaThreshold ||
-                    ((now - self.lastScrollPositionPublishTimestamp) > self.adaptiveFallbackTimeGate && delta > 3)
-
-                if shouldPublishScrollPosition {
-                    self.scrollPosition.wrappedValue = currentY
-                    self.lastScrollPositionPublishTimestamp = now
-                    self.requestSaveIfNeeded()
-                }
-
-                self.reportScrollProgress(from: scrollView, currentY: currentY)
-
-                if self.inspectorPublisher.hasTableOfContents,
-                   self.isSectionTrackingRequested,
-                   now - self.lastVisibleSectionPollTimestamp > 0.3,
-                   let webView {
-                    self.lastVisibleSectionPollTimestamp = now
-                    self.publishVisibleSection(from: webView)
-                }
-            }
-        }
-    }
-
     func requestSaveIfNeeded(force: Bool = false) {
         let now = Date().timeIntervalSinceReferenceDate
         if !force, isProgrammaticScrollActive(now: now) {
@@ -241,6 +182,7 @@ extension WebView.Coordinator {
     }
 
     func syncScrollTelemetryMode(on webView: WKWebView, force: Bool = false) {
+        guard canRunDocumentJavaScript(on: webView) else { return }
         let desired = isSectionTrackingRequested
         guard force || lastAppliedSectionTrackingRequest != desired else { return }
         let script = "window.setScrollTelemetrySectionTrackingEnabled && window.setScrollTelemetrySectionTrackingEnabled(\(desired ? "true" : "false"));"
@@ -251,6 +193,7 @@ extension WebView.Coordinator {
     }
 
     func syncRestoreTelemetryMode(on webView: WKWebView, force: Bool = false) {
+        guard canRunDocumentJavaScript(on: webView) else { return }
         let desired = isContentLoadInFlight
         guard force || lastAppliedRestoreTelemetryMode != desired else { return }
         let script = "window.setRestoreTelemetryMode && window.setRestoreTelemetryMode(\(desired ? "true" : "false"));"
@@ -270,35 +213,19 @@ extension WebView.Coordinator {
             adaptiveProgressDeltaThreshold = 0.035
             adaptiveProgressTimeGate = 1.25
             adaptiveSaveRequestInterval = 3.0
-            adaptiveFallbackDeltaThreshold = 13
-            adaptiveFallbackTimeGate = 1.2
         case .balanced:
             adaptiveScrollDeltaThreshold = 14
             adaptiveScrollTimeGate = 0.9
             adaptiveProgressDeltaThreshold = 0.045
             adaptiveProgressTimeGate = 1.6
             adaptiveSaveRequestInterval = 3.4
-            adaptiveFallbackDeltaThreshold = 14
-            adaptiveFallbackTimeGate = 1.4
         case .economy:
             adaptiveScrollDeltaThreshold = 18
             adaptiveScrollTimeGate = 1.15
             adaptiveProgressDeltaThreshold = 0.06
             adaptiveProgressTimeGate = 2.1
             adaptiveSaveRequestInterval = 4.0
-            adaptiveFallbackDeltaThreshold = 18
-            adaptiveFallbackTimeGate = 1.8
         }
-    }
-
-    func reportScrollProgress(from scrollView: NSScrollView, currentY: CGFloat? = nil, force: Bool = false) {
-        let contentHeight = scrollView.documentView?.bounds.height ?? 0
-        let viewportHeight = scrollView.contentView.bounds.height
-        let maxScroll = max(contentHeight - viewportHeight, 0)
-        let offsetY = currentY ?? scrollView.contentView.bounds.origin.y
-        let rawProgress = maxScroll > 0 ? Double(offsetY / maxScroll) : 1
-        let clamped = min(max(rawProgress, 0), 1)
-        reportScrollProgressValue(clamped, force: force)
     }
 
     func reportScrollProgressValue(_ progress: Double, force: Bool = false) {
@@ -319,20 +246,4 @@ extension WebView.Coordinator {
         }
     }
 
-    func findScrollView(in view: NSView) -> NSScrollView? {
-        if let webView = view as? WKWebView {
-            return webView.enclosingScrollView
-        }
-        if let scrollView = view as? NSScrollView {
-            return scrollView
-        }
-
-        for subview in view.subviews {
-            if let found = findScrollView(in: subview) {
-                return found
-            }
-        }
-
-        return nil
-    }
 }

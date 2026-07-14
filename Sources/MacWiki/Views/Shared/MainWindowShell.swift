@@ -3,18 +3,52 @@ import SwiftUI
 
 struct MainWindowShell: View {
     @Environment(AppState.self) private var appState
-    @AppStorage(AppStorageKey.MainWindow.sidebarWidth) private var sidebarWidth = AppStorageKey.MainWindow.sidebarWidthDefault
-    @AppStorage(AppStorageKey.MainWindow.directoryWidth) private var directoryWidth = AppStorageKey.MainWindow.directoryWidthDefault
-    @AppStorage(AppStorageKey.MainWindow.inspectorWidth) private var inspectorWidth = AppStorageKey.MainWindow.inspectorWidthDefault
     @State private var sidebarSearchModel = SidebarSearchSurfaceModel()
 
     @Binding var selectedList: ReadingList?
     @Binding var selectedLabel: Label?
     @Binding var selectedTag: Tag?
     @Binding var rootSelection: SidebarRootSelection
-    @Binding var showNewLabelSheet: Bool
-    @Binding var articleForNewLabel: SavedArticle?
+    let onEditLabel: (Label) -> Void
+    let onAddNewLabel: () -> Void
+    let onNewLabelWithArticle: (SavedArticle) -> Void
+    let onNewTagWithArticle: (Article) -> Void
 
+    var body: some View {
+        MainWorkspaceShell(
+            selectedList: $selectedList,
+            selectedLabel: $selectedLabel,
+            selectedTag: $selectedTag,
+            rootSelection: $rootSelection,
+            sidebarSearchModel: sidebarSearchModel,
+            onEditLabel: onEditLabel,
+            onAddNewLabel: onAddNewLabel,
+            onNewLabelWithArticle: onNewLabelWithArticle,
+            onNewTagWithArticle: onNewTagWithArticle
+        )
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+/// One native four-pane hierarchy keeps the reader and its WebView alive while
+/// AppKit provides standard sidebar, content-list, and inspector behavior.
+private struct MainWorkspaceShell: View {
+    @Environment(AppState.self) private var appState
+    @Environment(\.modelContext) private var modelContext
+    @Environment(\.openWindow) private var openWindow
+    @Environment(\.openURL) private var openURL
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.macWikiAccessibilityPersonalization) private var accessibilityPersonalization
+    @AppStorage(AppStorageKey.MainWindow.sidebarWidth) private var sidebarWidth = AppStorageKey.MainWindow.sidebarWidthDefault
+    @AppStorage(AppStorageKey.MainWindow.directoryWidth) private var directoryWidth = AppStorageKey.MainWindow.directoryWidthDefault
+    @AppStorage(AppStorageKey.MainWindow.inspectorWidth) private var inspectorWidth = AppStorageKey.MainWindow.inspectorWidthDefault
+    @State private var openWindowHandler = WorkspaceOpenWindowHandler()
+
+    @Binding var selectedList: ReadingList?
+    @Binding var selectedLabel: Label?
+    @Binding var selectedTag: Tag?
+    @Binding var rootSelection: SidebarRootSelection
+    let sidebarSearchModel: SidebarSearchSurfaceModel
     let onEditLabel: (Label) -> Void
     let onAddNewLabel: () -> Void
     let onNewLabelWithArticle: (SavedArticle) -> Void
@@ -23,133 +57,90 @@ struct MainWindowShell: View {
     var body: some View {
         @Bindable var appState = appState
 
-        GeometryReader { proxy in
-            let responsiveInput = MainWindowResponsiveLayout.Input(
-                windowWidth: proxy.size.width,
-                sidebarVisible: appState.listsSidebarVisible,
-                directoryVisible: appState.directoryColumnVisible,
-                hasArticle: appState.currentArticle != nil,
-                sidebarWidth: CGFloat(sidebarWidth),
-                directoryWidth: CGFloat(directoryWidth),
-                inspectorWidth: CGFloat(inspectorWidth)
-            )
-
-            MainNavigationShell(
-                columnVisibility: $appState.navigationSplitViewVisibility,
-                selectedList: $selectedList,
-                selectedLabel: $selectedLabel,
-                selectedTag: $selectedTag,
-                rootSelection: $rootSelection,
-                sidebarSearchModel: sidebarSearchModel,
-                onEditLabel: onEditLabel,
-                onAddNewLabel: onAddNewLabel,
-                onNewLabelWithArticle: onNewLabelWithArticle,
-                onNewTagWithArticle: onNewTagWithArticle
-            )
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .inspector(isPresented: $appState.inspectorPresented) {
-                MainInspectorColumn(
-                    showNewLabelSheet: $showNewLabelSheet,
-                    articleForNewLabel: $articleForNewLabel
+        NativeWorkspaceSplitView(
+            sidebarVisible: $appState.listsSidebarVisible,
+            directoryVisible: $appState.directoryColumnVisible,
+            inspectorVisible: $appState.inspectorVisible,
+            reduceMotion: accessibilityPersonalization.reduceMotion,
+            initialSidebarWidth: CGFloat(sidebarWidth),
+            initialDirectoryWidth: CGFloat(directoryWidth),
+            initialInspectorWidth: CGFloat(inspectorWidth),
+            sidebarRevision: workspaceAppearanceRevision,
+            directoryRevision: directoryContentRevision,
+            readerRevision: workspaceAppearanceRevision,
+            inspectorRevision: workspaceAppearanceRevision,
+            readerToolbarEnvironment: ReaderToolbarEnvironment(
+                appState: appState,
+                modelContext: modelContext,
+                openURL: openURL,
+                accessibilityPersonalization: accessibilityPersonalization
+            ),
+            sidebar: workspaceEnvironment(
+                ListsColumnView(
+                    selectedList: $selectedList,
+                    selectedLabel: $selectedLabel,
+                    selectedTag: $selectedTag,
+                    rootSelection: $rootSelection,
+                    sidebarSearchModel: sidebarSearchModel,
+                    onEditLabel: onEditLabel,
+                    onAddNewLabel: onAddNewLabel
                 )
-            }
-            .onAppear {
-                updateInspectorAvailability(for: responsiveInput)
-            }
-            .onChange(of: responsiveInput) { _, newValue in
-                updateInspectorAvailability(for: newValue)
-            }
-        }
-    }
-
-    private func updateInspectorAvailability(for input: MainWindowResponsiveLayout.Input) {
-        let isAvailable = MainWindowResponsiveLayout.canPresentInspector(for: input)
-        guard appState.inspectorPresentationAvailable != isAvailable else { return }
-        appState.inspectorPresentationAvailable = isAvailable
-    }
-}
-
-/// A stable native hierarchy keeps the reader and its WebView alive while the
-/// user changes auxiliary columns. NavigationSplitView owns the true sidebar;
-/// HSplitView owns the resizable List Contents and reader workspace.
-private struct MainNavigationShell: View {
-    @Environment(AppState.self) private var appState
-    @AppStorage(AppStorageKey.MainWindow.directoryWidth) private var directoryWidth = AppStorageKey.MainWindow.directoryWidthDefault
-
-    @Binding var columnVisibility: NavigationSplitViewVisibility
-    @Binding var selectedList: ReadingList?
-    @Binding var selectedLabel: Label?
-    @Binding var selectedTag: Tag?
-    @Binding var rootSelection: SidebarRootSelection
-
-    let sidebarSearchModel: SidebarSearchSurfaceModel
-    let onEditLabel: (Label) -> Void
-    let onAddNewLabel: () -> Void
-    let onNewLabelWithArticle: (SavedArticle) -> Void
-    let onNewTagWithArticle: (Article) -> Void
-
-    var body: some View {
-        NavigationSplitView(columnVisibility: $columnVisibility) {
-            ListsColumnView(
-                selectedList: $selectedList,
-                selectedLabel: $selectedLabel,
-                selectedTag: $selectedTag,
-                rootSelection: $rootSelection,
-                sidebarSearchModel: sidebarSearchModel,
-                onEditLabel: onEditLabel,
-                onAddNewLabel: onAddNewLabel
-            )
-        } detail: {
-            HSplitView {
-                if appState.directoryColumnVisible {
-                    DirectoryColumnView(
-                        selectedList: $selectedList,
-                        rootSelection: $rootSelection,
-                        selectedLabel: selectedLabel,
-                        selectedTag: selectedTag,
-                        sidebarSearchModel: sidebarSearchModel,
-                        onNewLabelWithArticle: onNewLabelWithArticle,
-                        onNewTagWithArticle: onNewTagWithArticle
-                    )
-                    .frame(
-                        minWidth: MainWindowColumnWidth.directoryRange.lowerBound,
-                        idealWidth: CGFloat(directoryWidth),
-                        maxWidth: MainWindowColumnWidth.directoryRange.upperBound
-                    )
-                }
-
+            ),
+            directory: workspaceEnvironment(
+                DirectoryColumnView(
+                    selectedList: $selectedList,
+                    rootSelection: $rootSelection,
+                    selectedLabel: selectedLabel,
+                    selectedTag: selectedTag,
+                    sidebarSearchModel: sidebarSearchModel,
+                    onNewLabelWithArticle: onNewLabelWithArticle,
+                    onNewTagWithArticle: onNewTagWithArticle
+                )
+            ),
+            reader: workspaceEnvironment(
                 ReaderColumnView(onNewLabelWithArticle: onNewLabelWithArticle)
                     .environment(\.readerChromeMetrics, .hidden)
-                    .frame(
-                        minWidth: MainWindowResponsiveLayout.minimumReaderWidth,
-                        maxWidth: .infinity,
-                        maxHeight: .infinity
-                    )
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .id("main-reader-column")
-            }
+            ),
+            inspector: workspaceEnvironment(
+                InspectorColumnView()
+            )
+        )
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .task {
+            openWindowHandler.update(action: openWindow)
         }
     }
-}
 
-private struct MainInspectorColumn: View {
-    @AppStorage(AppStorageKey.MainWindow.inspectorWidth) private var inspectorWidth = AppStorageKey.MainWindow.inspectorWidthDefault
+    private func workspaceEnvironment<Content: View>(_ content: Content) -> some View {
+        content
+            .defaultAppStorage(MacWikiDefaults.current)
+            .environment(appState)
+            .environment(\.modelContext, modelContext)
+            .environment(\.workspaceOpenWindowHandler, openWindowHandler)
+            .environment(\.openURL, openURL)
+            .environment(\.colorScheme, colorScheme)
+            .environment(\.macWikiAccessibilityPersonalization, accessibilityPersonalization)
+    }
 
-    @Binding var showNewLabelSheet: Bool
-    @Binding var articleForNewLabel: SavedArticle?
+    private var directoryContentRevision: String {
+        [
+            selectedList?.id.uuidString ?? "",
+            selectedLabel?.id.uuidString ?? "",
+            selectedTag?.id.uuidString ?? "",
+            String(describing: rootSelection),
+            workspaceAppearanceRevision
+        ].joined(separator: "|")
+    }
 
-    var body: some View {
-        InspectorColumnView(
-            showNewLabelSheet: $showNewLabelSheet,
-            articleForNewLabel: $articleForNewLabel
-        )
-        .frame(
-            minWidth: MainWindowColumnWidth.inspectorRange.lowerBound,
-            idealWidth: CGFloat(inspectorWidth),
-            maxWidth: MainWindowColumnWidth.inspectorRange.upperBound
-        )
-        .persistedColumnWidth(
-            key: AppStorageKey.MainWindow.inspectorWidth,
-            range: MainWindowColumnWidth.inspectorRange
-        )
+    private var workspaceAppearanceRevision: String {
+        [
+            colorScheme == .dark ? "dark" : "light",
+            accessibilityPersonalization.reduceMotion ? "reduce-motion" : "motion",
+            accessibilityPersonalization.reduceTransparency ? "opaque" : "transparent",
+            accessibilityPersonalization.differentiateWithoutColor ? "differentiated" : "color",
+            accessibilityPersonalization.colorSchemeContrast == .increased ? "high-contrast" : "standard-contrast"
+        ].joined(separator: "|")
     }
 }

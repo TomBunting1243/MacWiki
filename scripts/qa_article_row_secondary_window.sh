@@ -28,6 +28,7 @@ TRACE_DIRTY="$(plutil -extract GitDirty raw "$BUILD_INFO_PLIST")"
 [[ "$VERSION" == 1.0* ]] || { echo "Candidate is not on the 1.0 line: $VERSION" >&2; exit 1; }
 [[ "$TRACE_DIRTY" == "false" ]] || { echo "BuildInfo says candidate source was dirty" >&2; exit 1; }
 [[ "$TRACE_COMMIT" =~ ^[0-9a-f]{40}$ ]] || { echo "BuildInfo commit is invalid" >&2; exit 1; }
+qa_assert_candidate_manifest_matches_executable "$BUILD_INFO_PLIST"
 
 mkdir -p "$OUTPUT_DIR"
 APP_LOG="$OUTPUT_DIR/app.log"
@@ -70,11 +71,17 @@ rg -n 'AttributeGraph: cycle detected' "$APP_LOG" >"$OUTPUT_DIR/attributegraph-c
   printf -- '- Version/build: `%s (%s)`\n' "$VERSION" "$BUILD"
   printf -- '- BuildInfo commit: `%s`\n' "$TRACE_COMMIT"
   printf -- '- BuildInfo dirty: `%s`\n' "$TRACE_DIRTY"
+  printf -- '- Package manifest: `%s`\n' "$QA_PACKAGE_MANIFEST_PATH"
+  printf -- '- Packaged executable SHA-256: `%s`\n' "$QA_PACKAGED_EXECUTABLE_SHA256"
+  printf -- '- App tree SHA-256: `%s`\n' "$QA_APP_TREE_SHA256"
+  printf -- '- Toolchain: `%s`; Mach-O minOS/SDK: `%s / %s`\n' \
+    "$QA_XCODE_VERSION" "$QA_BINARY_MIN_OS" "$QA_BINARY_SDK"
   printf -- '- Exact candidate PID: `%s`\n' "$QA_APP_PID"
   printf -- '- Search query: `%s`\n' "$SEARCH_QUERY"
   printf -- '- Row assertions: ten title-bearing semantic buttons with press and native context-menu actions\n'
   printf -- '- Mutation assertion: unread to read to unread through a stable native Toggle Read Status accessibility action, with the updated state announced after each change\n'
-  printf -- '- Secondary-window assertions: selected article, Metadata and Contents, inspector Info/Notes/References, main-window preservation\n'
+  printf -- '- Secondary-window assertions: selected article, Metadata and Contents, inspector Info/Notes/References, exactly one native AXToolbar, and main-window preservation\n'
+  printf -- '- Secondary-toolbar assertions: Back, Forward, Save Article, Mark as Unread, Find in Page, Reader Style, Page Views, Open in Browser, Share, and Hide Inspector were contained inside that toolbar\n'
   printf -- '- Runtime failures: no fatal, assertion, or precondition messages\n'
   printf -- '- AttributeGraph cycle advisories: `%s` (captured separately; the complete AX journey remained functional)\n' "$ATTRIBUTEGRAPH_CYCLE_COUNT"
   printf -- '- AX evidence: `%s`\n' "$AX_RESULT"

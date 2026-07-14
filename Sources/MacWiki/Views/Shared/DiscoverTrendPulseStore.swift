@@ -4,16 +4,31 @@ import Observation
 /// Loads and caches trend pulse data for Discover's Most Read cards.
 @Observable @MainActor
 final class DiscoverTrendPulseStore {
+    typealias TrendPulseLoader = @Sendable (
+        _ title: String,
+        _ referenceDate: Date
+    ) async throws -> WikipediaService.TrendPulse
+
     private(set) var pulseByTitleKey: [String: WikipediaService.TrendPulse] = [:]
     private(set) var isLoading = false
 
     private var currentRequestID: UUID?
     private var activeReferenceDateKey: String?
     private var loadTask: Task<Void, Never>?
-    private let wikipediaService: WikipediaService
+    @ObservationIgnored private let trendPulseLoader: TrendPulseLoader
+    @ObservationIgnored private let batchSize: Int
 
-    init(wikipediaService: WikipediaService = .shared) {
-        self.wikipediaService = wikipediaService
+    init(
+        batchSize: Int = 6,
+        trendPulseLoader: @escaping TrendPulseLoader = { title, referenceDate in
+            try await WikipediaService.shared.fetchTrendPulse(
+                for: title,
+                referenceDate: referenceDate
+            )
+        }
+    ) {
+        self.batchSize = max(1, batchSize)
+        self.trendPulseLoader = trendPulseLoader
     }
 
     func queueLoad(results: [WikipediaService.SearchResult], referenceDate: Date) {
@@ -69,28 +84,42 @@ final class DiscoverTrendPulseStore {
         referenceDateKey: String,
         requestID: UUID
     ) async {
-        await withTaskGroup(of: (String, WikipediaService.TrendPulse?).self) { group in
-            for target in targets {
-                group.addTask { [wikipediaService] in
-                    do {
-                        let pulse = try await wikipediaService.fetchTrendPulse(
-                            for: target.title,
-                            referenceDate: referenceDate
-                        )
-                        return (target.key, pulse)
-                    } catch {
-                        return (target.key, nil)
+        var batchStart = 0
+        while batchStart < targets.count {
+            guard !Task.isCancelled,
+                  currentRequestID == requestID,
+                  activeReferenceDateKey == referenceDateKey else {
+                return
+            }
+
+            let batchEnd = min(batchStart + batchSize, targets.count)
+            let batch = targets[batchStart..<batchEnd]
+
+            await withTaskGroup(of: (String, WikipediaService.TrendPulse?).self) { group in
+                for target in batch {
+                    group.addTask { [trendPulseLoader] in
+                        do {
+                            let pulse = try await trendPulseLoader(
+                                target.title,
+                                referenceDate
+                            )
+                            return (target.key, pulse)
+                        } catch {
+                            return (target.key, nil)
+                        }
                     }
+                }
+
+                for await (key, pulse) in group {
+                    guard !Task.isCancelled else { return }
+                    guard currentRequestID == requestID else { return }
+                    guard activeReferenceDateKey == referenceDateKey else { return }
+                    guard let pulse else { continue }
+                    pulseByTitleKey[key] = pulse
                 }
             }
 
-            for await (key, pulse) in group {
-                guard !Task.isCancelled else { return }
-                guard currentRequestID == requestID else { return }
-                guard activeReferenceDateKey == referenceDateKey else { return }
-                guard let pulse else { continue }
-                pulseByTitleKey[key] = pulse
-            }
+            batchStart = batchEnd
         }
 
         guard !Task.isCancelled else { return }

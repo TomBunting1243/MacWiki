@@ -115,6 +115,23 @@ function enabled(menuName, itemName) {
   return Boolean(menuItem(menuName, itemName).enabled())
 }
 
+function assertDocumentReaderCommandsDisabled(context) {
+  for (const [menuName, itemName] of [
+    ['Article', 'Back'],
+    ['Article', 'Forward'],
+    ['Article', 'Mark as Read'],
+    ['Article', 'Reader Style…'],
+    ['Article', 'Page Views…'],
+    ['Article', 'Open in Browser'],
+    ['Article', 'Share…'],
+    ['View', 'Increase Reader Font Size'],
+    ['View', 'Decrease Reader Font Size'],
+    ['View', 'Reset Reader Font Size']
+  ]) {
+    assert(!enabled(menuName, itemName), `${menuName} → ${itemName} must be disabled ${context}`)
+  }
+}
+
 function commandCharacter(menuName, itemName) {
   const item = menuItem(menuName, itemName)
   return String(item.attributes.byName('AXMenuItemCmdChar').value() || '')
@@ -149,9 +166,12 @@ for (const [menuName, itemName, expectedCharacter] of [
   ['Edit', 'Search Wikipedia', 'K'],
   ['Edit', 'Find in Page', 'F'],
   ['View', 'Toggle Inspector', 'I'],
-  ['Window', 'Increase Reader Font Size', '='],
-  ['Window', 'Decrease Reader Font Size', '-'],
-  ['Window', 'Reset Reader Font Size', '0']
+  ['Article', 'Back', '['],
+  ['Article', 'Forward', ']'],
+  ['Article', 'Open in Browser', 'O'],
+  ['View', 'Increase Reader Font Size', '='],
+  ['View', 'Decrease Reader Font Size', '-'],
+  ['View', 'Reset Reader Font Size', '0']
 ]) {
   const actualCharacter = commandCharacter(menuName, itemName)
   assert(actualCharacter === expectedCharacter, `${menuName} → ${itemName} shortcut was ${actualCharacter}`)
@@ -170,12 +190,14 @@ assert(!enabled('Edit', 'Add to List...'), 'Add to List must be disabled without
 assert(enabled('Edit', 'Search Wikipedia'), 'Search Wikipedia must be enabled')
 assert(!enabled('Edit', 'Find in Page'), 'Find in Page must be disabled without an article')
 assert(enabled('View', 'Toggle Inspector'), 'Toggle Inspector must be enabled')
+assertDocumentReaderCommandsDisabled('with an empty workspace')
 
 menuItem('File', 'New Tab').click()
 waitUntil(() => enabled('File', 'Close Tab'), 'Close Tab did not enable after New Tab')
 assert(enabled('Edit', 'Add to List...'), 'Add to List did not enable for an active tab')
-assert(enabled('View', 'Next Tab'), 'Next Tab did not enable for an open tab')
-assert(enabled('View', 'Previous Tab'), 'Previous Tab did not enable for an open tab')
+assert(enabled('Tabs', 'Next Tab'), 'Next Tab did not enable for an open tab')
+assert(enabled('Tabs', 'Previous Tab'), 'Previous Tab did not enable for an open tab')
+assertDocumentReaderCommandsDisabled('with a tab but no article')
 observations.states.push(windowSnapshot('tab-open'))
 
 menuItem('File', 'Close Tab').click()
@@ -214,7 +236,7 @@ JXA
   printf -- '- BuildInfo commit: `%s`\n' "$TRACE_COMMIT"
   printf -- '- BuildInfo dirty: `%s`\n' "$TRACE_DIRTY"
   printf -- '- Exact candidate PID: `%s`\n' "$QA_APP_PID"
-  printf -- '- Menu assertions: native app/File/Edit/View/Window actions, shortcuts, and context-sensitive enabled states\n'
+  printf -- '- Menu assertions: native app/File/Edit/View/Article/Tabs/Window actions, shortcuts, and context-sensitive enabled states\n'
   printf -- '- Functional command cycle: New Tab → Close Tab → Reopen Closed Tab\n'
   printf -- '- Window states: ordinary → native full screen → restored → inactive → reactivated\n'
   printf -- '- AX snapshot: `%s`\n' "$SNAPSHOT_PATH"

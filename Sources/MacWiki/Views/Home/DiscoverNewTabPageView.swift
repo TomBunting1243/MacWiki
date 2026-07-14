@@ -4,6 +4,7 @@ import SwiftUI
 /// Apple News-inspired discovery hub used by the New Tab page.
 struct DiscoverNewTabPageView: View {
     @Environment(AppState.self) private var appState
+    @Environment(\.modelContext) private var modelContext
     @Environment(\.macWikiAccessibilityPersonalization.reduceMotion) private var reduceMotion
     @Query(sort: \ReadingList.updatedAt, order: .reverse) private var allLists: [ReadingList]
     @Query(sort: \Label.sortOrder) private var allLabels: [Label]
@@ -16,9 +17,9 @@ struct DiscoverNewTabPageView: View {
         searchPrefetchLimit: 24
     )
     @State private var screenModel = DiscoverScreenModel()
-    @State private var articleLookupSnapshot = ArticleLookupIndex.empty
+    @State private var articleLookupModel = DiscoverArticleLookupModel()
     @State private var isAppeared = false
-    @State private var discoverContentWidth: CGFloat = 1040
+    @State private var responsiveLayout = DiscoverResponsiveLayoutProfile.initial
 
     @FocusState private var isSearchFocused: Bool
 
@@ -30,18 +31,6 @@ struct DiscoverNewTabPageView: View {
         screenModel.discoverFeedStore
     }
 
-    private var discoverPageMaxWidth: CGFloat {
-        if discoverContentWidth >= 1540 { return 1320 }
-        if discoverContentWidth >= 1240 { return 1160 }
-        return 980
-    }
-
-    private var discoverHorizontalPadding: CGFloat {
-        if discoverContentWidth < 720 { return 18 }
-        if discoverContentWidth >= 1540 { return 42 }
-        return 28
-    }
-
     private var shouldQueueTimeTravelSkeleton: Bool {
         screenModel.shouldQueueTimeTravelSkeleton
     }
@@ -51,19 +40,11 @@ struct DiscoverNewTabPageView: View {
     }
 
     private var articleLookup: ArticleLookupIndex {
-        articleLookupSnapshot
-    }
-
-    private var articleLookupFingerprint: Int {
-        articleLookupIndexFingerprint(readingLists: allLists)
+        articleLookupModel.index
     }
 
     private var savedArticleTitlesNormalized: Set<String> {
         articleLookup.savedArticleTitlesNormalized
-    }
-
-    private func refreshArticleLookupSnapshot() {
-        articleLookupSnapshot = ArticleLookupIndex(readingLists: allLists)
     }
 
     @AppStorage(DiscoverStartMode.storageKey) private var discoverStartMode: DiscoverStartMode = .discoverFeed
@@ -84,7 +65,7 @@ struct DiscoverNewTabPageView: View {
 
     private var discoverFeedContent: some View {
         ScrollView {
-            LazyVStack(alignment: .leading, spacing: discoverContentWidth < 820 ? 16 : 20) {
+            LazyVStack(alignment: .leading, spacing: responsiveLayout.pageSectionSpacing) {
                 DiscoverSearchBarView(
                     searchCoordinator: searchCoordinator,
                     discoverFeedStore: discoverFeedStore,
@@ -117,7 +98,7 @@ struct DiscoverNewTabPageView: View {
                     DiscoverTimeMachineStageView(
                         screenModel: screenModel,
                         discoverFeedStore: discoverFeedStore,
-                        discoverContentWidth: discoverContentWidth,
+                        responsiveLayout: responsiveLayout,
                         isSearchFieldFocused: isSearchFocused,
                         refreshGeneration: screenModel.discoverRefreshGeneration,
                         allLists: allLists,
@@ -130,27 +111,22 @@ struct DiscoverNewTabPageView: View {
                     )
                 }
             }
-            .frame(maxWidth: discoverPageMaxWidth, alignment: .leading)
+            .frame(maxWidth: responsiveLayout.pageMaxWidth, alignment: .leading)
             .frame(maxWidth: .infinity, alignment: .center)
-            .padding(.horizontal, discoverHorizontalPadding)
+            .padding(.horizontal, responsiveLayout.horizontalPadding)
             .padding(.top, 24)
             .padding(.bottom, 48)
-            .background {
-                GeometryReader { proxy in
-                    Color.clear
-                        .onAppear {
-                            updateDiscoverContentWidth(proxy.size.width)
-                        }
-                        .onChange(of: proxy.size.width) { _, newWidth in
-                            updateDiscoverContentWidth(newWidth)
-                        }
-                }
+            .onGeometryChange(for: DiscoverResponsiveLayoutProfile?.self) { proxy in
+                DiscoverResponsiveLayoutProfile(width: proxy.size.width)
+            } action: { newLayout in
+                guard let newLayout, newLayout != responsiveLayout else { return }
+                responsiveLayout = newLayout
             }
         }
         .background(DiscoverEditionBackground().ignoresSafeArea())
         .onAppear {
             screenModel.selectedDiscoverDate = appState.selectedDiscoverDate
-            refreshArticleLookupSnapshot()
+            articleLookupModel.start(modelContext: modelContext)
             if reduceMotion {
                 isAppeared = true
             } else {
@@ -162,14 +138,12 @@ struct DiscoverNewTabPageView: View {
             updateTimeTravelSkeletonVisibility()
         }
         .onDisappear {
+            articleLookupModel.stop()
             if !reduceMotion {
                 isAppeared = false
             }
             searchCoordinator.cancel()
             screenModel.handleDisappear()
-        }
-        .onChange(of: articleLookupFingerprint) { _, _ in
-            refreshArticleLookupSnapshot()
         }
         .onChange(of: shouldQueueTimeTravelSkeleton) { _, _ in
             updateTimeTravelSkeletonVisibility()
@@ -220,12 +194,6 @@ struct DiscoverNewTabPageView: View {
         } else {
             appState.openArticle(article, inNewTab: inNewTab)
         }
-    }
-
-    private func updateDiscoverContentWidth(_ newWidth: CGFloat) {
-        guard newWidth > 0 else { return }
-        guard abs(discoverContentWidth - newWidth) > 0.5 else { return }
-        discoverContentWidth = newWidth
     }
 
 }

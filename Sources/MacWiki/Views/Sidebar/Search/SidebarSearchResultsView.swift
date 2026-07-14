@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct SidebarSearchResultsView: View {
+    @Environment(\.macWikiAccessibilityPersonalization.reduceMotion) private var reduceMotion
+
     let model: SidebarSearchSurfaceModel
     let allLists: [ReadingList]
     let allLabels: [Label]
@@ -64,7 +66,7 @@ struct SidebarSearchResultsView: View {
             .scrollContentBackground(.hidden)
             .onChange(of: model.selectedRowID) { _, newValue in
                 guard let newValue else { return }
-                withAnimation(.easeOut(duration: 0.15)) {
+                withAnimation(reduceMotion ? nil : .easeOut(duration: 0.15)) {
                     proxy.scrollTo(newValue, anchor: .center)
                 }
             }

@@ -77,15 +77,26 @@ final class DiscoverFeedStore {
     }
 
     private func prefetchThumbnails(for feed: WikipediaService.DiscoverFeed) {
-        var urls: [URL] = []
+        // Warm only the first useful viewport. Offscreen modules load their
+        // own artwork as they become visible instead of competing with the
+        // edition's initial text and lead image.
+        let initialPrefetchBudget = 10
+        var candidates: [URL] = []
         if let hero = feed.featuredArticle?.thumbnailURL {
-            urls.append(hero)
+            candidates.append(hero)
         }
         if let featuredImageURL = feed.featuredImage?.thumbnailURL ?? feed.featuredImage?.imageURL {
-            urls.append(featuredImageURL)
+            candidates.append(featuredImageURL)
         }
-        urls.append(contentsOf: feed.inTheNews.prefix(16).compactMap(\.thumbnailURL))
-        urls.append(contentsOf: feed.trending.prefix(24).compactMap(\.thumbnailURL))
+        candidates.append(contentsOf: feed.inTheNews.prefix(4).compactMap(\.thumbnailURL))
+        candidates.append(contentsOf: feed.trending.prefix(4).compactMap(\.thumbnailURL))
+
+        var seen = Set<URL>()
+        let urls = Array(
+            candidates
+                .filter { seen.insert($0).inserted }
+                .prefix(initialPrefetchBudget)
+        )
         guard !urls.isEmpty else { return }
         Task(priority: .utility) {
             await ThumbnailPrefetcher.shared.prefetch(urls)

@@ -55,12 +55,6 @@ enum AppStorageKey {
         static let sortOrder = "sidebarSortOrder"
     }
 
-    enum Inspector {
-        static let infoSplitRatio = "inspectorInfoSplitRatio"
-        static let metadataSectionHeight = "inspectorMetadataSectionHeight"
-        static let tocSectionHeight = "inspectorTOCSectionHeight"
-    }
-
     enum OptionClickSave {
         static let defaultListID = "optionClickSave.defaultListID"
     }

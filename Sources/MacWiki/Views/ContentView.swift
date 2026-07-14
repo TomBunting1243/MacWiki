@@ -1,3 +1,4 @@
+import SwiftData
 import SwiftUI
 
 /// Main content view implementing MacWiki's adaptive native workspace.
@@ -14,6 +15,7 @@ struct ContentView: View {
     }
 
     @Environment(AppState.self) private var appState
+    @Environment(\.modelContext) private var modelContext
     @Environment(\.macWikiAccessibilityPersonalization.reduceMotion) private var reduceMotion
     @State private var selectedList: ReadingList?
     @State private var selectedLabel: Label?
@@ -54,6 +56,22 @@ struct ContentView: View {
             showNewTagSheet: $showNewTagSheet,
             articleForNewTag: $articleForNewTag
         )
+        .focusedSceneValue(\.macWikiInspectorCommandsAvailable, true)
+        .focusedSceneValue(\.macWikiCommandCapabilities, .mainWorkspace)
+        .focusedSceneValue(\.macWikiCommandModelContext, modelContext)
+        .background {
+            WindowContentMinimumSizeBridge(
+                minimumSize: CGSize(
+                    width: MainWindowLayout.minimumContentWidth(
+                        listsSidebarVisible: appState.listsSidebarVisible,
+                        directoryVisible: appState.directoryColumnVisible,
+                        inspectorVisible: appState.inspectorVisible
+                    ),
+                    height: MainWindowLayout.minimumContentHeight
+                )
+            )
+            .frame(width: 0, height: 0)
+        }
         .onAppear {
             applyLaunchQAHarnessOverridesIfNeeded()
             enforceWikiHopAvailabilityIfNeeded()
@@ -110,8 +128,6 @@ struct ContentView: View {
             selectedLabel: $selectedLabel,
             selectedTag: $selectedTag,
             rootSelection: $rootSelection,
-            showNewLabelSheet: $showNewLabelSheet,
-            articleForNewLabel: $articleForNewLabel,
             onEditLabel: { label in editingLabel = label },
             onAddNewLabel: { showNewLabelSheet = true },
             onNewLabelWithArticle: { article in

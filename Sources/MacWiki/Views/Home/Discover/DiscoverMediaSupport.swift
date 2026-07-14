@@ -175,7 +175,16 @@ struct DiscoverThumbnailSlot: View {
     }
 
     private var emptySlot: some View {
-        Color.clear
+        ZStack {
+            Rectangle()
+                .fill(Color(nsColor: .quaternaryLabelColor).opacity(0.08))
+
+            Image(systemName: "photo")
+                .font(.system(size: max(12, size * 0.26), weight: .regular))
+                .foregroundStyle(.tertiary)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("No image available")
     }
 }
 

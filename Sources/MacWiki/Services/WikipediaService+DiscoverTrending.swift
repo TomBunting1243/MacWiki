@@ -446,34 +446,47 @@ extension WikipediaService {
         let summaryTargets = Array(rankedCandidates.prefix(summaryTargetCount))
         var orderedEntries = Array<AllTimeMostReadEntry?>(repeating: nil, count: summaryTargets.count)
 
-        await withTaskGroup(of: (Int, AllTimeMostReadEntry?).self) { group in
-            for (index, candidate) in summaryTargets.enumerated() {
-                group.addTask { [self] in
-                    do {
-                        let summary = try await self.fetchSummary(candidate.title)
-                        let result = SearchResult(
-                            id: String(summary.pageId),
-                            title: summary.title,
-                            description: summary.description ?? summary.extract,
-                            thumbnailURL: summary.thumbnailURL
-                        )
-                        return (
-                            index,
-                            AllTimeMostReadEntry(
-                                result: result,
-                                totalViews: candidate.totalViews
+        let summaryFetchBatchSize = 6
+        var summaryStartIndex = 0
+        while summaryStartIndex < summaryTargets.count {
+            let summaryEndIndex = min(
+                summaryStartIndex + summaryFetchBatchSize,
+                summaryTargets.count
+            )
+
+            await withTaskGroup(of: (Int, AllTimeMostReadEntry?).self) { group in
+                for index in summaryStartIndex..<summaryEndIndex {
+                    let candidate = summaryTargets[index]
+                    group.addTask { [self] in
+                        do {
+                            let summary = try await self.fetchSummary(candidate.title)
+                            let result = SearchResult(
+                                id: String(summary.pageId),
+                                title: summary.title,
+                                description: summary.description ?? summary.extract,
+                                thumbnailURL: summary.thumbnailURL
                             )
-                        )
-                    } catch {
-                        return (index, nil)
+                            return (
+                                index,
+                                AllTimeMostReadEntry(
+                                    result: result,
+                                    totalViews: candidate.totalViews
+                                )
+                            )
+                        } catch {
+                            return (index, nil)
+                        }
                     }
+                }
+
+                for await (index, entry) in group {
+                    guard !Task.isCancelled else { return }
+                    orderedEntries[index] = entry
                 }
             }
 
-            for await (index, entry) in group {
-                guard !Task.isCancelled else { return }
-                orderedEntries[index] = entry
-            }
+            guard !Task.isCancelled else { throw CancellationError() }
+            summaryStartIndex = summaryEndIndex
         }
 
         guard !Task.isCancelled else { throw CancellationError() }

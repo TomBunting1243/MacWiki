@@ -3,7 +3,7 @@ import SwiftUI
 enum MainWindowColumnWidth {
     static let sidebarRange: ClosedRange<CGFloat> = 176...260
     static let directoryRange: ClosedRange<CGFloat> = 260...420
-    static let inspectorRange: ClosedRange<CGFloat> = 260...460
+    static let inspectorRange: ClosedRange<CGFloat> = 270...460
 
     static func clampedStorageValue(
         _ width: CGFloat,
@@ -15,48 +15,32 @@ enum MainWindowColumnWidth {
     }
 }
 
-enum MainWindowResponsiveLayout {
-    struct Input: Equatable {
-        let windowWidth: CGFloat
-        let sidebarVisible: Bool
-        let directoryVisible: Bool
-        let hasArticle: Bool
-        let sidebarWidth: CGFloat
-        let directoryWidth: CGFloat
-        let inspectorWidth: CGFloat
-    }
-
+enum MainWindowLayout {
     /// A readable article should remain the dominant surface when auxiliary
     /// columns compete for space.
     static let minimumReaderWidth: CGFloat = 520
-    private static let splitDividerWidth: CGFloat = 1
+    static let minimumContentHeight: CGFloat = 520
+    static let dividerThickness: CGFloat = 1
 
-    static func canPresentInspector(for input: Input) -> Bool {
-        guard input.hasArticle, input.windowWidth.isFinite else { return false }
+    static func minimumContentWidth(
+        listsSidebarVisible: Bool,
+        directoryVisible: Bool,
+        inspectorVisible: Bool
+    ) -> CGFloat {
+        let visibleAuxiliaryWidths = [
+            listsSidebarVisible ? MainWindowColumnWidth.sidebarRange.lowerBound : 0,
+            directoryVisible ? MainWindowColumnWidth.directoryRange.lowerBound : 0,
+            inspectorVisible ? MainWindowColumnWidth.inspectorRange.lowerBound : 0
+        ]
+        let visibleAuxiliaryCount = [
+            listsSidebarVisible,
+            directoryVisible,
+            inspectorVisible
+        ].filter { $0 }.count
 
-        let sidebarWidth = input.sidebarVisible
-            ? resolved(input.sidebarWidth, in: MainWindowColumnWidth.sidebarRange)
-            : 0
-        let directoryWidth = input.directoryVisible
-            ? resolved(input.directoryWidth, in: MainWindowColumnWidth.directoryRange)
-            : 0
-        let inspectorWidth = resolved(input.inspectorWidth, in: MainWindowColumnWidth.inspectorRange)
-        let visibleAuxiliaryColumns = [input.sidebarVisible, input.directoryVisible, true]
-            .filter { $0 }
-            .count
-        let dividerBudget = CGFloat(visibleAuxiliaryColumns) * splitDividerWidth
-        let requiredWidth = sidebarWidth
-            + directoryWidth
-            + inspectorWidth
-            + minimumReaderWidth
-            + dividerBudget
-
-        return input.windowWidth >= requiredWidth
-    }
-
-    private static func resolved(_ value: CGFloat, in range: ClosedRange<CGFloat>) -> CGFloat {
-        guard value.isFinite else { return range.lowerBound }
-        return min(max(value, range.lowerBound), range.upperBound)
+        return minimumReaderWidth
+            + visibleAuxiliaryWidths.reduce(0, +)
+            + (CGFloat(visibleAuxiliaryCount) * dividerThickness)
     }
 }
 
@@ -72,11 +56,10 @@ private struct PersistedColumnWidthModifier: ViewModifier {
             .background {
                 GeometryReader { proxy in
                     Color.clear
-                        .onAppear {
+                        .task(id: proxy.size.width) {
+                            try? await Task.sleep(for: .milliseconds(200))
+                            guard !Task.isCancelled else { return }
                             persist(proxy.size.width)
-                        }
-                        .onChange(of: proxy.size.width) { _, newWidth in
-                            persist(newWidth)
                         }
                 }
             }
@@ -101,6 +84,10 @@ extension View {
         range: ClosedRange<CGFloat>,
         tolerance: Double = 1.0
     ) -> some View {
-        modifier(PersistedColumnWidthModifier(key: key, range: range, tolerance: tolerance))
+        modifier(PersistedColumnWidthModifier(
+            key: key,
+            range: range,
+            tolerance: tolerance
+        ))
     }
 }

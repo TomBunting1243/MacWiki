@@ -7,35 +7,45 @@ struct SettingsView: View {
 
     var body: some View {
         TabView(selection: $selectedTab) {
-            SettingsReadingPane()
-                .tabItem {
-                    SwiftUI.Label(SettingsTab.reading.title, systemImage: SettingsTab.reading.systemImage)
-                }
-                .tag(SettingsTab.reading)
+            Tab(
+                SettingsTab.reading.title,
+                systemImage: SettingsTab.reading.systemImage,
+                value: SettingsTab.reading
+            ) {
+                SettingsReadingPane()
+            }
 
-            SettingsLibraryPane()
-                .tabItem {
-                    SwiftUI.Label(SettingsTab.library.title, systemImage: SettingsTab.library.systemImage)
-                }
-                .tag(SettingsTab.library)
+            Tab(
+                SettingsTab.library.title,
+                systemImage: SettingsTab.library.systemImage,
+                value: SettingsTab.library
+            ) {
+                SettingsLibraryPane()
+            }
 
-            SettingsNavigationPane()
-                .tabItem {
-                    SwiftUI.Label(SettingsTab.navigation.title, systemImage: SettingsTab.navigation.systemImage)
-                }
-                .tag(SettingsTab.navigation)
+            Tab(
+                SettingsTab.navigation.title,
+                systemImage: SettingsTab.navigation.systemImage,
+                value: SettingsTab.navigation
+            ) {
+                SettingsNavigationPane()
+            }
 
-            SettingsChromePane()
-                .tabItem {
-                    SwiftUI.Label(SettingsTab.chrome.title, systemImage: SettingsTab.chrome.systemImage)
-                }
-                .tag(SettingsTab.chrome)
+            Tab(
+                SettingsTab.chrome.title,
+                systemImage: SettingsTab.chrome.systemImage,
+                value: SettingsTab.chrome
+            ) {
+                SettingsChromePane()
+            }
 
-            SettingsAdvancedPane()
-                .tabItem {
-                    SwiftUI.Label(SettingsTab.advanced.title, systemImage: SettingsTab.advanced.systemImage)
-                }
-                .tag(SettingsTab.advanced)
+            Tab(
+                SettingsTab.advanced.title,
+                systemImage: SettingsTab.advanced.systemImage,
+                value: SettingsTab.advanced
+            ) {
+                SettingsAdvancedPane()
+            }
         }
         .frame(minWidth: 620, idealWidth: 660, maxWidth: 760, minHeight: 600, idealHeight: 680)
     }

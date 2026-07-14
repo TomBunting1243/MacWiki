@@ -73,7 +73,7 @@ struct DiscoverSearchBarView: View {
         if #available(macOS 26, *) {
             shape
                 .fill(.clear)
-                .glassEffect(.regular.interactive(), in: .rect(cornerRadius: cornerRadius))
+                .glassEffect(.regular, in: .rect(cornerRadius: cornerRadius))
                 .overlay {
                     shape.fill(Color(nsColor: .windowBackgroundColor).opacity(colorScheme == .dark ? 0.018 : 0.055))
                 }

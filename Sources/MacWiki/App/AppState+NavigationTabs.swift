@@ -3,31 +3,18 @@ import SwiftUI
 
 extension AppState {
     func setNavigationColumnsVisible(_ isVisible: Bool) {
-        listContentsColumnVisible = isVisible
-        navigationSplitViewVisibility = isVisible ? .all : .detailOnly
+        listsSidebarVisible = isVisible
+        directoryColumnVisible = isVisible
     }
 
     func toggleListsSidebarVisibility() {
         guard !isWikiHopNavigationLocked else { return }
-
-        switch navigationSplitViewVisibility {
-        case .detailOnly:
-            navigationSplitViewVisibility = .all
-        default:
-            navigationSplitViewVisibility = .detailOnly
-        }
+        listsSidebarVisible.toggle()
     }
 
     func toggleDirectoryColumnVisibility() {
         guard !isWikiHopNavigationLocked else { return }
-
-        listContentsColumnVisible.toggle()
-    }
-
-    func setNavigationSplitViewVisibility(listsVisible: Bool, directoryVisible: Bool) {
-        listContentsColumnVisible = directoryVisible
-
-        navigationSplitViewVisibility = listsVisible ? .all : .detailOnly
+        directoryColumnVisible.toggle()
     }
 
     /// Current scroll position for a specific tab id.
@@ -161,6 +148,16 @@ extension AppState {
         optionClickSaveRequest = nil
     }
 
+    func requestReaderStylePresentation() {
+        guard currentArticle != nil, !isWikiHopNavigationLocked else { return }
+        readerStylePresentationRequestID = UUID()
+    }
+
+    func requestReaderPageViewsPresentation() {
+        guard currentArticle != nil, !isWikiHopNavigationLocked else { return }
+        readerPageViewsPresentationRequestID = UUID()
+    }
+
     /// Create a new empty tab page.
     func createNewTab() {
         tabSessionStore.createNewTab()
@@ -236,6 +233,11 @@ extension AppState {
         tabSessionStore.nextTab()
     }
 
+    @discardableResult
+    func selectTab(_ id: UUID) -> Bool {
+        tabSessionStore.selectTab(id: id)
+    }
+
     /// Switch to previous tab.
     func previousTab() {
         tabSessionStore.previousTab()
@@ -279,6 +281,11 @@ extension AppState {
     /// Move a tab from one position to another.
     func moveTab(from sourceIndex: Int, to destinationIndex: Int) {
         tabSessionStore.moveTab(from: sourceIndex, to: destinationIndex)
+    }
+
+    @discardableResult
+    func reorderTabs(_ sourceIDs: [UUID], before destinationID: UUID?) -> Bool {
+        tabSessionStore.reorderTabs(sourceIDs, before: destinationID)
     }
 
     /// Start a search with specific context.

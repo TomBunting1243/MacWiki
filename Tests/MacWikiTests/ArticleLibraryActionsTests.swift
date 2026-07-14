@@ -6,6 +6,25 @@ import Testing
 
 @MainActor
 struct ArticleLibraryActionsTests {
+    @Test func removeAllFromListClearsNormalizedLegacyDuplicatesInOneAction() throws {
+        let modelContext = try makeInMemoryModelContext()
+        let list = ReadingList(name: "Inbox")
+        let first = SavedArticle(title: "Ada Lovelace", list: list)
+        let duplicate = SavedArticle(title: "Ada_Lovelace", list: list)
+        let unrelated = SavedArticle(title: "Grace Hopper", list: list)
+        list.articles = [first, duplicate, unrelated]
+        modelContext.insert(list)
+
+        let removedCount = ArticleLibraryActions.removeAllFromList(
+            withTitle: "Ada Lovelace",
+            list: list,
+            modelContext: modelContext
+        )
+
+        #expect(removedCount == 2)
+        #expect(list.articles.map(\.title) == ["Grace Hopper"])
+    }
+
     @Test func saveSearchResultToListDeduplicatesAndResolvesReadState() throws {
         let modelContext = try makeInMemoryModelContext()
         let list = ReadingList(name: "Inbox")

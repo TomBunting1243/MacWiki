@@ -23,7 +23,7 @@ struct SidebarSearchContentView: View {
         case .error(let message):
             SidebarSearchStateView(
                 title: "Search Unavailable",
-                message: message,
+                message: Text(verbatim: message),
                 systemImage: "exclamationmark.triangle.fill",
                 style: .quiet,
                 actionTitle: "Try Again",

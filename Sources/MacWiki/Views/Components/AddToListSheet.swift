@@ -1,7 +1,7 @@
 import SwiftUI
 import SwiftData
 
-/// Sheet for adding current article to a reading list (⌘L)
+/// Native list chooser for adding the current article to a reading list (⌘L).
 struct AddToListSheet: View {
     let article: Article?
     
@@ -11,144 +11,121 @@ struct AddToListSheet: View {
     
     @State private var searchText = ""
     @State private var showNewListSheet = false
+    @State private var presentationOrder = ReadingListPresentationOrder()
+
+    private var presentedLists: [ReadingList] {
+        let listsByID = Dictionary(uniqueKeysWithValues: lists.map { ($0.id, $0) })
+        return presentationOrder.arrangedIDs(for: lists.map(\.id)).compactMap { listsByID[$0] }
+    }
     
     private var filteredLists: [ReadingList] {
         if searchText.isEmpty {
-            return lists
+            return presentedLists
         }
-        return lists.filter { $0.name.localizedStandardContains(searchText) }
+        return presentedLists.filter { $0.name.localizedStandardContains(searchText) }
     }
-    
+
     var body: some View {
-        VStack(spacing: 0) {
-            // Header
-            HStack {
-                if let article = article {
-                    Text("Add \"\(article.title)\" to list...")
-                        .font(.headline)
-                        .lineLimit(1)
-                } else {
-                    Text("Add to List")
-                        .font(.headline)
+        NavigationStack {
+            List {
+                if let article {
+                    Section("Article") {
+                        Text(article.title)
+                            .font(.headline)
+                            .lineLimit(2)
+                            .textSelection(.enabled)
+                    }
                 }
-                Spacer()
-                Button {
-                    dismiss()
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-                .keyboardShortcut(.cancelAction)
-                .accessibilityLabel("Close Add to List")
-            }
-            .padding()
-            
-            // Search field
-            HStack {
-                Image(systemName: "magnifyingglass")
-                    .foregroundStyle(.secondary)
-                TextField("Search lists...", text: $searchText)
-                    .textFieldStyle(.plain)
-            }
-            .padding(8)
-            .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 8))
-            .padding(.horizontal)
-            
-            Divider()
-                .padding(.top, 12)
-            
-            // Lists
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 4) {
+
+                Section("Destination") {
                     if filteredLists.isEmpty {
-                        if lists.isEmpty {
-                            Text("No lists yet")
-                                .foregroundStyle(.secondary)
-                                .padding()
-                        } else {
-                            Text("No matching lists")
-                                .foregroundStyle(.secondary)
-                                .padding()
-                        }
+                        emptyState
                     } else {
                         ForEach(filteredLists) { list in
+                            let isSaved = article.map {
+                                ArticleLibraryActions.containsArticle(withTitle: $0.title, in: list)
+                            } ?? false
+
                             Button {
                                 saveToList(list)
                             } label: {
-                                HStack {
-                                    Image(systemName: list.icon)
-                                        .frame(width: 24)
-                                    Text(list.name)
-                                    Spacer()
-                                    Text("\(list.articles.count)")
-                                        .font(.caption)
+                                HStack(spacing: 10) {
+                                    SwiftUI.Label(list.name, systemImage: list.icon)
+                                        .lineLimit(1)
+
+                                    Spacer(minLength: 12)
+
+                                    Text(list.articles.count, format: .number)
+                                        .font(.caption.monospacedDigit())
                                         .foregroundStyle(.tertiary)
+
+                                    if isSaved {
+                                        Image(systemName: "checkmark")
+                                            .foregroundStyle(.secondary)
+                                    }
                                 }
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 12)
                                 .contentShape(Rectangle())
                             }
-                            .buttonStyle(.plain)
+                            .disabled(article == nil || isSaved)
                             .accessibilityLabel(list.name)
-                            .accessibilityValue("\(list.articles.count) articles")
+                            .accessibilityValue(isSaved ? "Already saved" : "\(list.articles.count) articles")
                         }
                     }
-                    
-                    Divider()
-                        .padding(.vertical, 8)
-                    
-                    // Create new list
-                    Button {
+
+                    Button("Create New List…", systemImage: "plus") {
                         showNewListSheet = true
-                    } label: {
-                        HStack {
-                            Image(systemName: "plus")
-                                .frame(width: 24)
-                            Text("Create New List")
-                        }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 12)
-                        .contentShape(Rectangle())
                     }
-                    .buttonStyle(.plain)
                 }
-                .padding(.vertical, 8)
+            }
+            .searchable(text: $searchText, prompt: "Search Lists")
+            .navigationTitle("Add to List")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                    .keyboardShortcut(.cancelAction)
+                }
             }
         }
-        .frame(width: 320, height: 400)
+        .frame(minWidth: 440, minHeight: 460)
         .sheet(isPresented: $showNewListSheet) {
             NewListSheet(isPresented: $showNewListSheet)
         }
+        .onAppear {
+            presentationOrder.reconcile(with: lists.map(\.id))
+        }
+        .onChange(of: lists.map(\.id)) { _, ids in
+            presentationOrder.reconcile(with: ids)
+        }
+        .onDisappear {
+            presentationOrder.reset()
+        }
     }
-    
+
+    private var emptyState: some View {
+        ContentUnavailableView {
+            SwiftUI.Label(
+                lists.isEmpty ? "No Reading Lists" : "No Matching Lists",
+                systemImage: lists.isEmpty ? "bookmark.slash" : "magnifyingglass"
+            )
+        } description: {
+            Text(lists.isEmpty ? "Create a list to organize this article." : "Try a different search term.")
+        }
+    }
+
     private func saveToList(_ list: ReadingList) {
         guard let article = article else {
             dismiss()
             return
         }
         
-        // Check if already in list
-        let normalizedTitle = ReadStateSync.normalizedTitle(article.title)
-        if list.articles.contains(where: { ReadStateSync.normalizedTitle($0.title) == normalizedTitle }) {
+        if ArticleLibraryActions.containsArticle(withTitle: article.title, in: list) {
             dismiss()
             return
         }
-        
-        let saved = SavedArticle(
-            title: article.title,
-            description: article.description,
-            extract: article.extract,
-            thumbnailURL: article.thumbnailURL,
-            list: list,
-            wordCount: article.wordCount
-        )
-        saved.isRead = ReadStateSync.resolveReadState(for: article, in: modelContext)
-        list.articles.append(saved)
-        list.updatedAt = Date()
-        modelContext.saveReportingFailure(operation: #function)
-        SavedArticleSummaryBackfill.enqueueIfNeeded(saved, modelContext: modelContext)
-        
+
+        ArticleLibraryActions.saveToList(article, list: list, modelContext: modelContext)
         dismiss()
     }
 }

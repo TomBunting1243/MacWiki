@@ -90,6 +90,22 @@ struct TabSessionStoreTests {
         #expect(store.currentArticle?.title == "C")
     }
 
+    @Test func selectingATabUsesDebouncedPersistenceAndRejectsUnknownIDs() {
+        let store = TabSessionStore(persistenceMode: .ephemeral)
+        _ = store.openArticle(Article(id: "a", title: "A"), inNewTab: true)
+        _ = store.openArticle(Article(id: "b", title: "B"), inNewTab: true)
+        let target = store.openTabs[0].id
+        let generation = store.saveRequestGeneration
+
+        #expect(store.selectTab(id: target))
+        #expect(store.activeTabId == target)
+        #expect(store.saveRequestGeneration == generation + 1)
+        #expect(!store.selectTab(id: target))
+        #expect(!store.selectTab(id: UUID()))
+        #expect(store.saveRequestGeneration == generation + 1)
+        store.cancelPendingSaveForTesting()
+    }
+
     @Test func snapshotRoundTripPreservesHistoryPlaceholderAndRecentlyClosed() throws {
         let openTab = ArticleTab(
             id: UUID(uuidString: "11111111-1111-1111-1111-111111111111")!,

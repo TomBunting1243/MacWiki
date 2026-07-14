@@ -64,59 +64,15 @@ final class AppState {
     
     // MARK: - UI State
     
-    /// Shared visibility model for the three-column SwiftUI shell.
-    var navigationSplitViewVisibility: NavigationSplitViewVisibility = .all
+    /// Command and native-divider visibility share these sources of truth. The
+    /// root AppKit split bridge writes user-driven collapse changes back here.
+    var listsSidebarVisible = true
+    var directoryColumnVisible = true
 
-    /// SwiftUI's three-column visibility enum cannot represent sidebar + detail
-    /// without the middle content column, so MacWiki tracks that state directly.
-    var listContentsColumnVisible: Bool = true
-
-    /// Whether the native leading sidebar is currently visible.
-    var listsSidebarVisible: Bool {
-        get {
-            switch navigationSplitViewVisibility {
-            case .all, .automatic, .doubleColumn:
-                return true
-            case .detailOnly:
-                return false
-            default:
-                return true
-            }
-        }
-        set {
-            setNavigationSplitViewVisibility(
-                listsVisible: newValue,
-                directoryVisible: directoryColumnVisible
-            )
-        }
-    }
-
-    /// Whether List Contents participates in the stable detail split workspace.
-    /// This is intentionally independent from the native leading-sidebar state.
-    var directoryColumnVisible: Bool {
-        get { listContentsColumnVisible }
-        set { listContentsColumnVisible = newValue }
-    }
-
-    /// The user's inspector preference. Responsive layout suppression never
-    /// overwrites this value, so the inspector returns when space is available.
+    /// The user's inspector preference. Native split items remain mounted and
+    /// collapse without overwriting this source of truth.
     var inspectorVisible: Bool = true
 
-    /// Updated by the main window's responsive layout policy.
-    var inspectorPresentationAvailable: Bool = false
-
-    /// The effective binding used by SwiftUI's native inspector presentation.
-    var inspectorPresented: Bool {
-        get { inspectorVisible && inspectorPresentationAvailable }
-        set {
-            if newValue {
-                inspectorVisible = true
-            } else if inspectorPresentationAvailable {
-                inspectorVisible = false
-            }
-        }
-    }
-    
     /// Current inspector view mode
     var inspectorMode: InspectorMode = .info
 
@@ -169,6 +125,11 @@ final class AppState {
     var newFolderRequestID: UUID?
     var newArticleLabelRequest: NewArticleLabelRequest?
     var newArticleTagRequest: NewArticleTagRequest?
+
+    /// Scene-scoped requests for reader presentations that may be hosted by
+    /// either the main AppKit toolbar or a standalone article-window toolbar.
+    var readerStylePresentationRequestID: UUID?
+    var readerPageViewsPresentationRequestID: UUID?
 
     /// Context in which the search was triggered
     var searchContext: SearchContext = .navigation

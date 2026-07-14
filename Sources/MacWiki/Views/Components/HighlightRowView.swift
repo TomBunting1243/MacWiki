@@ -8,6 +8,7 @@ struct HighlightRowView: View {
     @Environment(AppState.self) private var appState
     @Environment(\.modelContext) private var modelContext
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.macWikiAccessibilityPersonalization.reduceMotion) private var reduceMotion
     @State private var isEditing = false
     @State private var editedNote = ""
     @State private var isHovered = false
@@ -47,7 +48,7 @@ struct HighlightRowView: View {
     private var interactiveRow: some View {
         styledRowContent
             .onHover { hovering in
-                withAnimation(.easeOut(duration: 0.15)) {
+                withAnimation(reduceMotion ? nil : .easeOut(duration: 0.15)) {
                     isHovered = hovering
                 }
             }
@@ -219,7 +220,7 @@ struct HighlightRowView: View {
 
         Button {
             editedNote = highlight.note ?? ""
-            withAnimation(.easeInOut(duration: 0.2)) {
+            withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) {
                 isExpanded = true
                 isEditing = true
             }
@@ -232,7 +233,7 @@ struct HighlightRowView: View {
         Section("Change Color") {
             ForEach(HighlightColor.allCases, id: \.self) { color in
                 Button {
-                    withAnimation(.easeOut(duration: 0.2)) {
+                    withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2)) {
                         highlight.color = color
                         highlight.updatedAt = Date()
                         modelContext.saveReportingFailure(operation: #function)
@@ -290,7 +291,7 @@ struct HighlightRowView: View {
     private func activateHighlightRow() {
         appState.selectedHighlightId = highlight.id.uuidString
         guard !isEditing else { return }
-        withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) {
+        withAnimation(reduceMotion ? nil : .spring(response: 0.28, dampingFraction: 0.82)) {
             isExpanded.toggle()
         }
     }
@@ -302,7 +303,7 @@ struct HighlightRowView: View {
                 systemImage: "pencil"
             ) {
                 editedNote = highlight.note ?? ""
-                withAnimation(.easeInOut(duration: 0.2)) {
+                withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) {
                     isExpanded = true
                     isEditing = true
                 }
@@ -442,7 +443,7 @@ struct HighlightRowView: View {
 
                 Button("Cancel") {
                     editedNote = highlight.note ?? ""
-                    withAnimation(.easeInOut(duration: 0.15)) {
+                    withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.15)) {
                         isEditing = false
                     }
                 }
@@ -453,7 +454,7 @@ struct HighlightRowView: View {
                     highlight.note = editedNote.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : editedNote
                     highlight.updatedAt = Date()
                     modelContext.saveReportingFailure(operation: #function)
-                    withAnimation(.easeInOut(duration: 0.15)) {
+                    withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.15)) {
                         isEditing = false
                     }
                 }
@@ -480,7 +481,7 @@ struct HighlightRowView: View {
 
         appState.selectedHighlightId = highlight.id.uuidString
         editedNote = highlight.note ?? ""
-        withAnimation(.easeInOut(duration: 0.2)) {
+        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) {
             isExpanded = true
             isEditing = true
         }

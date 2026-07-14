@@ -41,6 +41,7 @@ private struct VerificationResult: Codable {
     let readStateCycle: String
     let contextMenuAction: String
     let secondaryWindow: [String]
+    let secondaryToolbar: [String]
     let finalWindowCount: Int
     let runtimeDiagnosticCheckpoints: [RuntimeDiagnosticCheckpoint]
 }
@@ -340,6 +341,44 @@ do {
             "The secondary article window omitted: \(missingSecondaryLabels.joined(separator: ", "))."
         )
     }
+
+    var articleWindowToolbars: [AXUIElement] = []
+    guard wait(timeout: 8, condition: {
+        articleWindowToolbars = elements(in: articleWindow).filter { element in
+            stringAttribute(kAXRoleAttribute as CFString, from: element) == kAXToolbarRole as String
+        }
+        return articleWindowToolbars.count == 1
+    }), articleWindowToolbars.count == 1 else {
+        throw VerificationError.missing(
+            "The secondary article window exposed \(articleWindowToolbars.count) AXToolbar elements instead of exactly one."
+        )
+    }
+    let expectedSecondaryToolbarLabels = [
+        "Back",
+        "Forward",
+        "Save Article",
+        "Mark as Unread",
+        "Find in Page",
+        "Reader Style",
+        "Page Views",
+        "Open in Browser",
+        "Share",
+        "Hide Inspector"
+    ]
+    let articleWindowToolbar = articleWindowToolbars[0]
+    _ = wait(timeout: 5, condition: {
+        let currentLabels = labels(in: articleWindowToolbar)
+        return expectedSecondaryToolbarLabels.allSatisfy(currentLabels.contains)
+    })
+    let articleWindowToolbarLabels = labels(in: articleWindowToolbar)
+    let missingSecondaryToolbarLabels = expectedSecondaryToolbarLabels.filter {
+        !articleWindowToolbarLabels.contains($0)
+    }
+    guard missingSecondaryToolbarLabels.isEmpty else {
+        throw VerificationError.missing(
+            "The secondary article toolbar omitted: \(missingSecondaryToolbarLabels.joined(separator: ", "))."
+        )
+    }
     recordRuntimeDiagnostics("secondary window")
 
     try close(articleWindow)
@@ -369,6 +408,7 @@ do {
         readStateCycle: "unread -> read -> unread",
         contextMenuAction: "Open in New Window",
         secondaryWindow: expectedSecondaryLabels,
+        secondaryToolbar: expectedSecondaryToolbarLabels,
         finalWindowCount: windows(in: application).count,
         runtimeDiagnosticCheckpoints: runtimeDiagnosticCheckpoints
     )

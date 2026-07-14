@@ -48,6 +48,7 @@ struct ListsSidebar: View {
     @State private var sidebarSelectionSet: Set<SidebarSelectionID> = []
     @State private var topObscuredHeight: CGFloat = 38
     @State private var selectedAreaIDs: Set<UUID> = []
+    @State private var collectionsSnapshot: ListsSidebarSnapshot?
     @AppStorage(AppStorageKey.ListsSidebar.sortOrder) private var sortOrder: ListSortOrder = .updatedDate
 
     // Editing state for lists
@@ -113,12 +114,25 @@ struct ListsSidebar: View {
 
     private var sidebarSections: [ListsSidebarTreeSection] {
         ListsSidebarTreeBuilder.build(
-            snapshot: collectionsSnapshot,
+            snapshot: resolvedCollectionsSnapshot,
             isWikiHopAvailable: isWikiHopAvailable
         )
     }
 
-    private var collectionsSnapshot: ListsSidebarSnapshot {
+    private var collectionsSnapshotFingerprint: Int {
+        listsSidebarSnapshotFingerprint(
+            lists: lists,
+            areas: areas,
+            labels: labels,
+            tags: tags,
+            savedArticles: savedArticles,
+            highlights: highlights,
+            articleStates: articleStates,
+            sortOrder: sortOrder
+        )
+    }
+
+    private var liveCollectionsSnapshot: ListsSidebarSnapshot {
         ListsSidebarSnapshot(
             lists: lists,
             areas: areas,
@@ -131,48 +145,59 @@ struct ListsSidebar: View {
         )
     }
 
+    /// SwiftData query values are already available during the first body
+    /// evaluation. Use them synchronously until the cached snapshot is seeded
+    /// so mounting the native sidebar never flashes an empty tree.
+    private var resolvedCollectionsSnapshot: ListsSidebarSnapshot {
+        collectionsSnapshot ?? liveCollectionsSnapshot
+    }
+
+    private func refreshCollectionsSnapshot() {
+        collectionsSnapshot = liveCollectionsSnapshot
+    }
+
     private var sortedLists: [ReadingList] {
-        collectionsSnapshot.sortedLists
+        resolvedCollectionsSnapshot.sortedLists
     }
 
     /// Lists not in any area
     private var rootLevelLists: [ReadingList] {
-        collectionsSnapshot.rootLevelLists
+        resolvedCollectionsSnapshot.rootLevelLists
     }
 
     /// Lists within a specific area
     private func listsInArea(_ area: Area) -> [ReadingList] {
-        collectionsSnapshot.lists(in: area)
+        resolvedCollectionsSnapshot.lists(in: area)
     }
 
     /// Root-level areas (not nested under another area)
     private var rootAreas: [Area] {
-        collectionsSnapshot.rootAreas
+        resolvedCollectionsSnapshot.rootAreas
     }
 
     /// Child areas within a specific parent area
     private func childAreas(of parent: Area) -> [Area] {
-        collectionsSnapshot.childAreas(of: parent)
+        resolvedCollectionsSnapshot.childAreas(of: parent)
     }
 
     private var sortedLabels: [Label] {
-        collectionsSnapshot.sortedLabels
+        resolvedCollectionsSnapshot.sortedLabels
     }
 
     private var sortedTags: [Tag] {
-        collectionsSnapshot.sortedTags
+        resolvedCollectionsSnapshot.sortedTags
     }
 
     private var labelArticleCounts: [UUID: Int] {
-        collectionsSnapshot.labelArticleCounts
+        resolvedCollectionsSnapshot.labelArticleCounts
     }
 
     private var tagArticleCounts: [UUID: Int] {
-        collectionsSnapshot.tagArticleCounts
+        resolvedCollectionsSnapshot.tagArticleCounts
     }
 
     private var areaIndexByID: [UUID: Area] {
-        collectionsSnapshot.areaIndexByID
+        resolvedCollectionsSnapshot.areaIndexByID
     }
 
     private var areaDeleteDialogTitle: String {
@@ -302,6 +327,7 @@ struct ListsSidebar: View {
     private var sidebarWithCollectionSnapshotSync: some View {
         sidebarWithDeleteDialog
             .onAppear {
+                refreshCollectionsSnapshot()
                 syncSelectionFromBindings()
                 enforceWikiHopSelectionGuard()
             }
@@ -354,6 +380,9 @@ struct ListsSidebar: View {
 
     var body: some View {
         sidebarWithSelectionSync
+        .task(id: collectionsSnapshotFingerprint) {
+            refreshCollectionsSnapshot()
+        }
         .onDisappear {
             flushScheduledModelContextSave()
         }
@@ -638,7 +667,7 @@ struct ListsSidebar: View {
                 area: area,
                 lists: listsInArea(area),
                 childAreas: childAreas(of: area),
-                parentAreaByID: collectionsSnapshot.parentAreaByID,
+                parentAreaByID: resolvedCollectionsSnapshot.parentAreaByID,
                 selectedAreaIDs: $selectedAreaIDs,
                 listRow: listRow,
                 listsInArea: listsInArea,
@@ -656,7 +685,7 @@ struct ListsSidebar: View {
                        SidebarCollapseSelectionGuard.collapseWouldHideSelectedList(
                            selectedAreaID: selectedList?.areaId,
                            collapsingAreaID: areaToUpdate.id,
-                           parentAreaByID: collectionsSnapshot.parentAreaByID
+                           parentAreaByID: resolvedCollectionsSnapshot.parentAreaByID
                        ) {
                         setRecentsSelection()
                     }
@@ -979,7 +1008,7 @@ struct ListsSidebar: View {
     private func requestAreaDeletion(for requestedAreaIDs: Set<UUID>) {
         guard let pending = ListsSidebarAreaPlanner.buildDeletionPlan(
             requestedAreaIDs: requestedAreaIDs,
-            snapshot: collectionsSnapshot
+            snapshot: resolvedCollectionsSnapshot
         ) else {
             return
         }
@@ -1030,7 +1059,7 @@ struct ListsSidebar: View {
     private func deleteAreasAndContents(rootAreaIDs: [UUID]) {
         guard let deletionPlan = ListsSidebarAreaPlanner.buildDeletionPlan(
             requestedAreaIDs: Set(rootAreaIDs),
-            snapshot: collectionsSnapshot
+            snapshot: resolvedCollectionsSnapshot
         ) else {
             return
         }
@@ -1044,7 +1073,7 @@ struct ListsSidebar: View {
             modelContext.delete(list)
         }
 
-        for areaID in ListsSidebarAreaPlanner.sortAreasDeepestFirst(subtreeAreaIDs, snapshot: collectionsSnapshot) {
+        for areaID in ListsSidebarAreaPlanner.sortAreasDeepestFirst(subtreeAreaIDs, snapshot: resolvedCollectionsSnapshot) {
             if let area = areaIndexByID[areaID] {
                 modelContext.delete(area)
             }
@@ -1269,7 +1298,7 @@ struct ListsSidebar: View {
         guard !ListsSidebarAreaPlanner.isDescendant(
             areaID: targetAreaID,
             of: draggedArea.id,
-            parentAreaByID: collectionsSnapshot.parentAreaByID
+            parentAreaByID: resolvedCollectionsSnapshot.parentAreaByID
         ) else {
             return false
         }

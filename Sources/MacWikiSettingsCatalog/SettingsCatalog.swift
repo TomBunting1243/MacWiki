@@ -399,36 +399,6 @@ public enum SettingsCatalog {
             systemImage: "rectangle.split.3x1",
             options: [
                 option(
-                    id: "internal.inspectorInfoSplitRatio",
-                    title: "Inspector Info Split Ratio",
-                    summary: "Restores the inspector info split between metadata and table of contents.",
-                    storageKey: "inspectorInfoSplitRatio",
-                    defaultValue: "0",
-                    control: "Layout memory",
-                    codeReference: "AppStorageKey.Inspector.infoSplitRatio",
-                    appearsInSettings: false
-                ),
-                option(
-                    id: "internal.inspectorMetadataHeight",
-                    title: "Inspector Metadata Section Height",
-                    summary: "Restores the inspector metadata section height.",
-                    storageKey: "inspectorMetadataSectionHeight",
-                    defaultValue: "0",
-                    control: "Layout memory",
-                    codeReference: "AppStorageKey.Inspector.metadataSectionHeight",
-                    appearsInSettings: false
-                ),
-                option(
-                    id: "internal.inspectorTOCHeight",
-                    title: "Inspector TOC Section Height",
-                    summary: "Restores the inspector table-of-contents section height.",
-                    storageKey: "inspectorTOCSectionHeight",
-                    defaultValue: "0",
-                    control: "Layout memory",
-                    codeReference: "AppStorageKey.Inspector.tocSectionHeight",
-                    appearsInSettings: false
-                ),
-                option(
                     id: "internal.mainWindowSidebarWidth",
                     title: "Main Window Sidebar Width",
                     summary: "Restores the left navigation sidebar width after relaunch.",
@@ -457,7 +427,7 @@ public enum SettingsCatalog {
                     storageKey: "mainWindow.inspectorWidth",
                     defaultValue: "320",
                     control: "Layout memory",
-                    values: ["260...460 pt"],
+                    values: ["270...460 pt"],
                     codeReference: "AppStorageKey.MainWindow.inspectorWidth",
                     appearsInSettings: false
                 ),
@@ -468,7 +438,7 @@ public enum SettingsCatalog {
                     storageKey: "articleWindow.inspectorWidth",
                     defaultValue: "320",
                     control: "Layout memory",
-                    values: ["260...460 pt"],
+                    values: ["270...460 pt"],
                     codeReference: "AppStorageKey.ArticleWindow.inspectorWidth",
                     appearsInSettings: false
                 )

@@ -6,6 +6,7 @@ import SwiftData
 struct ArticleContextMenuContent: View {
     @Environment(AppState.self) private var appState
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.workspaceOpenWindowHandler) private var workspaceOpenWindowHandler
 
     // Article info
     let articleID: String?
@@ -165,7 +166,9 @@ struct ArticleContextMenuContent: View {
         }
 
         Button {
-            openWindow(value: windowArticle)
+            if workspaceOpenWindowHandler?.open(windowArticle) != true {
+                openWindow(value: windowArticle)
+            }
         } label: {
             SwiftUI.Label("Open in New Window", systemImage: "macwindow.badge.plus")
         }

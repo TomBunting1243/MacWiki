@@ -4,10 +4,10 @@
 # The caller must set APP_BIN, APP_NAME, and QA_HOME before launching MacWiki.
 
 qa_canonical_path() {
-  local path="$1"
+  local candidate_path="$1"
   local directory
-  directory="$(cd "$(dirname "$path")" && pwd -P)"
-  printf '%s/%s\n' "$directory" "$(basename "$path")"
+  directory="$(cd "$(dirname "$candidate_path")" && pwd -P)"
+  printf '%s/%s\n' "$directory" "$(basename "$candidate_path")"
 }
 
 qa_assert_trusted_defaults_suite() {
@@ -16,6 +16,107 @@ qa_assert_trusted_defaults_suite() {
     echo "Refusing untrusted QA defaults suite: $suite_name" >&2
     return 1
   fi
+}
+
+qa_assert_candidate_manifest_matches_executable() {
+  local build_info_path="$1"
+  local manifest_path="${PACKAGE_MANIFEST_PATH:-${APP_BUNDLE_PATH%.app}.manifest.txt}"
+  local build_info_commit
+  local build_info_source_hash
+  local manifest_commit
+  local manifest_source_hash
+  local manifest_packaged_hash
+  local manifest_app_tree_hash
+  local manifest_signing
+  local actual_packaged_hash
+  local actual_app_tree_hash
+  local build_info_xcode
+  local build_version_metadata
+  local binary_min_os
+  local binary_sdk
+
+  [[ -f "$manifest_path" ]] || {
+    echo "Candidate package manifest is missing: $manifest_path" >&2
+    return 1
+  }
+  build_info_commit="$(plutil -extract GitCommit raw "$build_info_path")"
+  build_info_source_hash="$(plutil -extract SourceExecutableSHA256 raw "$build_info_path")"
+  manifest_commit="$(awk -F= '$1 == "SourceCommit" { print substr($0, index($0, "=") + 1); exit }' "$manifest_path")"
+  manifest_source_hash="$(awk -F= '$1 == "SourceExecutableSHA256" { print $2; exit }' "$manifest_path")"
+  manifest_packaged_hash="$(awk -F= '$1 == "PackagedExecutableSHA256" { print $2; exit }' "$manifest_path")"
+  manifest_app_tree_hash="$(awk -F= '$1 == "AppTreeSHA256" { print $2; exit }' "$manifest_path")"
+  manifest_signing="$(awk -F= '$1 == "Signing" { print $2; exit }' "$manifest_path")"
+  actual_packaged_hash="$(shasum -a 256 "$APP_BIN" | awk '{ print $1 }')"
+  actual_app_tree_hash="$(
+    find -s "$APP_BUNDLE_PATH" -type f | while IFS= read -r file_path; do
+      printf '%s\t%s\n' "${file_path#"$APP_BUNDLE_PATH"/}" \
+        "$(shasum -a 256 "$file_path" | awk '{ print $1 }')"
+    done | shasum -a 256 | awk '{ print $1 }'
+  )"
+
+  [[ "$manifest_commit" == "$build_info_commit" ]] || {
+    echo "Candidate manifest commit does not match BuildInfo." >&2
+    return 1
+  }
+  [[ "$manifest_source_hash" == "$build_info_source_hash" ]] || {
+    echo "Candidate manifest source hash does not match BuildInfo." >&2
+    return 1
+  }
+  [[ "$build_info_source_hash" =~ ^[0-9a-f]{64}$ ]] || {
+    echo "BuildInfo source executable hash is invalid." >&2
+    return 1
+  }
+  [[ "$manifest_packaged_hash" =~ ^[0-9a-f]{64}$ ]] || {
+    echo "Candidate manifest packaged executable hash is invalid." >&2
+    return 1
+  }
+  [[ "$actual_packaged_hash" == "$manifest_packaged_hash" ]] || {
+    echo "Candidate executable does not match its package manifest." >&2
+    return 1
+  }
+  [[ "$manifest_app_tree_hash" =~ ^[0-9a-f]{64}$ \
+    && "$actual_app_tree_hash" == "$manifest_app_tree_hash" ]] || {
+    echo "Candidate app tree does not match its package manifest." >&2
+    return 1
+  }
+  [[ "$manifest_signing" == "ad-hoc" ]] || {
+    echo "Candidate manifest is not ad-hoc signed." >&2
+    return 1
+  }
+  codesign --verify --deep --strict "$APP_BUNDLE_PATH" || {
+    echo "Candidate code signature failed strict verification." >&2
+    return 1
+  }
+  codesign -dv --verbose=4 "$APP_BUNDLE_PATH" 2>&1 \
+    | rg -q '^Signature=adhoc$' || {
+      echo "Candidate does not carry an ad-hoc signature." >&2
+      return 1
+    }
+  build_info_xcode="$(plutil -extract XcodeVersion raw "$build_info_path")"
+  [[ "$build_info_xcode" =~ ^Xcode[[:space:]]27\. ]] || {
+    echo "Candidate was not packaged with Xcode 27: $build_info_xcode" >&2
+    return 1
+  }
+  build_version_metadata="$(otool -l "$APP_BIN" | awk '
+    /cmd LC_BUILD_VERSION/ { in_build_version = 1; next }
+    in_build_version && $1 == "minos" { print "MINOS=" $2 }
+    in_build_version && $1 == "sdk" { print "SDK=" $2; exit }
+  ')"
+  binary_min_os="$(printf '%s\n' "$build_version_metadata" | awk -F= '$1 == "MINOS" { print $2 }')"
+  binary_sdk="$(printf '%s\n' "$build_version_metadata" | awk -F= '$1 == "SDK" { print $2 }')"
+  [[ "$binary_min_os" == "26.0" && "$binary_sdk" =~ ^27\. ]] || {
+    echo "Candidate requires minOS 26.0 / SDK 27; found minOS=$binary_min_os SDK=$binary_sdk." >&2
+    return 1
+  }
+
+  QA_PACKAGE_MANIFEST_PATH="$manifest_path"
+  QA_PACKAGED_EXECUTABLE_SHA256="$actual_packaged_hash"
+  QA_APP_TREE_SHA256="$actual_app_tree_hash"
+  QA_XCODE_VERSION="$build_info_xcode"
+  QA_BINARY_MIN_OS="$binary_min_os"
+  QA_BINARY_SDK="$binary_sdk"
+  export QA_PACKAGE_MANIFEST_PATH QA_PACKAGED_EXECUTABLE_SHA256 QA_APP_TREE_SHA256
+  export QA_XCODE_VERSION QA_BINARY_MIN_OS QA_BINARY_SDK
 }
 
 qa_assert_supported_network_mode() {
@@ -71,7 +172,7 @@ qa_run_command_with_timeout() {
   local maximum_ticks=$((timeout_seconds * 10))
   while kill -0 "$command_pid" 2>/dev/null; do
     if (( elapsed_ticks >= maximum_ticks )); then
-      kill "$command_pid" 2>/dev/null || true
+      qa_terminate_process_tree "$command_pid"
       wait "$command_pid" 2>/dev/null || true
       rm -f "$input_path"
       return 124
@@ -85,14 +186,68 @@ qa_run_command_with_timeout() {
   return "$command_status"
 }
 
+qa_process_tree_pids() {
+  local root_pid="$1"
+  local child_pid
+  while IFS= read -r child_pid; do
+    [[ -n "$child_pid" ]] || continue
+    qa_process_tree_pids "$child_pid"
+  done < <(pgrep -P "$root_pid" 2>/dev/null || true)
+  printf '%s\n' "$root_pid"
+}
+
+qa_terminate_process_tree() {
+  local root_pid="$1"
+  local process_tree
+  local process_pid
+  local tick
+  process_tree="$(qa_process_tree_pids "$root_pid")"
+  for process_pid in $process_tree; do
+    kill -TERM "$process_pid" 2>/dev/null || true
+  done
+  for tick in $(seq 1 20); do
+    kill -0 "$root_pid" 2>/dev/null || return 0
+    sleep 0.1
+  done
+  for process_pid in $process_tree; do
+    kill -KILL "$process_pid" 2>/dev/null || true
+  done
+  for tick in $(seq 1 20); do
+    kill -0 "$root_pid" 2>/dev/null || return 0
+    sleep 0.1
+  done
+  return 1
+}
+
 qa_assert_isolated_path() {
   local candidate="$1"
   local root="$2"
   local canonical_candidate
   local canonical_root
+  local existing_ancestor
 
+  case "$root" in
+    /tmp/macwiki-qa/*|/private/tmp/macwiki-qa/*|"${REPO_ROOT:?}"/.qa/*)
+      ;;
+    *)
+      echo "ERROR: QA_HOME must be under /tmp/macwiki-qa or $REPO_ROOT/.qa: $root" >&2
+      return 1
+      ;;
+  esac
+  existing_ancestor="$root"
+  while [[ ! -e "$existing_ancestor" && "$existing_ancestor" != "/" ]]; do
+    existing_ancestor="$(dirname "$existing_ancestor")"
+  done
+  if [[ -L "$existing_ancestor" && "$existing_ancestor" != "/tmp" ]]; then
+    echo "ERROR: Refusing symlinked QA path component: $existing_ancestor" >&2
+    return 1
+  fi
   mkdir -p "$root"
-  canonical_root="$(qa_canonical_path "$root")"
+  if [[ -L "$root" || -L "$candidate" ]]; then
+    echo "ERROR: Refusing symlinked QA path: $candidate" >&2
+    return 1
+  fi
+  canonical_root="$(cd "$root" && pwd -P)"
   canonical_candidate="$(qa_canonical_path "$candidate")"
 
   case "$canonical_root" in
@@ -170,13 +325,15 @@ qa_launch_exact() {
     "HOME=$QA_HOME"
     "CFFIXED_USER_HOME=$QA_HOME"
     "MACWIKI_QA_DEFAULTS_SUITE=${QA_DEFAULTS_SUITE:?}"
-    "MACWIKI_QA_BACKGROUND_LAUNCH=${MACWIKI_QA_BACKGROUND_LAUNCH:-1}"
   )
   if [[ -n "${MACWIKI_QA_NETWORK_MODE:-}" ]]; then
     environment+=("MACWIKI_QA_NETWORK_MODE=$MACWIKI_QA_NETWORK_MODE")
   fi
   if [[ -n "${MACWIKI_QA_ACCESSIBILITY_PROFILE:-}" ]]; then
     environment+=("MACWIKI_QA_ACCESSIBILITY_PROFILE=$MACWIKI_QA_ACCESSIBILITY_PROFILE")
+  fi
+  if [[ "${MACWIKI_QA_TOOLBAR_TRACE:-}" == "1" ]]; then
+    environment+=("MACWIKI_QA_TOOLBAR_TRACE=1")
   fi
   if [[ "${MACWIKI_QA_PSEUDOLOCALIZATION:-}" == "1" ]]; then
     /usr/bin/env "${environment[@]}" "$APP_BIN" -NSDoubleLocalizedStrings YES >"$log_path" 2>&1 &
@@ -227,16 +384,15 @@ qa_launch_exact_bundle() {
     --env "HOME=$QA_HOME"
     --env "CFFIXED_USER_HOME=$QA_HOME"
     --env "MACWIKI_QA_DEFAULTS_SUITE=${QA_DEFAULTS_SUITE:?}"
-    --env "MACWIKI_QA_BACKGROUND_LAUNCH=${MACWIKI_QA_BACKGROUND_LAUNCH:-1}"
   )
-  if [[ "${MACWIKI_QA_BACKGROUND_LAUNCH:-1}" == "1" ]]; then
-    open_arguments+=(-g)
-  fi
   if [[ -n "${MACWIKI_QA_NETWORK_MODE:-}" ]]; then
     open_arguments+=(--env "MACWIKI_QA_NETWORK_MODE=$MACWIKI_QA_NETWORK_MODE")
   fi
   if [[ -n "${MACWIKI_QA_ACCESSIBILITY_PROFILE:-}" ]]; then
     open_arguments+=(--env "MACWIKI_QA_ACCESSIBILITY_PROFILE=$MACWIKI_QA_ACCESSIBILITY_PROFILE")
+  fi
+  if [[ "${MACWIKI_QA_TOOLBAR_TRACE:-}" == "1" ]]; then
+    open_arguments+=(--env "MACWIKI_QA_TOOLBAR_TRACE=1")
   fi
   if [[ "${MACWIKI_QA_PSEUDOLOCALIZATION:-}" == "1" ]]; then
     open "${open_arguments[@]}" -a "$bundle_path" --args -NSDoubleLocalizedStrings YES
@@ -286,7 +442,7 @@ qa_stop_exact() {
   expected="$(qa_canonical_path "$APP_BIN")"
   actual="$(qa_pid_executable_path "$pid")"
   if [[ -n "$actual" && "$actual" == "$expected" ]]; then
-    kill "$pid" 2>/dev/null || true
+    qa_terminate_process_tree "$pid" || true
     wait "$pid" 2>/dev/null || true
   fi
   QA_APP_PID=""
@@ -297,7 +453,7 @@ qa_stop_matching_exact() {
   local pid
   while IFS= read -r pid; do
     [[ -n "$pid" ]] || continue
-    kill "$pid" 2>/dev/null || true
+    qa_terminate_process_tree "$pid" || true
   done < <(qa_exact_binary_pids)
 }
 

@@ -5,21 +5,6 @@ import os
 
 private let appBootstrapLogger = Logger(subsystem: "com.macwiki", category: "app-bootstrap")
 
-private enum MacWikiLaunchPresentation {
-    static let runsBehindOtherApps =
-        ProcessInfo.processInfo.environment["MACWIKI_QA_BACKGROUND_LAUNCH"] == "1"
-
-    @MainActor
-    static func present(_ window: NSWindow) {
-        if runsBehindOtherApps {
-            window.orderBack(nil)
-        } else {
-            window.makeKeyAndOrderFront(nil)
-            NSApp.activate(ignoringOtherApps: true)
-        }
-    }
-}
-
 private struct MacWikiLaunchIssue: Identifiable {
     let id = UUID()
     let title: String
@@ -31,119 +16,6 @@ final class MacWikiAppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
         AppIconLoader.applyIfAvailable()
-    }
-
-    func applicationDidFinishLaunching(_ notification: Notification) {
-        if !MacWikiLaunchPresentation.runsBehindOtherApps {
-            NSApp.activate(ignoringOtherApps: true)
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-            MacWikiRuntime.shared.presentMainWindowIfNeeded()
-        }
-    }
-
-    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
-        if !flag {
-            MacWikiRuntime.shared.presentMainWindowIfNeeded()
-            return false
-        }
-        return true
-    }
-}
-
-@MainActor
-private final class MacWikiRuntime {
-    static let shared = MacWikiRuntime()
-
-    private var appState: AppState?
-    private var modelContainer: ModelContainer?
-    private var launchIssue: MacWikiLaunchIssue?
-    private var hasPresentedFallbackLaunchIssue = false
-    private var fallbackMainWindow: NSWindow?
-
-    func configure(
-        appState: AppState,
-        modelContainer: ModelContainer,
-        launchIssue: MacWikiLaunchIssue?
-    ) {
-        self.appState = appState
-        self.modelContainer = modelContainer
-        self.launchIssue = launchIssue
-    }
-
-    func presentMainWindowIfNeeded() {
-        if let existingWindow = NSApp.windows.first(where: { window in
-            !(window is NSPanel) && window.canBecomeKey
-        }) {
-            appBootstrapLogger.notice("Ordering existing main window to front")
-            existingWindow.deminiaturize(nil)
-            MacWikiLaunchPresentation.present(existingWindow)
-            if hasOnScreenWindow() {
-                return
-            }
-        }
-
-        if let fallbackMainWindow {
-            appBootstrapLogger.notice("Reopening fallback main window")
-            MacWikiLaunchPresentation.present(fallbackMainWindow)
-            return
-        }
-
-        guard let appState, let modelContainer else {
-            appBootstrapLogger.error("Cannot present fallback main window before runtime configuration")
-            return
-        }
-        appBootstrapLogger.notice("Presenting fallback main window")
-        let visibleFrame = NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
-        let window = NSWindow(
-            contentRect: visibleFrame,
-            styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
-            backing: .buffered,
-            defer: false
-        )
-        window.title = "MacWiki"
-        window.isReleasedWhenClosed = false
-        window.setFrame(visibleFrame, display: false)
-        window.contentView = NSHostingView(
-            rootView: ContentView()
-                .macWikiQAAccessibilityEnvironment()
-                .focusedSceneValue(\.macWikiCommandAppState, appState)
-                .toolbar(removing: .title)
-                .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
-                .environment(appState)
-                .modelContainer(modelContainer)
-        )
-        fallbackMainWindow = window
-        MacWikiLaunchPresentation.present(window)
-        presentFallbackLaunchIssueIfNeeded(for: window)
-    }
-
-    private func hasOnScreenWindow() -> Bool {
-        let processID = Int(ProcessInfo.processInfo.processIdentifier)
-        guard let windowInfo = CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID) as? [[String: Any]] else {
-            return false
-        }
-        return windowInfo.contains { info in
-            guard
-                info[kCGWindowOwnerPID as String] as? Int == processID,
-                let layer = info[kCGWindowLayer as String] as? Int,
-                layer == 0
-            else {
-                return false
-            }
-            return true
-        }
-    }
-
-    private func presentFallbackLaunchIssueIfNeeded(for window: NSWindow) {
-        guard let launchIssue, !hasPresentedFallbackLaunchIssue else { return }
-        hasPresentedFallbackLaunchIssue = true
-
-        let alert = NSAlert()
-        alert.messageText = launchIssue.title
-        alert.informativeText = launchIssue.message
-        alert.addButton(withTitle: "Continue")
-        alert.beginSheetModal(for: window)
     }
 }
 
@@ -174,14 +46,6 @@ struct MacWikiApp: App {
         _appState = State(initialValue: appState)
         _launchIssue = State(initialValue: nil)
         MacWikiQAFixtureSeeder.seedRequestedFixtures(in: bootstrap.modelContainer)
-        MacWikiRuntime.shared.configure(
-            appState: appState,
-            modelContainer: bootstrap.modelContainer,
-            launchIssue: bootstrap.launchIssue
-        )
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
-            MacWikiRuntime.shared.presentMainWindowIfNeeded()
-        }
     }
 
     private static var modelSchema: Schema {
@@ -249,7 +113,7 @@ struct MacWikiApp: App {
         let entries = defaults.dictionaryRepresentation()
         let visibleFrames = NSScreen.screens.map(\.visibleFrame)
         let shellLayoutMigrationKey = "mainWindow.shellLayoutVersion"
-        let currentShellLayoutVersion = 13
+        let currentShellLayoutVersion = 14
 
         // Search is now a single sidebar-resident surface. Drop the retired overlay preference.
         defaults.removeObject(forKey: AppStorageKey.Search.presentationMode)
@@ -272,6 +136,7 @@ struct MacWikiApp: App {
             defaults.removeObject(forKey: "NSToolbar Configuration main-window-toolbar-v11")
             defaults.removeObject(forKey: "NSToolbar Configuration main-window-toolbar-v12")
             defaults.removeObject(forKey: "NSToolbar Configuration main-window-toolbar-v13")
+            defaults.removeObject(forKey: "NSToolbar Configuration main-window-toolbar-v14")
             defaults.set(currentShellLayoutVersion, forKey: shellLayoutMigrationKey)
         }
 
@@ -294,8 +159,8 @@ struct MacWikiApp: App {
 
         sanitizePersistedSplitWidth(defaults, key: AppStorageKey.MainWindow.sidebarWidth, minimum: 176, maximum: 260)
         sanitizePersistedSplitWidth(defaults, key: AppStorageKey.MainWindow.directoryWidth, minimum: 260, maximum: 420)
-        sanitizePersistedSplitWidth(defaults, key: AppStorageKey.MainWindow.inspectorWidth, minimum: 260, maximum: 460)
-        sanitizePersistedSplitWidth(defaults, key: AppStorageKey.ArticleWindow.inspectorWidth, minimum: 260, maximum: 460)
+        sanitizePersistedSplitWidth(defaults, key: AppStorageKey.MainWindow.inspectorWidth, minimum: 270, maximum: 460)
+        sanitizePersistedSplitWidth(defaults, key: AppStorageKey.ArticleWindow.inspectorWidth, minimum: 270, maximum: 460)
     }
 
     private static func sanitizePersistedSplitWidth(
@@ -401,8 +266,6 @@ struct MacWikiApp: App {
                 .defaultAppStorage(MacWikiDefaults.current)
                 .persistenceIssueAlert()
                 .focusedSceneValue(\.macWikiCommandAppState, appState)
-                .toolbar(removing: .title)
-                .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
                 .alert(item: $launchIssue) { issue in
                     Alert(
                         title: Text(issue.title),
@@ -427,6 +290,7 @@ struct MacWikiApp: App {
         .modelContainer(bootstrap.modelContainer)
         .restorationBehavior(.disabled)
         .windowBackgroundDragBehavior(.enabled)
+        .windowToolbarStyle(.unifiedCompact(showsTitle: false))
         .defaultSize(
             width: Self.launchWindowSize.width,
             height: Self.launchWindowSize.height
@@ -459,6 +323,7 @@ struct MacWikiApp: App {
         .modelContainer(bootstrap.modelContainer)
         .restorationBehavior(.disabled)
         .windowBackgroundDragBehavior(.enabled)
+        .windowToolbarStyle(.unifiedCompact(showsTitle: false))
         .defaultSize(
             width: Self.launchWindowSize.width,
             height: Self.launchWindowSize.height
