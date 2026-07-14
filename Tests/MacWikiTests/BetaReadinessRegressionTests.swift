@@ -382,6 +382,7 @@ struct BetaReadinessRegressionTests {
         #expect(harness.contains("trap cleanup EXIT INT TERM"))
         #expect(harness.contains("EXC_BAD_ACCESS"))
         #expect(harness.contains("(.cycles | length) == 5"))
+        #expect(harness.contains(".stableSampleCount >= 20"))
         #expect(harness.contains("5 --audit-close"))
         #expect(harness.contains(".closeAudit.processResidentAfterClose == true"))
         #expect(harness.contains(".closeAudit.reopenedSamePID == true"))

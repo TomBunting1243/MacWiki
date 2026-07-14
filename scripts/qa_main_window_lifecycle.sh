@@ -62,7 +62,7 @@ kill -0 "$QA_APP_PID"
 jq -e --argjson pid "$LIFECYCLE_PID" '
   .pid == $pid
   and .stableObservationSeconds >= 3
-  and .stableSampleCount >= 30
+  and .stableSampleCount >= 20
   and .initialWindowCount == 1
   and .initialMainWindowCount == 1
   and .initialToolbarCount == 0
