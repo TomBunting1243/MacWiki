@@ -168,17 +168,15 @@ struct ReaderView: View {
 
     var body: some View {
         @Bindable var appState = appState
+        let readerProjection = appState.activeReaderProjection
+        let readerSurfaceID = activeReaderSurfaceID(for: readerProjection)
 
         ZStack {
-            if let activeId = appState.activeTabId,
-               let index = appState.openTabs.firstIndex(where: { $0.id == activeId }) {
-                let activeTab = appState.openTabs[index]
-                let activeHistoryItemID = activeTab.currentHistoryItem?.id
-
-                if activeTab.isPlaceholder {
+            if let activeId = readerProjection.activeTabID {
+                if readerProjection.isPlaceholder {
                     // Show new tab page with search
                     NewTabPageView()
-                } else if let article = activeTab.currentArticle {
+                } else if let article = readerProjection.article {
                     // Show article content
                     ArticleView(
                         tabId: activeId,
@@ -187,14 +185,14 @@ struct ReaderView: View {
                             get: {
                                 appState.scrollPosition(
                                     forTabID: activeId,
-                                    historyItemID: activeHistoryItemID
+                                    historyItemID: readerProjection.historyItemID
                                 )
                             },
                             set: {
                                 appState.setScrollPosition(
                                     $0,
                                     forTabID: activeId,
-                                    historyItemID: activeHistoryItemID
+                                    historyItemID: readerProjection.historyItemID
                                 )
                             }
                         )
@@ -223,7 +221,7 @@ struct ReaderView: View {
                 }
             }
         }
-        .id(activeReaderSurfaceID)
+        .id(readerSurfaceID)
         .transition(
             reduceMotion
                 ? .identity
@@ -234,30 +232,32 @@ struct ReaderView: View {
         )
         .animation(
             reduceMotion ? nil : ReaderMotion.surfaceSwap,
-            value: activeReaderSurfaceID
+            value: readerSurfaceID
         )
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear {
-            WebViewPool.shared.retain(only: Set(appState.openTabs.map(\.id)), for: appState.webViewPoolOwnerID)
+            WebViewPool.shared.retain(only: appState.openTabIDs, for: appState.webViewPoolOwnerID)
         }
-        .onChange(of: appState.openTabs.map(\.id)) { _, tabIDs in
-            WebViewPool.shared.retain(only: Set(tabIDs), for: appState.webViewPoolOwnerID)
+        .onChange(of: appState.openTabIDs) { _, tabIDs in
+            WebViewPool.shared.retain(only: tabIDs, for: appState.webViewPoolOwnerID)
         }
         .onDisappear {
             WebViewPool.shared.releaseOwner(appState.webViewPoolOwnerID)
         }
     }
 
-    private var activeReaderSurfaceID: String {
-        guard let activeId = appState.activeTabId,
-              let tab = appState.openTabs.first(where: { $0.id == activeId }) else {
+    private func activeReaderSurfaceID(for projection: ActiveReaderProjection) -> String {
+        guard let activeId = projection.activeTabID else {
             return "reader-surface-empty"
         }
 
-        if tab.isPlaceholder {
+        if projection.isPlaceholder {
             return "reader-surface-discover-\(activeId.uuidString)"
         }
-        return "reader-surface-article-\(activeId.uuidString)-\(tab.article.id)"
+        if let article = projection.article {
+            return "reader-surface-article-\(activeId.uuidString)-\(article.id)"
+        }
+        return "reader-surface-empty-\(activeId.uuidString)"
     }
 }
 /// New tab page routes to the dedicated Discover experience.

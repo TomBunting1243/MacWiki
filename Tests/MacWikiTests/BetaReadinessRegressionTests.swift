@@ -1652,6 +1652,25 @@ struct BetaReadinessRegressionTests {
         #expect(driver.contains("verify-order"))
     }
 
+    @Test func readerObservesNarrowStoredTabStateInsteadOfOrderedTabs() throws {
+        let reader = try source("Sources/MacWiki/Views/Reader/ReaderView.swift")
+        let appState = try source("Sources/MacWiki/App/AppState.swift")
+        let tabSessionStore = try source("Sources/MacWiki/App/TabSessionStore.swift")
+        let projectionTests = try source("Tests/MacWikiTests/ActiveReaderProjectionTests.swift")
+
+        #expect(reader.contains("let readerProjection = appState.activeReaderProjection"))
+        #expect(reader.contains(".onChange(of: appState.openTabIDs)"))
+        #expect(!reader.contains("appState.openTabs"))
+        #expect(appState.contains("var activeReaderProjection: ActiveReaderProjection"))
+        #expect(appState.contains("var openTabIDs: Set<UUID>"))
+        #expect(tabSessionStore.contains("private(set) var activeReaderProjection: ActiveReaderProjection = .empty"))
+        #expect(tabSessionStore.contains("private(set) var openTabIDs: Set<UUID> = []"))
+        #expect(tabSessionStore.contains("guard updatedProjection != activeReaderProjection else { return }"))
+        #expect(tabSessionStore.contains("guard updatedIDs != openTabIDs else { return }"))
+        #expect(projectionTests.contains("pureReorderDoesNotPublishReaderProjectionOrMembership"))
+        #expect(projectionTests.contains("#expect(invalidations.value == 0)"))
+    }
+
     @Test func sidebarSearchOwnsItsNativeTopSafeArea() throws {
         let source = try source("Sources/MacWiki/Views/Sidebar/SidebarSearchView.swift")
 
