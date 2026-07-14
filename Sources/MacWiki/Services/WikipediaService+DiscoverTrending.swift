@@ -373,15 +373,18 @@ extension WikipediaService {
         limit: Int = 36,
         referenceDate: Date = Date()
     ) async throws -> [AllTimeMostReadEntry] {
-        let clampedLimit = min(max(limit, 1), 80)
+        let clampedLimit = AllTimeMostReadCachePolicy.clampedLimit(limit)
         guard let latestMonth = latestCompletedTopPageviewsMonth(endingAt: referenceDate) else {
             return []
         }
 
         let cacheKey = "all-time-\(latestMonth.year)-\(latestMonth.month)"
         if let cached = cachedLRUValue(for: cacheKey, in: allTimeMostReadCache, order: &allTimeMostReadCacheOrder),
-           !cached.isEmpty {
-            return Array(cached.prefix(clampedLimit))
+           let reusablePrefixCount = AllTimeMostReadCachePolicy.reusablePrefixCount(
+               cachedCount: cached.count,
+               requestedLimit: clampedLimit
+           ) {
+            return Array(cached.prefix(reusablePrefixCount))
         }
 
         let monthKeys = allTimeTopPageviewsMonths(through: latestMonth)

@@ -983,7 +983,7 @@ struct ListsSidebar: View {
                     moveList(list, toArea: targetAreaID)
                 },
                 onDelete: {
-                    withAnimation {
+                    withAnimation(reduceMotion ? nil : .default) {
                         if selectedList?.id == list.id {
                             setRecentsSelection()
                         }

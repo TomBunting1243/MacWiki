@@ -16,7 +16,7 @@ final class DiscoverAllTimeMostReadStore {
     }
 
     func queueLoad(limit: Int = 36, referenceDate: Date = Date()) {
-        let clampedLimit = min(max(limit, 1), 80)
+        let clampedLimit = AllTimeMostReadCachePolicy.clampedLimit(limit)
 
         if !entries.isEmpty && entries.count >= clampedLimit {
             return

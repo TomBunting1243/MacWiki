@@ -1749,7 +1749,7 @@ extension DirectoryView {
             Divider()
 
             Button("Hide Time Machine", systemImage: "eye.slash") {
-                withAnimation(.easeInOut(duration: 0.18)) {
+                withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.18)) {
                     discoverSidebarTimeMachineHidden = true
                 }
             }
@@ -1786,7 +1786,7 @@ extension DirectoryView {
                     Spacer(minLength: 0)
 
                     Button("Show") {
-                        withAnimation(.easeInOut(duration: 0.18)) {
+                        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.18)) {
                             discoverSidebarTimeMachineHidden = false
                         }
                     }
@@ -1803,10 +1803,10 @@ extension DirectoryView {
                 }
                 .padding(.horizontal, 10)
                 .padding(.vertical, 8)
-                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.14 : 0.10), lineWidth: 0.7)
+                .discoverSurfaceChrome(
+                    cornerRadius: 12,
+                    material: .thin,
+                    borderOpacity: colorScheme == .dark ? 0.14 : 0.10
                 )
                 .padding(.vertical, 3)
                 .listRowSeparator(.hidden)
@@ -1851,27 +1851,20 @@ extension DirectoryView {
                 .padding(.horizontal, 10)
                 .padding(.vertical, 8)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background {
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(.ultraThinMaterial)
-                        .overlay {
-                            LinearGradient(
-                                colors: [
-                                    timeMachineAccentPrimary.opacity(colorScheme == .dark ? 0.22 : 0.14),
-                                    timeMachineAccentSecondary.opacity(colorScheme == .dark ? 0.14 : 0.09),
-                                    .clear
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                        }
-                }
-                .overlay(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .strokeBorder(timeMachineControlStrokeColor.opacity(colorScheme == .dark ? 0.75 : 0.85), lineWidth: 0.7)
+                .discoverSurfaceChrome(
+                    cornerRadius: 10,
+                    material: .thin,
+                    tintColors: [
+                        timeMachineAccentPrimary.opacity(colorScheme == .dark ? 0.22 : 0.14),
+                        timeMachineAccentSecondary.opacity(colorScheme == .dark ? 0.14 : 0.09),
+                        .clear
+                    ],
+                    borderColor: timeMachineControlStrokeColor,
+                    borderOpacity: colorScheme == .dark ? 0.75 : 0.85,
+                    shadowOpacity: colorScheme == .dark ? 0.16 : 0.07,
+                    shadowRadius: 4,
+                    shadowY: 1
                 )
-                .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.16 : 0.07), radius: 4, y: 1)
                 .animation(reduceMotion ? nil : .easeOut(duration: 0.14), value: isSidebarTimeTraveling)
                 .help("Time Machine lets you see what people were reading in the past.")
                 .padding(.vertical, 3)

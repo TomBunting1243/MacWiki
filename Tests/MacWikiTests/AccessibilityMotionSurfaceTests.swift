@@ -10,6 +10,8 @@ struct AccessibilityMotionSurfaceTests {
         let sidebarSearch = try source("Sources/MacWiki/Views/Sidebar/SidebarSearchView.swift")
         let searchResults = try source("Sources/MacWiki/Views/Sidebar/Search/SidebarSearchResultsView.swift")
         let timeMachine = try source("Sources/MacWiki/Views/Home/Discover/DiscoverTimeMachineControlsView.swift")
+        let directory = try source("Sources/MacWiki/Views/Sidebar/DirectoryView.swift")
+        let listsSidebar = try source("Sources/MacWiki/Views/Sidebar/ListsSidebar.swift")
 
         for surface in [highlightRow, sidebarSearch, searchResults, timeMachine] {
             #expect(surface.contains("@Environment(\\.macWikiAccessibilityPersonalization.reduceMotion)"))
@@ -22,6 +24,10 @@ struct AccessibilityMotionSurfaceTests {
         #expect(searchResults.contains("proxy.scrollTo(newValue, anchor: .center)"))
         #expect(timeMachine.components(separatedBy: "reduceMotion\n                                ? .opacity").count - 1 == 2)
         #expect(timeMachine.contains(".animation(reduceMotion ? nil : .easeOut(duration: 0.14), value: isScanning)"))
+        #expect(directory.components(separatedBy: "withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.18))").count - 1 == 2)
+        #expect(directory.components(separatedBy: ".discoverSurfaceChrome(").count - 1 >= 2)
+        #expect(!directory.contains(".fill(.ultraThinMaterial)"))
+        #expect(listsSidebar.contains("withAnimation(reduceMotion ? nil : .default)"))
     }
 
     @Test func timeMachineIconControlsExposeSemanticAccessibilityMetadata() throws {
