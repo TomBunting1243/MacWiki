@@ -68,6 +68,9 @@ struct WebView: NSViewRepresentable {
     /// Native accessibility preference mirrored into the reader document root.
     var reduceTransparency: Bool = false
 
+    /// Adds a shape cue to color-coded reader highlights.
+    var differentiateWithoutColor: Bool = false
+
     /// Top inset reserved for window + tab chrome so article headings remain visible.
     var readerTopInset: CGFloat = ReaderChromeDefaults.defaultTopInset
 
@@ -204,7 +207,8 @@ struct WebView: NSViewRepresentable {
             source: ReaderDocumentStyle.makeInjectionScript(
                 minimumReadableColumnWidth: ReaderAppearance.minimumReadableColumnWidth,
                 readerTopInset: readerTopInset,
-                reduceTransparency: reduceTransparency
+                reduceTransparency: reduceTransparency,
+                differentiateWithoutColor: differentiateWithoutColor
             ),
             injectionTime: .atDocumentEnd,
             forMainFrameOnly: true
@@ -238,6 +242,7 @@ struct WebView: NSViewRepresentable {
         context.coordinator.articleTitle = articleTitle
         context.coordinator.readerAppearance = readerAppearance
         context.coordinator.reduceTransparency = reduceTransparency
+        context.coordinator.differentiateWithoutColor = differentiateWithoutColor
         context.coordinator.readerTopInset = readerTopInset
         context.coordinator.preferImmediateReveal = preferImmediateReveal
         context.coordinator.onTableOfContentsUpdate = onTableOfContentsUpdate
@@ -469,6 +474,7 @@ struct WebView: NSViewRepresentable {
             context.coordinator.lastAppliedHighlightIds = []
             context.coordinator.lastAppliedReaderAppearance = nil
             context.coordinator.lastAppliedReduceTransparency = nil
+            context.coordinator.lastAppliedDifferentiateWithoutColor = nil
             context.coordinator.lastAppliedReaderTopInset = -1
             context.coordinator.lastKnownHighlightsCount = highlights.count
             context.coordinator.lastHighlightDiffCheckTimestamp = 0
@@ -530,6 +536,7 @@ struct WebView: NSViewRepresentable {
             articleTitle: articleTitle,
             readerAppearance: readerAppearance,
             reduceTransparency: reduceTransparency,
+            differentiateWithoutColor: differentiateWithoutColor,
             readerTopInset: readerTopInset,
             preferImmediateReveal: preferImmediateReveal,
             onTableOfContentsUpdate: onTableOfContentsUpdate,
@@ -576,6 +583,7 @@ struct WebView: NSViewRepresentable {
         var lastAppliedHighlightIds: Set<UUID> = []
         var readerAppearance: ReaderAppearance
         var reduceTransparency: Bool
+        var differentiateWithoutColor: Bool
         var readerTopInset: CGFloat
         var preferImmediateReveal: Bool
         var onTableOfContentsUpdate: (([ArticleTableOfContentsItem]) -> Void)?
@@ -593,6 +601,7 @@ struct WebView: NSViewRepresentable {
         }
         var lastAppliedReaderAppearance: ReaderAppearance?
         var lastAppliedReduceTransparency: Bool?
+        var lastAppliedDifferentiateWithoutColor: Bool?
         var lastAppliedReaderTopInset: CGFloat = -1
         var lastAppliedLinkPreviewImmediateModifier: ReaderLinkPreviewImmediateModifier?
         var lastAppliedNativeHighlightingMenuEnabled: Bool?
@@ -668,6 +677,7 @@ struct WebView: NSViewRepresentable {
             articleTitle: String,
             readerAppearance: ReaderAppearance,
             reduceTransparency: Bool = false,
+            differentiateWithoutColor: Bool = false,
             readerTopInset: CGFloat,
             preferImmediateReveal: Bool,
             onTableOfContentsUpdate: (([ArticleTableOfContentsItem]) -> Void)?,
@@ -693,6 +703,7 @@ struct WebView: NSViewRepresentable {
             self.articleTitle = articleTitle
             self.readerAppearance = readerAppearance
             self.reduceTransparency = reduceTransparency
+            self.differentiateWithoutColor = differentiateWithoutColor
             self.readerTopInset = readerTopInset
             self.preferImmediateReveal = preferImmediateReveal
             self.onTableOfContentsUpdate = onTableOfContentsUpdate
@@ -714,6 +725,7 @@ struct WebView: NSViewRepresentable {
             pendingPostRevealTasks.removeAll(keepingCapacity: false)
             self.webView = webView
             lastAppliedReduceTransparency = nil
+            lastAppliedDifferentiateWithoutColor = nil
             syncReaderAccessibilityStyle(on: webView)
             syncScrollTelemetryMode(on: webView, force: true)
             syncRestoreTelemetryMode(on: webView, force: true)

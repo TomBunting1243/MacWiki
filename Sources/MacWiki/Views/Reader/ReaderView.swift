@@ -611,6 +611,7 @@ struct ArticleView: View {
                 fallbackScrollProgress: progressCoordinator.latestReadingProgress,
                 readerAppearance: resolvedReaderAppearance,
                 reduceTransparency: accessibilityPersonalization.reduceTransparency,
+                differentiateWithoutColor: accessibilityPersonalization.differentiateWithoutColor,
                 readerTopInset: readerTopInset,
                 preferImmediateReveal: preferImmediateWebReveal,
                 onTableOfContentsUpdate: { toc in

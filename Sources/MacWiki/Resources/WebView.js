@@ -2447,6 +2447,14 @@ window._macwikiTagReferenceSections();
             background-color: rgba(255, 184, 102, 0.42);
             color: inherit;
         }
+        html.macwiki-differentiate-without-color ::highlight(macwiki-yellow),
+        html.macwiki-differentiate-without-color ::highlight(macwiki-blue),
+        html.macwiki-differentiate-without-color ::highlight(macwiki-pink),
+        html.macwiki-differentiate-without-color ::highlight(macwiki-orange) {
+            text-decoration-line: underline;
+            text-decoration-thickness: 0.12em;
+            text-underline-offset: 0.14em;
+        }
 
         /* Fallback for older browsers using mark elements */
         .macwiki-highlight {
@@ -2463,6 +2471,11 @@ window._macwikiTagReferenceSections();
         .macwiki-highlight:hover {
             filter: brightness(0.92);
             box-shadow: 0 0 0 2px currentColor;
+        }
+        html.macwiki-differentiate-without-color .macwiki-highlight {
+            text-decoration-line: underline;
+            text-decoration-thickness: 0.12em;
+            text-underline-offset: 0.14em;
         }
         @media (prefers-color-scheme: dark) {
             .macwiki-highlight:hover {

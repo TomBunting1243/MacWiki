@@ -6,7 +6,7 @@ import Testing
 
 @Suite
 struct ReaderDocumentAccessibilityStyleTests {
-    @Test func updateScriptTogglesTheNativeReduceTransparencyClassLive() throws {
+    @Test func updateScriptTogglesNativeReaderAccessibilityClassesLive() throws {
         let context = try #require(JSContext())
         context.evaluateScript(
             """
@@ -27,16 +27,36 @@ struct ReaderDocumentAccessibilityStyleTests {
         )
 
         let enabled = context.evaluateScript(
-            ReaderDocumentAccessibilityStyle.updateScript(reduceTransparency: true)
+            ReaderDocumentAccessibilityStyle.updateScript(
+                reduceTransparency: true,
+                differentiateWithoutColor: true
+            )
         )
         #expect(enabled?.toBool() == true)
-        #expect(classState(in: context) == true)
+        #expect(classState(
+            ReaderDocumentAccessibilityStyle.reduceTransparencyClass,
+            in: context
+        ) == true)
+        #expect(classState(
+            ReaderDocumentAccessibilityStyle.differentiateWithoutColorClass,
+            in: context
+        ) == true)
 
         let disabled = context.evaluateScript(
-            ReaderDocumentAccessibilityStyle.updateScript(reduceTransparency: false)
+            ReaderDocumentAccessibilityStyle.updateScript(
+                reduceTransparency: false,
+                differentiateWithoutColor: false
+            )
         )
         #expect(disabled?.toBool() == false)
-        #expect(classState(in: context) == false)
+        #expect(classState(
+            ReaderDocumentAccessibilityStyle.reduceTransparencyClass,
+            in: context
+        ) == false)
+        #expect(classState(
+            ReaderDocumentAccessibilityStyle.differentiateWithoutColorClass,
+            in: context
+        ) == false)
     }
 
     @Test func readerCSSUsesTheNativeRootClassInsteadOfUnsupportedWebKitMediaQuery() throws {
@@ -54,16 +74,28 @@ struct ReaderDocumentAccessibilityStyleTests {
         )
 
         #expect(reader.contains("reduceTransparency: accessibilityPersonalization.reduceTransparency"))
+        #expect(reader.contains("differentiateWithoutColor: accessibilityPersonalization.differentiateWithoutColor"))
         #expect(webView.contains("reduceTransparency: reduceTransparency"))
+        #expect(webView.contains("differentiateWithoutColor: differentiateWithoutColor"))
         #expect(webView.contains("context.coordinator.reduceTransparency = reduceTransparency"))
+        #expect(webView.contains("context.coordinator.differentiateWithoutColor = differentiateWithoutColor"))
         #expect(webView.contains("context.coordinator.syncReaderAccessibilityStyle(on: webView)"))
         #expect(lifecycle.contains("syncReaderAccessibilityStyle(on: webView, force: true)"))
-        #expect(lifecycle.contains("self.lastAppliedReduceTransparency = requestedValue"))
+        #expect(lifecycle.contains("self.lastAppliedReduceTransparency = requestedReduceTransparency"))
+        #expect(lifecycle.contains("self.lastAppliedDifferentiateWithoutColor = requestedDifferentiateWithoutColor"))
     }
 
-    private func classState(in context: JSContext) -> Bool {
+    @Test func highlightCSSProvidesANonColorCueWhenRequested() throws {
+        let script = try resource("Sources/MacWiki/Resources/WebView.js")
+
+        #expect(script.contains("html.macwiki-differentiate-without-color ::highlight(macwiki-yellow)"))
+        #expect(script.contains("html.macwiki-differentiate-without-color .macwiki-highlight"))
+        #expect(script.contains("text-decoration-line: underline"))
+    }
+
+    private func classState(_ className: String, in context: JSContext) -> Bool {
         context.evaluateScript(
-            "classStates['\(ReaderDocumentAccessibilityStyle.reduceTransparencyClass)'] === true"
+            "classStates['\(className)'] === true"
         )?.toBool() == true
     }
 

@@ -204,21 +204,28 @@ extension WebView.Coordinator {
     }
 
     func syncReaderAccessibilityStyle(on webView: WKWebView, force: Bool = false) {
-        guard force || lastAppliedReduceTransparency != reduceTransparency else { return }
+        let needsUpdate =
+            lastAppliedReduceTransparency != reduceTransparency ||
+            lastAppliedDifferentiateWithoutColor != differentiateWithoutColor
+        guard force || needsUpdate else { return }
         guard canRunDocumentJavaScript(on: webView) else { return }
 
-        let requestedValue = reduceTransparency
+        let requestedReduceTransparency = reduceTransparency
+        let requestedDifferentiateWithoutColor = differentiateWithoutColor
         webView.evaluateJavaScript(
             ReaderDocumentAccessibilityStyle.updateScript(
-                reduceTransparency: requestedValue
+                reduceTransparency: requestedReduceTransparency,
+                differentiateWithoutColor: requestedDifferentiateWithoutColor
             )
         ) { [weak self] _, error in
             guard error == nil,
                   let self,
-                  self.reduceTransparency == requestedValue else {
+                  self.reduceTransparency == requestedReduceTransparency,
+                  self.differentiateWithoutColor == requestedDifferentiateWithoutColor else {
                 return
             }
-            self.lastAppliedReduceTransparency = requestedValue
+            self.lastAppliedReduceTransparency = requestedReduceTransparency
+            self.lastAppliedDifferentiateWithoutColor = requestedDifferentiateWithoutColor
         }
     }
 
