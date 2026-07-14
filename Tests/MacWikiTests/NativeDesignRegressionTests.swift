@@ -115,6 +115,20 @@ struct NativeDesignRegressionTests {
         #expect(findBar.contains("increasedContrast ? 1"))
     }
 
+    @Test func linkHoverPreviewUsesNativeGlassPolicyAndSolidAccessibilityFallback() throws {
+        let source = try source("Sources/MacWiki/Views/Components/WebView/WebViewLinkHoverPreviewPane.swift")
+
+        #expect(source.contains("@Environment(\\.macWikiAccessibilityPersonalization)"))
+        #expect(source.contains("MacWikiGlassRuntime.usesNativeGlass("))
+        #expect(source.contains(") && !accessibilityPersonalization.reduceTransparency"))
+        #expect(source.contains("if accessibilityPersonalization.reduceTransparency"))
+        #expect(source.contains("else if #available(macOS 26, *), usesNativeGlass"))
+        #expect(source.contains(".glassEffect("))
+        #expect(source.contains(".fill(Color(nsColor: .windowBackgroundColor))"))
+        #expect(source.contains(".fill(.thinMaterial)"))
+        #expect(!source.contains("MacWikiGlassGroup("))
+    }
+
     @Test func readerToolbarsCommandsAndStyleControlsStayNativeReachableAndLockedSafely() throws {
         let toolbar = try source("Sources/MacWiki/Views/Shared/ReaderToolbarController.swift")
         let toolbarItems = try source("Sources/MacWiki/Views/Shared/ReaderToolbarController+Items.swift")
