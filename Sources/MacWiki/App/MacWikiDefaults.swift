@@ -43,4 +43,30 @@ enum MacWikiDefaults {
         }
         return suite
     }
+
+    /// Clears the defaults domain that backs `current` without crossing the QA
+    /// isolation boundary. A trusted QA launch owns its injected suite; ordinary
+    /// launches retain the runtime-domain fallbacks needed by SwiftPM builds.
+    @discardableResult
+    static func clearCurrentDomain(
+        in defaults: UserDefaults = current,
+        environment: [String: String] = ProcessInfo.processInfo.environment,
+        bundleIdentifier: String? = Bundle.main.bundleIdentifier,
+        bundleName: String? = Bundle.main.object(forInfoDictionaryKey: kCFBundleNameKey as String) as? String,
+        processName: String = ProcessInfo.processInfo.processName,
+        executablePath: String? = CommandLine.arguments.first
+    ) -> [String] {
+        if let suiteName = MacWikiQAEnvironment.trustedSuiteName(in: environment) {
+            defaults.removePersistentDomain(forName: suiteName)
+            return [suiteName]
+        }
+
+        return AppDefaultsReset.clearCandidateDomains(
+            in: defaults,
+            bundleIdentifier: bundleIdentifier,
+            bundleName: bundleName,
+            processName: processName,
+            executablePath: executablePath
+        )
+    }
 }

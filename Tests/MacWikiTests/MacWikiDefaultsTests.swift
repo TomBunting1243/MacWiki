@@ -24,6 +24,32 @@ struct MacWikiDefaultsTests {
         #expect(defaults === UserDefaults.standard)
     }
 
+    @Test func resetClearsOnlyTheTrustedQADomain() throws {
+        let suiteName = MacWikiDefaults.qaSuitePrefix + UUID().uuidString
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        let productionCandidate = "qa.production-candidate.\(UUID().uuidString)"
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+            defaults.removePersistentDomain(forName: productionCandidate)
+        }
+
+        defaults.set("isolated", forKey: "reader.fontPreset")
+        defaults.setPersistentDomain(["keep": true], forName: productionCandidate)
+
+        let cleared = MacWikiDefaults.clearCurrentDomain(
+            in: defaults,
+            environment: [MacWikiDefaults.qaSuiteEnvironmentKey: suiteName],
+            bundleIdentifier: productionCandidate,
+            bundleName: nil,
+            processName: "",
+            executablePath: nil
+        )
+
+        #expect(cleared == [suiteName])
+        #expect(defaults.persistentDomain(forName: suiteName)?.isEmpty ?? true)
+        #expect(defaults.persistentDomain(forName: productionCandidate)?["keep"] as? Bool == true)
+    }
+
     @Test func offlineInjectionRequiresAnExactlyTrustedQASuite() {
         let networkOnly = [MacWikiQAEnvironment.networkModeKey: "offline"]
         #expect(MacWikiQAEnvironment.injectedNetworkError(in: networkOnly) == nil)

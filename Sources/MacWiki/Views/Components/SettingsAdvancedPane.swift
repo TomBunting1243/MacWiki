@@ -253,6 +253,7 @@ struct SettingsAdvancedPane: View {
                     try await MainActor.run {
                         try deleteAllPersistedModels()
                         resetUserDefaultsDomain()
+                        performanceMetrics.clear()
                         appState.resetForFactoryDefaults()
                     }
                 }
@@ -267,15 +268,20 @@ struct SettingsAdvancedPane: View {
     }
 
     private func deleteAllPersistedModels() throws {
-        try deleteAllModels(of: ArticleNote.self)
-        try deleteAllModels(of: Highlight.self)
-        try deleteAllModels(of: ArticleState.self)
-        try deleteAllModels(of: SavedArticle.self)
-        try deleteAllModels(of: ReadingList.self)
-        try deleteAllModels(of: Area.self)
-        try deleteAllModels(of: Label.self)
-        try deleteAllModels(of: Tag.self)
-        try modelContext.save()
+        do {
+            try deleteAllModels(of: ArticleNote.self)
+            try deleteAllModels(of: Highlight.self)
+            try deleteAllModels(of: ArticleState.self)
+            try deleteAllModels(of: SavedArticle.self)
+            try deleteAllModels(of: ReadingList.self)
+            try deleteAllModels(of: Area.self)
+            try deleteAllModels(of: Label.self)
+            try deleteAllModels(of: Tag.self)
+            try modelContext.save()
+        } catch {
+            modelContext.rollback()
+            throw error
+        }
     }
 
     private func deleteAllModels<ModelType: PersistentModel>(of type: ModelType.Type) throws {
@@ -287,7 +293,7 @@ struct SettingsAdvancedPane: View {
     }
 
     private func resetUserDefaultsDomain() {
-        _ = AppDefaultsReset.clearCandidateDomains()
+        _ = MacWikiDefaults.clearCurrentDomain()
     }
 
     private func refreshCacheMetrics() async {

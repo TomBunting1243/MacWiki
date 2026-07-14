@@ -152,7 +152,7 @@ struct AccessibleActionButton: NSViewRepresentable {
         button.title = title
         button.isEnabled = isEnabled
         button.keyEquivalent = keyEquivalent
-        button.contentTintColor = isDestructive ? .systemRed : nil
+        button.hasDestructiveAction = isDestructive
         button.setAccessibilityTitle(title)
         button.setAccessibilityLabel(title)
         button.setAccessibilityRole(.button)
@@ -212,8 +212,8 @@ private struct AccessibleSettingsSlider: NSViewRepresentable {
         Coordinator(value: $value, step: step, range: range)
     }
 
-    func makeNSView(context: Context) -> NSSlider {
-        let slider = NSSlider(
+    func makeNSView(context: Context) -> ExactStepSettingsSlider {
+        let slider = ExactStepSettingsSlider(
             value: value,
             minValue: range.lowerBound,
             maxValue: range.upperBound,
@@ -222,17 +222,19 @@ private struct AccessibleSettingsSlider: NSViewRepresentable {
         )
         slider.isContinuous = true
         slider.altIncrementValue = step
+        slider.accessibilityStep = step
         applyAccessibility(to: slider)
         return slider
     }
 
-    func updateNSView(_ slider: NSSlider, context: Context) {
+    func updateNSView(_ slider: ExactStepSettingsSlider, context: Context) {
         context.coordinator.value = $value
         context.coordinator.step = step
         context.coordinator.range = range
         slider.minValue = range.lowerBound
         slider.maxValue = range.upperBound
         slider.altIncrementValue = step
+        slider.accessibilityStep = step
         if slider.doubleValue != value {
             slider.doubleValue = value
         }
@@ -242,7 +244,7 @@ private struct AccessibleSettingsSlider: NSViewRepresentable {
     private func applyAccessibility(to slider: NSSlider) {
         slider.setAccessibilityTitle(title)
         slider.setAccessibilityLabel(title)
-        slider.setAccessibilityValue(valueText)
+        slider.setAccessibilityValue(value)
         slider.setAccessibilityValueDescription(valueText)
     }
 
@@ -269,35 +271,65 @@ private struct AccessibleSettingsSlider: NSViewRepresentable {
     }
 }
 
+/// NSSlider's default accessibility increment is range-relative rather than
+/// step-relative. Reader settings expose deliberate units (1 point, 10 pixels,
+/// and so on), so Voice Control and accessibility clients must traverse the
+/// exact same value grid as pointer and keyboard input.
+final class ExactStepSettingsSlider: NSSlider {
+    var accessibilityStep = 1.0
+
+    override func accessibilityPerformIncrement() -> Bool {
+        performAccessibilityAdjustment(direction: 1)
+    }
+
+    override func accessibilityPerformDecrement() -> Bool {
+        performAccessibilityAdjustment(direction: -1)
+    }
+
+    private func performAccessibilityAdjustment(direction: Double) -> Bool {
+        guard accessibilityStep.isFinite, accessibilityStep > 0 else { return false }
+        let rawValue = doubleValue + (accessibilityStep * direction)
+        let stepIndex = ((rawValue - minValue) / accessibilityStep).rounded()
+        let adjustedValue = min(max(minValue + (stepIndex * accessibilityStep), minValue), maxValue)
+        guard adjustedValue != doubleValue else { return false }
+        doubleValue = adjustedValue
+        sendAction(action, to: target)
+        return true
+    }
+}
+
 struct ReaderTypographyPreviewView: View {
     let appearance: ReaderAppearance
+    @State private var viewportWidth: CGFloat = 320
 
     var body: some View {
-        GeometryReader { proxy in
-            let viewportWidth = max(Double(proxy.size.width), 1)
-            let resolved = appearance.resolvedForViewportWidth(viewportWidth)
-            let previewInlinePadding = max(10, min(42, resolved.horizontalPadding * 0.45))
-            let availableTextWidth = max(proxy.size.width - (previewInlinePadding * 2), 0)
-            let previewColumnWidth = min(
-                CGFloat(max(resolved.contentWidth, 0)),
-                availableTextWidth
-            )
+        let resolved = appearance.resolvedForViewportWidth(max(Double(viewportWidth), 1))
+        let previewInlinePadding = max(10, min(42, resolved.horizontalPadding * 0.45))
+        let availableTextWidth = max(viewportWidth - (previewInlinePadding * 2), 0)
+        let previewColumnWidth = min(
+            CGFloat(max(resolved.contentWidth, 0)),
+            availableTextWidth
+        )
 
-            VStack(alignment: .leading, spacing: max(8, resolved.paragraphSpacing * 0.35)) {
-                Text("Article Heading")
-                    .font(previewHeadingFont(for: resolved))
+        VStack(alignment: .leading, spacing: max(8, resolved.paragraphSpacing * 0.35)) {
+            Text("Article Heading")
+                .font(previewHeadingFont(for: resolved))
 
-                Text("This is a live preview of your reading typography settings for the article renderer.")
-                    .font(previewBodyFont(for: resolved))
-                    .lineSpacing(previewBodyLineSpacing(for: resolved))
-                    .foregroundStyle(.secondary)
-            }
-            .frame(maxWidth: previewColumnWidth, alignment: .leading)
-            .padding(.horizontal, previewInlinePadding)
-            .padding(.vertical, 12)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+            Text("This is a live preview of your reading typography settings for the article renderer.")
+                .font(previewBodyFont(for: resolved))
+                .lineSpacing(previewBodyLineSpacing(for: resolved))
+                .foregroundStyle(.secondary)
         }
-        .frame(height: 152)
+        .frame(maxWidth: previewColumnWidth, alignment: .leading)
+        .padding(.horizontal, previewInlinePadding)
+        .padding(.vertical, 12)
+        .frame(maxWidth: .infinity, minHeight: 152, alignment: .leading)
+        .onGeometryChange(for: CGFloat.self) { proxy in
+            proxy.size.width
+        } action: { newWidth in
+            guard newWidth.isFinite, newWidth > 0, newWidth != viewportWidth else { return }
+            viewportWidth = newWidth
+        }
     }
 
     private func previewFont(for preset: ReaderFontPreset, size: Double) -> Font {

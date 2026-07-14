@@ -80,7 +80,19 @@ final class PerformanceMetricsStore {
         self.userDefaults = userDefaults
         self.storageKeyPrefix = storageKey
         self.maxSamplesPerKind = max(1, maxSamplesPerKind)
-        self.samplesByKind = [:]
+        self.samplesByKind = Dictionary(
+            uniqueKeysWithValues: MetricKind.allCases.map { kind in
+                (
+                    kind,
+                    Self.loadSamples(
+                        for: kind,
+                        from: userDefaults,
+                        storageKey: "\(storageKey).\(kind.rawValue)"
+                    )
+                )
+            }
+        )
+        self.loadedKinds = Set(MetricKind.allCases)
     }
 
     var summaries: [Summary] {
