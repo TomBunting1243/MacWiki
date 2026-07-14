@@ -115,14 +115,164 @@ struct ReaderStateTests {
         let article = Article(id: "Turing", title: "Alan Turing")
         var coordinator = ReaderProgressCoordinator()
 
-        coordinator.markAsCompleted(for: article, in: modelContext, appState: appState, now: 500)
+        let completed = coordinator.markAsCompleted(
+            for: article,
+            in: modelContext,
+            appState: appState,
+            now: 500
+        )
 
+        #expect(completed)
         let state = ReadStateSync.fetchArticleState(forURLString: article.url.absoluteString, in: modelContext)
         #expect(state != nil)
         #expect(state?.isRead == true)
         #expect(approximatelyEqual(state?.readingProgress, 1))
         #expect(approximatelyEqual(coordinator.latestReadingProgress, 1))
         #expect(approximatelyEqual(appState.liveReadingProgress(forTitle: article.title), 1))
+    }
+
+    @Test func applyReadStatePersistsBeforePublishingAppState() throws {
+        let appState = AppState(persistenceMode: .ephemeral)
+        let modelContext = try makeInMemoryModelContext()
+        let article = Article(id: "read-boundary", title: "Read Boundary", isRead: false)
+        let list = ReadingList(name: "Inbox")
+        let savedArticle = SavedArticle(title: article.title, list: list)
+        savedArticle.isRead = false
+        list.articles = [savedArticle]
+        modelContext.insert(list)
+        try modelContext.save()
+        appState.openArticle(article)
+
+        let succeeded = ReadStateSync.applyReadState(
+            true,
+            for: article,
+            in: modelContext,
+            appState: appState
+        )
+
+        #expect(succeeded)
+        #expect(ReadStateSync.fetchArticleState(
+            forURLString: article.url.absoluteString,
+            in: modelContext
+        )?.isRead == true)
+        #expect(savedArticle.isRead)
+        #expect(appState.currentArticle?.isRead == true)
+    }
+
+    @Test func progressNoOpDoesNotInsertArticleState() throws {
+        let modelContext = try makeInMemoryModelContext()
+        let article = Article(id: "no-progress", title: "No Progress")
+
+        let persisted = ReadStateSync.updateReadingProgress(
+            0,
+            for: article,
+            in: modelContext
+        )
+
+        #expect(persisted == 0)
+        #expect(ReadStateSync.fetchArticleState(
+            forURLString: article.url.absoluteString,
+            in: modelContext
+        ) == nil)
+        #expect(!modelContext.hasChanges)
+    }
+
+    @Test func failedReadStateSaveRollsBackAndDoesNotPublish() throws {
+        let article = Article(id: "read-failure", title: "Read Failure", isRead: false)
+        let fixture = try makeReadOnlyModelContext { context in
+            context.insert(ArticleState(
+                articleTitle: article.title,
+                articleURL: article.url,
+                isRead: false
+            ))
+        }
+        defer { try? FileManager.default.removeItem(at: fixture.directoryURL) }
+        let appState = AppState(persistenceMode: .ephemeral)
+        appState.openArticle(article)
+        PersistenceIssueCenter.shared.dismiss()
+
+        let succeeded = ReadStateSync.applyReadState(
+            true,
+            for: article,
+            in: fixture.modelContext,
+            appState: appState
+        )
+
+        #expect(!succeeded)
+        #expect(!fixture.modelContext.hasChanges)
+        #expect(ReadStateSync.fetchArticleState(
+            forURLString: article.url.absoluteString,
+            in: fixture.modelContext
+        )?.isRead == false)
+        #expect(appState.currentArticle?.isRead == false)
+        #expect(PersistenceIssueCenter.shared.activeIssue?.operation == "update read state")
+        PersistenceIssueCenter.shared.dismiss()
+    }
+
+    @Test func failedProgressSaveReturnsNilAndRestoresStoredProgress() throws {
+        let article = Article(id: "progress-failure", title: "Progress Failure")
+        let fixture = try makeReadOnlyModelContext { context in
+            let state = ArticleState(
+                articleTitle: article.title,
+                articleURL: article.url
+            )
+            state.readingProgress = 0.25
+            context.insert(state)
+        }
+        defer { try? FileManager.default.removeItem(at: fixture.directoryURL) }
+        PersistenceIssueCenter.shared.dismiss()
+
+        let persisted = ReadStateSync.updateReadingProgress(
+            0.75,
+            for: article,
+            in: fixture.modelContext
+        )
+
+        #expect(persisted == nil)
+        #expect(!fixture.modelContext.hasChanges)
+        #expect(approximatelyEqual(ReadStateSync.fetchArticleState(
+            forURLString: article.url.absoluteString,
+            in: fixture.modelContext
+        )?.readingProgress, 0.25))
+        #expect(PersistenceIssueCenter.shared.activeIssue?.operation == "update reading progress")
+        PersistenceIssueCenter.shared.dismiss()
+    }
+
+    @Test func failedCompletionDoesNotAdvanceCoordinatorOrLiveProgress() throws {
+        let article = Article(id: "completion-failure", title: "Completion Failure")
+        let fixture = try makeReadOnlyModelContext { context in
+            let state = ArticleState(
+                articleTitle: article.title,
+                articleURL: article.url,
+                isRead: false
+            )
+            state.readingProgress = 0.20
+            context.insert(state)
+        }
+        defer { try? FileManager.default.removeItem(at: fixture.directoryURL) }
+        let appState = AppState(persistenceMode: .ephemeral)
+        appState.openArticle(article)
+        var coordinator = ReaderProgressCoordinator()
+        coordinator.bootstrapFromPersisted(
+            0.20,
+            articleTitle: article.title,
+            appState: appState,
+            now: 10
+        )
+        PersistenceIssueCenter.shared.dismiss()
+
+        let completed = coordinator.markAsCompleted(
+            for: article,
+            in: fixture.modelContext,
+            appState: appState,
+            now: 20
+        )
+
+        #expect(!completed)
+        #expect(approximatelyEqual(coordinator.latestReadingProgress, 0.20))
+        #expect(approximatelyEqual(appState.liveReadingProgress(forTitle: article.title), 0.20))
+        #expect(appState.currentArticle?.isRead == false)
+        PersistenceIssueCenter.shared.dismiss()
     }
 
     @Test func savedArticleReadStateSyncReportsOnlyRealMutations() throws {
@@ -162,6 +312,49 @@ struct ReaderStateTests {
             configurations: configuration
         )
         return ModelContext(container)
+    }
+
+    private func makeReadOnlyModelContext(
+        seed: (ModelContext) throws -> Void
+    ) throws -> (modelContext: ModelContext, directoryURL: URL) {
+        let directoryURL = FileManager.default.temporaryDirectory
+            .appending(path: "MacWiki-ReaderStateTests-\(UUID().uuidString)", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(
+            at: directoryURL,
+            withIntermediateDirectories: true
+        )
+        let storeURL = directoryURL.appending(path: "ReaderState.store")
+        let schema = Schema([
+            ArticleState.self,
+            Tag.self,
+            ReadingList.self,
+            SavedArticle.self
+        ])
+
+        do {
+            let writableConfiguration = ModelConfiguration(
+                schema: schema,
+                url: storeURL
+            )
+            let writableContainer = try ModelContainer(
+                for: schema,
+                configurations: writableConfiguration
+            )
+            let writableContext = ModelContext(writableContainer)
+            try seed(writableContext)
+            try writableContext.save()
+        }
+
+        let readOnlyConfiguration = ModelConfiguration(
+            schema: schema,
+            url: storeURL,
+            allowsSave: false
+        )
+        let readOnlyContainer = try ModelContainer(
+            for: schema,
+            configurations: readOnlyConfiguration
+        )
+        return (ModelContext(readOnlyContainer), directoryURL)
     }
 
     private func approximatelyEqual(_ lhs: Double?, _ rhs: Double, tolerance: Double = 0.0001) -> Bool {

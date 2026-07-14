@@ -10,13 +10,18 @@ enum ArticleLibraryActions {
         appState: AppState,
         touchedList: ReadingList? = nil
     ) {
-        for title in Set(titles) {
-            let article = Article(id: title, title: title, isRead: asRead)
-            _ = ReadStateSync.applyReadState(asRead, for: article, in: modelContext, appState: appState)
+        let articles = Set(titles).map { title in
+            Article(id: title, title: title, isRead: asRead)
         }
 
         touchedList?.updatedAt = Date()
-        modelContext.saveReportingFailure(operation: #function)
+        _ = ReadStateSync.applyReadStates(
+            asRead,
+            for: articles,
+            in: modelContext,
+            appState: appState,
+            operation: asRead ? "mark articles as read" : "mark articles as unread"
+        )
     }
 
     static func toggleReadStatus(

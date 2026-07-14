@@ -903,8 +903,13 @@ struct ArticleView: View {
     }
 
     private func markAllAsRead() {
-        progressCoordinator.markAsCompleted(for: article, in: modelContext, appState: appState)
-        isArticleUnreadState = false
+        if progressCoordinator.markAsCompleted(
+            for: article,
+            in: modelContext,
+            appState: appState
+        ) {
+            isArticleUnreadState = false
+        }
     }
 
     private func updateReadingProgress(_ progress: Double) {

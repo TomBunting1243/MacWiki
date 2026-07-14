@@ -5,7 +5,47 @@ import Testing
 @testable import MacWiki
 
 @MainActor
+private final class ModelContextSaveCounter: NSObject {
+    private(set) var count = 0
+
+    @objc func modelContextDidSave(_ notification: Notification) {
+        count += 1
+    }
+}
+
+@MainActor
 struct ArticleLibraryActionsTests {
+    @Test func batchMarkTitlesPostsOneModelContextDidSave() throws {
+        let modelContext = try makeInMemoryModelContext()
+        let appState = AppState(persistenceMode: .ephemeral)
+        let counter = ModelContextSaveCounter()
+        NotificationCenter.default.addObserver(
+            counter,
+            selector: #selector(ModelContextSaveCounter.modelContextDidSave(_:)),
+            name: ModelContext.didSave,
+            object: modelContext
+        )
+        defer {
+            NotificationCenter.default.removeObserver(
+                counter,
+                name: ModelContext.didSave,
+                object: modelContext
+            )
+        }
+
+        ArticleLibraryActions.batchMarkTitles(
+            ["Ada Lovelace", "Grace Hopper", "Katherine Johnson"],
+            asRead: true,
+            modelContext: modelContext,
+            appState: appState
+        )
+
+        #expect(counter.count == 1)
+        let states = try modelContext.fetch(FetchDescriptor<ArticleState>())
+        #expect(states.count == 3)
+        #expect(states.allSatisfy { $0.isRead })
+    }
+
     @Test func removeAllFromListClearsNormalizedLegacyDuplicatesInOneAction() throws {
         let modelContext = try makeInMemoryModelContext()
         let list = ReadingList(name: "Inbox")

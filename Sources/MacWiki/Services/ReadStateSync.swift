@@ -81,7 +81,43 @@ enum ReadStateSync {
         for article: Article,
         in context: ModelContext,
         appState: AppState? = nil
-    ) -> ArticleState {
+    ) -> Bool {
+        applyReadStates(
+            isRead,
+            for: [article],
+            in: context,
+            appState: appState,
+            operation: "update read state"
+        )
+    }
+
+    @discardableResult
+    static func applyReadStates(
+        _ isRead: Bool,
+        for articles: [Article],
+        in context: ModelContext,
+        appState: AppState? = nil,
+        operation: String
+    ) -> Bool {
+        for article in articles {
+            stageReadState(isRead, for: article, in: context)
+        }
+
+        guard context.saveReportingFailure(operation: operation) else {
+            return false
+        }
+
+        for article in articles {
+            appState?.updateReadState(forTitle: article.title, isRead: isRead)
+        }
+        return true
+    }
+
+    private static func stageReadState(
+        _ isRead: Bool,
+        for article: Article,
+        in context: ModelContext
+    ) {
         let state = ensureArticleState(for: article, in: context, fallbackReadState: isRead)
         if state.isRead != isRead {
             state.isRead = isRead
@@ -96,9 +132,6 @@ enum ReadStateSync {
 
         state.updatedAt = Date()
         syncSavedArticles(title: article.title, isRead: isRead, in: context)
-        appState?.updateReadState(forTitle: article.title, isRead: isRead)
-        try? context.save()
-        return state
     }
 
     @discardableResult
@@ -106,20 +139,25 @@ enum ReadStateSync {
         _ progress: Double,
         for article: Article,
         in context: ModelContext
-    ) -> Double {
+    ) -> Double? {
         let clamped = min(max(progress, 0), 1)
-
-        let state = ensureArticleState(for: article, in: context)
-        let current = state.readingProgress ?? 0
+        let existingState = fetchArticleState(
+            forURLString: article.url.absoluteString,
+            in: context
+        )
+        let current = existingState?.readingProgress ?? 0
 
         // Only persist meaningful changes
         if abs(current - clamped) < 0.004 {
             return current
         }
 
+        let state = existingState ?? ensureArticleState(for: article, in: context)
         state.readingProgress = clamped
         state.updatedAt = Date()
-        try? context.save()
+        guard context.saveReportingFailure(operation: "update reading progress") else {
+            return nil
+        }
         return clamped
     }
 }

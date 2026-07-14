@@ -99,24 +99,40 @@ struct ReaderProgressCoordinator {
 
         guard shouldPersist else { return }
 
-        let persisted = ReadStateSync.updateReadingProgress(clamped, for: article, in: modelContext)
+        guard let persisted = ReadStateSync.updateReadingProgress(
+            clamped,
+            for: article,
+            in: modelContext
+        ) else {
+            return
+        }
         lastPersistedReadingProgress = persisted
         lastReadingProgressPersistTimestamp = now
     }
 
+    @discardableResult
     mutating func markAsCompleted(
         for article: Article,
         in modelContext: ModelContext,
         appState: AppState,
         now: TimeInterval = Date().timeIntervalSinceReferenceDate
-    ) {
+    ) -> Bool {
+        guard ReadStateSync.applyReadState(
+            true,
+            for: article,
+            in: modelContext,
+            appState: appState
+        ) else {
+            return false
+        }
+
         appState.setLiveReadingProgress(forTitle: article.title, progress: 1)
         latestReadingProgress = 1
         lastPersistedReadingProgress = 1
         lastReadingProgressPersistTimestamp = now
         restoredProgressBaseline = 1
         initialRestoreRegressionGuardUntil = 0
-        _ = ReadStateSync.applyReadState(true, for: article, in: modelContext, appState: appState)
+        return true
     }
 
     private mutating func shouldIgnoreEarlyRestoreRegression(
