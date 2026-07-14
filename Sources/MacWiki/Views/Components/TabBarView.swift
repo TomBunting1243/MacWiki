@@ -122,7 +122,9 @@ struct TabBarView: View {
                     .coordinateSpace(name: "TabBarSpace")
                 }
                 .scrollIndicators(.hidden)
-                .scrollDisabled(draggedTabId != nil)
+                // The tab's high-priority gesture owns an active drag. Changing
+                // the parent scroll recognizer from that child-owned state
+                // creates an AttributeGraph cycle in optimized macOS 27 builds.
                 .scrollClipDisabled(false)
                 .onScrollGeometryChange(for: CGRect.self) { geometry in
                     geometry.visibleRect

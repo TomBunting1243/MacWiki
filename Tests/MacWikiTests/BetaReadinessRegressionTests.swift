@@ -1577,6 +1577,7 @@ struct BetaReadinessRegressionTests {
         #expect(tabBar.contains("ForEach(appState.openTabs)"))
         #expect(!tabBar.contains("ForEach(Array(appState.openTabs.enumerated())"))
         #expect(!tabBar.contains(".id(tab.id)"))
+        #expect(!tabBar.contains(".scrollDisabled(draggedTabId != nil)"))
         #expect(tabBar.contains("Unexpected identifier type"))
         #expect(tabItem.contains("TabReorderDragModifier("))
         #expect(reorderDrag.contains(".highPriorityGesture("))
