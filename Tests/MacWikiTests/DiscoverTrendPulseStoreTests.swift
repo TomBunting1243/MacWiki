@@ -37,6 +37,7 @@ struct DiscoverTrendPulseStoreTests {
         #expect(await recorder.requestCount() == results.count)
         #expect(await recorder.peakConcurrency() <= 4)
         #expect(results.allSatisfy { store.pulse(for: $0.title) != nil })
+        #expect(store.batchPublicationCountForCurrentRequest == 4)
     }
 
     private func waitUntilIdle(_ store: DiscoverTrendPulseStore) async {

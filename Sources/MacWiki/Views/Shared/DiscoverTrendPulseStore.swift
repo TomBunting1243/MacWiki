@@ -17,6 +17,7 @@ final class DiscoverTrendPulseStore {
     private var loadTask: Task<Void, Never>?
     @ObservationIgnored private let trendPulseLoader: TrendPulseLoader
     @ObservationIgnored private let batchSize: Int
+    @ObservationIgnored private(set) var batchPublicationCountForCurrentRequest = 0
 
     init(
         batchSize: Int = 6,
@@ -33,6 +34,7 @@ final class DiscoverTrendPulseStore {
 
     func queueLoad(results: [WikipediaService.SearchResult], referenceDate: Date) {
         loadTask?.cancel()
+        batchPublicationCountForCurrentRequest = 0
         let normalizedReferenceDate = Calendar.current.startOfDay(for: referenceDate)
         let referenceDateKey = referenceDateKey(for: normalizedReferenceDate)
 
@@ -95,7 +97,10 @@ final class DiscoverTrendPulseStore {
             let batchEnd = min(batchStart + batchSize, targets.count)
             let batch = targets[batchStart..<batchEnd]
 
-            await withTaskGroup(of: (String, WikipediaService.TrendPulse?).self) { group in
+            let batchUpdates = await withTaskGroup(
+                of: (String, WikipediaService.TrendPulse?).self,
+                returning: [String: WikipediaService.TrendPulse].self
+            ) { group in
                 for target in batch {
                     group.addTask { [trendPulseLoader] in
                         do {
@@ -110,13 +115,23 @@ final class DiscoverTrendPulseStore {
                     }
                 }
 
+                var updates: [String: WikipediaService.TrendPulse] = [:]
                 for await (key, pulse) in group {
-                    guard !Task.isCancelled else { return }
-                    guard currentRequestID == requestID else { return }
-                    guard activeReferenceDateKey == referenceDateKey else { return }
                     guard let pulse else { continue }
-                    pulseByTitleKey[key] = pulse
+                    updates[key] = pulse
                 }
+                return updates
+            }
+
+            guard !Task.isCancelled else { return }
+            guard currentRequestID == requestID else { return }
+            guard activeReferenceDateKey == referenceDateKey else { return }
+
+            if !batchUpdates.isEmpty {
+                var publishedPulses = pulseByTitleKey
+                publishedPulses.merge(batchUpdates) { _, new in new }
+                pulseByTitleKey = publishedPulses
+                batchPublicationCountForCurrentRequest += 1
             }
 
             batchStart = batchEnd
