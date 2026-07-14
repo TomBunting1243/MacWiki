@@ -7,6 +7,7 @@ private let highlightToolbarLogger = Logger(subsystem: "com.macwiki", category: 
 /// Floating toolbar that appears when text is selected in the article
 struct HighlightToolbar: View {
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.macWikiAccessibilityPersonalization) private var accessibilityPersonalization
     @AppStorage(AppStorageKey.Chrome.liquidGlassChrome) private var liquidGlassChrome = true
     @AppStorage(MacWikiGlassRuntime.forceLegacyFallbackKey) private var forceLegacyGlassFallback = false
     let selectionData: TextSelectionData
@@ -34,13 +35,20 @@ struct HighlightToolbar: View {
     }
 
     var body: some View {
-        MacWikiGlassGroup(spacing: 8) {
-            colorPickerView
-                .padding(.horizontal, 10)
-                .padding(.vertical, 8)
-                .background(toolbarBackground)
-        }
-        .shadow(color: .black.opacity(colorScheme == .dark ? 0.32 : 0.16), radius: 16, x: 0, y: 8)
+        colorPickerView
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .background(toolbarBackground)
+            .shadow(
+                color: .black.opacity(
+                    accessibilityPersonalization.reduceTransparency
+                        ? 0
+                        : (colorScheme == .dark ? 0.32 : 0.16)
+                ),
+                radius: 16,
+                x: 0,
+                y: 8
+            )
     }
 
     private var colorPickerView: some View {
@@ -145,7 +153,16 @@ struct HighlightToolbar: View {
     @ViewBuilder
     private var toolbarBackground: some View {
         let shape = RoundedRectangle(cornerRadius: Metrics.cornerRadius, style: .continuous)
-        if #available(macOS 26, *), usesNativeGlass {
+        if accessibilityPersonalization.reduceTransparency {
+            shape
+                .fill(Color(nsColor: .windowBackgroundColor))
+                .overlay {
+                    shape.strokeBorder(
+                        Color.primary.opacity(increasedContrast ? 0.34 : 0.14),
+                        lineWidth: increasedContrast ? 1 : 0.6
+                    )
+                }
+        } else if #available(macOS 26, *), usesNativeGlass {
             shape
                 .fill(.clear)
                 .glassEffect(.regular, in: .rect(cornerRadius: Metrics.cornerRadius))
@@ -153,7 +170,12 @@ struct HighlightToolbar: View {
                     shape.fill(Color(nsColor: .windowBackgroundColor).opacity(colorScheme == .dark ? 0.022 : 0.014))
                 }
                 .overlay {
-                    shape.strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.070 : 0.046), lineWidth: 0.52)
+                    shape.strokeBorder(
+                        Color.primary.opacity(
+                            (colorScheme == .dark ? 0.070 : 0.046) + (increasedContrast ? 0.14 : 0)
+                        ),
+                        lineWidth: increasedContrast ? 1 : 0.52
+                    )
                 }
         } else {
             shape
@@ -163,8 +185,10 @@ struct HighlightToolbar: View {
                 }
                 .overlay {
                     shape.strokeBorder(
-                        Color.primary.opacity(colorScheme == .dark ? 0.18 : 0.10),
-                        lineWidth: 0.7
+                        Color.primary.opacity(
+                            (colorScheme == .dark ? 0.18 : 0.10) + (increasedContrast ? 0.14 : 0)
+                        ),
+                        lineWidth: increasedContrast ? 1 : 0.7
                     )
                 }
         }
@@ -174,17 +198,29 @@ struct HighlightToolbar: View {
         MacWikiGlassRuntime.usesNativeGlass(
             isEnabled: liquidGlassChrome,
             forceLegacyFallback: forceLegacyGlassFallback
-        )
+        ) && !accessibilityPersonalization.reduceTransparency
+    }
+
+    private var increasedContrast: Bool {
+        accessibilityPersonalization.colorSchemeContrast == .increased
     }
 
     private var controlGroupBackground: some View {
         RoundedRectangle(cornerRadius: Metrics.groupCornerRadius, style: .continuous)
-            .fill(Color(nsColor: colorScheme == .dark ? .windowBackgroundColor : .controlBackgroundColor))
+            .fill(
+                Color(
+                    nsColor: accessibilityPersonalization.reduceTransparency
+                        ? .controlBackgroundColor
+                        : (colorScheme == .dark ? .windowBackgroundColor : .controlBackgroundColor)
+                )
+            )
             .overlay {
                 RoundedRectangle(cornerRadius: Metrics.groupCornerRadius, style: .continuous)
                     .strokeBorder(
-                        Color.primary.opacity(colorScheme == .dark ? 0.18 : 0.10),
-                        lineWidth: 0.45
+                        Color.primary.opacity(
+                            increasedContrast ? 0.24 : (colorScheme == .dark ? 0.18 : 0.10)
+                        ),
+                        lineWidth: increasedContrast ? 1 : 0.45
                     )
             }
     }
