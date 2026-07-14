@@ -24,6 +24,22 @@ struct NativeDesignRegressionTests {
         #expect(source.contains("Color.primary.opacity(isKeyWindow ? 0.42 : 0.26)"))
     }
 
+    @Test func activeWindowVisualsUseTheModernSwiftUIEnvironmentValue() throws {
+        let paths = [
+            "Sources/MacWiki/Views/Components/FindOnPageBarView.swift",
+            "Sources/MacWiki/Views/Components/ReaderTabItemView.swift",
+            "Sources/MacWiki/Views/Sidebar/Directory/DirectoryArticleRowViews.swift",
+            "Sources/MacWiki/Views/Sidebar/SidebarDropTargetModifier.swift",
+            "Sources/MacWiki/Views/Sidebar/SidebarRowChrome.swift"
+        ]
+
+        for path in paths {
+            let source = try source(path)
+            #expect(source.contains("@Environment(\\.appearsActive)"))
+            #expect(!source.contains("controlActiveState"))
+        }
+    }
+
     @Test func settingsUseValueBasedNativeTabs() throws {
         let settingsSource = try source("Sources/MacWiki/Views/Components/SettingsView.swift")
         let appSource = try source("Sources/MacWiki/App/MacWikiApp.swift")
@@ -92,7 +108,8 @@ struct NativeDesignRegressionTests {
         #expect(tabAccessories.contains("accessibilityPersonalization.colorSchemeContrast == .increased"))
         #expect(tabAccessories.contains(".fill(Color(nsColor: .controlBackgroundColor))"))
 
-        #expect(tabItem.contains("@Environment(\\.controlActiveState)"))
+        #expect(tabItem.contains("@Environment(\\.appearsActive)"))
+        #expect(!tabItem.contains("controlActiveState"))
         #expect(tabItem.contains("@Environment(\\.macWikiAccessibilityPersonalization)"))
         #expect(tabItem.contains("accessibilityPersonalization.reduceTransparency"))
         #expect(tabItem.contains("accessibilityPersonalization.colorSchemeContrast == .increased"))
@@ -107,7 +124,8 @@ struct NativeDesignRegressionTests {
         #expect(tabContextMenu.contains("DebouncedActionScheduler"))
         #expect(tabContextMenu.contains("flushScheduledModelContextSave()"))
 
-        #expect(findBar.contains("@Environment(\\.controlActiveState)"))
+        #expect(findBar.contains("@Environment(\\.appearsActive)"))
+        #expect(!findBar.contains("controlActiveState"))
         #expect(findBar.contains("@Environment(\\.macWikiAccessibilityPersonalization)"))
         #expect(findBar.contains(") && !accessibilityPersonalization.reduceTransparency"))
         #expect(findBar.contains("Color(nsColor: accessibilityPersonalization.reduceTransparency ? .controlBackgroundColor : .windowBackgroundColor)"))

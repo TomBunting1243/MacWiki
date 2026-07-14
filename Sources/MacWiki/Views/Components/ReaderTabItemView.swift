@@ -3,7 +3,7 @@ import SwiftUI
 /// Individual draggable tab item component
 struct ReaderTabItemView: View {
     @Environment(\.colorScheme) private var colorScheme
-    @Environment(\.controlActiveState) private var controlActiveState
+    @Environment(\.appearsActive) private var appearsActive
     @Environment(\.macWikiAccessibilityPersonalization) private var accessibilityPersonalization
     @AppStorage(MacWikiGlassRuntime.forceLegacyFallbackKey) private var forceLegacyGlassFallback = false
 
@@ -68,7 +68,7 @@ struct ReaderTabItemView: View {
     }
 
     private var isKeyWindow: Bool {
-        controlActiveState == .key
+        appearsActive
     }
 
     private var increasedContrast: Bool {

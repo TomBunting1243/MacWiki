@@ -99,7 +99,7 @@ struct SidebarRowContainer<Content: View>: View {
     @Environment(\.macWikiAccessibilityPersonalization.differentiateWithoutColor) private var differentiateWithoutColor
     @Environment(\.macWikiAccessibilityPersonalization.colorSchemeContrast) private var colorSchemeContrast
     @Environment(\.colorScheme) private var colorScheme
-    @Environment(\.controlActiveState) private var controlActiveState
+    @Environment(\.appearsActive) private var appearsActive
     @Environment(\.sidebarRowLayoutMetrics) private var layoutMetrics
 
     let isSelected: Bool
@@ -116,7 +116,7 @@ struct SidebarRowContainer<Content: View>: View {
     }
 
     private var isKeyWindow: Bool {
-        controlActiveState == .key
+        appearsActive
     }
 
     private var selectedFill: Color {

@@ -4,13 +4,13 @@ struct SidebarDropTargetModifier: ViewModifier {
     @Environment(\.macWikiAccessibilityPersonalization.differentiateWithoutColor) private var differentiateWithoutColor
     @Environment(\.macWikiAccessibilityPersonalization.reduceMotion) private var reduceMotion
     @Environment(\.colorScheme) private var colorScheme
-    @Environment(\.controlActiveState) private var controlActiveState
+    @Environment(\.appearsActive) private var appearsActive
 
     let isTargeted: Bool
 
     private var fillColor: Color {
         guard isTargeted else { return .clear }
-        let isKeyWindow = controlActiveState == .key
+        let isKeyWindow = appearsActive
         if colorScheme == .dark {
             return Color.accentColor.opacity(isKeyWindow ? 0.14 : 0.09)
         }
@@ -22,7 +22,7 @@ struct SidebarDropTargetModifier: ViewModifier {
         if differentiateWithoutColor {
             return colorScheme == .dark ? Color.white.opacity(0.88) : Color.primary.opacity(0.78)
         }
-        let isKeyWindow = controlActiveState == .key
+        let isKeyWindow = appearsActive
         return Color.accentColor.opacity(isKeyWindow ? 0.82 : 0.60)
     }
 

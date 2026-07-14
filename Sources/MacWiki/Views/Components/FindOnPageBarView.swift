@@ -3,7 +3,7 @@ import SwiftUI
 struct FindOnPageBarView: View {
     @Environment(AppState.self) private var appState
     @Environment(\.colorScheme) private var colorScheme
-    @Environment(\.controlActiveState) private var controlActiveState
+    @Environment(\.appearsActive) private var appearsActive
     @Environment(\.macWikiAccessibilityPersonalization) private var accessibilityPersonalization
     @AppStorage(AppStorageKey.Chrome.liquidGlassChrome) private var liquidGlassChrome = true
     @AppStorage(MacWikiGlassRuntime.forceLegacyFallbackKey) private var forceLegacyGlassFallback = false
@@ -84,7 +84,7 @@ struct FindOnPageBarView: View {
     }
 
     private var isKeyWindow: Bool {
-        controlActiveState == .key
+        appearsActive
     }
 
     @ViewBuilder

@@ -14,14 +14,14 @@ struct ArticleListItem<Content: View>: View {
     @AppStorage(AppStorageKey.Labels.displayMode) private var labelDisplayMode: LabelDisplayMode = .rowHighlight
     @Environment(\.macWikiAccessibilityPersonalization.reduceMotion) private var reduceMotion
     @Environment(\.colorScheme) private var colorScheme
-    @Environment(\.controlActiveState) private var controlActiveState
+    @Environment(\.appearsActive) private var appearsActive
 
     @State private var isHovered = false
 
     private var rowCornerRadius: CGFloat { 8 }
 
     private var rowFill: Color {
-        let isKeyWindow = controlActiveState == .key
+        let isKeyWindow = appearsActive
         if isSelected {
             return Color(nsColor: .controlBackgroundColor)
                 .opacity(colorScheme == .dark ? (isKeyWindow ? 0.24 : 0.18) : (isKeyWindow ? 0.50 : 0.40))
@@ -38,7 +38,7 @@ struct ArticleListItem<Content: View>: View {
     }
 
     private var rowStroke: Color {
-        let isKeyWindow = controlActiveState == .key
+        let isKeyWindow = appearsActive
         if isSelected {
             return Color.accentColor.opacity(colorScheme == .dark ? (isKeyWindow ? 0.15 : 0.11) : (isKeyWindow ? 0.12 : 0.09))
         }
