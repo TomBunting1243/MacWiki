@@ -10,6 +10,7 @@ struct ArticleListAccessibilityModifier: ViewModifier {
     func body(content: Content) -> some View {
         if let onToggleRead {
             content
+                .accessibilityElement(children: .ignore)
                 .accessibilityLabel(title)
                 .accessibilityInputLabels([title])
                 .accessibilityValue("\(title), \(isRead ? "Read" : "Unread")")
@@ -24,6 +25,7 @@ struct ArticleListAccessibilityModifier: ViewModifier {
                 )
         } else {
             content
+                .accessibilityElement(children: .ignore)
                 .accessibilityLabel(title)
                 .accessibilityInputLabels([title])
                 .accessibilityValue(title)

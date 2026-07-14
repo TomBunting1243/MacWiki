@@ -52,6 +52,7 @@ struct BetaReadinessRegressionTests {
     @Test func articleListRowsExposeArticleIdentityAndIndependentReadAction() throws {
         let rowSource = try source("Sources/MacWiki/Views/Sidebar/Directory/ArticleListAccessibility.swift")
         #expect(!rowSource.contains(".accessibilityElement(children: .contain)"))
+        #expect(rowSource.components(separatedBy: ".accessibilityElement(children: .ignore)").count - 1 == 2)
         #expect(rowSource.contains("let onToggleRead: (() -> Void)?"))
         #expect(rowSource.contains(".accessibilityInputLabels([title])"))
         #expect(rowSource.contains(".accessibilityValue(\"\\(title), \\(isRead ?"))
