@@ -56,6 +56,11 @@ struct ArticleWindowRootView: View {
                     showsPageViewsPopover: $showsPageViewsPopover
                 )
             }
+            .background {
+                FixedWindowToolbarPolicy()
+                    .frame(width: 0, height: 0)
+                    .accessibilityHidden(true)
+            }
             .focusedSceneValue(\.macWikiCommandAppState, appState)
             .focusedSceneValue(\.macWikiInspectorCommandsAvailable, true)
             .focusedSceneValue(\.macWikiCommandCapabilities, .articleWindow)

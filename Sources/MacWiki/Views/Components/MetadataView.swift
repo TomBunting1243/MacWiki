@@ -4,6 +4,7 @@ struct MetadataView: View {
     @Environment(\.macWikiAccessibilityPersonalization.reduceMotion) private var reduceMotion
 
     let items: [WikipediaService.MetadataItem]
+    var onRowBottomsChange: (([CGFloat]) -> Void)? = nil
 
     private enum MetadataLayout {
         static let markdownParseByteLimit = 8_192
@@ -12,14 +13,16 @@ struct MetadataView: View {
 
     private var displayItems: [MetadataDisplayItem] {
         var labelOccurrences: [String: Int] = [:]
-        return items.map { item in
+        return items.enumerated().map { index, item in
             let occurrence = labelOccurrences[item.label, default: 0]
             labelOccurrences[item.label] = occurrence + 1
             let displayID = occurrence == 0 ? item.label : "\(item.label)#\(occurrence)"
 
             return MetadataDisplayItem(
                 id: displayID,
-                item: item
+                sourceIndex: index,
+                item: item,
+                isLast: index == items.indices.last
             )
         }
     }
@@ -31,7 +34,7 @@ struct MetadataView: View {
     }
     
     var body: some View {
-        Group {
+        LazyVStack(alignment: .leading, spacing: 12) {
             if items.isEmpty {
                 ContentUnavailableView(
                     "No Data",
@@ -41,15 +44,33 @@ struct MetadataView: View {
                 .padding(.top, 40)
             } else {
                 ForEach(displayItems) { displayItem in
-                    LabeledContent {
-                        metadataValueText(displayItem.item.value)
-                            .foregroundStyle(.primary)
-                            .multilineTextAlignment(.trailing)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .contentTransition(.opacity)
-                    } label: {
-                        Text(displayItem.item.label)
-                            .foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: 0) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(displayItem.item.label)
+                                .font(MacWikiTypography.metadataLabel)
+                                .foregroundStyle(.secondary)
+
+                            metadataValueText(displayItem.item.value)
+                                .font(MacWikiTypography.metadataValue)
+                                .foregroundStyle(.primary)
+                                .multilineTextAlignment(.leading)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .contentTransition(.opacity)
+                        }
+
+                        if !displayItem.isLast {
+                            Divider()
+                                .opacity(0.38)
+                                .padding(.top, 12)
+                        }
+                    }
+                    .background {
+                        GeometryReader { proxy in
+                            Color.clear.preference(
+                                key: MetadataRowBoundaryPreferenceKey.self,
+                                value: [IndexedBoundary(index: displayItem.sourceIndex, value: proxy.frame(in: .named("MetadataRows")).maxY)]
+                            )
+                        }
                     }
                     .transition(rowTransition)
                 }
@@ -57,6 +78,17 @@ struct MetadataView: View {
         }
         .animation(reduceMotion ? nil : MetadataLayout.rowAnimation, value: displayItems.map(\.id))
         .animation(reduceMotion ? nil : MetadataLayout.rowAnimation, value: displayItems.map(\.valueFingerprint))
+        .coordinateSpace(name: "MetadataRows")
+        .onPreferenceChange(MetadataRowBoundaryPreferenceKey.self) { boundaries in
+            guard let onRowBottomsChange else { return }
+            let rowBottoms = boundaries
+                .sorted { $0.index < $1.index }
+                .map(\.value)
+                .filter { $0.isFinite && $0 > 0 }
+            onRowBottomsChange(rowBottoms)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
     }
 
     private func metadataValueText(_ value: String) -> Text {
@@ -75,10 +107,25 @@ struct MetadataView: View {
 
 private struct MetadataDisplayItem: Identifiable {
     let id: String
+    let sourceIndex: Int
     let item: WikipediaService.MetadataItem
+    let isLast: Bool
 
     var valueFingerprint: String {
         "\(id)=\(item.value)"
+    }
+}
+
+private struct IndexedBoundary: Equatable {
+    let index: Int
+    let value: CGFloat
+}
+
+private struct MetadataRowBoundaryPreferenceKey: PreferenceKey {
+    static let defaultValue: [IndexedBoundary] = []
+
+    static func reduce(value: inout [IndexedBoundary], nextValue: () -> [IndexedBoundary]) {
+        value.append(contentsOf: nextValue())
     }
 }
 

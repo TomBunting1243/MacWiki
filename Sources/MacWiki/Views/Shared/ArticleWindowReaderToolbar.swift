@@ -17,7 +17,7 @@ struct ArticleWindowReaderToolbar: ToolbarContent {
     }
 
     var body: some ToolbarContent {
-        ToolbarItem {
+        ToolbarItem(placement: .navigation) {
             ControlGroup("History") {
                 Button("Back", systemImage: "chevron.left") {
                     appState.goBack()
@@ -32,9 +32,7 @@ struct ArticleWindowReaderToolbar: ToolbarContent {
             .labelStyle(.iconOnly)
         }
 
-        ToolbarSpacer(.flexible)
-
-        ToolbarItem {
+        ToolbarItemGroup(placement: .primaryAction) {
             Button("Save Article", systemImage: "bookmark") {
                 dismissOtherPopovers(keeping: .save)
                 showsSavePopover = true
@@ -46,9 +44,7 @@ struct ArticleWindowReaderToolbar: ToolbarContent {
                     SaveToListPopover(article: article)
                 }
             }
-        }
 
-        ToolbarItem {
             Button(
                 article?.isRead == true ? "Mark as Unread" : "Mark as Read",
                 systemImage: article?.isRead == true ? "checkmark.circle.fill" : "circle"
@@ -57,17 +53,13 @@ struct ArticleWindowReaderToolbar: ToolbarContent {
             }
             .labelStyle(.iconOnly)
             .disabled(article == nil)
-        }
 
-        ToolbarItem {
             Button("Find in Page", systemImage: "text.magnifyingglass") {
                 appState.presentFindOnPage()
             }
             .labelStyle(.iconOnly)
             .disabled(article == nil)
-        }
 
-        ToolbarItem {
             Button("Reader Style", systemImage: "textformat.size") {
                 dismissOtherPopovers(keeping: .style)
                 showsReaderStylePopover = true
@@ -77,9 +69,7 @@ struct ArticleWindowReaderToolbar: ToolbarContent {
             .popover(isPresented: $showsReaderStylePopover) {
                 ReaderStylePopover()
             }
-        }
 
-        ToolbarItem {
             Button("Page Views", systemImage: "chart.xyaxis.line") {
                 dismissOtherPopovers(keeping: .pageViews)
                 showsPageViewsPopover = true
@@ -94,9 +84,7 @@ struct ArticleWindowReaderToolbar: ToolbarContent {
                     )
                 }
             }
-        }
 
-        ToolbarItem {
             Button("Open in Browser", systemImage: "safari") {
                 if let article {
                     openURL(article.url)
@@ -104,9 +92,7 @@ struct ArticleWindowReaderToolbar: ToolbarContent {
             }
             .labelStyle(.iconOnly)
             .disabled(article == nil)
-        }
 
-        ToolbarItem {
             if let article {
                 ShareLink(item: article.url) {
                     SwiftUI.Label("Share", systemImage: "square.and.arrow.up")
@@ -117,16 +103,7 @@ struct ArticleWindowReaderToolbar: ToolbarContent {
                     .labelStyle(.iconOnly)
                     .disabled(true)
             }
-        }
 
-        ToolbarItem {
-            Button(
-                appState.inspectorVisible ? "Hide Inspector" : "Show Inspector",
-                systemImage: "sidebar.trailing"
-            ) {
-                appState.toggleInspectorVisibility()
-            }
-            .labelStyle(.iconOnly)
         }
     }
 

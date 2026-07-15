@@ -4,6 +4,7 @@ import SwiftData
 struct InspectorTagStatusBox: View {
     @Environment(AppState.self) private var appState
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.colorScheme) private var colorScheme
     @Environment(\.macWikiAccessibilityPersonalization.reduceMotion) private var reduceMotion
 
     let article: Article
@@ -30,6 +31,48 @@ struct InspectorTagStatusBox: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
+            // Header
+            HStack(spacing: 8) {
+                Image(systemName: "tag")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(Color.accentColor.opacity(0.9))
+
+                Text("Tags")
+                    .font(MacWikiTypography.inspectorSectionLabel)
+                    .foregroundStyle(.primary)
+
+                Spacer()
+
+                if !tags.isEmpty {
+                    Text("\(tags.count)")
+                        .font(MacWikiTypography.compactRowMetadata)
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .readerInspectorCapsuleSurface(
+                            material: .thin,
+                            baseBorderOpacity: 0.08
+                        )
+                }
+
+                Button(isExpanded ? "Collapse Tags" : "Add Tags", systemImage: "chevron.down") {
+                    withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.25)) {
+                        isExpanded.toggle()
+                        tagMarkedForRemoval = nil
+                        if isExpanded {
+                            isFieldFocused = true
+                        }
+                    }
+                }
+                .labelStyle(.iconOnly)
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .frame(width: 20, height: 20)
+                .rotationEffect(.degrees(isExpanded ? -180 : 0))
+                .buttonStyle(.plain)
+                .help(isExpanded ? "Collapse" : "Add Tags")
+            }
+
             // Assigned tag chips
             if !tags.isEmpty {
                 FlowLayout(spacing: 6) {
@@ -77,21 +120,22 @@ struct InspectorTagStatusBox: View {
                     .padding(.vertical, 2)
             }
 
-            DisclosureGroup(isExpanded: $isExpanded) {
+            // Inline tag editor
+            if isExpanded {
                 tagEditor
-                    .padding(.top, 6)
-            } label: {
-                SwiftUI.Label(
-                    tags.isEmpty ? "Add Tags" : "Edit Tags (\(tags.count))",
-                    systemImage: "tag"
-                )
+                    .transition(
+                        reduceMotion
+                            ? .opacity
+                            : .opacity.combined(with: .scale(scale: 0.96, anchor: .top))
+                    )
             }
         }
+        .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .onChange(of: isExpanded) { _, expanded in
-            tagMarkedForRemoval = nil
-            if expanded {
-                isFieldFocused = true
+        .background(tagModuleBackground)
+        .onTapGesture {
+            withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.15)) {
+                tagMarkedForRemoval = nil
             }
         }
         .onChange(of: InspectorArticleKey(article: article)) {
@@ -138,6 +182,16 @@ struct InspectorTagStatusBox: View {
             onCreateOrAssign: addOrAssignTag,
             onAssign: assignTag
         )
+    }
+
+    private var tagModuleBackground: some View {
+        let shape = RoundedRectangle(cornerRadius: 14, style: .continuous)
+
+        return shape
+            .fill(.quaternary.opacity(colorScheme == .dark ? 0.22 : 0.30))
+            .overlay {
+                shape.strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.10 : 0.08), lineWidth: 0.8)
+            }
     }
 
     // MARK: - Tag Actions

@@ -132,6 +132,11 @@ private struct MainWorkspaceShell: View {
                 showsPageViewsPopover: $showsPageViewsPopover
             )
         }
+        .background {
+            FixedWindowToolbarPolicy()
+                .frame(width: 0, height: 0)
+                .accessibilityHidden(true)
+        }
         .environment(\.workspaceOpenWindowHandler, openWindowHandler)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .task {

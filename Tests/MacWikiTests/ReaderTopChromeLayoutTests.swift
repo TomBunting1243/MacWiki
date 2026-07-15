@@ -11,12 +11,15 @@ struct ReaderTopChromeLayoutTests {
     func mainReaderUsesNativeWindowToolbar() throws {
         let toolbar = try source("Sources/MacWiki/Views/Shared/MainWindowReaderToolbar.swift")
         let shell = try source("Sources/MacWiki/Views/Shared/MainWindowShell.swift")
+        let policy = try source("Sources/MacWiki/Views/Shared/FixedWindowToolbarPolicy.swift")
 
         #expect(toolbar.contains("struct MainWindowReaderToolbar: ToolbarContent"))
         #expect(!toolbar.contains("CustomizableToolbarContent"))
         #expect(!toolbar.contains("ToolbarItem(id:"))
         #expect(toolbar.contains("ControlGroup(\"Navigation\")"))
-        #expect(toolbar.components(separatedBy: "ToolbarSpacer(.flexible)").count - 1 == 1)
+        #expect(toolbar.contains("ToolbarItem(placement: .navigation)"))
+        #expect(toolbar.contains("ToolbarItemGroup(placement: .primaryAction)"))
+        #expect(!toolbar.contains("ToolbarSpacer("))
         #expect(!toolbar.contains("ToolbarSpacer(.fixed)"))
         #expect(shell.contains(".toolbar {"))
         #expect(!shell.contains(".toolbar(removing: .sidebarToggle)"))
@@ -25,6 +28,10 @@ struct ReaderTopChromeLayoutTests {
         #expect(!toolbar.contains("NSButton"))
         #expect(!toolbar.contains(".controlSize(.small)"))
         #expect(!toolbar.contains(".frame(width:"))
+        #expect(policy.contains("toolbar.allowsUserCustomization = false"))
+        #expect(policy.contains("toolbar.autosavesConfiguration = false"))
+        #expect(policy.contains("NSToolbarItem.Identifier.inspectorTrackingSeparator"))
+        #expect(policy.contains("NSToolbarItem.Identifier.toggleInspector"))
     }
 
     @Test("navigation remains leading and reader actions remain trailing")
@@ -34,14 +41,16 @@ struct ReaderTopChromeLayoutTests {
             "Sources/MacWiki/Views/Shared/ArticleWindowReaderToolbar.swift"
         ] {
             let toolbar = try source(path)
+            let leadingPlacement = try #require(toolbar.range(of: "ToolbarItem(placement: .navigation)"))
             let leadingControl = try #require(toolbar.range(of: "ControlGroup("))
-            let flexibleSpacer = try #require(toolbar.range(of: "ToolbarSpacer(.flexible)"))
+            let trailingPlacement = try #require(toolbar.range(of: "ToolbarItemGroup(placement: .primaryAction)"))
             let saveAction = try #require(toolbar.range(of: "Button(\"Save Article\""))
-            let inspectorAction = try #require(toolbar.range(of: "appState.inspectorVisible"))
+            let shareAction = try #require(toolbar.range(of: "ShareLink(item: article.url)"))
 
-            #expect(leadingControl.lowerBound < flexibleSpacer.lowerBound)
-            #expect(flexibleSpacer.lowerBound < saveAction.lowerBound)
-            #expect(saveAction.lowerBound < inspectorAction.lowerBound)
+            #expect(leadingPlacement.lowerBound < leadingControl.lowerBound)
+            #expect(leadingControl.lowerBound < trailingPlacement.lowerBound)
+            #expect(trailingPlacement.lowerBound < saveAction.lowerBound)
+            #expect(saveAction.lowerBound < shareAction.lowerBound)
         }
     }
 
@@ -52,8 +61,7 @@ struct ReaderTopChromeLayoutTests {
         for action in [
             "Hide List Contents", "Show List Contents", "Back", "Forward",
             "Search Wikipedia", "Save Article", "Mark as Read", "Find in Page",
-            "Reader Style", "Page Views", "Open in Browser", "Share",
-            "Hide Inspector", "Show Inspector"
+            "Reader Style", "Page Views", "Open in Browser", "Share"
         ] {
             #expect(toolbar.contains(action))
         }
@@ -63,6 +71,8 @@ struct ReaderTopChromeLayoutTests {
         #expect(toolbar.contains("SidebarPageViewsPopoverContent("))
         #expect(toolbar.contains("ReadStateSync.applyReadState("))
         #expect(toolbar.contains("ShareLink(item: article.url)"))
+        let policy = try source("Sources/MacWiki/Views/Shared/FixedWindowToolbarPolicy.swift")
+        #expect(policy.contains("NSToolbarItem.Identifier.toggleInspector"))
     }
 
     @Test("menu presentation requests reach native toolbar popovers")

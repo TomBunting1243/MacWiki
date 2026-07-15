@@ -3,6 +3,7 @@ import SwiftData
 
 struct InspectorLabelSection: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.macWikiAccessibilityPersonalization.reduceMotion) private var reduceMotion
     @Query(sort: \ReadingList.updatedAt, order: .reverse) private var allLists: [ReadingList]
     @Query private var matchingSavedArticles: [SavedArticle]
     @Query private var matchingArticleStates: [ArticleState]
@@ -12,6 +13,7 @@ struct InspectorLabelSection: View {
 
     @State private var showNewLabelSheet = false
     @State private var pendingNewLabel: InspectorLabelSnapshot?
+    @State private var isHovered = false
     @State private var assignment: InspectorLabelAssignment?
 
     init(article: Article, allLabels: [InspectorLabelSnapshot]) {
@@ -75,8 +77,14 @@ struct InspectorLabelSection: View {
         } label: {
             labelMenuButton
         }
-        .menuStyle(.button)
-        .controlSize(.small)
+        .buttonStyle(.plain)
+        .menuIndicator(.hidden)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .animation(reduceMotion ? nil : .spring(response: 0.25, dampingFraction: 0.82), value: selectedLabelId)
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: isHovered)
+        .onHover { hovering in
+            isHovered = hovering
+        }
         .task(id: assignmentRefreshKey) {
             await refreshAssignment(for: articleKey)
         }
@@ -100,7 +108,7 @@ struct InspectorLabelSection: View {
         let color = currentLabel?.color.swiftUIColor
         let hasLabel = currentLabel != nil
 
-        return HStack(spacing: 6) {
+        return HStack(spacing: 8) {
             Circle()
                 .fill(color ?? Color.clear)
                 .overlay {
@@ -117,8 +125,33 @@ struct InspectorLabelSection: View {
                 .lineLimit(1)
                 .contentTransition(.interpolate)
 
+            Spacer(minLength: 8)
+
+            if !hasLabel {
+                Image(systemName: "plus")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(.secondary)
+            }
+
+            Image(systemName: "chevron.up.chevron.down")
+                .font(.system(size: 9, weight: .semibold))
+                .foregroundStyle(.tertiary)
         }
-        .fixedSize(horizontal: true, vertical: false)
+        .padding(.horizontal, 11)
+        .frame(height: 27)
+        .contentShape(Capsule())
+        .background(
+            Capsule()
+                .fill(color?.opacity(0.06) ?? Color.secondary.opacity(0.032))
+        )
+        .overlay {
+            Capsule()
+                .strokeBorder(
+                    color?.opacity(isHovered ? 0.28 : 0.16) ?? Color.primary.opacity(isHovered ? 0.11 : 0.055),
+                    lineWidth: isHovered ? 1.0 : 0.8
+                )
+        }
+        .animation(reduceMotion ? nil : .spring(response: 0.24, dampingFraction: 0.78), value: selectedLabelId)
     }
 
     // MARK: - Menu Items
