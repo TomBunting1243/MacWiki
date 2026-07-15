@@ -194,6 +194,9 @@ private struct ReaderToolbarAccessoryView: View {
             .disabled(article == nil)
             .help("Find in Page")
             .accessibilityIdentifier("reader-find-in-page")
+            .accessibilityAction {
+                presentFindOnPage()
+            }
     }
 
     private var readerPresentationControls: some View {

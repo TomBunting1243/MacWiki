@@ -46,6 +46,7 @@ struct ReaderTopChromeLayoutTests {
         #expect(chrome.contains("reader-top-chrome-regular"))
         #expect(chrome.contains("reader-top-chrome-compact"))
         #expect(chrome.contains("reader-find-in-page"))
+        #expect(chrome.contains(".accessibilityAction"))
         #expect(chrome.contains(".popover(isPresented: $showingSavePopover)"))
         #expect(chrome.contains("presentSavePopover()"))
         #expect(chrome.contains("presentReaderStylePopover()"))

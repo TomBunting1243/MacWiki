@@ -142,11 +142,10 @@ private func readerPane(in window: AXUIElement) -> AXUIElement? {
         .filter { hasRole($0, kAXGroupRole as String) }
         .first { group in
             let descendants = elements(in: group, limit: 500)
-            return descendants.contains { hasRole($0, kAXScrollAreaRole as String) }
-                && descendants.contains { child in
-                    hasRole(child, kAXButtonRole as String)
-                        && accessibilityLabels(of: child).contains("New Tab")
-                }
+            return descendants.contains { child in
+                hasRole(child, kAXButtonRole as String)
+                    && accessibilityLabels(of: child).contains("New Tab")
+            }
         }
 }
 
