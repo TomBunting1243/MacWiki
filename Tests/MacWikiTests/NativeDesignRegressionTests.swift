@@ -150,20 +150,23 @@ struct NativeDesignRegressionTests {
     }
 
     @Test func readerToolbarsCommandsAndStyleControlsStayNativeReachableAndLockedSafely() throws {
-        let toolbar = try source("Sources/MacWiki/Views/Shared/ReaderTopChromeView.swift")
+        let toolbar = try source("Sources/MacWiki/Views/Shared/MainWindowReaderToolbar.swift")
         let articleToolbar = try source("Sources/MacWiki/Views/Shared/ArticleWindowReaderToolbar.swift")
         let articlePresenter = try source("Sources/MacWiki/Views/Shared/ArticleWindowReaderCommandPresenter.swift")
         let commands = try source("Sources/MacWiki/App/MacWikiCommands.swift")
         let style = try source("Sources/MacWiki/Views/Components/ReaderStylePopover.swift")
 
-        #expect(toolbar.contains("ViewThatFits(in: .horizontal)"))
+        #expect(toolbar.contains("CustomizableToolbarContent"))
         #expect(toolbar.contains("ControlGroup"))
         #expect(toolbar.contains(".disabled(article == nil)"))
-        #expect(toolbar.contains("appState.currentTab?.canGoBack != true"))
-        #expect(toolbar.contains("readerStylePresentationRequestID"))
-        #expect(toolbar.contains("readerPageViewsPresentationRequestID"))
+        #expect(toolbar.contains("appState.canGoBack"))
+        #expect(toolbar.contains("toggleListsSidebarVisibility"))
+        #expect(toolbar.contains("toggleDirectoryColumnVisibility"))
+        #expect(toolbar.contains("toggleInspectorVisibility"))
+        #expect(toolbar.contains("reader-find-in-page"))
         #expect(articleToolbar.contains("CustomizableToolbarContent"))
         for action in ["Save Article", "Mark as Read", "Find in Page", "Reader Style", "Page Views", "Open in Browser", "Share"] {
+            #expect(toolbar.contains(action))
             #expect(articleToolbar.contains(action))
             #expect(commands.contains(action))
         }

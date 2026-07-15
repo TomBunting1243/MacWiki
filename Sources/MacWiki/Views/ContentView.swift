@@ -59,22 +59,14 @@ struct ContentView: View {
         .focusedSceneValue(\.macWikiInspectorCommandsAvailable, true)
         .focusedSceneValue(\.macWikiCommandCapabilities, .mainWorkspace)
         .focusedSceneValue(\.macWikiCommandModelContext, modelContext)
-        .background {
-            WindowContentMinimumSizeBridge(
-                minimumSize: CGSize(
-                    width: MainWindowLayout.minimumContentWidth(
-                        listsSidebarVisible: appState.listsSidebarVisible,
-                        directoryVisible: appState.directoryColumnVisible,
-                        inspectorVisible: appState.inspectorVisible
-                    ),
-                    height: MainWindowLayout.minimumContentHeight
-                )
-            )
-            .frame(width: 0, height: 0)
-        }
+        .frame(
+            minWidth: MainWindowLayout.minimumWindowWidth,
+            minHeight: MainWindowLayout.minimumContentHeight
+        )
         .onAppear {
             applyLaunchQAHarnessOverridesIfNeeded()
             enforceWikiHopAvailabilityIfNeeded()
+            enforceWikiHopNavigationLayoutIfNeeded()
             guard suppressInitialImplicitAnimations else { return }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
                 suppressInitialImplicitAnimations = false
@@ -101,12 +93,7 @@ struct ContentView: View {
             showNewTagSheet = true
         }
         .onChange(of: appState.isWikiHopNavigationLocked) { _, _ in
-            if appState.isWikiHopNavigationLocked {
-                // Determine if we need to force close
-                if appState.listsSidebarVisible || appState.directoryColumnVisible {
-                    appState.setNavigationColumnsVisible(false)
-                }
-            }
+            enforceWikiHopNavigationLayoutIfNeeded()
         }
         .transaction { transaction in
             if suppressInitialImplicitAnimations {
@@ -182,6 +169,12 @@ struct ContentView: View {
         guard !isWikiHopAvailable else { return }
         guard rootSelection == .wikiHop else { return }
         rootSelection = .recents
+    }
+
+    private func enforceWikiHopNavigationLayoutIfNeeded() {
+        guard appState.isWikiHopNavigationLocked else { return }
+        guard appState.listsSidebarVisible || appState.directoryColumnVisible else { return }
+        appState.setNavigationColumnsVisible(false)
     }
 
     private func revealSidebarForEmbeddedSearchIfNeeded() {

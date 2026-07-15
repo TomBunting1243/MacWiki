@@ -67,17 +67,16 @@ struct QAProcessSafetyShellTests {
         #expect(elapsed < .seconds(6))
     }
 
-    @Test func readerAXDriverTargetsEscapeAtTheCandidateProcess() throws {
+    @Test func readerAXDriverNeedsNoKeyboardInjection() throws {
         let source = try String(
             contentsOf: repositoryRoot
                 .appending(path: "scripts/ax_reader_inspector_journey.swift"),
             encoding: .utf8
         )
 
-        #expect(source.contains("private func postEscape(to pid: pid_t) throws"))
-        #expect(source.contains("keyDown.postToPid(pid)"))
-        #expect(source.contains("keyUp.postToPid(pid)"))
-        #expect(!source.contains("virtualKey: 53, keyDown: true)?.post(tap: .cghidEventTap)"))
+        #expect(!source.contains("CGEvent("))
+        #expect(!source.contains("postToPid"))
+        #expect(!source.contains(".post(tap:"))
     }
 
     @Test func readerJourneyUsesTheOptInBackgroundBundleLaunch() throws {

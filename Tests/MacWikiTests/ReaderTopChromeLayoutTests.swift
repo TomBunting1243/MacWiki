@@ -1,73 +1,56 @@
-import Foundation
 import AppKit
+import Foundation
 import SwiftUI
 import Testing
 
 @testable import MacWiki
 
-@Suite("Reader top chrome layout")
+@Suite("Reader toolbar and search layout")
 struct ReaderTopChromeLayoutTests {
-    @Test("main reader chrome is owned by a native split-item accessory")
-    func readerChromeUsesNativeSplitItemAccessory() throws {
-        let workspace = try source("Sources/MacWiki/Views/Shared/WorkspaceSplitViewController.swift")
-        let bridge = try source("Sources/MacWiki/Views/Shared/NativeWorkspaceSplitView.swift")
+    @Test("main reader commands use a full-width customizable native toolbar")
+    func mainReaderUsesNativeWindowToolbar() throws {
+        let toolbar = try source("Sources/MacWiki/Views/Shared/MainWindowReaderToolbar.swift")
         let shell = try source("Sources/MacWiki/Views/Shared/MainWindowShell.swift")
 
-        #expect(workspace.contains("readerItem.topAlignedAccessoryViewControllers"))
-        #expect(workspace.contains("setReaderTopAccessoryVisible"))
-        #expect(bridge.contains("NSSplitViewItemAccessoryViewController"))
-        #expect(bridge.contains("preferredScrollEdgeEffectStyle = .soft"))
-        #expect(bridge.contains("hostingController.sizingOptions = [.intrinsicContentSize, .preferredContentSize]"))
-        #expect(bridge.contains("lastRequestedReaderChromeVisible"))
-        #expect(shell.contains("readerChromeVisible: !appState.isWikiHopNavigationLocked"))
-        #expect(shell.contains("readerRevision: readerPresentationRevision"))
-        #expect(shell.contains("appState.showFindOnPage ? \"find-visible\" : \"find-hidden\""))
-        #expect(shell.contains("appState.findOnPageFocusRequestID?.uuidString"))
-        #expect(!workspace.contains("window.toolbar"))
-        #expect(!shell.contains("ReaderToolbarEnvironment("))
+        #expect(toolbar.contains("struct MainWindowReaderToolbar: CustomizableToolbarContent"))
+        #expect(toolbar.contains("main-window-native-toolbar-v1"))
+        #expect(toolbar.contains("ControlGroup(\"Navigation\")"))
+        #expect(shell.contains(".toolbar(id: MainWindowReaderToolbarIdentifier.configuration)"))
+        #expect(shell.contains("TabBarView("))
+        #expect(shell.contains("ReaderColumnView()"))
+        #expect(!toolbar.contains("NSButton"))
+        #expect(!toolbar.contains(".controlSize(.small)"))
+        #expect(!toolbar.contains(".frame(width:"))
     }
 
-    @Test("reader actions adapt by intrinsic fit and preserve every command path")
-    func readerActionsUseIntrinsicNativeLayouts() throws {
-        let chrome = try source("Sources/MacWiki/Views/Shared/ReaderTopChromeView.swift")
+    @Test("every main reader command remains natively reachable")
+    func mainReaderToolbarPreservesEveryCommandPath() throws {
+        let toolbar = try source("Sources/MacWiki/Views/Shared/MainWindowReaderToolbar.swift")
 
-        #expect(chrome.contains("ViewThatFits(in: .horizontal)"))
-        #expect(chrome.contains("ControlGroup"))
-        #expect(!chrome.contains("GeometryReader"))
-        #expect(!chrome.contains("NSToolbar"))
-        #expect(chrome.contains("toggleListsSidebarVisibility"))
-        #expect(chrome.contains("toggleDirectoryColumnVisibility"))
-        #expect(chrome.contains("toggleInspectorVisibility"))
-        #expect(chrome.contains("readerStylePresentationRequestID"))
-        #expect(chrome.contains("readerPageViewsPresentationRequestID"))
-        #expect(chrome.contains("action: presentFindOnPage"))
-        #expect(!chrome.contains("toggleFindOnPage"))
-        #expect(chrome.contains("reader-top-chrome-spacious"))
-        #expect(chrome.contains("reader-top-chrome-regular"))
-        #expect(chrome.contains("reader-top-chrome-compact"))
-        #expect(chrome.contains("reader-find-in-page"))
-        #expect(chrome.contains("NativeReaderToolbarButton("))
-        #expect(chrome.contains(".controlSize(.regular)"))
-        #expect(chrome.contains("reader-toggle-lists"))
-        #expect(chrome.contains("reader-toggle-list-contents"))
-        #expect(chrome.contains("reader-toggle-inspector"))
-        #expect(chrome.contains(".popover(isPresented: $showingSavePopover)"))
-        #expect(chrome.contains("presentSavePopover()"))
-        #expect(chrome.contains("presentReaderStylePopover()"))
-        #expect(chrome.contains("presentPageViewsPopover()"))
-    }
-
-    @Test("native reader action dispatches its target action")
-    @MainActor
-    func nativeReaderActionDispatchesTargetAction() {
-        var actionCount = 0
-        let coordinator = NativeReaderToolbarButton.Coordinator {
-            actionCount += 1
+        for action in [
+            "Hide List Contents", "Show List Contents", "Back", "Forward",
+            "Search Wikipedia", "Save Article", "Mark as Read", "Find in Page",
+            "Reader Style", "Page Views", "Open in Browser", "Share",
+            "Hide Inspector", "Show Inspector"
+        ] {
+            #expect(toolbar.contains(action))
         }
+        #expect(toolbar.contains("reader-find-in-page"))
+        #expect(toolbar.contains("SaveToListPopover(article: article)"))
+        #expect(toolbar.contains("ReaderStylePopover()"))
+        #expect(toolbar.contains("SidebarPageViewsPopoverContent("))
+        #expect(toolbar.contains("ReadStateSync.applyReadState("))
+        #expect(toolbar.contains("ShareLink(item: article.url)"))
+    }
 
-        coordinator.performAction()
+    @Test("menu presentation requests reach native toolbar popovers")
+    func menuRequestsReachToolbarPopovers() throws {
+        let shell = try source("Sources/MacWiki/Views/Shared/MainWindowShell.swift")
 
-        #expect(actionCount == 1)
+        #expect(shell.contains(".onChange(of: appState.readerStylePresentationRequestID)"))
+        #expect(shell.contains("showsReaderStylePopover = true"))
+        #expect(shell.contains(".onChange(of: appState.readerPageViewsPresentationRequestID)"))
+        #expect(shell.contains("showsPageViewsPopover = true"))
     }
 
     @Test("List Contents search is an embedded native AppKit search field")
@@ -128,14 +111,16 @@ struct ReaderTopChromeLayoutTests {
     }
 
     private func source(_ relativePath: String) throws -> String {
-        let testsURL = URL(fileURLWithPath: #filePath)
-        let packageRoot = testsURL
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-        return try String(
-            contentsOf: packageRoot.appendingPathComponent(relativePath),
+        try String(
+            contentsOf: repositoryRoot.appendingPathComponent(relativePath),
             encoding: .utf8
         )
+    }
+
+    private var repositoryRoot: URL {
+        URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
     }
 }

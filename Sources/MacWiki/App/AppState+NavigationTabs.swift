@@ -2,19 +2,93 @@ import Foundation
 import SwiftUI
 
 extension AppState {
+    var navigationSplitViewVisibility: NavigationSplitViewVisibility {
+        get {
+            switch workspaceNavigationColumns {
+            case .all:
+                .all
+            case .listContentsAndReader:
+                .doubleColumn
+            case .readerOnly:
+                .detailOnly
+            }
+        }
+        set {
+            if newValue == .all {
+                applyUserNavigationColumnVisibility(
+                    listsVisible: true,
+                    directoryVisible: true
+                )
+            } else if newValue == .doubleColumn {
+                applyUserNavigationColumnVisibility(
+                    listsVisible: false,
+                    directoryVisible: true
+                )
+            } else if newValue == .detailOnly {
+                applyUserNavigationColumnVisibility(
+                    listsVisible: false,
+                    directoryVisible: false
+                )
+            }
+        }
+    }
+
     func setNavigationColumnsVisible(_ isVisible: Bool) {
-        listsSidebarVisible = isVisible
-        directoryColumnVisible = isVisible
+        workspaceNavigationColumns = isVisible ? .all : .readerOnly
+    }
+
+    /// Keep navigation state representable by the platform's hierarchical
+    /// three-column split view. Lists cannot be visible without their List
+    /// Contents child column.
+    func setNavigationColumnVisibility(
+        listsVisible: Bool,
+        directoryVisible: Bool
+    ) {
+        if !directoryVisible {
+            workspaceNavigationColumns = .readerOnly
+        } else if listsVisible {
+            workspaceNavigationColumns = .all
+        } else {
+            workspaceNavigationColumns = .listContentsAndReader
+        }
+    }
+
+    /// Applies a collapse request originating from NavigationSplitView. The
+    /// system sidebar command can write this binding directly, so enforce the
+    /// same Wiki-Hop lock used by MacWiki's explicit toolbar and menu actions.
+    func applyUserNavigationColumnVisibility(
+        listsVisible: Bool,
+        directoryVisible: Bool
+    ) {
+        guard !isWikiHopNavigationLocked else { return }
+        setNavigationColumnVisibility(
+            listsVisible: listsVisible,
+            directoryVisible: directoryVisible
+        )
     }
 
     func toggleListsSidebarVisibility() {
         guard !isWikiHopNavigationLocked else { return }
-        listsSidebarVisible.toggle()
+        if listsSidebarVisible {
+            workspaceNavigationColumns = .listContentsAndReader
+        } else {
+            setNavigationColumnVisibility(
+                listsVisible: true,
+                directoryVisible: true
+            )
+        }
     }
 
     func toggleDirectoryColumnVisibility() {
         guard !isWikiHopNavigationLocked else { return }
-        directoryColumnVisible.toggle()
+        if directoryColumnVisible {
+            setNavigationColumnsVisible(false)
+        } else {
+            setNavigationColumnVisibility(
+                listsVisible: false,
+                directoryVisible: true
+            )
+        }
     }
 
     /// Current scroll position for a specific tab id.

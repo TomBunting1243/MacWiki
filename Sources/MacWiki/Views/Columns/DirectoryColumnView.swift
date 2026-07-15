@@ -1,10 +1,6 @@
 import SwiftUI
 
 struct DirectoryColumnView: View {
-    private enum Chrome {
-        static let topInset: CGFloat = 8
-    }
-
     @Binding var selectedList: ReadingList?
     @Binding var rootSelection: SidebarRootSelection
 
@@ -24,11 +20,6 @@ struct DirectoryColumnView: View {
             onNewLabelWithArticle: onNewLabelWithArticle,
             onNewTagWithArticle: onNewTagWithArticle
         )
-        .padding(.top, Chrome.topInset)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background {
-            SidebarPaneBackground()
-                .ignoresSafeArea(.container, edges: .top)
-        }
     }
 }

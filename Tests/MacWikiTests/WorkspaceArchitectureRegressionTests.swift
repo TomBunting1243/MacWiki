@@ -3,7 +3,7 @@ import Testing
 
 @Suite
 struct WorkspaceArchitectureRegressionTests {
-    @Test func hostedPanesUseAStableSceneScopedOpenWindowHandler() throws {
+    @Test func workspaceUsesAStableSceneScopedOpenWindowHandler() throws {
         let handler = try source("Sources/MacWiki/Views/Shared/WorkspaceOpenWindowHandler.swift")
         let shell = try source("Sources/MacWiki/Views/Shared/MainWindowShell.swift")
         let reader = try source("Sources/MacWiki/Views/Reader/ReaderView.swift")
@@ -17,70 +17,65 @@ struct WorkspaceArchitectureRegressionTests {
         #expect(shell.contains(".environment(\\.workspaceOpenWindowHandler, openWindowHandler)"))
         #expect(reader.contains("workspaceOpenWindowHandler?.open(article) != true"))
         #expect(contextMenu.contains("workspaceOpenWindowHandler?.open(windowArticle) != true"))
-        #expect(!shell.contains("forwardedOpenWindowAction"))
-        #expect(!handler.contains("@Entry var forwardedOpenWindowAction"))
     }
 
-    @Test func hostedPaneInvalidationIsScopedByPane() throws {
+    @Test func mainWorkspaceUsesPlatformOwnedNavigationAndInspectorContainers() throws {
         let shell = try source("Sources/MacWiki/Views/Shared/MainWindowShell.swift")
-        let split = try source("Sources/MacWiki/Views/Shared/NativeWorkspaceSplitView.swift")
 
-        #expect(shell.contains("sidebarRevision: workspaceAppearanceRevision"))
-        #expect(shell.contains("directoryRevision: directoryContentRevision"))
-        #expect(shell.contains("readerRevision: readerPresentationRevision"))
-        #expect(shell.contains("inspectorRevision: workspaceAppearanceRevision"))
-        #expect(split.contains("lastSidebarRevision != sidebarRevision"))
-        #expect(split.contains("lastDirectoryRevision != directoryRevision"))
-        #expect(split.contains("lastReaderRevision != readerRevision"))
-        #expect(split.contains("lastInspectorRevision != inspectorRevision"))
-        #expect(split.contains("sidebarBox.content = sidebar"))
-        #expect(split.contains("directoryBox.content = directory"))
-        #expect(split.contains("readerBox.content = reader"))
-        #expect(split.contains("inspectorBox.content = inspector"))
-        #expect(!split.contains("contentRevision"))
+        #expect(shell.contains("NavigationSplitView(columnVisibility: $appState.navigationSplitViewVisibility)"))
+        #expect(shell.contains("} content: {"))
+        #expect(shell.contains("} detail: {"))
+        #expect(shell.contains(".navigationSplitViewStyle(.balanced)"))
+        #expect(shell.contains(".inspector(isPresented: $appState.inspectorVisible)"))
+        #expect(shell.components(separatedBy: ".navigationSplitViewColumnWidth(").count - 1 == 2)
+        #expect(shell.components(separatedBy: ".persistedColumnWidth(").count - 1 == 3)
+        #expect(shell.contains(".inspectorColumnWidth("))
+        #expect(shell.contains(".toolbar(id: MainWindowReaderToolbarIdentifier.configuration)"))
     }
 
-    @Test func nativeCollapseFeedbackPublishesThroughStableBindingsAfterLayout() throws {
+    @Test func readerTabsRemainInsideTheDetailColumn() throws {
         let shell = try source("Sources/MacWiki/Views/Shared/MainWindowShell.swift")
-        let split = try source("Sources/MacWiki/Views/Shared/NativeWorkspaceSplitView.swift")
-        let controller = try source("Sources/MacWiki/Views/Shared/WorkspaceSplitViewController.swift")
+        let detail = try #require(shell.range(of: "} detail: {"))
+        let inspector = try #require(shell.range(of: ".inspector(isPresented:"))
+        let detailSource = String(shell[detail.lowerBound..<inspector.lowerBound])
+        let tabs = try #require(detailSource.range(of: "TabBarView("))
+        let reader = try #require(detailSource.range(of: "ReaderColumnView()"))
 
-        #expect(shell.contains("sidebarVisible: $appState.listsSidebarVisible"))
-        #expect(shell.contains("directoryVisible: $appState.directoryColumnVisible"))
-        #expect(shell.contains("inspectorVisible: $appState.inspectorVisible"))
-        #expect(split.contains("await Task.yield()"))
-        #expect(split.contains("receiveNativeVisibility"))
-        #expect(controller.contains("reportUserDrivenVisibilityIfNeeded()"))
-        #expect(controller.contains("guard !isApplyingRequestedVisibility else { return }"))
-        #expect(controller.contains("onPaneVisibilityChange?(visibility)"))
-        #expect(controller.contains("setReaderTopAccessoryViewControllers"))
-        #expect(controller.contains("readerItem.topAlignedAccessoryViewControllers = controllers"))
-        #expect(split.contains("lastRequestedVisibility != visibility"))
+        #expect(tabs.lowerBound < reader.lowerBound)
+        #expect(detailSource.contains("VStack(spacing: 0)"))
     }
 
-    @Test func nativeWorkspaceAcceptsTheFullWindowProposal() throws {
-        let split = try source("Sources/MacWiki/Views/Shared/NativeWorkspaceSplitView.swift")
+    @Test func visibilityIsOneInvariantStateBoundByKeyPath() throws {
+        let appState = try source("Sources/MacWiki/App/AppState.swift")
+        let navigation = try source("Sources/MacWiki/App/AppState+NavigationTabs.swift")
 
-        #expect(split.contains("func sizeThatFits("))
-        #expect(split.contains("let width = proposal.width"))
-        #expect(split.contains("let height = proposal.height"))
-        #expect(split.contains("return CGSize(width: width, height: height)"))
-        #expect(split.contains("setContentHuggingPriority(.defaultLow, for: .horizontal)"))
+        #expect(appState.contains("var workspaceNavigationColumns: WorkspaceNavigationColumns = .all"))
+        #expect(appState.contains("var listsSidebarVisible: Bool"))
+        #expect(appState.contains("var directoryColumnVisible: Bool"))
+        #expect(navigation.contains("var navigationSplitViewVisibility: NavigationSplitViewVisibility"))
+        #expect(navigation.contains("guard !isWikiHopNavigationLocked else { return }"))
+        #expect(!navigation.contains("listsSidebarVisible.toggle()"))
+        #expect(!navigation.contains("directoryColumnVisible.toggle()"))
     }
 
-    @Test func paneVisibilityDefersOutsideRepresentableUpdatesAndCannotBeCancelledByContentWork() throws {
-        let split = try source("Sources/MacWiki/Views/Shared/NativeWorkspaceSplitView.swift")
-        let updateStart = try #require(split.range(of: "func updateWorkspace("))
-        let updateSource = String(split[updateStart.lowerBound...])
-        let visibilityTask = try #require(updateSource.range(of: "paneVisibilityUpdate = Task"))
-        let visibilityYield = try #require(updateSource.range(of: "await Task.yield()"))
-        let visibilityApply = try #require(updateSource.range(of: "controller.setPaneVisibility("))
-        let deferredContentUpdate = try #require(updateSource.range(of: "hostedContentUpdate = Task"))
+    @Test func obsoleteSplitAndWindowMinimumBridgesAreGone() {
+        for path in [
+            "Sources/MacWiki/Views/Shared/NativeWorkspaceSplitView.swift",
+            "Sources/MacWiki/Views/Shared/WorkspaceSplitViewController.swift",
+            "Sources/MacWiki/Views/Shared/WindowContentMinimumSizeBridge.swift",
+            "Sources/MacWiki/Views/Shared/ReaderTopChromeView.swift",
+            "Sources/MacWiki/Views/Shared/NativeReaderToolbarButton.swift"
+        ] {
+            #expect(!FileManager.default.fileExists(atPath: repositoryRoot.appending(path: path).path))
+        }
+    }
 
-        #expect(visibilityTask.lowerBound < visibilityYield.lowerBound)
-        #expect(visibilityYield.lowerBound < visibilityApply.lowerBound)
-        #expect(visibilityApply.lowerBound < deferredContentUpdate.lowerBound)
-        #expect(updateSource.contains("paneVisibilityUpdate?.cancel()"))
+    @Test func windowMinimumIsStableAcrossPaneVisibilityChanges() throws {
+        let content = try source("Sources/MacWiki/Views/ContentView.swift")
+
+        #expect(content.contains("minWidth: MainWindowLayout.minimumWindowWidth"))
+        #expect(!content.contains("WindowContentMinimumSizeBridge"))
+        #expect(!content.contains("minimumContentWidth("))
     }
 
     private func source(_ relativePath: String) throws -> String {

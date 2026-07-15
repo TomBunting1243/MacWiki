@@ -135,9 +135,9 @@ fi
   printf -- '- Exact candidate PID: `%s`\n' "$READER_PID"
   printf -- '- Isolated QA home: `%s`\n' "$QA_HOME"
   printf -- '- Seeded public article: `%s`\n' "$ARTICLE_TITLE"
-  printf -- '- Reader assertions: reader-scoped native controls and More-menu fallbacks, exactly one Find field, native Find actions, dismissal\n'
-  printf -- '- Inspector assertions: native Info/Notes/References selection and content, 12 rapid pane cycles, reader-accessory hide/restore cycle\n'
-  printf -- '- Narrow-window assertion: restoring List Contents and Inspector preserves the 900-point window and a usable reader while the semantic Lists sidebar yields\n'
+  printf -- '- Reader assertions: full-width native toolbar command reachability, no retired custom More control, exactly one Find field, native Find actions, dismissal\n'
+  printf -- '- Inspector assertions: native Info/Notes/References selection and content, 12 rapid mode cycles, six native hide/restore cycles\n'
+  printf -- '- Narrow-window assertion: restoring native List Contents and Inspector preserves the 900-point window and a usable Reader\n'
   printf -- '- AX evidence: `%s`\n' "$AX_RESULT"
   printf -- '- Production preferences/data touched: **No** — state, defaults, persistence, and caches were isolated.\n'
 } >"$REPORT_PATH"

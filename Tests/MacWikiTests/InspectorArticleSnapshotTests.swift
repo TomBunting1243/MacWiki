@@ -131,6 +131,24 @@ struct InspectorArticleSnapshotTests {
         #expect(!tagDetail.contains("var tagToEdit: Tag?"))
     }
 
+    @Test func inspectorAppearanceReadsExistingStateWithoutPersistenceSideEffects() throws {
+        let panel = try source("Sources/MacWiki/Views/Inspector/InspectorPanel.swift")
+        let labels = try source("Sources/MacWiki/Views/Inspector/InspectorLabelSection.swift")
+        let tags = try source("Sources/MacWiki/Views/Inspector/InspectorTagStatusBox.swift")
+
+        #expect(panel.contains("let state = currentArticleStates.first"))
+        #expect(!panel.contains("loadOrCreateArticleState"))
+        #expect(!panel.contains("ReadStateSync.syncSavedArticles"))
+        #expect(!panel.contains("ReadStateSync.resolveReadState"))
+        #expect(!panel.contains("modelContext.insert(newState)"))
+        #expect(!panel.contains("modelContext.saveReportingFailure"))
+        #expect(!panel.contains("appState.updateReadState"))
+
+        // Explicit organization edits retain their lazy mutation boundary.
+        #expect(labels.contains("ReadStateSync.ensureArticleState(for: article, in: modelContext)"))
+        #expect(tags.contains("ReadStateSync.ensureArticleState(for: article, in: modelContext)"))
+    }
+
     private func makeInMemoryModelContext() throws -> ModelContext {
         let configuration = ModelConfiguration(isStoredInMemoryOnly: true)
         let container = try ModelContainer(

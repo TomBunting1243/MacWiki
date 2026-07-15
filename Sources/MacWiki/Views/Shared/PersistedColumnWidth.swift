@@ -19,6 +19,9 @@ enum MainWindowLayout {
     /// A readable article should remain the dominant surface when auxiliary
     /// columns compete for space.
     static let minimumReaderWidth: CGFloat = 520
+    /// A stable minimum avoids resizing the window when auxiliary panes open.
+    /// Native split and inspector containers adapt their own columns above it.
+    static let minimumWindowWidth: CGFloat = 720
     static let minimumContentHeight: CGFloat = 520
     static let dividerThickness: CGFloat = 1
 

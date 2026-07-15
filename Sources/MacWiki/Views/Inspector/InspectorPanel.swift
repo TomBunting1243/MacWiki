@@ -4,7 +4,6 @@ import SwiftData
 /// Inspector panel with grouped, context-sensitive modes.
 struct InspectorPanel: View {
     @Environment(AppState.self) private var appState
-    @Environment(\.modelContext) private var modelContext
     @Environment(\.openURL) private var openURL
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.macWikiAccessibilityPersonalization.reduceMotion) private var reduceMotion
@@ -418,7 +417,11 @@ struct InspectorPanel: View {
             return
         }
         let requestedKey = InspectorArticleKey(article: article)
-        let state = await loadOrCreateArticleState(for: article, requestedKey: requestedKey)
+        // Native inspectors may reconstruct their content whenever they are
+        // hidden and shown. Snapshot refreshes must therefore remain read-only:
+        // state creation and synchronization belong to the Reader lifecycle or
+        // explicit inspector mutations such as assigning a label or tag.
+        let state = currentArticleStates.first
         guard !Task.isCancelled, currentArticleKey == requestedKey else { return }
 
         let refreshed = InspectorArticleSnapshot.make(
@@ -429,51 +432,6 @@ struct InspectorPanel: View {
         if articleSnapshot != refreshed {
             articleSnapshot = refreshed
         }
-    }
-
-    @MainActor
-    private func loadOrCreateArticleState(
-        for article: Article,
-        requestedKey: InspectorArticleKey
-    ) async -> ArticleState? {
-
-        if let existing = fetchArticleState(for: article) {
-            // Check cancellation before writing — article may have changed
-            guard !Task.isCancelled, currentArticleKey == requestedKey else { return nil }
-            let didChangeSavedArticles = ReadStateSync.syncSavedArticles(
-                title: article.title,
-                isRead: existing.isRead,
-                in: modelContext
-            )
-            appState.updateReadState(forTitle: article.title, isRead: existing.isRead)
-            if didChangeSavedArticles {
-                modelContext.saveReportingFailure(operation: #function)
-            }
-            return existing
-        }
-
-        let resolvedReadState = ReadStateSync.resolveReadState(for: article, in: modelContext)
-
-        // Check cancellation before inserting — a rapid tab switch could cause stale writes
-        guard !Task.isCancelled, currentArticleKey == requestedKey else { return nil }
-
-        let newState = ArticleState(
-            articleTitle: article.title,
-            articleURL: article.url,
-            isRead: resolvedReadState
-        )
-        modelContext.insert(newState)
-        modelContext.saveReportingFailure(operation: #function)
-        appState.updateReadState(forTitle: article.title, isRead: resolvedReadState)
-        return newState
-    }
-
-    private func fetchArticleState(for article: Article) -> ArticleState? {
-        let urlString = article.url.absoluteString
-        let descriptor = FetchDescriptor<ArticleState>(
-            predicate: #Predicate { $0.articleURLString == urlString }
-        )
-        return try? modelContext.fetch(descriptor).first
     }
 
 }

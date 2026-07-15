@@ -8,6 +8,5 @@ struct InspectorColumnView: View {
             currentArticle: appState.currentArticle
         )
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .ignoresSafeArea(.container, edges: .top)
     }
 }

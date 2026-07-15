@@ -97,7 +97,7 @@ private struct WindowSnapshot {
     }
 
     var isReady: Bool {
-        windows.count == 1 && mainWindows.count == 1 && toolbarCount == 0
+        windows.count == 1 && mainWindows.count == 1 && toolbarCount == 1
     }
 }
 
@@ -384,7 +384,7 @@ private func run() throws {
         }
         guard settled else {
             throw LifecycleError.failure(
-                "Cycle \(cycle) did not settle with one native window and no window-wide toolbar."
+                "Cycle \(cycle) did not settle with one native window and one full-width native toolbar."
             )
         }
 

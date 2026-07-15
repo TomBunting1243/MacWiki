@@ -30,19 +30,21 @@ struct MainWindowShell: View {
     }
 }
 
-/// One native four-pane hierarchy keeps the reader and its WebView alive while
-/// AppKit provides standard sidebar, content-list, and inspector behavior.
+/// The main window uses SwiftUI's platform-owned navigation and inspector
+/// containers. This keeps collapse, resize, keyboard, and accessibility
+/// behavior on the same native state path instead of mirroring it through a
+/// custom AppKit split-controller bridge.
 private struct MainWorkspaceShell: View {
     @Environment(AppState.self) private var appState
     @Environment(\.modelContext) private var modelContext
     @Environment(\.openWindow) private var openWindow
-    @Environment(\.openURL) private var openURL
-    @Environment(\.colorScheme) private var colorScheme
-    @Environment(\.macWikiAccessibilityPersonalization) private var accessibilityPersonalization
     @AppStorage(AppStorageKey.MainWindow.sidebarWidth) private var sidebarWidth = AppStorageKey.MainWindow.sidebarWidthDefault
     @AppStorage(AppStorageKey.MainWindow.directoryWidth) private var directoryWidth = AppStorageKey.MainWindow.directoryWidthDefault
     @AppStorage(AppStorageKey.MainWindow.inspectorWidth) private var inspectorWidth = AppStorageKey.MainWindow.inspectorWidthDefault
     @State private var openWindowHandler = WorkspaceOpenWindowHandler()
+    @State private var showsSavePopover = false
+    @State private var showsReaderStylePopover = false
+    @State private var showsPageViewsPopover = false
 
     @Binding var selectedList: ReadingList?
     @Binding var selectedLabel: Label?
@@ -57,100 +59,100 @@ private struct MainWorkspaceShell: View {
     var body: some View {
         @Bindable var appState = appState
 
-        NativeWorkspaceSplitView(
-            sidebarVisible: $appState.listsSidebarVisible,
-            directoryVisible: $appState.directoryColumnVisible,
-            inspectorVisible: $appState.inspectorVisible,
-            reduceMotion: accessibilityPersonalization.reduceMotion,
-            initialSidebarWidth: CGFloat(sidebarWidth),
-            initialDirectoryWidth: CGFloat(directoryWidth),
-            initialInspectorWidth: CGFloat(inspectorWidth),
-            sidebarRevision: workspaceAppearanceRevision,
-            directoryRevision: directoryContentRevision,
-            readerRevision: readerPresentationRevision,
-            inspectorRevision: workspaceAppearanceRevision,
-            readerChromeVisible: !appState.isWikiHopNavigationLocked,
-            sidebar: workspaceEnvironment(
-                ListsColumnView(
-                    selectedList: $selectedList,
-                    selectedLabel: $selectedLabel,
-                    selectedTag: $selectedTag,
-                    rootSelection: $rootSelection,
-                    sidebarSearchModel: sidebarSearchModel,
-                    onEditLabel: onEditLabel,
-                    onAddNewLabel: onAddNewLabel
-                )
-            ),
-            directory: workspaceEnvironment(
-                DirectoryColumnView(
-                    selectedList: $selectedList,
-                    rootSelection: $rootSelection,
-                    selectedLabel: selectedLabel,
-                    selectedTag: selectedTag,
-                    sidebarSearchModel: sidebarSearchModel,
-                    onNewLabelWithArticle: onNewLabelWithArticle,
-                    onNewTagWithArticle: onNewTagWithArticle
-                )
-            ),
-            reader: workspaceEnvironment(
-                ReaderColumnView()
-                    .id("main-reader-column")
-            ),
-            inspector: workspaceEnvironment(
-                InspectorColumnView()
-            ),
-            readerTopAccessory: workspaceEnvironment(
-                ReaderTopChromeView(
+        NavigationSplitView(columnVisibility: $appState.navigationSplitViewVisibility) {
+            ListsColumnView(
+                selectedList: $selectedList,
+                selectedLabel: $selectedLabel,
+                selectedTag: $selectedTag,
+                rootSelection: $rootSelection,
+                sidebarSearchModel: sidebarSearchModel,
+                onEditLabel: onEditLabel,
+                onAddNewLabel: onAddNewLabel
+            )
+            .navigationSplitViewColumnWidth(
+                min: MainWindowColumnWidth.sidebarRange.lowerBound,
+                ideal: CGFloat(sidebarWidth),
+                max: MainWindowColumnWidth.sidebarRange.upperBound
+            )
+            .persistedColumnWidth(
+                key: AppStorageKey.MainWindow.sidebarWidth,
+                range: MainWindowColumnWidth.sidebarRange
+            )
+        } content: {
+            DirectoryColumnView(
+                selectedList: $selectedList,
+                rootSelection: $rootSelection,
+                selectedLabel: selectedLabel,
+                selectedTag: selectedTag,
+                sidebarSearchModel: sidebarSearchModel,
+                onNewLabelWithArticle: onNewLabelWithArticle,
+                onNewTagWithArticle: onNewTagWithArticle
+            )
+            .navigationSplitViewColumnWidth(
+                min: MainWindowColumnWidth.directoryRange.lowerBound,
+                ideal: CGFloat(directoryWidth),
+                max: MainWindowColumnWidth.directoryRange.upperBound
+            )
+            .persistedColumnWidth(
+                key: AppStorageKey.MainWindow.directoryWidth,
+                range: MainWindowColumnWidth.directoryRange
+            )
+        } detail: {
+            VStack(spacing: 0) {
+                TabBarView(
+                    showsTopDivider: false,
                     onNewLabelWithArticle: onNewLabelWithArticle
                 )
+
+                Divider()
+
+                ReaderColumnView()
+                    .id("main-reader-column")
+            }
+        }
+        .navigationSplitViewStyle(.balanced)
+        .inspector(isPresented: $appState.inspectorVisible) {
+            InspectorColumnView()
+                .inspectorColumnWidth(
+                    min: MainWindowColumnWidth.inspectorRange.lowerBound,
+                    ideal: CGFloat(inspectorWidth),
+                    max: MainWindowColumnWidth.inspectorRange.upperBound
+                )
+                .persistedColumnWidth(
+                    key: AppStorageKey.MainWindow.inspectorWidth,
+                    range: MainWindowColumnWidth.inspectorRange
+                )
+        }
+        .toolbar(id: MainWindowReaderToolbarIdentifier.configuration) {
+            MainWindowReaderToolbar(
+                appState: appState,
+                modelContext: modelContext,
+                showsSavePopover: $showsSavePopover,
+                showsReaderStylePopover: $showsReaderStylePopover,
+                showsPageViewsPopover: $showsPageViewsPopover
             )
-        )
+        }
+        .environment(\.workspaceOpenWindowHandler, openWindowHandler)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .task {
             openWindowHandler.update(action: openWindow)
         }
-    }
-
-    private func workspaceEnvironment<Content: View>(_ content: Content) -> some View {
-        content
-            .defaultAppStorage(MacWikiDefaults.current)
-            .environment(appState)
-            .environment(\.modelContext, modelContext)
-            .environment(\.workspaceOpenWindowHandler, openWindowHandler)
-            .environment(\.openURL, openURL)
-            .environment(\.colorScheme, colorScheme)
-            .environment(\.macWikiAccessibilityPersonalization, accessibilityPersonalization)
-    }
-
-    private var directoryContentRevision: String {
-        [
-            selectedList?.id.uuidString ?? "",
-            selectedLabel?.id.uuidString ?? "",
-            selectedTag?.id.uuidString ?? "",
-            String(describing: rootSelection),
-            workspaceAppearanceRevision
-        ].joined(separator: "|")
-    }
-
-    private var workspaceAppearanceRevision: String {
-        [
-            colorScheme == .dark ? "dark" : "light",
-            accessibilityPersonalization.reduceMotion ? "reduce-motion" : "motion",
-            accessibilityPersonalization.reduceTransparency ? "opaque" : "transparent",
-            accessibilityPersonalization.differentiateWithoutColor ? "differentiated" : "color",
-            accessibilityPersonalization.colorSchemeContrast == .increased ? "high-contrast" : "standard-contrast"
-        ].joined(separator: "|")
-    }
-
-    /// The Reader and its controls live in separate native hosting controllers.
-    /// Include cross-host presentation signals in the bridge revision so an
-    /// accessory action invalidates Reader chrome without changing the stable
-    /// reader/WebView identity.
-    private var readerPresentationRevision: String {
-        [
-            workspaceAppearanceRevision,
-            appState.showFindOnPage ? "find-visible" : "find-hidden",
-            appState.findOnPageFocusRequestID?.uuidString ?? ""
-        ].joined(separator: "|")
+        .onChange(of: appState.currentArticle?.id) { _, _ in
+            showsSavePopover = false
+            showsReaderStylePopover = false
+            showsPageViewsPopover = false
+        }
+        .onChange(of: appState.readerStylePresentationRequestID) { _, requestID in
+            guard requestID != nil, appState.currentArticle != nil else { return }
+            showsSavePopover = false
+            showsPageViewsPopover = false
+            showsReaderStylePopover = true
+        }
+        .onChange(of: appState.readerPageViewsPresentationRequestID) { _, requestID in
+            guard requestID != nil, appState.currentArticle != nil else { return }
+            showsSavePopover = false
+            showsReaderStylePopover = false
+            showsPageViewsPopover = true
+        }
     }
 }

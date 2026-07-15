@@ -8,8 +8,9 @@ struct DirectoryDiscoverySurfaceRegressionTests {
     @Test func directoryLetsContentUseTheNativeTopSafeArea() throws {
         let source = try repositorySource("Sources/MacWiki/Views/Columns/DirectoryColumnView.swift")
 
-        #expect(source.contains("SidebarPaneBackground()\n                .ignoresSafeArea(.container, edges: .top)"))
-        #expect(source.components(separatedBy: ".ignoresSafeArea").count == 2)
+        #expect(source.contains(".frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)"))
+        #expect(!source.contains("SidebarPaneBackground()"))
+        #expect(!source.contains(".ignoresSafeArea"))
         #expect(!source.contains("proxy.frame(in: .global)"))
         #expect(!source.contains("Task.sleep"))
         #expect(!source.contains("updateTrafficLightAvoidance"))

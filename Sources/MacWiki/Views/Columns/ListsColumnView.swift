@@ -20,6 +20,5 @@ struct ListsColumnView: View {
             onEditLabel: onEditLabel,
             onAddNewLabel: onAddNewLabel
         )
-        .ignoresSafeArea(.container, edges: [.top, .leading, .bottom])
     }
 }

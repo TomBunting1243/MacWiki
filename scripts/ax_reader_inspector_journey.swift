@@ -97,56 +97,72 @@ private func hasRole(_ element: AXUIElement, _ role: String) -> Bool {
     stringAttribute(kAXRoleAttribute as CFString, from: element) == role
 }
 
-private func isMenuControl(_ element: AXUIElement) -> Bool {
-    let role = stringAttribute(kAXRoleAttribute as CFString, from: element)
-    return role == kAXMenuButtonRole as String || role == kAXPopUpButtonRole as String
-}
-
-private func workspaceSplitGroup(in window: AXUIElement) -> AXUIElement? {
-    guard let shellRoot = directChildren(of: window).first(where: { hasRole($0, kAXGroupRole as String) }),
-          let outerSplit = directChildren(of: shellRoot).first(where: { hasRole($0, kAXSplitGroupRole as String) }) else {
+private func parent(of element: AXUIElement) -> AXUIElement? {
+    guard let value = attributeValue(kAXParentAttribute as CFString, from: element),
+          CFGetTypeID(value) == AXUIElementGetTypeID() else {
         return nil
     }
-
-    let rootPaneGroups = directChildren(of: outerSplit).filter {
-        hasRole($0, kAXGroupRole as String)
-    }
-    let rootOwnsInspector = rootPaneGroups.contains { group in
-        directChildren(of: group).contains { hasRole($0, kAXRadioGroupRole as String) }
-    }
-    if rootOwnsInspector || rootPaneGroups.count >= 3 {
-        return outerSplit
-    }
-
-    guard let detailGroup = rootPaneGroups.last else { return nil }
-    return directChildren(of: detailGroup).first { hasRole($0, kAXSplitGroupRole as String) }
+    return (value as! AXUIElement)
 }
 
-private func inspectorPane(in window: AXUIElement) -> AXUIElement? {
-    guard let workspace = workspaceSplitGroup(in: window) else { return nil }
-    return directChildren(of: workspace)
-        .filter { hasRole($0, kAXGroupRole as String) }
-        .first { group in
-            directChildren(of: group).contains { hasRole($0, kAXRadioGroupRole as String) }
-        }
+private func nativeWindowToolbar(in window: AXUIElement) -> AXUIElement? {
+    elements(in: window, limit: 1_000).first {
+        hasRole($0, kAXToolbarRole as String)
+    }
 }
 
 private func inspectorModeGroup(in window: AXUIElement) -> AXUIElement? {
-    guard let inspector = inspectorPane(in: window) else { return nil }
-    return directChildren(of: inspector).first { hasRole($0, kAXRadioGroupRole as String) }
+    elements(in: window, limit: 1_500).first { candidate in
+        guard hasRole(candidate, kAXRadioGroupRole as String) else { return false }
+        let candidateLabels = Set(elements(in: candidate, limit: 30).flatMap(accessibilityLabels))
+        return candidateLabels.isSuperset(of: ["Info", "Notes", "References"])
+    }
 }
 
-private func readerPane(in window: AXUIElement) -> AXUIElement? {
-    guard let workspace = workspaceSplitGroup(in: window) else { return nil }
-    return directChildren(of: workspace)
-        .filter { hasRole($0, kAXGroupRole as String) }
-        .first { group in
-            let descendants = elements(in: group, limit: 500)
-            return descendants.contains { child in
-                hasRole(child, kAXButtonRole as String)
-                    && accessibilityLabels(of: child).contains("New Tab")
+private func inspectorPane(in window: AXUIElement) -> AXUIElement? {
+    guard let modeGroup = inspectorModeGroup(in: window) else { return nil }
+    let contentMarkers = [
+        "Metadata", "Contents", "No Highlights Yet", "No References Found", "Export"
+    ]
+    var candidate = parent(of: modeGroup)
+    for _ in 0..<8 {
+        guard let current = candidate else { break }
+        if hasRole(current, kAXGroupRole as String) {
+            let candidateLabels = labels(in: current)
+            if candidateLabels.contains(where: { label in
+                contentMarkers.contains { matchesAXLabel(label, expected: $0) }
+            }) {
+                return current
             }
         }
+        candidate = parent(of: current)
+    }
+    return parent(of: modeGroup)
+}
+
+private func readerPane(in window: AXUIElement, articleTitle: String) -> AXUIElement? {
+    guard let newTabButton = button(in: window, label: "New Tab") else { return nil }
+    var candidate = parent(of: newTabButton)
+    for _ in 0..<12 {
+        guard let current = candidate else { break }
+        let role = stringAttribute(kAXRoleAttribute as CFString, from: current)
+        if (role == kAXGroupRole as String || role == kAXSplitGroupRole as String),
+           containsLabel(articleTitle, in: current) {
+            return current
+        }
+        candidate = parent(of: current)
+    }
+    return nil
+}
+
+private func nativeSplitPaneSizes(in window: AXUIElement) -> String {
+    let sizes = elements(in: window, limit: 1_500)
+        .filter { hasRole($0, kAXSplitGroupRole as String) }
+        .flatMap(directChildren)
+        .filter { hasRole($0, kAXGroupRole as String) }
+        .compactMap(elementSize)
+        .map { "\(Int($0.width))x\(Int($0.height))" }
+    return sizes.isEmpty ? "unavailable" : sizes.joined(separator: ", ")
 }
 
 private func mainWindow(in application: AXUIElement) -> AXUIElement? {
@@ -212,63 +228,6 @@ private func matchingElements(
 
 private func button(in application: AXUIElement, label: String) -> AXUIElement? {
     element(in: application, role: kAXButtonRole as String, label: label)
-}
-
-private func menuItem(in application: AXUIElement, label: String) -> AXUIElement? {
-    if let focusedValue = attributeValue(
-        kAXFocusedUIElementAttribute as CFString,
-        from: application
-    ), CFGetTypeID(focusedValue) == AXUIElementGetTypeID() {
-        let focusedElement = focusedValue as! AXUIElement
-        var candidate: AXUIElement? = focusedElement
-        for _ in 0..<8 {
-            guard let current = candidate else { break }
-            let role = stringAttribute(kAXRoleAttribute as CFString, from: current)
-            if role == kAXMenuItemRole as String,
-               accessibilityLabels(of: current).contains(where: { matchesAXLabel($0, expected: label) }) {
-                return current
-            }
-            if (role == "AXMenu" || role == kAXMenuBarRole as String),
-               let result = element(in: current, role: kAXMenuItemRole as String, label: label) {
-                return result
-            }
-            guard let parentValue = attributeValue(kAXParentAttribute as CFString, from: current),
-                  CFGetTypeID(parentValue) == AXUIElementGetTypeID() else {
-                break
-            }
-            let parent = parentValue as! AXUIElement
-            candidate = parent
-        }
-    }
-
-    // Menus are exposed as immediate application children (or beneath the menu
-    // bar). Restrict the fallback to those roots so opening the Reader More menu does
-    // not recursively query every SwiftUI hosting view in every application window.
-    let applicationChildren = attributeValue(
-        kAXChildrenAttribute as CFString,
-        from: application
-    ) as? [AXUIElement] ?? []
-    let menuRoots = applicationChildren.filter { child in
-        let role = stringAttribute(kAXRoleAttribute as CFString, from: child)
-        return role == "AXMenu" || role == kAXMenuBarRole as String
-    }
-    return menuRoots.lazy.compactMap {
-        element(in: $0, role: kAXMenuItemRole as String, label: label)
-    }.first
-}
-
-private func postEscape(to pid: pid_t) throws {
-    guard let keyDown = CGEvent(keyboardEventSource: nil, virtualKey: 53, keyDown: true),
-          let keyUp = CGEvent(keyboardEventSource: nil, virtualKey: 53, keyDown: false) else {
-        throw JourneyError.missing("Unable to create a targeted Escape key event.")
-    }
-    keyDown.postToPid(pid)
-    keyUp.postToPid(pid)
-}
-
-private func inspectorModeControl(in application: AXUIElement, label: String) -> AXUIElement? {
-    button(in: application, label: label) ??
-        element(in: application, role: kAXRadioButtonRole as String, label: label)
 }
 
 private func isSelected(_ element: AXUIElement) -> Bool {
@@ -371,7 +330,7 @@ do {
     // announced, and querying AXChildren during that update is re-entrant.
     settleAccessibility(for: 1.0)
     guard wait(timeout: 10, condition: {
-        guard let reader = readerPane(in: contentWindow) else { return false }
+        guard let reader = readerPane(in: contentWindow, articleTitle: articleTitle) else { return false }
         return containsLabel(articleTitle, in: reader)
     }) else {
         throw JourneyError.missing("The seeded article did not become accessible in the main window.")
@@ -381,38 +340,46 @@ do {
     settleAccessibility(for: 0.75)
     traceRuntimeDiagnostics("window resize")
 
-    func refreshReaderChrome() throws -> AXUIElement {
-        guard let reader = readerPane(in: contentWindow) else {
-            throw JourneyError.missing("The reader-scoped accessory disappeared during the journey.")
+    func refreshNativeToolbar() throws -> AXUIElement {
+        guard let toolbar = nativeWindowToolbar(in: contentWindow) else {
+            throw JourneyError.missing("The native window toolbar disappeared during the journey.")
         }
-        return reader
+        return toolbar
+    }
+
+    func toolbarButton(_ label: String) throws -> AXUIElement {
+        let toolbar = try refreshNativeToolbar()
+        guard let result = button(in: toolbar, label: label) else {
+            throw JourneyError.missing("The native window toolbar omitted \(label).")
+        }
+        return result
     }
 
     var modeGroup = inspectorModeGroup(in: contentWindow)
     let listContentsControlReport: String
-    let initialReader = try refreshReaderChrome()
-    if button(in: initialReader, label: "Hide List Contents") != nil {
+    let initialToolbar = try refreshNativeToolbar()
+    if button(in: initialToolbar, label: "Hide List Contents") != nil {
         listContentsControlReport = "Hide List Contents"
-    } else if button(in: initialReader, label: "Show List Contents") != nil {
+    } else if button(in: initialToolbar, label: "Show List Contents") != nil {
         listContentsControlReport = "Show List Contents"
     } else {
-        throw JourneyError.missing("The reader accessory omitted its List Contents control.")
+        throw JourneyError.missing("The native window toolbar omitted its List Contents control.")
     }
     let listsControlReport: String
-    if button(in: initialReader, label: "Hide Lists") != nil {
+    if button(in: initialToolbar, label: "Hide Lists") != nil {
         listsControlReport = "Hide Lists"
-    } else if button(in: initialReader, label: "Show Lists") != nil {
+    } else if button(in: initialToolbar, label: "Show Lists") != nil {
         listsControlReport = "Show Lists"
     } else {
-        throw JourneyError.missing("The reader accessory omitted its Lists control.")
+        throw JourneyError.missing("The native window toolbar omitted its Lists control.")
     }
     if modeGroup == nil {
         guard wait(condition: {
-            guard let reader = try? refreshReaderChrome(),
-                  let showInspector = button(in: reader, label: "Show Inspector") else { return false }
+            guard let toolbar = try? refreshNativeToolbar(),
+                  let showInspector = button(in: toolbar, label: "Show Inspector") else { return false }
             return isEnabled(showInspector)
-        }), let reader = try? refreshReaderChrome(),
-            let showInspector = button(in: reader, label: "Show Inspector") else {
+        }), let toolbar = try? refreshNativeToolbar(),
+            let showInspector = button(in: toolbar, label: "Show Inspector") else {
             throw JourneyError.missing(
                 "Show Inspector never became enabled at the wide test size \(String(describing: windowSize(contentWindow)))."
             )
@@ -424,93 +391,43 @@ do {
         modeGroup = inspectorModeGroup(in: contentWindow)
         return modeGroup != nil
     }) else {
-        throw JourneyError.missing("The split inspector did not become accessible.")
+        throw JourneyError.missing("The native inspector did not become accessible.")
     }
     traceRuntimeDiagnostics("inspector readiness")
-    trace("window, reader accessory, and inspector ready")
+    trace("native window toolbar, NavigationSplitView Reader, and inspector ready")
 
     let expectedReaderControls = [
         "Back", "Forward", "Search Wikipedia", "Save Article",
         "Mark as Read", "Find in Page", "Reader Style",
         "Page Views", "Open in Browser", "Share", "Hide Inspector"
     ]
-    let readerElements = elements(in: try refreshReaderChrome(), limit: 500)
-    func readerButton(_ label: String, among candidates: [AXUIElement]) -> AXUIElement? {
-        candidates.first { candidate in
-            guard stringAttribute(kAXRoleAttribute as CFString, from: candidate) == kAXButtonRole as String else {
-                return false
-            }
-            return accessibilityLabels(of: candidate).contains {
-                matchesAXLabel($0, expected: label)
-            }
-        }
+    let contractToolbar = try refreshNativeToolbar()
+    let missingToolbarControls = expectedReaderControls.filter {
+        button(in: contractToolbar, label: $0) == nil
     }
-    let visibleReaderControls = expectedReaderControls.filter {
-        readerButton($0, among: readerElements) != nil
-    }
-    var menuReaderControls: [String] = []
-    let missingVisibleControls = expectedReaderControls.filter { !visibleReaderControls.contains($0) }
-    if !missingVisibleControls.isEmpty,
-       let currentReader = try? refreshReaderChrome() {
-        let moreButtons = elements(in: currentReader, limit: 500).filter {
-            isMenuControl($0)
-                && accessibilityLabels(of: $0).contains { matchesAXLabel($0, expected: "More Reader Actions") }
-        }
-        for moreButton in moreButtons {
-            try press(moreButton, label: "More Reader Actions")
-            settleAccessibility(for: 0.2)
-            _ = wait(timeout: 2, condition: {
-                missingVisibleControls.contains { menuItem(in: application, label: $0) != nil }
-            })
-            menuReaderControls.append(contentsOf: missingVisibleControls.filter {
-                menuItem(in: application, label: $0) != nil
-            })
-            try postEscape(to: pid)
-            if Set(menuReaderControls).isSuperset(of: missingVisibleControls) { break }
-        }
-    }
-    let availableReaderControls = Array(Set(visibleReaderControls + menuReaderControls))
-    guard availableReaderControls.count == expectedReaderControls.count else {
-        let missing = expectedReaderControls.filter { !availableReaderControls.contains($0) }
+    guard missingToolbarControls.isEmpty else {
         if traceEnabled,
-           let currentReader = try? refreshReaderChrome() {
-            let summary = elements(in: currentReader, limit: 500).map { element in
+           let currentToolbar = try? refreshNativeToolbar() {
+            let summary = elements(in: currentToolbar, limit: 300).map { element in
                 let role = stringAttribute(kAXRoleAttribute as CFString, from: element)
                 let title = stringAttribute(kAXTitleAttribute as CFString, from: element)
                 let description = stringAttribute(kAXDescriptionAttribute as CFString, from: element)
                 return "\(role)|\(title)|\(description)"
             }
-            trace("reader accessory AX: \(summary)")
+            trace("native toolbar AX: \(summary)")
         }
-        throw JourneyError.missing("Reader accessory omitted accessible controls: \(missing.joined(separator: ", "))")
+        throw JourneyError.missing(
+            "Native window toolbar omitted accessible controls: \(missingToolbarControls.joined(separator: ", "))"
+        )
     }
 
-    let reportedReaderControls = [listsControlReport, listContentsControlReport] + expectedReaderControls.map { label in
-        menuReaderControls.contains(label) ? "\(label) (More menu)" : label
+    guard labeledElement(in: contentWindow, label: "More Reader Actions") == nil else {
+        throw JourneyError.missing("The retired custom More Reader Actions control is still exposed.")
     }
-    trace("reader accessory contract verified")
-    traceRuntimeDiagnostics("reader accessory contract")
 
-    func readerAction(_ label: String) throws -> AXUIElement {
-        let currentReader = try refreshReaderChrome()
-        let readerDescendants = elements(in: currentReader, limit: 500)
-        if let visibleButton = readerButton(label, among: readerDescendants) {
-            return visibleButton
-        }
-        for moreButton in readerDescendants.filter({
-            isMenuControl($0)
-                && accessibilityLabels(of: $0).contains { matchesAXLabel($0, expected: "More Reader Actions") }
-        }) {
-            try press(moreButton, label: "More Reader Actions")
-            settleAccessibility(for: 0.2)
-            if wait(timeout: 2, condition: { menuItem(in: application, label: label) != nil }),
-               let item = menuItem(in: application, label: label) {
-                return item
-            }
-            try postEscape(to: pid)
-        }
-        throw JourneyError.missing("Reader controls and More menu omitted \(label).")
-    }
+    let reportedReaderControls = [listsControlReport, listContentsControlReport] + expectedReaderControls
+    trace("native window toolbar contract verified")
+    traceRuntimeDiagnostics("native window toolbar contract")
 
     func inspectorButton(_ label: String) throws -> AXUIElement {
         guard let group = inspectorModeGroup(in: contentWindow) else {
@@ -549,9 +466,7 @@ do {
     func currentInspectorLabels() -> [String] {
         guard let inspector = inspectorPane(in: contentWindow) else { return [] }
         var seen = Set<String>()
-        return directChildren(of: inspector)
-            .filter { !hasRole($0, kAXRadioGroupRole as String) }
-            .flatMap(labels)
+        return labels(in: inspector)
             .filter { seen.insert($0).inserted }
     }
 
@@ -619,7 +534,33 @@ do {
     trace("inspector stress cycle verified")
     traceRuntimeDiagnostics("inspector stress cycle")
 
-    let findButton = try readerAction("Find in Page")
+    // The inspector is a native scene modifier now. Exercise its actual toolbar
+    // visibility path repeatedly, refreshing both the toolbar item and inspector
+    // AX subtree after every structural transition.
+    for cycle in 1...6 {
+        let hideInspector = try toolbarButton("Hide Inspector")
+        try press(hideInspector, label: "Hide Inspector")
+        guard wait(timeout: 4, condition: {
+            inspectorModeGroup(in: contentWindow) == nil
+                && (try? toolbarButton("Show Inspector")) != nil
+        }) else {
+            throw JourneyError.missing("Inspector visibility cycle \(cycle) did not hide the native inspector.")
+        }
+
+        let showInspector = try toolbarButton("Show Inspector")
+        try press(showInspector, label: "Show Inspector")
+        guard wait(timeout: 4, condition: {
+            inspectorModeGroup(in: contentWindow) != nil
+                && (try? toolbarButton("Hide Inspector")) != nil
+        }) else {
+            throw JourneyError.missing("Inspector visibility cycle \(cycle) did not restore the native inspector.")
+        }
+        settleAccessibility(for: 0.15)
+    }
+    trace("native inspector visibility stress cycle verified")
+    traceRuntimeDiagnostics("inspector visibility stress cycle")
+
+    let findButton = try toolbarButton("Find in Page")
     try press(findButton, label: "Find in Page")
     settleAccessibility(for: 0.4)
     guard wait(condition: {
@@ -661,19 +602,19 @@ do {
     trace("single Find UI verified")
     traceRuntimeDiagnostics("Find UI")
 
-    let hideInspector = try readerAction("Hide Inspector")
+    let hideInspector = try toolbarButton("Hide Inspector")
     try press(hideInspector, label: "Hide Inspector")
     settleAccessibility(for: 0.45)
     guard wait(condition: { inspectorModeGroup(in: contentWindow) == nil }) else {
-        throw JourneyError.missing("Hide Inspector did not remove the split inspector.")
+        throw JourneyError.missing("Hide Inspector did not remove the native inspector.")
     }
     traceRuntimeDiagnostics("inspector hide")
 
-    let hideListContents = try readerAction("Hide List Contents")
+    let hideListContents = try toolbarButton("Hide List Contents")
     try press(hideListContents, label: "Hide List Contents")
     settleAccessibility(for: 0.45)
     guard wait(condition: {
-        (try? readerAction("Show List Contents")) != nil
+        (try? toolbarButton("Show List Contents")) != nil
     }) else {
         throw JourneyError.missing("Hide List Contents did not collapse the directory pane.")
     }
@@ -686,40 +627,20 @@ do {
         throw JourneyError.missing("The window did not reach the narrow pane-restore test width.")
     }
 
-    guard let narrowReader = try? refreshReaderChrome(),
-          let narrowMore = elements(in: narrowReader, limit: 500).first(where: {
-              isMenuControl($0)
-                  && accessibilityLabels(of: $0).contains {
-                      matchesAXLabel($0, expected: "More Reader Actions")
-                  }
-          }) else {
-        throw JourneyError.missing("The 900-point reader did not expose its native More Reader Actions control.")
+    guard nativeWindowToolbar(in: contentWindow) != nil,
+          readerPane(in: contentWindow, articleTitle: articleTitle) != nil else {
+        throw JourneyError.missing("The native toolbar or Reader detail disappeared at 900 points.")
     }
-    try press(narrowMore, label: "More Reader Actions at 900 points")
-    guard wait(timeout: 2, condition: {
-        menuItem(in: application, label: "Reader Style") != nil
-    }), let narrowReaderStyle = menuItem(in: application, label: "Reader Style") else {
-        throw JourneyError.missing("The compact More menu omitted Reader Style.")
-    }
-    try press(narrowReaderStyle, label: "Reader Style from compact More menu")
-    guard wait(timeout: 3, condition: {
-        containsLabel("Text Styles", in: contentWindow)
-    }) else {
-        throw JourneyError.missing("The compact More menu did not present Reader Style controls.")
-    }
-    try postEscape(to: pid)
-    settleAccessibility(for: 0.25)
-    trace("compact More-menu command path verified")
 
-    let showListContents = try readerAction("Show List Contents")
+    let showListContents = try toolbarButton("Show List Contents")
     try press(showListContents, label: "Show List Contents")
     settleAccessibility(for: 0.3)
-    let showInspector = try readerAction("Show Inspector")
+    let showInspector = try toolbarButton("Show Inspector")
     try press(showInspector, label: "Show Inspector")
     settleAccessibility(for: 0.5)
     guard wait(condition: {
         inspectorModeGroup(in: contentWindow) != nil
-            && (try? readerAction("Hide List Contents")) != nil
+            && (try? toolbarButton("Hide List Contents")) != nil
     }) else {
         throw JourneyError.missing("The narrow window did not restore both auxiliary panes.")
     }
@@ -728,7 +649,7 @@ do {
               abs(restoredWindowSize.width - narrowWidth) < 2 else {
             throw JourneyError.missing("Restoring panes resized the whole window instead of redistributing the native split.")
         }
-        let restoredReader = readerPane(in: contentWindow)
+        let restoredReader = readerPane(in: contentWindow, articleTitle: articleTitle)
         let restoredReaderSize = restoredReader.flatMap(elementSize)
         let restoredReaderContainsArticle = restoredReader.map {
             containsLabel(articleTitle, in: $0)
@@ -737,13 +658,7 @@ do {
               let restoredReaderSize,
               restoredReaderSize.width >= 300,
               restoredReaderContainsArticle else {
-            let workspacePaneSizes = workspaceSplitGroup(in: contentWindow).map {
-                directChildren(of: $0)
-                    .filter { hasRole($0, kAXGroupRole as String) }
-                    .compactMap(elementSize)
-                    .map { "\(Int($0.width))x\(Int($0.height))" }
-                    .joined(separator: ", ")
-            } ?? "unavailable"
+            let workspacePaneSizes = nativeSplitPaneSizes(in: contentWindow)
             let readerGeometry = restoredReaderSize.map {
                 "\(Int($0.width))x\(Int($0.height))"
             } ?? "unavailable"
@@ -765,8 +680,8 @@ do {
         readerControls: reportedReaderControls,
         inspectorStates: inspectorStates,
         findBar: findBar,
-        inspectorToggleCycle: "reader accessory hidden → restored",
-        narrowPaneRestoreCycle: "900-point window preserved; Lists sidebar yielded while List Contents and Inspector restored around a usable reader"
+        inspectorToggleCycle: "native inspector hidden and restored through six rapid cycles",
+        narrowPaneRestoreCycle: "900-point window preserved while native List Contents and Inspector restored around a usable Reader"
     )
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.prettyPrinted, .sortedKeys]

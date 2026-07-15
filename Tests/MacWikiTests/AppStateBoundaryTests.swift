@@ -59,36 +59,67 @@ struct AppStateBoundaryTests {
         #expect(appState.tabSessionStore.hasPendingSaveForTesting == false)
     }
 
-    @Test func listContentsTogglePreservesListsSidebarVisibility() {
+    @Test func listContentsTogglePreservesTheNativeNavigationHierarchy() {
         let appState = AppState(persistenceMode: .ephemeral)
-        appState.listsSidebarVisible = true
-        appState.directoryColumnVisible = true
+        appState.setNavigationColumnsVisible(true)
 
         appState.toggleDirectoryColumnVisibility()
 
-        #expect(appState.listsSidebarVisible == true)
+        #expect(appState.listsSidebarVisible == false)
         #expect(appState.directoryColumnVisible == false)
+        #expect(appState.navigationSplitViewVisibility == .detailOnly)
 
         appState.toggleDirectoryColumnVisibility()
 
-        #expect(appState.listsSidebarVisible == true)
+        #expect(appState.listsSidebarVisible == false)
         #expect(appState.directoryColumnVisible == true)
+        #expect(appState.navigationSplitViewVisibility == .doubleColumn)
     }
 
-    @Test func nativeSidebarVisibilityIsIndependentFromListContents() {
+    @Test func listsCanHideIndependentlyButShowingThemAlsoShowsListContents() {
         let appState = AppState(persistenceMode: .ephemeral)
-        appState.listsSidebarVisible = true
-        appState.directoryColumnVisible = true
+        appState.setNavigationColumnsVisible(true)
 
         appState.toggleListsSidebarVisibility()
 
         #expect(appState.listsSidebarVisible == false)
         #expect(appState.directoryColumnVisible == true)
+        #expect(appState.navigationSplitViewVisibility == .doubleColumn)
 
         appState.toggleListsSidebarVisibility()
 
         #expect(appState.listsSidebarVisible == true)
         #expect(appState.directoryColumnVisible == true)
+        #expect(appState.navigationSplitViewVisibility == .all)
+    }
+
+    @Test func invalidNavigationCombinationNormalizesToReaderOnly() {
+        let appState = AppState(persistenceMode: .ephemeral)
+
+        appState.setNavigationColumnVisibility(
+            listsVisible: true,
+            directoryVisible: false
+        )
+
+        #expect(appState.workspaceNavigationColumns == .readerOnly)
+        #expect(!appState.listsSidebarVisible)
+        #expect(!appState.directoryColumnVisible)
+    }
+
+    @Test func wikiHopLockRejectsNativeAndExplicitNavigationRevealRequests() {
+        let appState = AppState(persistenceMode: .ephemeral)
+        appState.setNavigationColumnsVisible(false)
+        appState.startWikiHop(
+            mode: .chill,
+            start: Article(id: "swift", title: "Swift"),
+            target: Article(id: "objective-c", title: "Objective-C")
+        )
+
+        appState.toggleListsSidebarVisibility()
+        appState.toggleDirectoryColumnVisibility()
+        appState.navigationSplitViewVisibility = .all
+
+        #expect(appState.workspaceNavigationColumns == .readerOnly)
     }
 
     @Test func readerPresentationRequestsRequireAnUnlockedArticle() {

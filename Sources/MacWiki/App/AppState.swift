@@ -17,6 +17,14 @@ enum AppStatePersistenceMode: Equatable, Sendable {
     }
 }
 
+/// The only navigation-column states representable by a hierarchical
+/// Lists -> List Contents -> Reader workspace.
+enum WorkspaceNavigationColumns: Equatable, Sendable {
+    case all
+    case listContentsAndReader
+    case readerOnly
+}
+
 /// Global application state container
 /// 
 /// Manages all shared state across the application including:
@@ -73,13 +81,19 @@ final class AppState {
     
     // MARK: - UI State
     
-    /// Command and native-divider visibility share these sources of truth. The
-    /// root AppKit split bridge writes user-driven collapse changes back here.
-    var listsSidebarVisible = true
-    var directoryColumnVisible = true
+    /// A single stored state prevents impossible combinations such as Lists
+    /// remaining visible after List Contents has collapsed.
+    var workspaceNavigationColumns: WorkspaceNavigationColumns = .all
 
-    /// The user's inspector preference. Native split items remain mounted and
-    /// collapse without overwriting this source of truth.
+    var listsSidebarVisible: Bool {
+        workspaceNavigationColumns == .all
+    }
+
+    var directoryColumnVisible: Bool {
+        workspaceNavigationColumns != .readerOnly
+    }
+
+    /// The user's inspector preference, bound directly to SwiftUI's inspector.
     var inspectorVisible: Bool = true
 
     /// Current inspector view mode
