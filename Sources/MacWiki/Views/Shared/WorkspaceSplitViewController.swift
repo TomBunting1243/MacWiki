@@ -50,7 +50,6 @@ final class WorkspaceSplitViewController: NSSplitViewController {
     private var pendingInitialWidthRestore: Task<Void, Never>?
     private var pendingWidthPersistence: Task<Void, Never>?
     private var pendingAdaptiveVisibilityReport: Task<Void, Never>?
-    private var readerToolbarController: ReaderToolbarController?
 
     init(
         sidebarController: NSViewController,
@@ -140,34 +139,14 @@ final class WorkspaceSplitViewController: NSSplitViewController {
     override func viewDidLayout() {
         super.viewDidLayout()
         scheduleInitialWidthRestore(after: WidthPersistence.restoreDelay)
-        readerToolbarController?.installIfPossible()
     }
 
     override func viewDidAppear() {
         super.viewDidAppear()
-        readerToolbarController?.installIfPossible()
     }
 
-    func configureReaderToolbar(environment: ReaderToolbarEnvironment) {
-        if let readerToolbarController {
-            readerToolbarController.update(environment: environment)
-        } else {
-            readerToolbarController = ReaderToolbarController(
-                splitController: self,
-                environment: environment
-            )
-        }
-        readerToolbarController?.installIfPossible()
-    }
-
-    func invalidateReaderToolbar() {
-        readerToolbarController?.invalidate()
-        readerToolbarController = nil
-    }
-
-    /// Reserved for reader-scoped native chrome. Keeping the accessory owned by
-    /// the semantic reader item lets a later toolbar pass move controls without
-    /// changing this four-pane hierarchy or replacing the reader host.
+    /// Reader controls and tabs belong to the semantic reader item, so the
+    /// navigation and inspector panes remain full-height native surfaces.
     func setReaderTopAccessoryViewControllers(
         _ controllers: [NSSplitViewItemAccessoryViewController]
     ) {
@@ -177,6 +156,17 @@ final class WorkspaceSplitViewController: NSSplitViewController {
             return
         }
         readerItem.topAlignedAccessoryViewControllers = controllers
+    }
+
+    func setReaderTopAccessoryVisible(_ visible: Bool, animated: Bool) {
+        for controller in readerItem.topAlignedAccessoryViewControllers
+            where controller.isHidden == visible {
+            if animated, view.window != nil {
+                controller.animator().isHidden = !visible
+            } else {
+                controller.isHidden = !visible
+            }
+        }
     }
 
     func setPaneVisibility(

@@ -1,9 +1,6 @@
 import SwiftUI
 
 enum ColumnChromeMetrics {
-    /// Tiny downward optical nudge so grouped toolbar controls appear centered
-    /// against the lane highlight/divider stack.
-    static let readerToolbarOpticalYOffset: CGFloat = 0.6
     static let horizontalPadding: CGFloat = 9
     static let dividerOpacity: CGFloat = 0.065
     static let internalDividerOpacity: CGFloat = 0.035
@@ -35,52 +32,7 @@ enum ChromeIconMetrics {
 }
 
 enum TopChromeControlMetrics {
-    static let groupHeight: CGFloat = 26
     static let groupButtonSize: CGFloat = 25
-    static let groupInnerSpacing: CGFloat = 1
-    static let groupHorizontalPadding: CGFloat = 5
-    static let groupCornerRadius: CGFloat = 9
-    static let activePlateCornerRadius: CGFloat = 6
-
-    static func accessoryCornerRadius(compact: Bool) -> CGFloat {
-        compact ? 9 : groupCornerRadius
-    }
-}
-
-enum TopChromeControlSurface {
-    static func tintOpacity(darkMode: Bool, compactAccessory: Bool = false) -> Double {
-        if darkMode {
-            return compactAccessory ? 0.18 : 0.16
-        }
-        return compactAccessory ? 0.08 : 0.07
-    }
-
-    static func sheenOpacity(darkMode: Bool, compactAccessory: Bool = false) -> Double {
-        if darkMode {
-            return compactAccessory ? 0.035 : 0.030
-        }
-        return compactAccessory ? 0.055 : 0.050
-    }
-
-    static func depthMultiplyOpacity(darkMode: Bool, compactAccessory: Bool = false) -> Double {
-        if darkMode {
-            return compactAccessory ? 0.050 : 0.045
-        }
-        return compactAccessory ? 0.012 : 0.010
-    }
-
-    static func borderOpacity(darkMode: Bool, liquid: Bool, compactAccessory: Bool = false) -> Double {
-        if liquid {
-            if darkMode {
-                return compactAccessory ? 0.082 : 0.075
-            }
-            return compactAccessory ? 0.060 : 0.055
-        }
-        if darkMode {
-            return compactAccessory ? 0.10 : 0.095
-        }
-        return compactAccessory ? 0.060 : 0.055
-    }
 }
 
 enum ColumnMotion {
@@ -241,53 +193,6 @@ struct SidebarPaneBackground: View {
             Rectangle()
                 .fill(.thinMaterial)
         }
-    }
-}
-
-struct ReaderTabLaneBackground: View {
-    @AppStorage(AppStorageKey.Chrome.liquidGlassChrome) private var liquidGlassChrome = true
-    @Environment(\.colorScheme) private var colorScheme
-    @Environment(\.macWikiAccessibilityPersonalization.colorSchemeContrast) private var colorSchemeContrast
-    @Environment(\.macWikiAccessibilityPersonalization.reduceTransparency) private var reduceTransparency
-
-    var body: some View {
-        ZStack {
-            if liquidGlassChrome && reduceTransparency {
-                Rectangle()
-                    .fill(Color(nsColor: .windowBackgroundColor))
-
-                Rectangle()
-                    .fill(Color(nsColor: .controlBackgroundColor))
-                    .opacity(colorScheme == .dark ? 0.72 : 0.86)
-            } else if liquidGlassChrome {
-                Rectangle()
-                    .fill(.thinMaterial)
-
-                Rectangle()
-                    .fill(Color(nsColor: .controlBackgroundColor))
-                    .opacity(colorScheme == .dark ? 0.08 : 0.12)
-
-                LinearGradient(
-                    colors: [
-                        Color.white.opacity(colorScheme == .dark ? 0.050 : 0.16),
-                        Color.white.opacity(0)
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .blendMode(.screen)
-            } else {
-                Color.clear
-            }
-
-            if colorSchemeContrast == .increased {
-                Rectangle()
-                    .fill(Color.primary.opacity(0.12))
-                    .frame(height: 1)
-                    .frame(maxHeight: .infinity, alignment: .bottom)
-            }
-        }
-            .allowsHitTesting(false)
     }
 }
 

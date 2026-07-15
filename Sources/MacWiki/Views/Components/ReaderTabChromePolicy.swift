@@ -52,23 +52,6 @@ enum TabChromeHierarchy {
         0.35
     }
 
-    static func activeGlassTintOpacity(darkMode: Bool) -> Double {
-        darkMode ? 0.010 : 0.008
-    }
-
-    static func nativeAccessoryTintOpacity(darkMode: Bool, compactAccessory: Bool) -> Double {
-        if darkMode {
-            return compactAccessory ? 0.16 : 0.18
-        }
-        return compactAccessory ? 0.42 : 0.48
-    }
-
-    static func nativeAccessoryStrokeOpacity(darkMode: Bool, compactAccessory: Bool) -> Double {
-        if darkMode {
-            return compactAccessory ? 0.074 : 0.082
-        }
-        return compactAccessory ? 0.056 : 0.064
-    }
 }
 
 struct TabInteractionProfile {

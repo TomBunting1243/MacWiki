@@ -43,7 +43,7 @@ private enum JourneyError: LocalizedError {
 private struct JourneyResult: Codable {
     let pid: Int32
     let articleTitle: String
-    let toolbarControls: [String]
+    let readerControls: [String]
     let inspectorStates: [String: [String]]
     let findBar: [String]
     let inspectorToggleCycle: String
@@ -95,10 +95,6 @@ private func directChildren(of element: AXUIElement) -> [AXUIElement] {
 
 private func hasRole(_ element: AXUIElement, _ role: String) -> Bool {
     stringAttribute(kAXRoleAttribute as CFString, from: element) == role
-}
-
-private func nativeToolbar(in window: AXUIElement) -> AXUIElement? {
-    directChildren(of: window).first { hasRole($0, kAXToolbarRole as String) }
 }
 
 private func workspaceSplitGroup(in window: AXUIElement) -> AXUIElement? {
@@ -242,7 +238,7 @@ private func menuItem(in application: AXUIElement, label: String) -> AXUIElement
     }
 
     // Menus are exposed as immediate application children (or beneath the menu
-    // bar). Restrict the fallback to those roots so opening toolbar overflow does
+    // bar). Restrict the fallback to those roots so opening the Reader More menu does
     // not recursively query every SwiftUI hosting view in every application window.
     let applicationChildren = attributeValue(
         kAXChildrenAttribute as CFString,
@@ -370,13 +366,6 @@ do {
     // still be bridging its accessibility graph immediately after the window is
     // announced, and querying AXChildren during that update is re-entrant.
     settleAccessibility(for: 1.0)
-    var resolvedToolbar: AXUIElement?
-    guard wait(timeout: 10, condition: {
-        resolvedToolbar = nativeToolbar(in: contentWindow)
-        return resolvedToolbar != nil
-    }), let initialToolbar = resolvedToolbar else {
-        throw JourneyError.missing("The article window's native toolbar did not become accessible.")
-    }
     guard wait(timeout: 10, condition: {
         guard let reader = readerPane(in: contentWindow) else { return false }
         return containsLabel(articleTitle, in: reader)
@@ -388,32 +377,30 @@ do {
     settleAccessibility(for: 0.75)
     traceRuntimeDiagnostics("window resize")
 
-    var toolbar = initialToolbar
-    func refreshToolbar() throws -> AXUIElement {
-        if stringAttribute(kAXRoleAttribute as CFString, from: toolbar) == kAXToolbarRole as String {
-            return toolbar
+    func refreshReaderChrome() throws -> AXUIElement {
+        guard let reader = readerPane(in: contentWindow) else {
+            throw JourneyError.missing("The reader-scoped accessory disappeared during the journey.")
         }
-        guard let refreshed = nativeToolbar(in: contentWindow) else {
-            throw JourneyError.missing("The native toolbar disappeared during the reader journey.")
-        }
-        toolbar = refreshed
-        return refreshed
+        return reader
     }
 
     var modeGroup = inspectorModeGroup(in: contentWindow)
     let listContentsControlReport: String
-    if button(in: initialToolbar, label: "Hide List Contents") != nil {
+    let initialReader = try refreshReaderChrome()
+    if button(in: initialReader, label: "Hide List Contents") != nil {
         listContentsControlReport = "Hide List Contents"
-    } else if button(in: initialToolbar, label: "Show List Contents") != nil {
+    } else if button(in: initialReader, label: "Show List Contents") != nil {
         listContentsControlReport = "Show List Contents"
     } else {
-        throw JourneyError.missing("The native toolbar omitted its List Contents control.")
+        throw JourneyError.missing("The reader accessory omitted its List Contents control.")
     }
     if modeGroup == nil {
         guard wait(condition: {
-            guard let showInspector = button(in: initialToolbar, label: "Show Inspector") else { return false }
+            guard let reader = try? refreshReaderChrome(),
+                  let showInspector = button(in: reader, label: "Show Inspector") else { return false }
             return isEnabled(showInspector)
-        }), let showInspector = button(in: initialToolbar, label: "Show Inspector") else {
+        }), let reader = try? refreshReaderChrome(),
+            let showInspector = button(in: reader, label: "Show Inspector") else {
             throw JourneyError.missing(
                 "Show Inspector never became enabled at the wide test size \(String(describing: windowSize(contentWindow)))."
             )
@@ -428,15 +415,15 @@ do {
         throw JourneyError.missing("The split inspector did not become accessible.")
     }
     traceRuntimeDiagnostics("inspector readiness")
-    trace("window, toolbar, and inspector ready")
+    trace("window, reader accessory, and inspector ready")
 
-    let expectedToolbarControls = [
-        "Back", "Forward", "Search Wikipedia", "Save Article",
+    let expectedReaderControls = [
+        "Hide Lists", "Back", "Forward", "Search Wikipedia", "Save Article",
         "Mark as Read", "Find in Page", "Reader Style",
         "Page Views", "Open in Browser", "Share", "Hide Inspector"
     ]
-    let toolbarElements = elements(in: try refreshToolbar(), limit: 500)
-    func toolbarButton(_ label: String, among candidates: [AXUIElement]) -> AXUIElement? {
+    let readerElements = elements(in: try refreshReaderChrome(), limit: 500)
+    func readerButton(_ label: String, among candidates: [AXUIElement]) -> AXUIElement? {
         candidates.first { candidate in
             guard stringAttribute(kAXRoleAttribute as CFString, from: candidate) == kAXButtonRole as String else {
                 return false
@@ -446,61 +433,63 @@ do {
             }
         }
     }
-    let visibleToolbarControls = expectedToolbarControls.filter {
-        toolbarButton($0, among: toolbarElements) != nil
+    let visibleReaderControls = expectedReaderControls.filter {
+        readerButton($0, among: readerElements) != nil
     }
-    var overflowToolbarControls: [String] = []
-    let missingVisibleControls = expectedToolbarControls.filter { !visibleToolbarControls.contains($0) }
+    var menuReaderControls: [String] = []
+    let missingVisibleControls = expectedReaderControls.filter { !visibleReaderControls.contains($0) }
     if !missingVisibleControls.isEmpty,
-       let currentToolbar = try? refreshToolbar() {
-        let overflowButtons = elements(in: currentToolbar, limit: 500).filter {
+       let currentReader = try? refreshReaderChrome() {
+        let moreButtons = elements(in: currentReader, limit: 500).filter {
             stringAttribute(kAXRoleAttribute as CFString, from: $0) == kAXMenuButtonRole as String
+                && accessibilityLabels(of: $0).contains { matchesAXLabel($0, expected: "More Reader Actions") }
         }
-        for overflowButton in overflowButtons {
-            try press(overflowButton, label: "Toolbar overflow")
+        for moreButton in moreButtons {
+            try press(moreButton, label: "More Reader Actions")
             settleAccessibility(for: 0.2)
             _ = wait(timeout: 2, condition: {
                 missingVisibleControls.contains { menuItem(in: application, label: $0) != nil }
             })
-            overflowToolbarControls.append(contentsOf: missingVisibleControls.filter {
+            menuReaderControls.append(contentsOf: missingVisibleControls.filter {
                 menuItem(in: application, label: $0) != nil
             })
             try postEscape(to: pid)
-            if Set(overflowToolbarControls).isSuperset(of: missingVisibleControls) { break }
+            if Set(menuReaderControls).isSuperset(of: missingVisibleControls) { break }
         }
     }
-    let availableToolbarControls = Array(Set(visibleToolbarControls + overflowToolbarControls))
-    guard availableToolbarControls.count == expectedToolbarControls.count else {
-        let missing = expectedToolbarControls.filter { !availableToolbarControls.contains($0) }
+    let availableReaderControls = Array(Set(visibleReaderControls + menuReaderControls))
+    guard availableReaderControls.count == expectedReaderControls.count else {
+        let missing = expectedReaderControls.filter { !availableReaderControls.contains($0) }
         if traceEnabled,
-           let currentToolbar = try? refreshToolbar() {
-            let summary = elements(in: currentToolbar, limit: 500).map { element in
+           let currentReader = try? refreshReaderChrome() {
+            let summary = elements(in: currentReader, limit: 500).map { element in
                 let role = stringAttribute(kAXRoleAttribute as CFString, from: element)
                 let title = stringAttribute(kAXTitleAttribute as CFString, from: element)
                 let description = stringAttribute(kAXDescriptionAttribute as CFString, from: element)
                 return "\(role)|\(title)|\(description)"
             }
-            trace("toolbar AX: \(summary)")
+            trace("reader accessory AX: \(summary)")
         }
-        throw JourneyError.missing("Reader toolbar omitted accessible controls: \(missing.joined(separator: ", "))")
+        throw JourneyError.missing("Reader accessory omitted accessible controls: \(missing.joined(separator: ", "))")
     }
 
-    let reportedToolbarControls = [listContentsControlReport] + expectedToolbarControls.map { label in
-        overflowToolbarControls.contains(label) ? "\(label) (native overflow)" : label
+    let reportedReaderControls = [listContentsControlReport] + expectedReaderControls.map { label in
+        menuReaderControls.contains(label) ? "\(label) (More menu)" : label
     }
-    trace("toolbar contract verified")
-    traceRuntimeDiagnostics("toolbar contract")
+    trace("reader accessory contract verified")
+    traceRuntimeDiagnostics("reader accessory contract")
 
-    func toolbarAction(_ label: String) throws -> AXUIElement {
-        let currentToolbar = try refreshToolbar()
-        let toolbarDescendants = elements(in: currentToolbar, limit: 500)
-        if let visibleButton = toolbarButton(label, among: toolbarDescendants) {
+    func readerAction(_ label: String) throws -> AXUIElement {
+        let currentReader = try refreshReaderChrome()
+        let readerDescendants = elements(in: currentReader, limit: 500)
+        if let visibleButton = readerButton(label, among: readerDescendants) {
             return visibleButton
         }
-        for overflowButton in toolbarDescendants.filter({
+        for moreButton in readerDescendants.filter({
             stringAttribute(kAXRoleAttribute as CFString, from: $0) == kAXMenuButtonRole as String
+                && accessibilityLabels(of: $0).contains { matchesAXLabel($0, expected: "More Reader Actions") }
         }) {
-            try press(overflowButton, label: "Toolbar overflow")
+            try press(moreButton, label: "More Reader Actions")
             settleAccessibility(for: 0.2)
             if wait(timeout: 2, condition: { menuItem(in: application, label: label) != nil }),
                let item = menuItem(in: application, label: label) {
@@ -508,7 +497,7 @@ do {
             }
             try postEscape(to: pid)
         }
-        throw JourneyError.missing("Native toolbar overflow omitted \(label).")
+        throw JourneyError.missing("Reader controls and More menu omitted \(label).")
     }
 
     func inspectorButton(_ label: String) throws -> AXUIElement {
@@ -618,7 +607,7 @@ do {
     trace("inspector stress cycle verified")
     traceRuntimeDiagnostics("inspector stress cycle")
 
-    let findButton = try toolbarAction("Find in Page")
+    let findButton = try readerAction("Find in Page")
     try press(findButton, label: "Find in Page")
     settleAccessibility(for: 0.4)
     guard wait(condition: {
@@ -655,7 +644,7 @@ do {
     trace("single Find UI verified")
     traceRuntimeDiagnostics("Find UI")
 
-    let hideInspector = try toolbarAction("Hide Inspector")
+    let hideInspector = try readerAction("Hide Inspector")
     try press(hideInspector, label: "Hide Inspector")
     settleAccessibility(for: 0.45)
     guard wait(condition: { inspectorModeGroup(in: contentWindow) == nil }) else {
@@ -663,11 +652,11 @@ do {
     }
     traceRuntimeDiagnostics("inspector hide")
 
-    let hideListContents = try toolbarAction("Hide List Contents")
+    let hideListContents = try readerAction("Hide List Contents")
     try press(hideListContents, label: "Hide List Contents")
     settleAccessibility(for: 0.45)
     guard wait(condition: {
-        (try? toolbarAction("Show List Contents")) != nil
+        (try? readerAction("Show List Contents")) != nil
     }) else {
         throw JourneyError.missing("Hide List Contents did not collapse the directory pane.")
     }
@@ -680,15 +669,15 @@ do {
         throw JourneyError.missing("The window did not reach the narrow pane-restore test width.")
     }
 
-    let showListContents = try toolbarAction("Show List Contents")
+    let showListContents = try readerAction("Show List Contents")
     try press(showListContents, label: "Show List Contents")
     settleAccessibility(for: 0.3)
-    let showInspector = try toolbarAction("Show Inspector")
+    let showInspector = try readerAction("Show Inspector")
     try press(showInspector, label: "Show Inspector")
     settleAccessibility(for: 0.5)
     guard wait(condition: {
         inspectorModeGroup(in: contentWindow) != nil
-            && (try? toolbarAction("Hide List Contents")) != nil
+            && (try? readerAction("Hide List Contents")) != nil
     }) else {
         throw JourneyError.missing("The narrow window did not restore both auxiliary panes.")
     }
@@ -731,10 +720,10 @@ do {
     let result = JourneyResult(
         pid: pid,
         articleTitle: articleTitle,
-        toolbarControls: reportedToolbarControls,
+        readerControls: reportedReaderControls,
         inspectorStates: inspectorStates,
         findBar: findBar,
-        inspectorToggleCycle: "toolbar hidden → restored",
+        inspectorToggleCycle: "reader accessory hidden → restored",
         narrowPaneRestoreCycle: "900-point window preserved; Lists sidebar yielded while List Contents and Inspector restored around a usable reader"
     )
     let encoder = JSONEncoder()

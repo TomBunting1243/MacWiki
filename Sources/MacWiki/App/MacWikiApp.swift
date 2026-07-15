@@ -113,7 +113,7 @@ struct MacWikiApp: App {
         let entries = defaults.dictionaryRepresentation()
         let visibleFrames = NSScreen.screens.map(\.visibleFrame)
         let shellLayoutMigrationKey = "mainWindow.shellLayoutVersion"
-        let currentShellLayoutVersion = 14
+        let currentShellLayoutVersion = 15
 
         // Search is now a single sidebar-resident surface. Drop the retired overlay preference.
         defaults.removeObject(forKey: AppStorageKey.Search.presentationMode)
@@ -137,6 +137,8 @@ struct MacWikiApp: App {
             defaults.removeObject(forKey: "NSToolbar Configuration main-window-toolbar-v12")
             defaults.removeObject(forKey: "NSToolbar Configuration main-window-toolbar-v13")
             defaults.removeObject(forKey: "NSToolbar Configuration main-window-toolbar-v14")
+            defaults.removeObject(forKey: "NSToolbar Configuration main-window-reader-scoped-toolbar-v15")
+            defaults.removeObject(forKey: "NSToolbar Configuration main-window-reader-scoped-toolbar-v16")
             defaults.set(currentShellLayoutVersion, forKey: shellLayoutMigrationKey)
         }
 

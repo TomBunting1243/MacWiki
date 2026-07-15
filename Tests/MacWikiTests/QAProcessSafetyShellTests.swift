@@ -67,23 +67,6 @@ struct QAProcessSafetyShellTests {
         #expect(elapsed < .seconds(6))
     }
 
-    @Test func toolbarAXDriverAlwaysReleasesGlobalMouseState() throws {
-        let source = try String(
-            contentsOf: repositoryRoot
-                .appending(path: "scripts/ax_toolbar_customization_journey.swift"),
-            encoding: .utf8
-        )
-
-        #expect(source.contains("var isLeftMouseDown = false"))
-        #expect(source.contains("defer {"))
-        #expect(
-            source.contains("if isLeftMouseDown {") ||
-            source.contains("guard isLeftMouseDown else { return }")
-        )
-        #expect(source.contains("try? postMouseEvent(.leftMouseUp, at: latestPoint, source: source)"))
-        #expect(source.contains("isLeftMouseDown = false"))
-    }
-
     @Test func readerAXDriverTargetsEscapeAtTheCandidateProcess() throws {
         let source = try String(
             contentsOf: repositoryRoot

@@ -6,7 +6,6 @@ struct TabBarView: View {
     @Environment(AppState.self) private var appState
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.macWikiAccessibilityPersonalization) private var accessibilityPersonalization
-    @AppStorage(AppStorageKey.Chrome.liquidGlassChrome) private var liquidGlassChrome = true
     @AppStorage(TabAccompanimentStorageKey.showSavedMarker) private var showSavedTabMarker = true
     @AppStorage(TabAccompanimentStorageKey.showHighlightMarker) private var showHighlightTabMarker = true
     @AppStorage(TabAccompanimentStorageKey.showReadMarker) private var showReadTabMarker = true
@@ -114,11 +113,9 @@ struct TabBarView: View {
         HStack(spacing: 8) {
             ScrollViewReader { proxy in
                 ScrollView(.horizontal) {
-                    MacWikiGlassGroup(spacing: tabSpacing) {
-                        tabItemsStack(
-                            librarySnapshot: librarySnapshot
-                        )
-                    }
+                    tabItemsStack(
+                        librarySnapshot: librarySnapshot
+                    )
                     .coordinateSpace(name: "TabBarSpace")
                 }
                 .scrollIndicators(.hidden)
@@ -191,7 +188,6 @@ struct TabBarView: View {
             tab: tab,
             lists: lists,
             allLabels: allLabels,
-            liquidGlassChrome: liquidGlassChrome,
             isActive: appState.activeTabId == tab.id,
             isDragged: draggedTabId == tab.id,
             dragOffset: draggedTabId == tab.id ? dragOffset : 0,
@@ -246,7 +242,7 @@ struct TabBarView: View {
 
     @ViewBuilder
     private var tabBarBackground: some View {
-        ReaderTabLaneBackground()
+        Color.clear
             .overlay(alignment: .top) {
                 if showsTopDivider {
                     Rectangle()

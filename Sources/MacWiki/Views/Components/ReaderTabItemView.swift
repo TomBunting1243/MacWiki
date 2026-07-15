@@ -5,12 +5,10 @@ struct ReaderTabItemView: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.appearsActive) private var appearsActive
     @Environment(\.macWikiAccessibilityPersonalization) private var accessibilityPersonalization
-    @AppStorage(MacWikiGlassRuntime.forceLegacyFallbackKey) private var forceLegacyGlassFallback = false
 
     let tab: ArticleTab
     let lists: [ReadingList]
     let allLabels: [Label]
-    let liquidGlassChrome: Bool
     let isActive: Bool
     let isDragged: Bool
     let dragOffset: CGFloat
@@ -73,13 +71,6 @@ struct ReaderTabItemView: View {
 
     private var increasedContrast: Bool {
         accessibilityPersonalization.colorSchemeContrast == .increased
-    }
-
-    private var usesNativeGlass: Bool {
-        MacWikiGlassRuntime.usesNativeGlass(
-            isEnabled: liquidGlassChrome,
-            forceLegacyFallback: forceLegacyGlassFallback
-        ) && !accessibilityPersonalization.reduceTransparency
     }
 
     private var showsSavedMarker: Bool {
@@ -179,7 +170,7 @@ struct ReaderTabItemView: View {
                 .frame(width: tabWidth)
                 .background {
                     if !isDragged {
-                        stripGlassCellBackground
+                        tabSelectionBackground
                     } else {
                         RoundedRectangle(cornerRadius: tabCornerRadius)
                             .fill(Color(nsColor: .controlBackgroundColor))
@@ -254,118 +245,24 @@ struct ReaderTabItemView: View {
     }
 
     @ViewBuilder
-    private var stripGlassCellBackground: some View {
+    private var tabSelectionBackground: some View {
         let darkMode = colorScheme == .dark
-        if accessibilityPersonalization.reduceTransparency {
-            let shape = RoundedRectangle(cornerRadius: tabCornerRadius, style: .continuous)
-            shape
-                .fill(Color(nsColor: .controlBackgroundColor))
-                .overlay {
-                    if isActive {
-                        shape.fill(
-                            (isKeyWindow ? Color.accentColor : Color.primary)
-                                .opacity(isKeyWindow ? 0.12 : 0.055)
-                        )
-                    } else if isHovered {
-                        shape.fill(Color.primary.opacity(0.035))
-                    }
-                }
-                .overlay {
+        let shape = RoundedRectangle(cornerRadius: tabCornerRadius, style: .continuous)
+        shape
+            .fill(
+                isActive
+                    ? Color(nsColor: .selectedContentBackgroundColor)
+                        .opacity(isKeyWindow ? (darkMode ? 0.24 : 0.18) : 0.09)
+                    : Color.primary.opacity(isHovered ? (darkMode ? 0.075 : 0.055) : 0)
+            )
+            .overlay {
+                if accessibilityPersonalization.reduceTransparency || increasedContrast {
                     shape.strokeBorder(
-                        Color.primary.opacity(increasedContrast ? 0.34 : (isActive ? 0.16 : 0.09)),
+                        Color.primary.opacity(increasedContrast ? 0.30 : (isActive ? 0.15 : 0.08)),
                         lineWidth: increasedContrast ? 1 : 0.5
                     )
                 }
-        } else if #available(macOS 26, *), usesNativeGlass {
-            let tint: Color = {
-                if isActive && isKeyWindow {
-                    return Color.accentColor.opacity(colorScheme == .dark ? 0.20 : 0.15)
-                }
-                if isActive {
-                    return Color.primary.opacity(0.055)
-                }
-                if isHovered {
-                    return Color.primary.opacity(0.035)
-                }
-                return .clear
-            }()
-            let shape = RoundedRectangle(cornerRadius: tabCornerRadius, style: .continuous)
-            shape
-                .fill(.clear)
-                .glassEffect(
-                    .regular.tint(tint).interactive(),
-                    in: .rect(cornerRadius: tabCornerRadius)
-                )
-                .overlay {
-                    if increasedContrast {
-                        shape.strokeBorder(Color.primary.opacity(0.30), lineWidth: 1)
-                    }
-                }
-        } else if liquidGlassChrome {
-            let edgeOpacity = darkMode
-                ? (isActive ? 0.086 : (isHovered ? 0.060 : 0.042))
-                : (isActive ? 0.086 : (isHovered ? 0.064 : 0.052))
-            let neutralFillOpacity = darkMode
-                ? (isActive ? 0.26 : (isHovered ? 0.19 : 0.13))
-                : (isActive ? 0.56 : (isHovered ? 0.46 : 0.36))
-            let windowActivityScale = isKeyWindow ? 1.0 : 0.72
-            RoundedRectangle(cornerRadius: tabCornerRadius, style: .continuous)
-                .fill(AnyShapeStyle(.thinMaterial))
-                .overlay {
-                    RoundedRectangle(cornerRadius: tabCornerRadius, style: .continuous)
-                        .fill(
-                            Color(nsColor: .controlBackgroundColor)
-                                .opacity(neutralFillOpacity * windowActivityScale)
-                        )
-                }
-                .overlay {
-                    if isActive && isKeyWindow {
-                        RoundedRectangle(cornerRadius: tabCornerRadius, style: .continuous)
-                            .fill(Color.accentColor.opacity(TabChromeHierarchy.activeGlassTintOpacity(darkMode: darkMode)))
-                    }
-                }
-                .overlay(
-                    RoundedRectangle(cornerRadius: tabCornerRadius, style: .continuous)
-                        .strokeBorder(
-                            Color.primary.opacity(
-                                edgeOpacity + (isActive ? 0 : 0.010) + (increasedContrast ? 0.14 : 0)
-                            ),
-                            lineWidth: increasedContrast ? 1 : (isActive ? 0.46 : 0.44)
-                        )
-                )
-        } else {
-            let fillOpacity: CGFloat = {
-                if darkMode {
-                    if isActive { return 0.042 }
-                    if isHovered { return 0.012 }
-                    return 0.0
-                } else {
-                    if isActive { return 0.065 }
-                    if isHovered { return 0.02 }
-                    return 0.0
-                }
-            }()
-            let strokeOpacity: CGFloat = {
-                if darkMode {
-                    if isActive { return 0.03 }
-                    if isHovered { return 0.018 }
-                    return 0.012
-                } else {
-                    if isActive { return 0.075 }
-                    if isHovered { return 0.04 }
-                    return 0.028
-                }
-            }()
-            RoundedRectangle(cornerRadius: tabCornerRadius, style: .continuous)
-                .fill((darkMode ? Color.white : Color.black).opacity(fillOpacity))
-                .overlay(
-                    RoundedRectangle(cornerRadius: tabCornerRadius, style: .continuous)
-                        .strokeBorder(
-                            (darkMode ? Color.white : Color.black).opacity(isActive ? strokeOpacity : strokeOpacity + 0.014),
-                            lineWidth: increasedContrast ? 1 : (isActive ? 0.50 : 0.46)
-                        )
-                )
-        }
+            }
     }
 
     private var faviconView: some View {

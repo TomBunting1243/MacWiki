@@ -69,13 +69,7 @@ private struct MainWorkspaceShell: View {
             directoryRevision: directoryContentRevision,
             readerRevision: workspaceAppearanceRevision,
             inspectorRevision: workspaceAppearanceRevision,
-            readerToolbarEnvironment: ReaderToolbarEnvironment(
-                appState: appState,
-                modelContext: modelContext,
-                openURL: openURL,
-                accessibilityPersonalization: accessibilityPersonalization,
-                sidebarSearchModel: sidebarSearchModel
-            ),
+            readerChromeVisible: !appState.isWikiHopNavigationLocked,
             sidebar: workspaceEnvironment(
                 ListsColumnView(
                     selectedList: $selectedList,
@@ -99,13 +93,16 @@ private struct MainWorkspaceShell: View {
                 )
             ),
             reader: workspaceEnvironment(
-                ReaderColumnView(onNewLabelWithArticle: onNewLabelWithArticle)
-                    .environment(\.readerChromeMetrics, .hidden)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                ReaderColumnView()
                     .id("main-reader-column")
             ),
             inspector: workspaceEnvironment(
                 InspectorColumnView()
+            ),
+            readerTopAccessory: workspaceEnvironment(
+                ReaderTopChromeView(
+                    onNewLabelWithArticle: onNewLabelWithArticle
+                )
             )
         )
         .frame(maxWidth: .infinity, maxHeight: .infinity)

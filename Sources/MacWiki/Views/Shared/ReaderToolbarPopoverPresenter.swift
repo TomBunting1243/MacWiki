@@ -7,20 +7,17 @@ struct ReaderToolbarEnvironment {
     let modelContext: ModelContext
     let openURL: OpenURLAction
     let accessibilityPersonalization: MacWikiAccessibilityPersonalization
-    let sidebarSearchModel: SidebarSearchSurfaceModel?
 
     init(
         appState: AppState,
         modelContext: ModelContext,
         openURL: OpenURLAction,
-        accessibilityPersonalization: MacWikiAccessibilityPersonalization,
-        sidebarSearchModel: SidebarSearchSurfaceModel? = nil
+        accessibilityPersonalization: MacWikiAccessibilityPersonalization
     ) {
         self.appState = appState
         self.modelContext = modelContext
         self.openURL = openURL
         self.accessibilityPersonalization = accessibilityPersonalization
-        self.sidebarSearchModel = sidebarSearchModel
     }
 }
 

@@ -8,6 +8,8 @@ struct SidebarSearchHeaderView: View {
 
     let model: SidebarSearchSurfaceModel
     let allLists: [ReadingList]
+    @Binding var isSearchFieldFocused: Bool
+    let onSubmit: () -> Void
     let onClose: () -> Void
     let onMarkVisibleRead: () -> Void
     let onMarkVisibleUnread: () -> Void
@@ -46,12 +48,30 @@ struct SidebarSearchHeaderView: View {
             .padding(.horizontal, ColumnChromeMetrics.horizontalPadding)
             .padding(.top, 12)
             .padding(.bottom, 10)
+
+            searchField
+                .padding(.horizontal, ColumnChromeMetrics.horizontalPadding)
+                .padding(.bottom, 12)
         }
         .overlay(alignment: .bottom) {
             Rectangle()
                 .fill(Color.primary.opacity(ColumnChromeMetrics.dividerOpacity(for: colorScheme)))
                 .frame(height: 0.5)
         }
+    }
+
+    private var searchField: some View {
+        @Bindable var searchCoordinator = model.searchCoordinator
+
+        return NativeSidebarSearchField(
+            text: $searchCoordinator.searchText,
+            isFocused: $isSearchFieldFocused,
+            onMoveDown: model.moveSelectionDown,
+            onMoveUp: model.moveSelectionUp,
+            onSubmit: onSubmit,
+            onCancel: onClose
+        )
+        .frame(height: 24)
     }
 
     private var unreadFilterButton: some View {

@@ -5,7 +5,7 @@ import SwiftUI
 /// A stable SwiftUI-to-AppKit bridge for the main window's four native panes.
 /// SwiftUI owns pane content and application state; AppKit owns the semantic
 /// split items, dividers, collapse interactions, and point-based sizing.
-struct NativeWorkspaceSplitView<Sidebar: View, Directory: View, Reader: View, Inspector: View>:
+struct NativeWorkspaceSplitView<Sidebar: View, Directory: View, Reader: View, Inspector: View, ReaderTopAccessory: View>:
     NSViewControllerRepresentable
 {
     @Binding var sidebarVisible: Bool
@@ -20,11 +20,12 @@ struct NativeWorkspaceSplitView<Sidebar: View, Directory: View, Reader: View, In
     let directoryRevision: String
     let readerRevision: String
     let inspectorRevision: String
-    let readerToolbarEnvironment: ReaderToolbarEnvironment
+    let readerChromeVisible: Bool
     let sidebar: Sidebar
     let directory: Directory
     let reader: Reader
     let inspector: Inspector
+    let readerTopAccessory: ReaderTopAccessory
 
     func makeCoordinator() -> Coordinator {
         Coordinator(
@@ -35,6 +36,7 @@ struct NativeWorkspaceSplitView<Sidebar: View, Directory: View, Reader: View, In
             directory: directory,
             reader: reader,
             inspector: inspector,
+            readerTopAccessory: readerTopAccessory,
             sidebarRevision: sidebarRevision,
             directoryRevision: directoryRevision,
             readerRevision: readerRevision,
@@ -55,7 +57,10 @@ struct NativeWorkspaceSplitView<Sidebar: View, Directory: View, Reader: View, In
         controller.onPaneVisibilityChange = { [weak coordinator = context.coordinator] visibility in
             coordinator?.receiveNativeVisibility(visibility)
         }
-        controller.configureReaderToolbar(environment: readerToolbarEnvironment)
+        controller.setReaderTopAccessoryViewControllers([
+            context.coordinator.readerTopAccessoryController
+        ])
+        controller.setReaderTopAccessoryVisible(readerChromeVisible, animated: false)
         controller.setPaneVisibility(
             sidebarVisible: sidebarVisible,
             directoryVisible: directoryVisible,
@@ -66,7 +71,11 @@ struct NativeWorkspaceSplitView<Sidebar: View, Directory: View, Reader: View, In
     }
 
     func updateNSViewController(_ controller: WorkspaceSplitViewController, context: Context) {
-        controller.configureReaderToolbar(environment: readerToolbarEnvironment)
+        context.coordinator.updateReaderChromeVisibility(
+            readerChromeVisible,
+            controller: controller,
+            animated: !reduceMotion
+        )
         context.coordinator.updateBindings(
             sidebarVisible: $sidebarVisible,
             directoryVisible: $directoryVisible,
@@ -77,6 +86,7 @@ struct NativeWorkspaceSplitView<Sidebar: View, Directory: View, Reader: View, In
             directory: directory,
             reader: reader,
             inspector: inspector,
+            readerTopAccessory: readerTopAccessory,
             sidebarRevision: sidebarRevision,
             directoryRevision: directoryRevision,
             readerRevision: readerRevision,
@@ -95,7 +105,7 @@ struct NativeWorkspaceSplitView<Sidebar: View, Directory: View, Reader: View, In
         _ controller: WorkspaceSplitViewController,
         coordinator: Coordinator
     ) {
-        controller.invalidateReaderToolbar()
+        controller.setReaderTopAccessoryViewControllers([])
     }
 
     @MainActor
@@ -104,10 +114,13 @@ struct NativeWorkspaceSplitView<Sidebar: View, Directory: View, Reader: View, In
         fileprivate let directoryBox: HostingContentBox<Directory>
         fileprivate let readerBox: HostingContentBox<Reader>
         fileprivate let inspectorBox: HostingContentBox<Inspector>
+        fileprivate let readerTopAccessoryBox: HostingContentBox<ReaderTopAccessory>
         fileprivate let sidebarController: NSHostingController<HostingContentRoot<Sidebar>>
         fileprivate let directoryController: NSHostingController<HostingContentRoot<Directory>>
         fileprivate let readerController: NSHostingController<HostingContentRoot<Reader>>
         fileprivate let inspectorController: NSHostingController<HostingContentRoot<Inspector>>
+        fileprivate let readerTopAccessoryHostingController: NSHostingController<HostingContentRoot<ReaderTopAccessory>>
+        fileprivate let readerTopAccessoryController: NSSplitViewItemAccessoryViewController
 
         private var sidebarVisibility: Binding<Bool>
         private var directoryVisibility: Binding<Bool>
@@ -115,6 +128,7 @@ struct NativeWorkspaceSplitView<Sidebar: View, Directory: View, Reader: View, In
         private var paneVisibilityUpdate: Task<Void, Never>?
         private var hostedContentUpdate: Task<Void, Never>?
         private var nativeVisibilityUpdate: Task<Void, Never>?
+        private var readerChromeVisibilityUpdate: Task<Void, Never>?
         private var lastSidebarRevision: String
         private var lastDirectoryRevision: String
         private var lastReaderRevision: String
@@ -129,6 +143,7 @@ struct NativeWorkspaceSplitView<Sidebar: View, Directory: View, Reader: View, In
             directory: Directory,
             reader: Reader,
             inspector: Inspector,
+            readerTopAccessory: ReaderTopAccessory,
             sidebarRevision: String,
             directoryRevision: String,
             readerRevision: String,
@@ -142,10 +157,12 @@ struct NativeWorkspaceSplitView<Sidebar: View, Directory: View, Reader: View, In
             let directoryBox = HostingContentBox(content: directory)
             let readerBox = HostingContentBox(content: reader)
             let inspectorBox = HostingContentBox(content: inspector)
+            let readerTopAccessoryBox = HostingContentBox(content: readerTopAccessory)
             self.sidebarBox = sidebarBox
             self.directoryBox = directoryBox
             self.readerBox = readerBox
             self.inspectorBox = inspectorBox
+            self.readerTopAccessoryBox = readerTopAccessoryBox
             lastSidebarRevision = sidebarRevision
             lastDirectoryRevision = directoryRevision
             lastReaderRevision = readerRevision
@@ -159,6 +176,12 @@ struct NativeWorkspaceSplitView<Sidebar: View, Directory: View, Reader: View, In
             directoryController = NSHostingController(rootView: HostingContentRoot(box: directoryBox))
             readerController = NSHostingController(rootView: HostingContentRoot(box: readerBox))
             inspectorController = NSHostingController(rootView: HostingContentRoot(box: inspectorBox))
+            readerTopAccessoryHostingController = NSHostingController(
+                rootView: HostingContentRoot(box: readerTopAccessoryBox)
+            )
+            readerTopAccessoryController = Self.makeReaderTopAccessoryController(
+                hostingController: readerTopAccessoryHostingController
+            )
         }
 
         func updateBindings(
@@ -176,6 +199,7 @@ struct NativeWorkspaceSplitView<Sidebar: View, Directory: View, Reader: View, In
             directory: Directory,
             reader: Reader,
             inspector: Inspector,
+            readerTopAccessory: ReaderTopAccessory,
             sidebarRevision: String,
             directoryRevision: String,
             readerRevision: String,
@@ -238,7 +262,34 @@ struct NativeWorkspaceSplitView<Sidebar: View, Directory: View, Reader: View, In
                     lastInspectorRevision = inspectorRevision
                     inspectorBox.content = inspector
                 }
+                if readerChanged {
+                    readerTopAccessoryBox.content = readerTopAccessory
+                }
             }
+        }
+
+        private static func makeReaderTopAccessoryController(
+            hostingController: NSHostingController<HostingContentRoot<ReaderTopAccessory>>
+        ) -> NSSplitViewItemAccessoryViewController {
+            let controller = NSSplitViewItemAccessoryViewController()
+            let containerView = NSView()
+            controller.view = containerView
+            controller.addChild(hostingController)
+            let hostedView = hostingController.view
+            hostedView.translatesAutoresizingMaskIntoConstraints = false
+            containerView.addSubview(hostedView)
+            NSLayoutConstraint.activate([
+                hostedView.leadingAnchor.constraint(equalTo: containerView.leadingAnchor),
+                hostedView.trailingAnchor.constraint(equalTo: containerView.trailingAnchor),
+                hostedView.topAnchor.constraint(equalTo: containerView.topAnchor),
+                hostedView.bottomAnchor.constraint(equalTo: containerView.bottomAnchor)
+            ])
+            hostingController.sizingOptions = [.intrinsicContentSize, .preferredContentSize]
+            controller.automaticallyAppliesContentInsets = false
+            if #available(macOS 26.1, *) {
+                controller.preferredScrollEdgeEffectStyle = .soft
+            }
+            return controller
         }
 
         /// AppKit reports divider-driven collapse changes during its layout
@@ -261,10 +312,24 @@ struct NativeWorkspaceSplitView<Sidebar: View, Directory: View, Reader: View, In
             }
         }
 
+        func updateReaderChromeVisibility(
+            _ visible: Bool,
+            controller: WorkspaceSplitViewController,
+            animated: Bool
+        ) {
+            readerChromeVisibilityUpdate?.cancel()
+            readerChromeVisibilityUpdate = Task { @MainActor [weak controller] in
+                await Task.yield()
+                guard let controller, !Task.isCancelled else { return }
+                controller.setReaderTopAccessoryVisible(visible, animated: animated)
+            }
+        }
+
         deinit {
             paneVisibilityUpdate?.cancel()
             hostedContentUpdate?.cancel()
             nativeVisibilityUpdate?.cancel()
+            readerChromeVisibilityUpdate?.cancel()
         }
     }
 }

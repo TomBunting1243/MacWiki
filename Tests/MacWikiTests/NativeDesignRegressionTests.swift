@@ -104,9 +104,9 @@ struct NativeDesignRegressionTests {
         #expect(tabBar.contains("ReaderTabAccessoryCluster("))
 
         #expect(tabAccessories.contains("@Environment(\\.macWikiAccessibilityPersonalization)"))
-        #expect(tabAccessories.contains("accessibilityPersonalization.reduceTransparency"))
-        #expect(tabAccessories.contains("accessibilityPersonalization.colorSchemeContrast == .increased"))
-        #expect(tabAccessories.contains(".fill(Color(nsColor: .controlBackgroundColor))"))
+        #expect(tabAccessories.contains("ControlGroup"))
+        #expect(!tabAccessories.contains(".glassEffect("))
+        #expect(!tabAccessories.contains(".thinMaterial"))
 
         #expect(tabItem.contains("@Environment(\\.appearsActive)"))
         #expect(!tabItem.contains("controlActiveState"))
@@ -115,7 +115,8 @@ struct NativeDesignRegressionTests {
         #expect(tabItem.contains("accessibilityPersonalization.colorSchemeContrast == .increased"))
         #expect(tabItem.contains("accessibilityPersonalization.differentiateWithoutColor"))
         #expect(tabItem.contains("Image(systemName: \"highlighter\")"))
-        #expect(tabItem.contains(".fill(Color(nsColor: .controlBackgroundColor))"))
+        #expect(tabItem.contains("Color(nsColor: .selectedContentBackgroundColor)"))
+        #expect(!tabItem.contains(".glassEffect("))
         #expect(tabItem.contains("isKeyWindow && isActive && !isDragged"))
         #expect(tabItem.contains("ReaderTabContextMenuContent("))
         #expect(!tabItem.contains("@Environment(\\.modelContext)"))
@@ -149,16 +150,18 @@ struct NativeDesignRegressionTests {
     }
 
     @Test func readerToolbarsCommandsAndStyleControlsStayNativeReachableAndLockedSafely() throws {
-        let toolbar = try source("Sources/MacWiki/Views/Shared/ReaderToolbarController.swift")
-        let toolbarItems = try source("Sources/MacWiki/Views/Shared/ReaderToolbarController+Items.swift")
+        let toolbar = try source("Sources/MacWiki/Views/Shared/ReaderTopChromeView.swift")
         let articleToolbar = try source("Sources/MacWiki/Views/Shared/ArticleWindowReaderToolbar.swift")
         let articlePresenter = try source("Sources/MacWiki/Views/Shared/ArticleWindowReaderCommandPresenter.swift")
         let commands = try source("Sources/MacWiki/App/MacWikiCommands.swift")
         let style = try source("Sources/MacWiki/Views/Components/ReaderStylePopover.swift")
 
-        #expect(toolbar.contains("let canActOnArticle = snapshot.articleID != nil && !snapshot.navigationLocked"))
-        #expect(toolbar.contains("canGoBack: !appState.isWikiHopNavigationLocked"))
-        #expect(toolbarItems.components(separatedBy: "guard !environment.appState.isWikiHopNavigationLocked").count - 1 >= 7)
+        #expect(toolbar.contains("ViewThatFits(in: .horizontal)"))
+        #expect(toolbar.contains("ControlGroup"))
+        #expect(toolbar.contains(".disabled(article == nil)"))
+        #expect(toolbar.contains("appState.currentTab?.canGoBack != true"))
+        #expect(toolbar.contains("readerStylePresentationRequestID"))
+        #expect(toolbar.contains("readerPageViewsPresentationRequestID"))
         #expect(articleToolbar.contains("CustomizableToolbarContent"))
         for action in ["Save Article", "Mark as Read", "Find in Page", "Reader Style", "Page Views", "Open in Browser", "Share"] {
             #expect(articleToolbar.contains(action))
