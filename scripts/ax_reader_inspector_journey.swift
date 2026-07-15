@@ -631,55 +631,8 @@ do {
                 role: kAXStaticTextRole as String,
                 label: "Tab History"
             ) == nil
-            && element(
-                in: contentWindow,
-                role: kAXStaticTextRole as String,
-                label: "Explore"
-            ) != nil
     }) else {
-        throw JourneyError.missing(
-            "Hide List Contents did not collapse only the directory pane while preserving Lists."
-        )
-    }
-
-    let hideSidebar = try toolbarButton("Hide Sidebar")
-    try press(hideSidebar, label: "Hide Sidebar")
-    settleAccessibility(for: 0.45)
-    guard wait(condition: {
-        (try? toolbarButton("Show Sidebar")) != nil
-            && (try? toolbarButton("Show List Contents")) != nil
-            && element(
-                in: contentWindow,
-                role: kAXStaticTextRole as String,
-                label: "Explore"
-            ) == nil
-            && element(
-                in: contentWindow,
-                role: kAXStaticTextRole as String,
-                label: "Tab History"
-            ) == nil
-    }) else {
-        throw JourneyError.missing("The native Sidebar control was not independent from List Contents.")
-    }
-
-    let showSidebar = try toolbarButton("Show Sidebar")
-    try press(showSidebar, label: "Show Sidebar")
-    settleAccessibility(for: 0.45)
-    guard wait(condition: {
-        (try? toolbarButton("Hide Sidebar")) != nil
-            && (try? toolbarButton("Show List Contents")) != nil
-            && element(
-                in: contentWindow,
-                role: kAXStaticTextRole as String,
-                label: "Explore"
-            ) != nil
-            && element(
-                in: contentWindow,
-                role: kAXStaticTextRole as String,
-                label: "Tab History"
-            ) == nil
-    }) else {
-        throw JourneyError.missing("Restoring Lists also restored List Contents unexpectedly.")
+        throw JourneyError.missing("Hide List Contents changed state without collapsing the directory pane.")
     }
 
     let narrowWidth: CGFloat = 900

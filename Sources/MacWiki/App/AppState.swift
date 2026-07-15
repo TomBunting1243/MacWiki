@@ -17,6 +17,14 @@ enum AppStatePersistenceMode: Equatable, Sendable {
     }
 }
 
+/// The only navigation-column states representable by a hierarchical
+/// Lists -> List Contents -> Reader workspace.
+enum WorkspaceNavigationColumns: Equatable, Sendable {
+    case all
+    case listContentsAndReader
+    case readerOnly
+}
+
 /// Global application state container
 /// 
 /// Manages all shared state across the application including:
@@ -73,34 +81,54 @@ final class AppState {
     
     // MARK: - UI State
     
-    /// The exact values bound to the two platform-owned split views. macOS
-    /// always keeps a three-column split view's content column visible, so the
-    /// independently collapsible Lists and List Contents panes each own a
-    /// supported two-column `NavigationSplitView` visibility path.
-    var listsSplitViewVisibility: NavigationSplitViewVisibility = .all {
+    /// The exact value bound to `NavigationSplitView`. Keeping this as stored
+    /// observable state lets the platform and MacWiki share one authoritative
+    /// transition path; a computed projection can update toolbar labels while
+    /// leaving the native columns visually unchanged.
+    var navigationSplitViewVisibility: NavigationSplitViewVisibility = .all {
         didSet {
+            // SDK 27 intentionally considers `.automatic` equal to
+            // `.doubleColumn`; do not attempt to distinguish them with `==`.
+            // The semantic projection below safely treats either as the
+            // Lists-hidden, List-Contents-visible hierarchy.
             if isWikiHopNavigationLocked,
-               listsSplitViewVisibility != .detailOnly {
-                listsSplitViewVisibility = .detailOnly
+               navigationSplitViewVisibility != .detailOnly {
+                navigationSplitViewVisibility = .detailOnly
             }
         }
     }
 
-    var directorySplitViewVisibility: NavigationSplitViewVisibility = .all {
-        didSet {
-            if isWikiHopNavigationLocked,
-               directorySplitViewVisibility != .detailOnly {
-                directorySplitViewVisibility = .detailOnly
+    /// A semantic projection used by persistence-independent domain logic and
+    /// tests. Unsupported combinations can only be introduced through this
+    /// setter and are normalized before reaching the native binding.
+    var workspaceNavigationColumns: WorkspaceNavigationColumns {
+        get {
+            if navigationSplitViewVisibility == .detailOnly {
+                .readerOnly
+            } else if navigationSplitViewVisibility == .doubleColumn {
+                .listContentsAndReader
+            } else {
+                .all
+            }
+        }
+        set {
+            switch newValue {
+            case .all:
+                navigationSplitViewVisibility = .all
+            case .listContentsAndReader:
+                navigationSplitViewVisibility = .doubleColumn
+            case .readerOnly:
+                navigationSplitViewVisibility = .detailOnly
             }
         }
     }
 
     var listsSidebarVisible: Bool {
-        listsSplitViewVisibility != .detailOnly
+        workspaceNavigationColumns == .all
     }
 
     var directoryColumnVisible: Bool {
-        directorySplitViewVisibility != .detailOnly
+        workspaceNavigationColumns != .readerOnly
     }
 
     /// The user's inspector preference, bound directly to SwiftUI's inspector.

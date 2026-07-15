@@ -59,7 +59,7 @@ private struct MainWorkspaceShell: View {
     var body: some View {
         @Bindable var appState = appState
 
-        NavigationSplitView(columnVisibility: $appState.listsSplitViewVisibility) {
+        NavigationSplitView(columnVisibility: $appState.navigationSplitViewVisibility) {
             ListsColumnView(
                 selectedList: $selectedList,
                 selectedLabel: $selectedLabel,
@@ -78,43 +78,37 @@ private struct MainWorkspaceShell: View {
                 key: AppStorageKey.MainWindow.sidebarWidth,
                 range: MainWindowColumnWidth.sidebarRange
             )
+        } content: {
+            DirectoryColumnView(
+                selectedList: $selectedList,
+                rootSelection: $rootSelection,
+                selectedLabel: selectedLabel,
+                selectedTag: selectedTag,
+                sidebarSearchModel: sidebarSearchModel,
+                onNewLabelWithArticle: onNewLabelWithArticle,
+                onNewTagWithArticle: onNewTagWithArticle
+            )
+            .navigationSplitViewColumnWidth(
+                min: MainWindowColumnWidth.directoryRange.lowerBound,
+                ideal: CGFloat(directoryWidth),
+                max: MainWindowColumnWidth.directoryRange.upperBound
+            )
+            .persistedColumnWidth(
+                key: AppStorageKey.MainWindow.directoryWidth,
+                range: MainWindowColumnWidth.directoryRange
+            )
         } detail: {
-            NavigationSplitView(columnVisibility: $appState.directorySplitViewVisibility) {
-                DirectoryColumnView(
-                    selectedList: $selectedList,
-                    rootSelection: $rootSelection,
-                    selectedLabel: selectedLabel,
-                    selectedTag: selectedTag,
-                    sidebarSearchModel: sidebarSearchModel,
-                    onNewLabelWithArticle: onNewLabelWithArticle,
-                    onNewTagWithArticle: onNewTagWithArticle
+            VStack(spacing: 0) {
+                TabBarView(
+                    showsTopDivider: false,
+                    onNewLabelWithArticle: onNewLabelWithArticle
                 )
-                .navigationSplitViewColumnWidth(
-                    min: MainWindowColumnWidth.directoryRange.lowerBound,
-                    ideal: CGFloat(directoryWidth),
-                    max: MainWindowColumnWidth.directoryRange.upperBound
-                )
-                .persistedColumnWidth(
-                    key: AppStorageKey.MainWindow.directoryWidth,
-                    range: MainWindowColumnWidth.directoryRange
-                )
-            } detail: {
-                VStack(spacing: 0) {
-                    TabBarView(
-                        showsTopDivider: false,
-                        onNewLabelWithArticle: onNewLabelWithArticle
-                    )
 
-                    Divider()
+                Divider()
 
-                    ReaderColumnView()
-                        .id("main-reader-column")
-                }
+                ReaderColumnView()
+                    .id("main-reader-column")
             }
-            .navigationSplitViewStyle(.balanced)
-            // The window already exposes the outer split's native Lists
-            // control. List Contents has its own labeled toolbar/menu command.
-            .toolbar(removing: .sidebarToggle)
         }
         .navigationSplitViewStyle(.balanced)
         .inspector(isPresented: $appState.inspectorVisible) {

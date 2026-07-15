@@ -59,26 +59,24 @@ struct AppStateBoundaryTests {
         #expect(appState.tabSessionStore.hasPendingSaveForTesting == false)
     }
 
-    @Test func listContentsToggleLeavesTheListsSidebarVisible() {
+    @Test func listContentsTogglePreservesTheNativeNavigationHierarchy() {
         let appState = AppState(persistenceMode: .ephemeral)
         appState.setNavigationColumnsVisible(true)
 
         appState.toggleDirectoryColumnVisibility()
 
-        #expect(appState.listsSidebarVisible == true)
+        #expect(appState.listsSidebarVisible == false)
         #expect(appState.directoryColumnVisible == false)
-        #expect(appState.listsSplitViewVisibility == .all)
-        #expect(appState.directorySplitViewVisibility == .detailOnly)
+        #expect(appState.navigationSplitViewVisibility == .detailOnly)
 
         appState.toggleDirectoryColumnVisibility()
 
-        #expect(appState.listsSidebarVisible == true)
+        #expect(appState.listsSidebarVisible == false)
         #expect(appState.directoryColumnVisible == true)
-        #expect(appState.listsSplitViewVisibility == .all)
-        #expect(appState.directorySplitViewVisibility == .all)
+        #expect(appState.navigationSplitViewVisibility == .doubleColumn)
     }
 
-    @Test func listsAndListContentsSupportIndependentVisibility() {
+    @Test func invalidNavigationCombinationNormalizesToReaderOnly() {
         let appState = AppState(persistenceMode: .ephemeral)
 
         appState.setNavigationColumnVisibility(
@@ -86,7 +84,8 @@ struct AppStateBoundaryTests {
             directoryVisible: false
         )
 
-        #expect(appState.listsSidebarVisible)
+        #expect(appState.workspaceNavigationColumns == .readerOnly)
+        #expect(!appState.listsSidebarVisible)
         #expect(!appState.directoryColumnVisible)
     }
 
@@ -100,13 +99,9 @@ struct AppStateBoundaryTests {
         )
 
         appState.toggleDirectoryColumnVisibility()
-        appState.listsSplitViewVisibility = .all
-        appState.directorySplitViewVisibility = .all
+        appState.navigationSplitViewVisibility = .all
 
-        #expect(!appState.listsSidebarVisible)
-        #expect(!appState.directoryColumnVisible)
-        #expect(appState.listsSplitViewVisibility == .detailOnly)
-        #expect(appState.directorySplitViewVisibility == .detailOnly)
+        #expect(appState.workspaceNavigationColumns == .readerOnly)
     }
 
     @Test func readerPresentationRequestsRequireAnUnlockedArticle() {
