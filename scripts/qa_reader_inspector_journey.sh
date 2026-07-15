@@ -16,6 +16,12 @@ BUILD_INFO_PLIST="$APP_BUNDLE_PATH/Contents/Resources/BuildInfo.plist"
 ARTICLE_TITLE="${ARTICLE_TITLE:-Ada Lovelace}"
 ARTICLE_HTML='<main><h1>Ada Lovelace</h1><p>A deterministic public-domain QA fixture for MacWiki reader and inspector checks.</p><h2 id="legacy">Legacy</h2><p>Ada Lovelace wrote notes on the Analytical Engine.</p></main>'
 
+# This journey uses AX actions and PID-targeted key events only. Launching the
+# candidate without activation keeps the user's current app in front while the
+# isolated MacWiki window remains fully inspectable through Accessibility.
+MACWIKI_QA_LAUNCH_BACKGROUND="${MACWIKI_QA_LAUNCH_BACKGROUND:-1}"
+export MACWIKI_QA_LAUNCH_BACKGROUND
+
 # shellcheck source=scripts/lib/qa_process_safety.sh
 source "$SCRIPT_DIR/lib/qa_process_safety.sh"
 

@@ -80,6 +80,23 @@ struct QAProcessSafetyShellTests {
         #expect(!source.contains("virtualKey: 53, keyDown: true)?.post(tap: .cghidEventTap)"))
     }
 
+    @Test func readerJourneyUsesTheOptInBackgroundBundleLaunch() throws {
+        let launcher = try String(
+            contentsOf: repositoryRoot
+                .appending(path: "scripts/lib/qa_process_safety.sh"),
+            encoding: .utf8
+        )
+        let journey = try String(
+            contentsOf: repositoryRoot
+                .appending(path: "scripts/qa_reader_inspector_journey.sh"),
+            encoding: .utf8
+        )
+
+        #expect(launcher.contains("MACWIKI_QA_LAUNCH_BACKGROUND"))
+        #expect(launcher.contains("open_arguments=(-g \"${open_arguments[@]}\")"))
+        #expect(journey.contains("MACWIKI_QA_LAUNCH_BACKGROUND=\"${MACWIKI_QA_LAUNCH_BACKGROUND:-1}\""))
+    }
+
     private func runBash(
         _ script: String,
         arguments: [String]

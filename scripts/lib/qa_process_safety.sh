@@ -385,6 +385,9 @@ qa_launch_exact_bundle() {
     --env "CFFIXED_USER_HOME=$QA_HOME"
     --env "MACWIKI_QA_DEFAULTS_SUITE=${QA_DEFAULTS_SUITE:?}"
   )
+  if [[ "${MACWIKI_QA_LAUNCH_BACKGROUND:-}" == "1" ]]; then
+    open_arguments=(-g "${open_arguments[@]}")
+  fi
   if [[ -n "${MACWIKI_QA_NETWORK_MODE:-}" ]]; then
     open_arguments+=(--env "MACWIKI_QA_NETWORK_MODE=$MACWIKI_QA_NETWORK_MODE")
   fi
