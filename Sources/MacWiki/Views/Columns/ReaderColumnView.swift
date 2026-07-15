@@ -5,7 +5,6 @@ struct ReaderColumnView: View {
 
     var body: some View {
         ReaderView()
-            .environment(\.readerChromeMetrics, .hidden)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .onChange(of: appState.activeTabId) { oldTabID, newTabID in
                 appState.resetFindOnPageForTabChange(from: oldTabID, to: newTabID)

@@ -24,10 +24,6 @@ enum TabChromeHierarchy {
         darkMode ? 0.84 : 0.82
     }
 
-    static func iconPrimaryOpacity(darkMode: Bool) -> Double {
-        darkMode ? 0.62 : 0.56
-    }
-
     static func progressTrackOpacity(darkMode: Bool) -> Double {
         darkMode ? 0.09 : 0.07
     }
@@ -132,15 +128,15 @@ struct TabInteractionProfile {
         switch density {
         case .compact:
             return TabInteractionProfile(
-                tabSelect: TopChromeMotion.tabSelect(density: density, strip: true),
-                tabCreateClose: TopChromeMotion.tabCreateClose(density: density, strip: true),
-                neighborShift: TopChromeMotion.neighborShift(density: density, strip: true),
-                snapBack: TopChromeMotion.snapBack(density: density, strip: true),
-                dragLift: TopChromeMotion.dragLift(density: density, strip: true),
-                hover: TopChromeMotion.hover(density: density, strip: true),
-                closeButtonShow: TopChromeMotion.closeReveal(density: density, strip: true),
-                closeButtonHide: TopChromeMotion.closeHide(density: density, strip: true),
-                overflowAffordance: TopChromeMotion.overflowAffordance(density: density, strip: true),
+                tabSelect: TopChromeMotion.tabSelect(density: density),
+                tabCreateClose: TopChromeMotion.tabCreateClose(density: density),
+                neighborShift: TopChromeMotion.neighborShift(density: density),
+                snapBack: TopChromeMotion.snapBack(density: density),
+                dragLift: TopChromeMotion.dragLift(density: density),
+                hover: TopChromeMotion.hover(density: density),
+                closeButtonShow: TopChromeMotion.closeReveal(density: density),
+                closeButtonHide: TopChromeMotion.closeHide(density: density),
+                overflowAffordance: TopChromeMotion.overflowAffordance(density: density),
                 dragAutoScroll: TopChromeMotion.dragAutoScroll(density: density),
                 dragAutoScrollThrottle: 0.045,
                 dragEdgeThreshold: 34,
@@ -148,15 +144,15 @@ struct TabInteractionProfile {
             )
         case .regular:
             return TabInteractionProfile(
-                tabSelect: TopChromeMotion.tabSelect(density: density, strip: true),
-                tabCreateClose: TopChromeMotion.tabCreateClose(density: density, strip: true),
-                neighborShift: TopChromeMotion.neighborShift(density: density, strip: true),
-                snapBack: TopChromeMotion.snapBack(density: density, strip: true),
-                dragLift: TopChromeMotion.dragLift(density: density, strip: true),
-                hover: TopChromeMotion.hover(density: density, strip: true),
-                closeButtonShow: TopChromeMotion.closeReveal(density: density, strip: true),
-                closeButtonHide: TopChromeMotion.closeHide(density: density, strip: true),
-                overflowAffordance: TopChromeMotion.overflowAffordance(density: density, strip: true),
+                tabSelect: TopChromeMotion.tabSelect(density: density),
+                tabCreateClose: TopChromeMotion.tabCreateClose(density: density),
+                neighborShift: TopChromeMotion.neighborShift(density: density),
+                snapBack: TopChromeMotion.snapBack(density: density),
+                dragLift: TopChromeMotion.dragLift(density: density),
+                hover: TopChromeMotion.hover(density: density),
+                closeButtonShow: TopChromeMotion.closeReveal(density: density),
+                closeButtonHide: TopChromeMotion.closeHide(density: density),
+                overflowAffordance: TopChromeMotion.overflowAffordance(density: density),
                 dragAutoScroll: TopChromeMotion.dragAutoScroll(density: density),
                 dragAutoScrollThrottle: 0.05,
                 dragEdgeThreshold: 42,
@@ -164,15 +160,15 @@ struct TabInteractionProfile {
             )
         case .spacious:
             return TabInteractionProfile(
-                tabSelect: TopChromeMotion.tabSelect(density: density, strip: true),
-                tabCreateClose: TopChromeMotion.tabCreateClose(density: density, strip: true),
-                neighborShift: TopChromeMotion.neighborShift(density: density, strip: true),
-                snapBack: TopChromeMotion.snapBack(density: density, strip: true),
-                dragLift: TopChromeMotion.dragLift(density: density, strip: true),
-                hover: TopChromeMotion.hover(density: density, strip: true),
-                closeButtonShow: TopChromeMotion.closeReveal(density: density, strip: true),
-                closeButtonHide: TopChromeMotion.closeHide(density: density, strip: true),
-                overflowAffordance: TopChromeMotion.overflowAffordance(density: density, strip: true),
+                tabSelect: TopChromeMotion.tabSelect(density: density),
+                tabCreateClose: TopChromeMotion.tabCreateClose(density: density),
+                neighborShift: TopChromeMotion.neighborShift(density: density),
+                snapBack: TopChromeMotion.snapBack(density: density),
+                dragLift: TopChromeMotion.dragLift(density: density),
+                hover: TopChromeMotion.hover(density: density),
+                closeButtonShow: TopChromeMotion.closeReveal(density: density),
+                closeButtonHide: TopChromeMotion.closeHide(density: density),
+                overflowAffordance: TopChromeMotion.overflowAffordance(density: density),
                 dragAutoScroll: TopChromeMotion.dragAutoScroll(density: density),
                 dragAutoScrollThrottle: 0.06,
                 dragEdgeThreshold: 50,

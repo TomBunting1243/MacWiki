@@ -69,27 +69,11 @@ private struct ReaderToolbarAccessoryView: View {
         }
         .onChange(of: appState.readerStylePresentationRequestID) { _, requestID in
             guard requestID != nil, article != nil else { return }
-            showingReaderStylePopover = true
+            presentReaderStylePopover()
         }
         .onChange(of: appState.readerPageViewsPresentationRequestID) { _, requestID in
             guard requestID != nil, article != nil else { return }
-            showingPageViewsPopover = true
-        }
-        .popover(isPresented: $showingSavePopover) {
-            if let article {
-                SaveToListPopover(article: article)
-            }
-        }
-        .popover(isPresented: $showingReaderStylePopover) {
-            ReaderStylePopover()
-        }
-        .popover(isPresented: $showingPageViewsPopover) {
-            if let article {
-                SidebarPageViewsPopoverContent(
-                    title: article.title,
-                    referenceDate: Date()
-                )
-            }
+            presentPageViewsPopover()
         }
     }
 
@@ -195,10 +179,15 @@ private struct ReaderToolbarAccessoryView: View {
             currentArticleIsSaved ? "Saved Article" : "Save Article",
             systemImage: currentArticleIsSaved ? "bookmark.fill" : "bookmark"
         ) {
-            showingSavePopover = true
+            presentSavePopover()
         }
         .labelStyle(.iconOnly)
         .disabled(article == nil)
+        .popover(isPresented: $showingSavePopover) {
+            if let article {
+                SaveToListPopover(article: article)
+            }
+        }
     }
 
     private var readerControls: some View {
@@ -208,16 +197,22 @@ private struct ReaderToolbarAccessoryView: View {
                 .disabled(article == nil)
 
             Button("Reader Style", systemImage: "textformat.size") {
-                showingReaderStylePopover = true
+                presentReaderStylePopover()
             }
             .labelStyle(.iconOnly)
             .disabled(article == nil)
+            .popover(isPresented: $showingReaderStylePopover) {
+                ReaderStylePopover()
+            }
 
             Button("Page Views", systemImage: "chart.xyaxis.line") {
-                showingPageViewsPopover = true
+                presentPageViewsPopover()
             }
             .labelStyle(.iconOnly)
             .disabled(article == nil)
+            .popover(isPresented: $showingPageViewsPopover) {
+                pageViewsPopoverContent
+            }
         }
     }
 
@@ -248,7 +243,7 @@ private struct ReaderToolbarAccessoryView: View {
         Menu("More Reader Actions", systemImage: "ellipsis.circle") {
             if includesArticleState {
                 Button(currentArticleIsSaved ? "Saved Article" : "Save Article") {
-                    showingSavePopover = true
+                    presentSavePopover()
                 }
                 .disabled(article == nil)
 
@@ -263,11 +258,11 @@ private struct ReaderToolbarAccessoryView: View {
             Button("Find in Page", action: toggleFindOnPage)
                 .disabled(article == nil)
             Button("Reader Style") {
-                showingReaderStylePopover = true
+                presentReaderStylePopover()
             }
             .disabled(article == nil)
             Button("Page Views") {
-                showingPageViewsPopover = true
+                presentPageViewsPopover()
             }
             .disabled(article == nil)
 
@@ -288,6 +283,45 @@ private struct ReaderToolbarAccessoryView: View {
         }
         .menuStyle(.borderlessButton)
         .help("More Reader Actions")
+        .popover(isPresented: $showingSavePopover) {
+            if let article {
+                SaveToListPopover(article: article)
+            }
+        }
+        .popover(isPresented: $showingReaderStylePopover) {
+            ReaderStylePopover()
+        }
+        .popover(isPresented: $showingPageViewsPopover) {
+            pageViewsPopoverContent
+        }
+    }
+
+    @ViewBuilder
+    private var pageViewsPopoverContent: some View {
+        if let article {
+            SidebarPageViewsPopoverContent(
+                title: article.title,
+                referenceDate: Date()
+            )
+        }
+    }
+
+    private func presentSavePopover() {
+        showingReaderStylePopover = false
+        showingPageViewsPopover = false
+        showingSavePopover = true
+    }
+
+    private func presentReaderStylePopover() {
+        showingSavePopover = false
+        showingPageViewsPopover = false
+        showingReaderStylePopover = true
+    }
+
+    private func presentPageViewsPopover() {
+        showingSavePopover = false
+        showingReaderStylePopover = false
+        showingPageViewsPopover = true
     }
 
     private func toggleReadState() {

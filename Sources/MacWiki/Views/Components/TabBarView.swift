@@ -76,9 +76,10 @@ struct TabBarView: View {
 
     private var resolvedTabWidth: CGFloat {
         let viewport = tabsViewportWidth > 0 ? tabsViewportWidth : 900
-        let buttonReserve = ReaderTabLaneMetrics.newTabButtonSize + 8
-            + (showsOverflowMenu ? ReaderTabLaneMetrics.newTabButtonSize + 8 : 0)
-        let available = max(200, viewport - buttonReserve)
+        // The ScrollView has already received the width left after the native
+        // New Tab/overflow ControlGroup. Reserving those controls again creates
+        // dead space and forces tabs to compress prematurely.
+        let available = max(200, viewport)
         let tabCount = max(1, appState.openTabs.count)
         let totalSpacing = tabSpacing * CGFloat(max(0, tabCount - 1))
         let proportional = (available - totalSpacing) / CGFloat(tabCount)
@@ -122,7 +123,7 @@ struct TabBarView: View {
                 // The tab's high-priority gesture owns an active drag. Changing
                 // the parent scroll recognizer from that child-owned state
                 // creates an AttributeGraph cycle in optimized macOS 27 builds.
-                .scrollClipDisabled(false)
+                .scrollClipDisabled()
                 .onScrollGeometryChange(for: CGRect.self) { geometry in
                     geometry.visibleRect
                 } action: { _, visibleRect in
@@ -292,7 +293,6 @@ struct TabBarView: View {
         
         // Only trigger neighbor animations when target actually changes
         if newTarget != currentTargetIndex {
-            triggerReorderHaptic()
             performAnimation(interactionProfile.neighborShift) {
                 currentTargetIndex = newTarget
             }
@@ -378,11 +378,6 @@ struct TabBarView: View {
         guard pendingScrollTabId != targetId else { return }
         pendingScrollTabId = targetId
         lastDragAutoScrollTimestamp = now
-    }
-
-    private func triggerReorderHaptic() {
-        // SwiftUI owns the interaction now; keep reorder motion visual-only until a
-        // view-scoped sensoryFeedback trigger is introduced for this drag path.
     }
 
     private func updateTabsViewportWidth(_ newWidth: CGFloat) {

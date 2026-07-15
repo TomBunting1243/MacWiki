@@ -141,10 +141,6 @@ final class WorkspaceSplitViewController: NSSplitViewController {
         scheduleInitialWidthRestore(after: WidthPersistence.restoreDelay)
     }
 
-    override func viewDidAppear() {
-        super.viewDidAppear()
-    }
-
     /// Reader controls and tabs belong to the semantic reader item, so the
     /// navigation and inspector panes remain full-height native surfaces.
     func setReaderTopAccessoryViewControllers(

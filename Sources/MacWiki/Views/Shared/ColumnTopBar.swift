@@ -4,13 +4,8 @@ enum ColumnChromeMetrics {
     static let horizontalPadding: CGFloat = 9
     static let dividerOpacity: CGFloat = 0.065
     static let internalDividerOpacity: CGFloat = 0.035
-    static let highlightStrongOpacity: CGFloat = 0.055
-    static let highlightSoftOpacity: CGFloat = 0.012
     static let darkDividerOpacity: CGFloat = 0.038
     static let darkInternalDividerOpacity: CGFloat = 0.020
-    static let darkHighlightStrongOpacity: CGFloat = 0.014
-    static let darkHighlightSoftOpacity: CGFloat = 0.004
-    static let darkBaseTintOpacity: CGFloat = 0.05
 
     static func dividerOpacity(for colorScheme: ColorScheme) -> CGFloat {
         colorScheme == .dark ? darkDividerOpacity : dividerOpacity
@@ -26,9 +21,6 @@ enum ChromeIconMetrics {
     /// typographically instead of forcing ad-hoc pixel dimensions.
     static let symbolPointSize: CGFloat = 13
     static let regularWeight: Font.Weight = .regular
-    static let emphasizedWeight: Font.Weight = .semibold
-    static let buttonSize: CGFloat = 28
-    static let compactButtonSize: CGFloat = 24
 }
 
 enum TopChromeControlMetrics {
@@ -37,9 +29,6 @@ enum TopChromeControlMetrics {
 
 enum ColumnMotion {
     static let sidebarVisibility = Animation.interactiveSpring(response: 0.30, dampingFraction: 0.90, blendDuration: 0.12)
-    static let readerOnlyVisibility = Animation.interactiveSpring(response: 0.44, dampingFraction: 0.93, blendDuration: 0.18)
-    static let inspectorVisibility = Animation.interactiveSpring(response: 0.32, dampingFraction: 0.89, blendDuration: 0.12)
-    static let sidebarRevealFollowDelay: Double = 0.14
 }
 
 enum TopChromeMotion {
@@ -55,114 +44,114 @@ enum TopChromeMotion {
         }
     }
 
-    static func tabSelect(density: Density, strip: Bool) -> Animation {
+    static func tabSelect(density: Density) -> Animation {
         switch density {
         case .compact:
-            return .spring(response: strip ? 0.22 : 0.20, dampingFraction: 0.92)
+            return .spring(response: 0.22, dampingFraction: 0.92)
         case .regular:
-            return .spring(response: strip ? 0.24 : 0.22, dampingFraction: 0.90)
+            return .spring(response: 0.24, dampingFraction: 0.90)
         case .spacious:
-            return .spring(response: strip ? 0.27 : 0.25, dampingFraction: 0.89)
+            return .spring(response: 0.27, dampingFraction: 0.89)
         }
     }
 
-    static func tabCreateClose(density: Density, strip: Bool) -> Animation {
+    static func tabCreateClose(density: Density) -> Animation {
         switch density {
         case .compact:
-            return .spring(response: strip ? 0.20 : 0.18, dampingFraction: 0.95)
+            return .spring(response: 0.20, dampingFraction: 0.95)
         case .regular:
-            return .spring(response: strip ? 0.22 : 0.20, dampingFraction: 0.94)
+            return .spring(response: 0.22, dampingFraction: 0.94)
         case .spacious:
-            return .spring(response: strip ? 0.25 : 0.23, dampingFraction: 0.92)
+            return .spring(response: 0.25, dampingFraction: 0.92)
         }
     }
 
-    static func neighborShift(density: Density, strip: Bool) -> Animation {
+    static func neighborShift(density: Density) -> Animation {
         switch density {
         case .compact:
             return .interactiveSpring(
-                response: strip ? 0.28 : 0.26,
-                dampingFraction: strip ? 0.91 : 0.90,
+                response: 0.28,
+                dampingFraction: 0.91,
                 blendDuration: 0.08
             )
         case .regular:
             return .interactiveSpring(
-                response: strip ? 0.32 : 0.30,
-                dampingFraction: strip ? 0.90 : 0.89,
+                response: 0.32,
+                dampingFraction: 0.90,
                 blendDuration: 0.08
             )
         case .spacious:
             return .interactiveSpring(
-                response: strip ? 0.36 : 0.34,
-                dampingFraction: strip ? 0.89 : 0.88,
+                response: 0.36,
+                dampingFraction: 0.89,
                 blendDuration: 0.10
             )
         }
     }
 
-    static func snapBack(density: Density, strip: Bool) -> Animation {
+    static func snapBack(density: Density) -> Animation {
         switch density {
         case .compact:
-            return .spring(response: strip ? 0.22 : 0.20, dampingFraction: 0.84, blendDuration: 0.05)
+            return .spring(response: 0.22, dampingFraction: 0.84, blendDuration: 0.05)
         case .regular:
-            return .spring(response: strip ? 0.25 : 0.23, dampingFraction: 0.84, blendDuration: 0.06)
+            return .spring(response: 0.25, dampingFraction: 0.84, blendDuration: 0.06)
         case .spacious:
-            return .spring(response: strip ? 0.28 : 0.26, dampingFraction: 0.84, blendDuration: 0.08)
+            return .spring(response: 0.28, dampingFraction: 0.84, blendDuration: 0.08)
         }
     }
 
-    static func dragLift(density: Density, strip: Bool) -> Animation {
+    static func dragLift(density: Density) -> Animation {
         switch density {
         case .compact:
-            return .spring(response: strip ? 0.22 : 0.20, dampingFraction: 0.80)
+            return .spring(response: 0.22, dampingFraction: 0.80)
         case .regular:
-            return .spring(response: strip ? 0.24 : 0.22, dampingFraction: 0.79)
+            return .spring(response: 0.24, dampingFraction: 0.79)
         case .spacious:
-            return .spring(response: strip ? 0.26 : 0.24, dampingFraction: 0.78)
+            return .spring(response: 0.26, dampingFraction: 0.78)
         }
     }
 
-    static func hover(density: Density, strip: Bool) -> Animation {
+    static func hover(density: Density) -> Animation {
         switch density {
         case .compact:
-            return .easeOut(duration: strip ? 0.13 : 0.12)
+            return .easeOut(duration: 0.13)
         case .regular:
-            return .easeOut(duration: strip ? 0.14 : 0.13)
+            return .easeOut(duration: 0.14)
         case .spacious:
-            return .easeOut(duration: strip ? 0.15 : 0.14)
+            return .easeOut(duration: 0.15)
         }
     }
 
-    static func closeReveal(density: Density, strip: Bool) -> Animation {
+    static func closeReveal(density: Density) -> Animation {
         switch density {
         case .compact:
-            return .easeOut(duration: strip ? 0.13 : 0.12)
+            return .easeOut(duration: 0.13)
         case .regular:
-            return .easeOut(duration: strip ? 0.13 : 0.12)
+            return .easeOut(duration: 0.13)
         case .spacious:
-            return .easeOut(duration: strip ? 0.14 : 0.13)
+            return .easeOut(duration: 0.14)
         }
     }
 
-    static func closeHide(density: Density, strip: Bool) -> Animation {
+    static func closeHide(density: Density) -> Animation {
         switch density {
         case .compact:
-            return .easeOut(duration: strip ? 0.16 : 0.14)
+            return .easeOut(duration: 0.16)
         case .regular:
-            return .easeOut(duration: strip ? 0.16 : 0.14)
+            return .easeOut(duration: 0.16)
         case .spacious:
-            return .easeOut(duration: strip ? 0.17 : 0.15)
+            return .easeOut(duration: 0.17)
         }
     }
 
-    static func overflowAffordance(density: Density, strip: Bool) -> Animation {
+    static func overflowAffordance(density: Density) -> Animation {
         switch density {
         case .compact:
-            return .easeOut(duration: strip ? 0.15 : 0.14)
+            return .easeOut(duration: 0.15)
         case .regular:
-            return .easeOut(duration: strip ? 0.16 : 0.15)
+            return .easeOut(duration: 0.16)
         case .spacious:
-            return .easeOut(duration: strip ? 0.17 : 0.16)
+            return .easeOut(duration: 0.17)
         }
     }
 

@@ -285,7 +285,6 @@ struct ArticleView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.macWikiAccessibilityPersonalization) private var accessibilityPersonalization
-    @Environment(\.readerChromeMetrics) private var readerChromeMetrics
     @Query(sort: \ReadingList.updatedAt, order: .reverse) private var allLists: [ReadingList]
     @Query private var highlightsForArticle: [Highlight]
 
@@ -387,7 +386,7 @@ struct ArticleView: View {
     }
 
     private var resolvedTopObscuredHeight: CGFloat {
-        max(topObscuredHeight, readerChromeMetrics.topObscuredHeight)
+        topObscuredHeight
     }
 
     private var readerTopInset: CGFloat {
@@ -406,7 +405,7 @@ struct ArticleView: View {
         let resolved: CGFloat
         if hasToolbarControls {
             let chromeOverlapInset = max(
-                readerChromeMetrics.titlebarTabStripHeight + 8,
+                8,
                 resolvedTopObscuredHeight - 44
             )
             resolved = chromeOverlapInset + compactWidthBoost

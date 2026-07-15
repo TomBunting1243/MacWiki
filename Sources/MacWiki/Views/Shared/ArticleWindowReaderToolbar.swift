@@ -15,8 +15,8 @@ enum ArticleWindowReaderToolbarIdentifier {
 }
 
 /// A reader-only customizable toolbar for standalone article windows. The main
-/// window keeps its AppKit tracking-separator toolbar because it also owns four
-/// pane boundaries; this surface has only reader actions plus its inspector.
+/// window instead scopes its chrome to the reader split item; this surface has
+/// only reader actions plus its inspector.
 @MainActor
 struct ArticleWindowReaderToolbar: CustomizableToolbarContent {
     let appState: AppState

@@ -97,6 +97,11 @@ private func hasRole(_ element: AXUIElement, _ role: String) -> Bool {
     stringAttribute(kAXRoleAttribute as CFString, from: element) == role
 }
 
+private func isMenuControl(_ element: AXUIElement) -> Bool {
+    let role = stringAttribute(kAXRoleAttribute as CFString, from: element)
+    return role == kAXMenuButtonRole as String || role == kAXPopUpButtonRole as String
+}
+
 private func workspaceSplitGroup(in window: AXUIElement) -> AXUIElement? {
     guard let shellRoot = directChildren(of: window).first(where: { hasRole($0, kAXGroupRole as String) }),
           let outerSplit = directChildren(of: shellRoot).first(where: { hasRole($0, kAXSplitGroupRole as String) }) else {
@@ -136,9 +141,9 @@ private func readerPane(in window: AXUIElement) -> AXUIElement? {
     return directChildren(of: workspace)
         .filter { hasRole($0, kAXGroupRole as String) }
         .first { group in
-            let children = directChildren(of: group)
-            return children.contains { hasRole($0, kAXScrollAreaRole as String) }
-                && children.contains { child in
+            let descendants = elements(in: group, limit: 500)
+            return descendants.contains { hasRole($0, kAXScrollAreaRole as String) }
+                && descendants.contains { child in
                     hasRole(child, kAXButtonRole as String)
                         && accessibilityLabels(of: child).contains("New Tab")
                 }
@@ -441,7 +446,7 @@ do {
     if !missingVisibleControls.isEmpty,
        let currentReader = try? refreshReaderChrome() {
         let moreButtons = elements(in: currentReader, limit: 500).filter {
-            stringAttribute(kAXRoleAttribute as CFString, from: $0) == kAXMenuButtonRole as String
+            isMenuControl($0)
                 && accessibilityLabels(of: $0).contains { matchesAXLabel($0, expected: "More Reader Actions") }
         }
         for moreButton in moreButtons {
@@ -486,7 +491,7 @@ do {
             return visibleButton
         }
         for moreButton in readerDescendants.filter({
-            stringAttribute(kAXRoleAttribute as CFString, from: $0) == kAXMenuButtonRole as String
+            isMenuControl($0)
                 && accessibilityLabels(of: $0).contains { matchesAXLabel($0, expected: "More Reader Actions") }
         }) {
             try press(moreButton, label: "More Reader Actions")
@@ -668,6 +673,31 @@ do {
     }) else {
         throw JourneyError.missing("The window did not reach the narrow pane-restore test width.")
     }
+
+    guard let narrowReader = try? refreshReaderChrome(),
+          let narrowMore = elements(in: narrowReader, limit: 500).first(where: {
+              isMenuControl($0)
+                  && accessibilityLabels(of: $0).contains {
+                      matchesAXLabel($0, expected: "More Reader Actions")
+                  }
+          }) else {
+        throw JourneyError.missing("The 900-point reader did not expose its native More Reader Actions control.")
+    }
+    try press(narrowMore, label: "More Reader Actions at 900 points")
+    guard wait(timeout: 2, condition: {
+        menuItem(in: application, label: "Reader Style") != nil
+    }), let narrowReaderStyle = menuItem(in: application, label: "Reader Style") else {
+        throw JourneyError.missing("The compact More menu omitted Reader Style.")
+    }
+    try press(narrowReaderStyle, label: "Reader Style from compact More menu")
+    guard wait(timeout: 3, condition: {
+        containsLabel("Text Styles", in: contentWindow)
+    }) else {
+        throw JourneyError.missing("The compact More menu did not present Reader Style controls.")
+    }
+    try postEscape(to: pid)
+    settleAccessibility(for: 0.25)
+    trace("compact More-menu command path verified")
 
     let showListContents = try readerAction("Show List Contents")
     try press(showListContents, label: "Show List Contents")

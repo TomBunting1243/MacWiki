@@ -18,6 +18,7 @@ struct ReaderTopChromeLayoutTests {
         #expect(bridge.contains("NSSplitViewItemAccessoryViewController"))
         #expect(bridge.contains("preferredScrollEdgeEffectStyle = .soft"))
         #expect(bridge.contains("hostingController.sizingOptions = [.intrinsicContentSize, .preferredContentSize]"))
+        #expect(bridge.contains("lastRequestedReaderChromeVisible"))
         #expect(shell.contains("readerChromeVisible: !appState.isWikiHopNavigationLocked"))
         #expect(!workspace.contains("window.toolbar"))
         #expect(!shell.contains("ReaderToolbarEnvironment("))
@@ -37,6 +38,9 @@ struct ReaderTopChromeLayoutTests {
         #expect(chrome.contains("readerStylePresentationRequestID"))
         #expect(chrome.contains("readerPageViewsPresentationRequestID"))
         #expect(chrome.contains(".popover(isPresented: $showingSavePopover)"))
+        #expect(chrome.contains("presentSavePopover()"))
+        #expect(chrome.contains("presentReaderStylePopover()"))
+        #expect(chrome.contains("presentPageViewsPopover()"))
     }
 
     @Test("List Contents search is an embedded native AppKit search field")

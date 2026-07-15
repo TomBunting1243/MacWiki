@@ -19,10 +19,7 @@ struct ArticleLoadingSkeletonView: View {
     let articleTitle: String
     let phase: Phase
 
-    @Environment(\.readerChromeMetrics) private var readerChromeMetrics
-
     private func resolvedTopPadding(for availableWidth: CGFloat, topSafeArea: CGFloat) -> CGFloat {
-        let chromeInset = max(topSafeArea, readerChromeMetrics.topObscuredHeight)
         let compactWidthBoost: CGFloat
         switch availableWidth {
         case ..<520:
@@ -34,7 +31,7 @@ struct ArticleLoadingSkeletonView: View {
         default:
             compactWidthBoost = 0
         }
-        return chromeInset + 18 + compactWidthBoost
+        return topSafeArea + 18 + compactWidthBoost
     }
 
     var body: some View {

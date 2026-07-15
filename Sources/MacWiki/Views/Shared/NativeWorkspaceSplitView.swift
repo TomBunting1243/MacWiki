@@ -37,6 +37,7 @@ struct NativeWorkspaceSplitView<Sidebar: View, Directory: View, Reader: View, In
             reader: reader,
             inspector: inspector,
             readerTopAccessory: readerTopAccessory,
+            readerChromeVisible: readerChromeVisible,
             sidebarRevision: sidebarRevision,
             directoryRevision: directoryRevision,
             readerRevision: readerRevision,
@@ -134,6 +135,7 @@ struct NativeWorkspaceSplitView<Sidebar: View, Directory: View, Reader: View, In
         private var lastReaderRevision: String
         private var lastInspectorRevision: String
         private var lastRequestedVisibility: WorkspacePaneVisibility
+        private var lastRequestedReaderChromeVisible: Bool
 
         init(
             sidebarVisible: Binding<Bool>,
@@ -144,6 +146,7 @@ struct NativeWorkspaceSplitView<Sidebar: View, Directory: View, Reader: View, In
             reader: Reader,
             inspector: Inspector,
             readerTopAccessory: ReaderTopAccessory,
+            readerChromeVisible: Bool,
             sidebarRevision: String,
             directoryRevision: String,
             readerRevision: String,
@@ -172,6 +175,7 @@ struct NativeWorkspaceSplitView<Sidebar: View, Directory: View, Reader: View, In
                 directoryVisible: directoryVisible.wrappedValue,
                 inspectorVisible: inspectorVisible.wrappedValue
             )
+            lastRequestedReaderChromeVisible = readerChromeVisible
             sidebarController = NSHostingController(rootView: HostingContentRoot(box: sidebarBox))
             directoryController = NSHostingController(rootView: HostingContentRoot(box: directoryBox))
             readerController = NSHostingController(rootView: HostingContentRoot(box: readerBox))
@@ -317,6 +321,8 @@ struct NativeWorkspaceSplitView<Sidebar: View, Directory: View, Reader: View, In
             controller: WorkspaceSplitViewController,
             animated: Bool
         ) {
+            guard lastRequestedReaderChromeVisible != visible else { return }
+            lastRequestedReaderChromeVisible = visible
             readerChromeVisibilityUpdate?.cancel()
             readerChromeVisibilityUpdate = Task { @MainActor [weak controller] in
                 await Task.yield()
