@@ -46,7 +46,6 @@ struct ListsSidebar: View {
     @State private var showNewListSheet = false
     @State private var showNewAreaSheet = false
     @State private var sidebarSelectionSet: Set<SidebarSelectionID> = []
-    @State private var topObscuredHeight: CGFloat = 38
     @State private var selectedAreaIDs: Set<UUID> = []
     @State private var collectionsSnapshot: ListsSidebarSnapshot?
     @AppStorage(AppStorageKey.ListsSidebar.sortOrder) private var sortOrder: ListSortOrder = .updatedDate
@@ -223,13 +222,6 @@ struct ListsSidebar: View {
         return "The selected folder\(pendingAreaDeletion.folderCount == 1 ? "" : "s") contain \(nestedDescription). Choose whether to move contents to root or delete them."
     }
 
-    private var plainSidebarTopInset: CGFloat {
-        max(
-            SidebarRowMetrics.nativeTopContentInset,
-            max(0, topObscuredHeight) + SidebarRowMetrics.titlebarContentPadding
-        )
-    }
-
     private func saveModelContextNow() {
         guard modelContext.hasChanges else { return }
         modelContext.saveReportingFailure(operation: #function)
@@ -398,34 +390,17 @@ struct ListsSidebar: View {
     }
 
     private var sidebarList: some View {
-        GeometryReader { proxy in
-            List {
-                ForEach(sidebarSections) { section in
-                    sidebarSectionView(section)
-                }
-            }
-            .listStyle(.sidebar)
-            .scrollContentBackground(.hidden)
-            .contentMargins(.top, plainSidebarTopInset, for: .scrollIndicators)
-            .safeAreaInset(edge: .top, spacing: 0) {
-                Color.clear
-                    .frame(height: plainSidebarTopInset)
-                    .allowsHitTesting(false)
-            }
-            .transaction { transaction in
-                transaction.animation = nil
-            }
-            .animation(reduceMotion ? nil : .easeOut(duration: 0.16), value: isWikiHopAvailable)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .background(Color.clear)
-            .environment(\.sidebarRowLayoutMetrics, SidebarRowLayoutMetrics(availableWidth: proxy.size.width))
-            .onAppear {
-                updateTopObscuredHeight(proxy.safeAreaInsets.top)
-            }
-            .onChange(of: proxy.safeAreaInsets.top) { _, newValue in
-                updateTopObscuredHeight(newValue)
+        List(selection: $sidebarSelectionSet) {
+            ForEach(sidebarSections) { section in
+                sidebarSectionView(section)
             }
         }
+        .listStyle(.sidebar)
+        .transaction { transaction in
+            transaction.animation = nil
+        }
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.16), value: isWikiHopAvailable)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
     @ViewBuilder
@@ -715,15 +690,9 @@ struct ListsSidebar: View {
         isDisabled: Bool = false,
         @ViewBuilder label: () -> Content
     ) -> some View {
-        Button {
-            guard !isDisabled else { return }
-            selectSidebarSelection(selection)
-        } label: {
-            SidebarRowContainer(isSelected: isSelected) {
-                label()
-            }
+        SidebarRowContainer(isSelected: isSelected) {
+            label()
         }
-        .buttonStyle(.plain)
         .tag(selection)
         .disabled(isDisabled)
         .accessibilityElement(children: .combine)
@@ -939,15 +908,6 @@ struct ListsSidebar: View {
             return "4-tag-\(id.uuidString)"
         case .area(let id):
             return "5-area-\(id.uuidString)"
-        }
-    }
-
-    private func updateTopObscuredHeight(_ proposedHeight: CGFloat) {
-        let resolved = max(0, proposedHeight)
-        guard abs(topObscuredHeight - resolved) > 0.5 else { return }
-        DispatchQueue.main.async {
-            guard abs(topObscuredHeight - resolved) > 0.5 else { return }
-            topObscuredHeight = resolved
         }
     }
 

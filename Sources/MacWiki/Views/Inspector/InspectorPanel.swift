@@ -42,19 +42,8 @@ struct InspectorPanel: View {
         static let sectionSpacing: CGFloat = 14
         static let sectionCornerRadius: CGFloat = 12
         static let metadataTransitionAnimation = Animation.easeOut(duration: 0.22)
-    }
-
-    private var standardTOCTransition: AnyTransition {
-        reduceMotion
-            ? .opacity
-            : .asymmetric(
-                insertion: .opacity
-                    .combined(with: .move(edge: .bottom))
-                    .combined(with: .scale(scale: 0.985, anchor: .top)),
-                removal: .opacity
-                    .combined(with: .move(edge: .bottom))
-                    .combined(with: .scale(scale: 0.985, anchor: .top))
-            )
+        static let detailsMinimumHeight: CGFloat = 220
+        static let contentsMinimumHeight: CGFloat = 150
     }
 
     private var metadataSectionTransition: AnyTransition {
@@ -176,34 +165,14 @@ struct InspectorPanel: View {
     private var infoContent: some View {
         Group {
             if let article = appState.currentArticle {
-                ScrollViewReader { proxy in
-                    ScrollView {
-                        LazyVStack(alignment: .leading, spacing: InspectorLayout.sectionSpacing) {
-                            infoTopModules(article)
+                VSplitView {
+                    infoDetails(article)
+                        .frame(minHeight: InspectorLayout.detailsMinimumHeight)
 
-                            if !appState.currentArticleMetadata.isEmpty {
-                                metadataSection
-                                    .transition(metadataSectionTransition)
-                            }
-
-                            if !appState.currentArticleTableOfContents.isEmpty {
-                                tableOfContentsSection
-                                    .transition(standardTOCTransition)
-                            }
-                        }
-                        .padding(.horizontal, 14)
-                        .padding(.top, 12)
-                        .padding(.bottom, 14)
-                    }
-                    .onChange(of: appState.currentVisibleTableOfContentsSectionId) { _, newID in
-                        guard let newID else { return }
-                        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2)) {
-                            proxy.scrollTo(newID, anchor: .center)
-                        }
-                    }
+                    tableOfContentsPane
+                        .frame(minHeight: InspectorLayout.contentsMinimumHeight)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                .animation(reduceMotion ? nil : InspectorLayout.metadataTransitionAnimation, value: appState.currentArticleMetadata.isEmpty)
             } else {
                 ColumnEmptyStateView(
                     title: "No Article",
@@ -214,6 +183,26 @@ struct InspectorPanel: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    private func infoDetails(_ article: Article) -> some View {
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: InspectorLayout.sectionSpacing) {
+                infoTopModules(article)
+
+                if !appState.currentArticleMetadata.isEmpty {
+                    metadataSection
+                        .transition(metadataSectionTransition)
+                }
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+        }
+        .animation(
+            reduceMotion ? nil : InspectorLayout.metadataTransitionAnimation,
+            value: appState.currentArticleMetadata.isEmpty
+        )
+        .accessibilityLabel("Article details")
     }
 
     private func infoTopModules(_ article: Article) -> some View {
@@ -234,83 +223,62 @@ struct InspectorPanel: View {
         }
     }
 
-    private var tableOfContentsSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 10) {
-                Text("Contents")
-                    .font(MacWikiTypography.inspectorSectionLabel)
-                    .foregroundStyle(.primary)
-            }
+    private var tableOfContentsPane: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("Contents")
+                .font(MacWikiTypography.inspectorSectionLabel)
+                .foregroundStyle(.primary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
 
-            LazyVStack(alignment: .leading, spacing: 4) {
-                ForEach(appState.currentArticleTableOfContents, id: \.id) { item in
-                    tableOfContentsRow(item: item)
+            Divider()
+
+            if appState.currentArticleTableOfContents.isEmpty {
+                ContentUnavailableView(
+                    "No Contents",
+                    systemImage: "list.bullet.indent",
+                    description: Text("This article has no section headings.")
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                List(selection: tableOfContentsSelection) {
+                    ForEach(appState.currentArticleTableOfContents, id: \.id) { item in
+                        tableOfContentsRow(item: item)
+                            .tag(item.id)
+                    }
                 }
+                .listStyle(.sidebar)
+                .accessibilityLabel("Article contents")
             }
-        }
-        .padding(12)
-        .background {
-            inspectorSectionBackground()
         }
     }
 
-    private func tableOfContentsRow(item: ArticleTableOfContentsItem) -> some View {
-        let isActive = appState.currentVisibleTableOfContentsSectionId == item.id
-        let indent = CGFloat(max(item.level - 2, 0)) * 14
-
-        return Button {
-            appState.pendingTableOfContentsScrollTarget = item.id
-            appState.currentVisibleTableOfContentsSectionId = item.id
-        } label: {
-            HStack(spacing: 6) {
-                if item.level > 2 {
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 8, weight: .semibold))
-                        .foregroundStyle(
-                            isActive
-                                ? AnyShapeStyle(SidebarRowSelectionVisuals.tint)
-                                : AnyShapeStyle(.tertiary)
-                        )
-                }
-
-                Text(item.title)
-                    .font(isActive ? MacWikiTypography.inspectorTOCItemActive : MacWikiTypography.inspectorTOCItem)
-                    .foregroundStyle(
-                        isActive
-                            ? AnyShapeStyle(SidebarRowSelectionVisuals.tint)
-                            : AnyShapeStyle(.secondary)
-                    )
-                    .contentTransition(.interpolate)
-                    .lineLimit(1)
+    private var tableOfContentsSelection: Binding<String?> {
+        Binding(
+            get: { appState.currentVisibleTableOfContentsSectionId },
+            set: { newID in
+                guard let newID else { return }
+                appState.pendingTableOfContentsScrollTarget = newID
+                appState.currentVisibleTableOfContentsSectionId = newID
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.leading, indent)
-            .padding(.vertical, 4)
-            .padding(.horizontal, 6)
-            .background(
-                RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .fill(SidebarRowSelectionVisuals.tint.opacity(isActive ? 0.14 : 0))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .strokeBorder(SidebarRowSelectionVisuals.tint.opacity(0.28), lineWidth: 0.8)
-                    .opacity(isActive ? 1 : 0)
-            )
-            .scaleEffect(reduceMotion ? 1 : (isActive ? 1.015 : 1), anchor: .leading)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .animation(
-            reduceMotion
-                ? nil
-                : .interactiveSpring(
-                    response: 0.22,
-                    dampingFraction: 0.74,
-                    blendDuration: 0.06
-                ),
-            value: isActive
         )
-        .id(item.id)
+    }
+
+    private func tableOfContentsRow(item: ArticleTableOfContentsItem) -> some View {
+        HStack(spacing: 6) {
+            if item.level > 2 {
+                Image(systemName: "chevron.right")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.tertiary)
+            }
+
+            Text(item.title)
+                .font(MacWikiTypography.inspectorTOCItem)
+                .lineLimit(1)
+        }
+        .padding(.leading, CGFloat(max(item.level - 2, 0)) * 12)
+        .accessibilityLabel(item.title)
     }
 
     private var metadataSection: some View {

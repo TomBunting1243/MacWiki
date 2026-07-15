@@ -1,4 +1,3 @@
-import AppKit
 import SwiftUI
 
 enum SidebarRowMetrics {
@@ -11,8 +10,6 @@ enum SidebarRowMetrics {
     static let trailingCountWidth: CGFloat = 24
     static let headerAccessorySize: CGFloat = 24
     static let headerMinHeight: CGFloat = 34
-    static let nativeTopContentInset: CGFloat = 44
-    static let titlebarContentPadding: CGFloat = 10
     static let bodyFont: Font = .system(size: 13)
     static let symbolFont: Font = .system(size: 15, weight: .regular)
     static let countFont: Font = .system(size: 11)
@@ -28,7 +25,7 @@ enum SidebarRowSelectionVisuals {
         if isHighlighted {
             return tint
         }
-        return isSelected ? tint : .primary
+        return .primary
     }
 }
 
@@ -95,17 +92,10 @@ private struct SidebarListRowModifier: ViewModifier {
 }
 
 struct SidebarRowContainer<Content: View>: View {
-    @Environment(\.macWikiAccessibilityPersonalization.reduceMotion) private var reduceMotion
-    @Environment(\.macWikiAccessibilityPersonalization.differentiateWithoutColor) private var differentiateWithoutColor
-    @Environment(\.macWikiAccessibilityPersonalization.colorSchemeContrast) private var colorSchemeContrast
-    @Environment(\.colorScheme) private var colorScheme
-    @Environment(\.appearsActive) private var appearsActive
     @Environment(\.sidebarRowLayoutMetrics) private var layoutMetrics
 
     let isSelected: Bool
     let content: Content
-
-    @State private var isHovered = false
 
     init(
         isSelected: Bool = false,
@@ -115,101 +105,15 @@ struct SidebarRowContainer<Content: View>: View {
         self.content = content()
     }
 
-    private var isKeyWindow: Bool {
-        appearsActive
-    }
-
-    private var selectedFill: Color {
-        if colorScheme == .dark {
-            return SidebarRowSelectionVisuals.tint.opacity(isKeyWindow ? 0.18 : 0.11)
-        }
-        return SidebarRowSelectionVisuals.tint.opacity(isKeyWindow ? 0.12 : 0.08)
-    }
-
-    private var hoverFill: Color {
-        if colorScheme == .dark {
-            return Color.white.opacity(isKeyWindow ? 0.070 : 0.048)
-        }
-        return Color.black.opacity(isKeyWindow ? 0.042 : 0.028)
-    }
-
-    private var selectedStroke: Color {
-        if emphasizesSelectionWithoutColor {
-            return Color.primary.opacity(isKeyWindow ? 0.42 : 0.26)
-        }
-        if colorScheme == .dark {
-            return SidebarRowSelectionVisuals.tint.opacity(isHovered ? 0.28 : 0.18)
-        }
-        return SidebarRowSelectionVisuals.tint.opacity(isHovered ? 0.24 : 0.15)
-    }
-
-    private var hoverStroke: Color {
-        if colorScheme == .dark {
-            return Color.white.opacity(0.10)
-        }
-        return Color.black.opacity(0.055)
-    }
-
-    private var fillColor: Color {
-        if isSelected {
-            return selectedFill
-        }
-        if isHovered {
-            return hoverFill
-        }
-        return .clear
-    }
-
-    private var strokeColor: Color {
-        if isSelected {
-            return selectedStroke
-        }
-        if isHovered {
-            return hoverStroke
-        }
-        return .clear
-    }
-
-    private var strokeLineWidth: CGFloat {
-        guard isSelected else { return 0 }
-        return emphasizesSelectionWithoutColor ? 1 : 0.5
-    }
-
-    private var emphasizesSelectionWithoutColor: Bool {
-        differentiateWithoutColor || colorSchemeContrast == .increased
-    }
-
     var body: some View {
         content
             .environment(\.sidebarRowIsSelected, isSelected)
-            .foregroundStyle(
-                isSelected
-                    ? AnyShapeStyle(SidebarRowSelectionVisuals.tint)
-                    : AnyShapeStyle(.primary)
-            )
             .font(SidebarRowMetrics.bodyFont)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, layoutMetrics.horizontalInset)
             .padding(.vertical, SidebarRowMetrics.rowVerticalInset)
-            .background {
-                RoundedRectangle(cornerRadius: SidebarRowMetrics.rowCornerRadius, style: .continuous)
-                    .fill(fillColor)
-                    .overlay {
-                        RoundedRectangle(cornerRadius: SidebarRowMetrics.rowCornerRadius, style: .continuous)
-                            .strokeBorder(strokeColor, lineWidth: strokeLineWidth)
-                    }
-                    .padding(.horizontal, layoutMetrics.rowBackgroundInset)
-            }
             .contentShape(Rectangle())
             .modifier(SidebarListRowModifier())
-            .animation(
-                reduceMotion ? nil : .easeOut(duration: SidebarRowMetrics.microInteractionDuration),
-                value: isHovered
-            )
-            .onHover { hovering in
-                guard hovering != isHovered else { return }
-                isHovered = hovering
-            }
     }
 }
 
@@ -240,14 +144,12 @@ struct SidebarSymbolIcon: View {
 }
 
 struct SidebarCountBadge: View {
-    @Environment(\.sidebarRowIsSelected) private var isSelected
-
     let count: Int
 
     var body: some View {
         Text(count.formatted())
             .font(SidebarRowMetrics.countFont)
-            .foregroundStyle(isSelected ? SidebarRowSelectionVisuals.tint.opacity(0.72) : .secondary)
+            .foregroundStyle(.secondary)
             .monospacedDigit()
             .frame(width: SidebarRowMetrics.trailingCountWidth, alignment: .trailing)
     }

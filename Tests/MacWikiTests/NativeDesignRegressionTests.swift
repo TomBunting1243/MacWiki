@@ -13,15 +13,16 @@ struct NativeDesignRegressionTests {
         #expect(source.contains(".safeAreaPadding(.top)"))
     }
 
-    @Test func sidebarSelectionUsesSemanticAccentAndAccessibilityStructure() throws {
-        let source = try source("Sources/MacWiki/Views/Sidebar/SidebarRowChrome.swift")
+    @Test func sidebarSelectionIsOwnedByTheNativeSidebarList() throws {
+        let sidebar = try source("Sources/MacWiki/Views/Sidebar/ListsSidebar.swift")
+        let chrome = try source("Sources/MacWiki/Views/Sidebar/SidebarRowChrome.swift")
 
-        #expect(source.contains("static let tint = Color.accentColor"))
-        #expect(!source.contains("Color(red: 0.22, green: 0.50, blue: 0.88)"))
-        #expect(source.contains("macWikiAccessibilityPersonalization.differentiateWithoutColor"))
-        #expect(source.contains("macWikiAccessibilityPersonalization.colorSchemeContrast"))
-        #expect(source.contains("emphasizesSelectionWithoutColor ? 1 : 0.5"))
-        #expect(source.contains("Color.primary.opacity(isKeyWindow ? 0.42 : 0.26)"))
+        #expect(sidebar.contains("List(selection: $sidebarSelectionSet)"))
+        #expect(sidebar.contains(".listStyle(.sidebar)"))
+        #expect(!chrome.contains("selectedFill"))
+        #expect(!chrome.contains("hoverFill"))
+        #expect(!chrome.contains("RoundedRectangle(cornerRadius: SidebarRowMetrics.rowCornerRadius"))
+        #expect(!chrome.contains(".onHover"))
     }
 
     @Test func activeWindowVisualsUseTheModernSwiftUIEnvironmentValue() throws {
@@ -29,8 +30,7 @@ struct NativeDesignRegressionTests {
             "Sources/MacWiki/Views/Components/FindOnPageBarView.swift",
             "Sources/MacWiki/Views/Components/ReaderTabItemView.swift",
             "Sources/MacWiki/Views/Sidebar/Directory/DirectoryArticleRowViews.swift",
-            "Sources/MacWiki/Views/Sidebar/SidebarDropTargetModifier.swift",
-            "Sources/MacWiki/Views/Sidebar/SidebarRowChrome.swift"
+            "Sources/MacWiki/Views/Sidebar/SidebarDropTargetModifier.swift"
         ]
 
         for path in paths {
@@ -89,8 +89,10 @@ struct NativeDesignRegressionTests {
         #expect(inspectorModes.contains("showsSpinner || toast.isSuccess ? .medium : .high"))
         #expect(inspectorPanel.contains("appState.isHighlightRehydrateInProgress"))
         #expect(inspectorPanel.contains("result.success ? \"Rehydrate succeeded\" : \"Rehydrate failed\""))
-        #expect(inspectorPanel.contains("private var standardTOCTransition: AnyTransition"))
-        #expect(inspectorPanel.contains("reduceMotion\n            ? .opacity\n            : .asymmetric("))
+        #expect(inspectorPanel.contains("VSplitView"))
+        #expect(inspectorPanel.contains("List(selection: tableOfContentsSelection)"))
+        #expect(inspectorPanel.contains(".frame(minHeight: InspectorLayout.contentsMinimumHeight)"))
+        #expect(!inspectorPanel.contains("standardTOCTransition"))
         #expect(!inspectorPanel.contains("Form {"))
         #expect(!inspectorPanel.contains("DisclosureGroup(\"Contents\""))
     }

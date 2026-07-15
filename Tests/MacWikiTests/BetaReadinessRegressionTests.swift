@@ -142,7 +142,7 @@ struct BetaReadinessRegressionTests {
         #expect(source?.contains(".onChange(of: proxy.size.width)") == false)
     }
 
-    @Test func sidebarSelectableRowsUseButtonSemantics() throws {
+    @Test func sidebarSelectableRowsUseNativeListSelectionSemantics() throws {
         let sidebarSource = try String(contentsOf: repositoryRoot()
             .appendingPathComponent("Sources")
             .appendingPathComponent("MacWiki")
@@ -158,8 +158,10 @@ struct BetaReadinessRegressionTests {
             .components(separatedBy: "private func rootTitle")
             .first ?? ""
 
-        #expect(functionBody.contains("Button {"))
+        #expect(sidebarSource.contains("List(selection: $sidebarSelectionSet)"))
+        #expect(!functionBody.contains("Button {"))
         #expect(!functionBody.contains(".onTapGesture"))
+        #expect(functionBody.contains(".tag(selection)"))
         #expect(functionBody.contains("accessibilityLabel: String"))
         #expect(functionBody.contains(".accessibilityLabel(accessibilityLabel)"))
         #expect(functionBody.contains(".accessibilityIdentifier(selection.accessibilityIdentifier)"))
@@ -330,22 +332,55 @@ struct BetaReadinessRegressionTests {
         #expect(wikiHop.contains(".accessibilityLabel(\"Give Up Wiki-Hop\")"))
     }
 
-    @Test func inspectorInfoUsesOneReachableNativeScrollSurface() throws {
+    @Test func inspectorInfoKeepsFixedChromeAndScopesScrollableContent() throws {
         let inspectorSource = try source("Sources/MacWiki/Views/Inspector/InspectorPanel.swift")
         let infoContent = sourceSection(
             inspectorSource,
             startingAt: "private var infoContent",
+            endingBefore: "private func infoDetails"
+        )
+        let details = sourceSection(
+            inspectorSource,
+            startingAt: "private func infoDetails",
             endingBefore: "private func infoTopModules"
         )
+        let contents = sourceSection(
+            inspectorSource,
+            startingAt: "private var tableOfContentsPane",
+            endingBefore: "private var tableOfContentsSelection"
+        )
 
-        #expect(infoContent.contains("ScrollViewReader"))
-        #expect(infoContent.contains("ScrollView {"))
-        #expect(infoContent.contains("LazyVStack"))
+        #expect(infoContent.contains("VSplitView"))
+        #expect(infoContent.contains("infoDetails(article)"))
+        #expect(infoContent.contains("tableOfContentsPane"))
+        #expect(!infoContent.contains("ScrollView"))
+        #expect(details.contains("ScrollView {"))
+        #expect(details.contains("LazyVStack"))
+        #expect(contents.contains("List(selection: tableOfContentsSelection)"))
+        #expect(contents.contains("Text(\"Contents\")"))
         #expect(!inspectorSource.contains("Form {"))
         #expect(!inspectorSource.contains("DisclosureGroup(\"Contents\""))
-        #expect(!infoContent.contains(".clipped()"))
+        #expect(!inspectorSource.contains("standardTOCTransition"))
         #expect(!inspectorSource.contains("SectionResizeHandle"))
         #expect(!inspectorSource.contains("infoSplitFallbackBudget"))
+    }
+
+    @Test func mainSidebarDelegatesTitlebarInsetsAndSurfaceToNativeList() throws {
+        let sidebar = try source("Sources/MacWiki/Views/Sidebar/ListsSidebar.swift")
+        let chrome = try source("Sources/MacWiki/Views/Sidebar/SidebarRowChrome.swift")
+
+        #expect(sidebar.contains("List(selection: $sidebarSelectionSet)"))
+        #expect(sidebar.contains(".listStyle(.sidebar)"))
+        #expect(!sidebar.contains("topObscuredHeight"))
+        #expect(!sidebar.contains("plainSidebarTopInset"))
+        #expect(!sidebar.contains(".safeAreaInset(edge: .top"))
+        #expect(!sidebar.contains(".contentMargins(.top"))
+        #expect(!sidebar.contains(".scrollContentBackground(.hidden)"))
+        #expect(!sidebar.contains(".background(Color.clear)"))
+        #expect(!chrome.contains("nativeTopContentInset"))
+        #expect(!chrome.contains("titlebarContentPadding"))
+        #expect(!chrome.contains("selectedFill"))
+        #expect(!chrome.contains("hoverFill"))
     }
 
     @Test func mainWindowHasASingleSwiftUISceneOwnerAndNativeLaunchPolicy() throws {
