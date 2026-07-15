@@ -68,7 +68,28 @@ struct NativeWorkspaceSplitView<Sidebar: View, Directory: View, Reader: View, In
             inspectorVisible: inspectorVisible,
             animated: false
         )
+        controller.view.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        controller.view.setContentHuggingPriority(.defaultLow, for: .vertical)
         return controller
+    }
+
+    /// A controller representable otherwise reports the split hierarchy's
+    /// intrinsic/minimum width back to SwiftUI. In a larger window SwiftUI can
+    /// then center that fixed-width island instead of allowing the semantic
+    /// reader item to absorb the available space. Accept the parent's concrete
+    /// proposal so the native split view always fills the window content area.
+    func sizeThatFits(
+        _ proposal: ProposedViewSize,
+        nsViewController: WorkspaceSplitViewController,
+        context: Context
+    ) -> CGSize? {
+        guard let width = proposal.width,
+              let height = proposal.height,
+              width.isFinite,
+              height.isFinite else {
+            return nil
+        }
+        return CGSize(width: width, height: height)
     }
 
     func updateNSViewController(_ controller: WorkspaceSplitViewController, context: Context) {

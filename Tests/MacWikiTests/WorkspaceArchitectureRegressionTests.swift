@@ -58,6 +58,16 @@ struct WorkspaceArchitectureRegressionTests {
         #expect(split.contains("lastRequestedVisibility != visibility"))
     }
 
+    @Test func nativeWorkspaceAcceptsTheFullWindowProposal() throws {
+        let split = try source("Sources/MacWiki/Views/Shared/NativeWorkspaceSplitView.swift")
+
+        #expect(split.contains("func sizeThatFits("))
+        #expect(split.contains("let width = proposal.width"))
+        #expect(split.contains("let height = proposal.height"))
+        #expect(split.contains("return CGSize(width: width, height: height)"))
+        #expect(split.contains("setContentHuggingPriority(.defaultLow, for: .horizontal)"))
+    }
+
     @Test func paneVisibilityDefersOutsideRepresentableUpdatesAndCannotBeCancelledByContentWork() throws {
         let split = try source("Sources/MacWiki/Views/Shared/NativeWorkspaceSplitView.swift")
         let updateStart = try #require(split.range(of: "func updateWorkspace("))
