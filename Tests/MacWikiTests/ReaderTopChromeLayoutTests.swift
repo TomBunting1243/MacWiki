@@ -22,7 +22,7 @@ struct ReaderTopChromeLayoutTests {
         #expect(!toolbar.contains("ToolbarSpacer("))
         #expect(!toolbar.contains("ToolbarSpacer(.fixed)"))
         #expect(shell.contains(".toolbar {"))
-        #expect(!shell.contains(".toolbar(removing: .sidebarToggle)"))
+        #expect(shell.components(separatedBy: ".toolbar(removing: .sidebarToggle)").count - 1 == 1)
         #expect(shell.contains("TabBarView("))
         #expect(shell.contains("ReaderColumnView()"))
         #expect(!toolbar.contains("NSButton"))

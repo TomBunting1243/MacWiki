@@ -3,35 +3,26 @@ import SwiftUI
 
 extension AppState {
     func setNavigationColumnsVisible(_ isVisible: Bool) {
-        workspaceNavigationColumns = isVisible ? .all : .readerOnly
+        setNavigationColumnVisibility(
+            listsVisible: isVisible,
+            directoryVisible: isVisible
+        )
     }
 
-    /// Keep navigation state representable by the platform's hierarchical
-    /// three-column split view. Lists cannot be visible without their List
-    /// Contents child column.
+    /// Updates both native sidebar bindings without rebuilding the Reader.
+    /// Lists and List Contents are independent two-column split-view sidebars,
+    /// so every visibility combination is supported on macOS.
     func setNavigationColumnVisibility(
         listsVisible: Bool,
         directoryVisible: Bool
     ) {
-        if !directoryVisible {
-            workspaceNavigationColumns = .readerOnly
-        } else if listsVisible {
-            workspaceNavigationColumns = .all
-        } else {
-            workspaceNavigationColumns = .listContentsAndReader
-        }
+        listsSplitViewVisibility = listsVisible ? .all : .detailOnly
+        directorySplitViewVisibility = directoryVisible ? .all : .detailOnly
     }
 
     func toggleDirectoryColumnVisibility() {
         guard !isWikiHopNavigationLocked else { return }
-        if directoryColumnVisible {
-            setNavigationColumnsVisible(false)
-        } else {
-            setNavigationColumnVisibility(
-                listsVisible: false,
-                directoryVisible: true
-            )
-        }
+        directorySplitViewVisibility = directoryColumnVisible ? .detailOnly : .all
     }
 
     /// Current scroll position for a specific tab id.

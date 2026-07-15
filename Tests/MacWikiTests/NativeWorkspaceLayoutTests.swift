@@ -5,32 +5,37 @@ import Testing
 
 @MainActor
 struct NativeWorkspaceLayoutTests {
-    @Test func nativeVisibilityBindingRoundTripsEverySupportedHierarchy() {
+    @Test func nativeVisibilityBindingsRoundTripIndependently() {
         let appState = AppState(persistenceMode: .ephemeral)
 
-        appState.navigationSplitViewVisibility = .doubleColumn
-        #expect(appState.workspaceNavigationColumns == .listContentsAndReader)
-        #expect(appState.navigationSplitViewVisibility == .doubleColumn)
+        appState.listsSplitViewVisibility = .detailOnly
+        #expect(!appState.listsSidebarVisible)
+        #expect(appState.directoryColumnVisible)
 
-        appState.navigationSplitViewVisibility = .detailOnly
-        #expect(appState.workspaceNavigationColumns == .readerOnly)
-        #expect(appState.navigationSplitViewVisibility == .detailOnly)
+        appState.directorySplitViewVisibility = .detailOnly
+        #expect(!appState.listsSidebarVisible)
+        #expect(!appState.directoryColumnVisible)
 
-        appState.navigationSplitViewVisibility = .all
-        #expect(appState.workspaceNavigationColumns == .all)
-        #expect(appState.navigationSplitViewVisibility == .all)
+        appState.listsSplitViewVisibility = .all
+        #expect(appState.listsSidebarVisible)
+        #expect(!appState.directoryColumnVisible)
+
+        appState.directorySplitViewVisibility = .all
+        #expect(appState.listsSidebarVisible)
+        #expect(appState.directoryColumnVisible)
     }
 
-    @Test func automaticVisibilityDoesNotOverwriteExplicitWorkspaceState() {
+    @Test func automaticVisibilityCountsAsAVisibleTwoColumnSidebar() {
         let appState = AppState(persistenceMode: .ephemeral)
         appState.setNavigationColumnVisibility(
             listsVisible: false,
             directoryVisible: true
         )
 
-        appState.navigationSplitViewVisibility = .automatic
+        appState.directorySplitViewVisibility = .automatic
 
-        #expect(appState.workspaceNavigationColumns == .listContentsAndReader)
+        #expect(!appState.listsSidebarVisible)
+        #expect(appState.directoryColumnVisible)
     }
 
     @Test func columnWidthStorageRejectsInvalidValuesAndClampsExtremes() {
