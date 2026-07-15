@@ -55,9 +55,9 @@ private struct ReaderToolbarAccessoryView: View {
 
     var body: some View {
         ViewThatFits(in: .horizontal) {
-            spaciousControls
-            regularControls
-            compactControls
+            spaciousControls.id("reader-top-chrome-spacious")
+            regularControls.id("reader-top-chrome-regular")
+            compactControls.id("reader-top-chrome-compact")
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 5)
@@ -82,7 +82,8 @@ private struct ReaderToolbarAccessoryView: View {
             navigationControls
             articleStateControls
             Spacer(minLength: 8)
-            readerControls
+            findButton
+            readerPresentationControls
             externalControls
             inspectorButton
         }
@@ -93,10 +94,7 @@ private struct ReaderToolbarAccessoryView: View {
             navigationControls
             articleStateControls
             Spacer(minLength: 8)
-            Button("Find in Page", systemImage: "text.magnifyingglass", action: presentFindOnPage)
-                .labelStyle(.iconOnly)
-                .disabled(article == nil)
-                .help("Find in Page")
+            findButton
             moreMenu(includesArticleState: false)
             inspectorButton
         }
@@ -190,12 +188,16 @@ private struct ReaderToolbarAccessoryView: View {
         }
     }
 
-    private var readerControls: some View {
-        ControlGroup {
-            Button("Find in Page", systemImage: "text.magnifyingglass", action: presentFindOnPage)
-                .labelStyle(.iconOnly)
-                .disabled(article == nil)
+    private var findButton: some View {
+        Button("Find in Page", systemImage: "text.magnifyingglass", action: presentFindOnPage)
+            .labelStyle(.iconOnly)
+            .disabled(article == nil)
+            .help("Find in Page")
+            .accessibilityIdentifier("reader-find-in-page")
+    }
 
+    private var readerPresentationControls: some View {
+        ControlGroup {
             Button("Reader Style", systemImage: "textformat.size") {
                 presentReaderStylePopover()
             }
