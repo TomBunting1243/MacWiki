@@ -76,23 +76,6 @@ struct AppStateBoundaryTests {
         #expect(appState.navigationSplitViewVisibility == .doubleColumn)
     }
 
-    @Test func listsCanHideIndependentlyButShowingThemAlsoShowsListContents() {
-        let appState = AppState(persistenceMode: .ephemeral)
-        appState.setNavigationColumnsVisible(true)
-
-        appState.toggleListsSidebarVisibility()
-
-        #expect(appState.listsSidebarVisible == false)
-        #expect(appState.directoryColumnVisible == true)
-        #expect(appState.navigationSplitViewVisibility == .doubleColumn)
-
-        appState.toggleListsSidebarVisibility()
-
-        #expect(appState.listsSidebarVisible == true)
-        #expect(appState.directoryColumnVisible == true)
-        #expect(appState.navigationSplitViewVisibility == .all)
-    }
-
     @Test func invalidNavigationCombinationNormalizesToReaderOnly() {
         let appState = AppState(persistenceMode: .ephemeral)
 
@@ -115,7 +98,6 @@ struct AppStateBoundaryTests {
             target: Article(id: "objective-c", title: "Objective-C")
         )
 
-        appState.toggleListsSidebarVisibility()
         appState.toggleDirectoryColumnVisibility()
         appState.navigationSplitViewVisibility = .all
 

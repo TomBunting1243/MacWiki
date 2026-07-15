@@ -81,9 +81,47 @@ final class AppState {
     
     // MARK: - UI State
     
-    /// A single stored state prevents impossible combinations such as Lists
-    /// remaining visible after List Contents has collapsed.
-    var workspaceNavigationColumns: WorkspaceNavigationColumns = .all
+    /// The exact value bound to `NavigationSplitView`. Keeping this as stored
+    /// observable state lets the platform and MacWiki share one authoritative
+    /// transition path; a computed projection can update toolbar labels while
+    /// leaving the native columns visually unchanged.
+    var navigationSplitViewVisibility: NavigationSplitViewVisibility = .all {
+        didSet {
+            // SDK 27 intentionally considers `.automatic` equal to
+            // `.doubleColumn`; do not attempt to distinguish them with `==`.
+            // The semantic projection below safely treats either as the
+            // Lists-hidden, List-Contents-visible hierarchy.
+            if isWikiHopNavigationLocked,
+               navigationSplitViewVisibility != .detailOnly {
+                navigationSplitViewVisibility = .detailOnly
+            }
+        }
+    }
+
+    /// A semantic projection used by persistence-independent domain logic and
+    /// tests. Unsupported combinations can only be introduced through this
+    /// setter and are normalized before reaching the native binding.
+    var workspaceNavigationColumns: WorkspaceNavigationColumns {
+        get {
+            if navigationSplitViewVisibility == .detailOnly {
+                .readerOnly
+            } else if navigationSplitViewVisibility == .doubleColumn {
+                .listContentsAndReader
+            } else {
+                .all
+            }
+        }
+        set {
+            switch newValue {
+            case .all:
+                navigationSplitViewVisibility = .all
+            case .listContentsAndReader:
+                navigationSplitViewVisibility = .doubleColumn
+            case .readerOnly:
+                navigationSplitViewVisibility = .detailOnly
+            }
+        }
+    }
 
     var listsSidebarVisible: Bool {
         workspaceNavigationColumns == .all

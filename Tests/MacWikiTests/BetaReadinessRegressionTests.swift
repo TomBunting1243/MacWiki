@@ -620,7 +620,8 @@ struct BetaReadinessRegressionTests {
         #expect(!tabBarSource.contains("ReaderTabLaneBackground()"))
         #expect(mainToolbarSource.contains("CustomizableToolbarContent"))
         #expect(articleToolbarSource.contains("CustomizableToolbarContent"))
-        #expect(mainToolbarSource.contains("appState.toggleListsSidebarVisibility()"))
+        #expect(!mainToolbarSource.contains("appState.toggleListsSidebarVisibility()"))
+        #expect(!mainToolbarSource.contains("sidebar.leading"))
         #expect(mainToolbarSource.contains("appState.toggleDirectoryColumnVisibility()"))
         #expect(mainToolbarSource.contains("appState.toggleInspectorVisibility()"))
         #expect(mainToolbarSource.contains("appState.goBack()"))
@@ -1461,6 +1462,10 @@ struct BetaReadinessRegressionTests {
         #expect(driver.contains("Populated reference list"))
         #expect(driver.contains("Find in page"))
         #expect(driver.contains("Hide List Contents"))
+        #expect(driver.contains("Hide Sidebar"))
+        #expect(driver.contains("A duplicate custom Lists control competed with the native sidebar item."))
+        #expect(driver.contains("Hide List Contents changed state without collapsing the directory pane."))
+        #expect(driver.contains("label: \"Tab History\""))
         #expect(driver.contains("Page Views"))
         #expect(driver.contains("Open in Browser"))
         #expect(driver.contains("matchingElements("))
@@ -1663,6 +1668,7 @@ struct BetaReadinessRegressionTests {
 
     @Test func mainWindowShellKeepsAStableNativeSplitHierarchyAndUsesKeyPathBindings() throws {
         let shellSource = try source("Sources/MacWiki/Views/Shared/MainWindowShell.swift")
+        let appStateSource = try source("Sources/MacWiki/App/AppState.swift")
         let navigationSource = try source("Sources/MacWiki/App/AppState+NavigationTabs.swift")
 
         #expect(shellSource.contains("private struct MainWorkspaceShell: View"))
@@ -1674,8 +1680,9 @@ struct BetaReadinessRegressionTests {
         #expect(shellSource.contains(".inspector(isPresented: $appState.inspectorVisible)"))
         #expect(shellSource.components(separatedBy: ".navigationSplitViewColumnWidth(").count - 1 == 2)
         #expect(shellSource.components(separatedBy: ".persistedColumnWidth(").count - 1 == 3)
-        #expect(navigationSource.contains("var navigationSplitViewVisibility: NavigationSplitViewVisibility"))
-        #expect(navigationSource.contains("applyUserNavigationColumnVisibility"))
+        #expect(appStateSource.contains("var navigationSplitViewVisibility: NavigationSplitViewVisibility = .all"))
+        #expect(appStateSource.contains("var workspaceNavigationColumns: WorkspaceNavigationColumns {"))
+        #expect(!navigationSource.contains("applyUserNavigationColumnVisibility"))
         #expect(!FileManager.default.fileExists(
             atPath: repositoryRoot()
                 .appendingPathComponent("Sources/MacWiki/Views/Shared/NativeWorkspaceSplitView.swift")

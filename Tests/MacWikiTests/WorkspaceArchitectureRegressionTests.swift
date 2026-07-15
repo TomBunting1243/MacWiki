@@ -30,7 +30,7 @@ struct WorkspaceArchitectureRegressionTests {
         #expect(shell.components(separatedBy: ".navigationSplitViewColumnWidth(").count - 1 == 2)
         #expect(shell.components(separatedBy: ".persistedColumnWidth(").count - 1 == 3)
         #expect(shell.contains(".inspectorColumnWidth("))
-        #expect(shell.contains(".toolbar(removing: .sidebarToggle)"))
+        #expect(!shell.contains(".toolbar(removing: .sidebarToggle)"))
         #expect(shell.contains(".toolbar(id: MainWindowReaderToolbarIdentifier.configuration)"))
     }
 
@@ -50,10 +50,13 @@ struct WorkspaceArchitectureRegressionTests {
         let appState = try source("Sources/MacWiki/App/AppState.swift")
         let navigation = try source("Sources/MacWiki/App/AppState+NavigationTabs.swift")
 
-        #expect(appState.contains("var workspaceNavigationColumns: WorkspaceNavigationColumns = .all"))
+        #expect(appState.contains("var navigationSplitViewVisibility: NavigationSplitViewVisibility = .all"))
+        #expect(appState.contains("var workspaceNavigationColumns: WorkspaceNavigationColumns {"))
         #expect(appState.contains("var listsSidebarVisible: Bool"))
         #expect(appState.contains("var directoryColumnVisible: Bool"))
-        #expect(navigation.contains("var navigationSplitViewVisibility: NavigationSplitViewVisibility"))
+        #expect(appState.contains("SDK 27 intentionally considers `.automatic` equal to"))
+        #expect(appState.contains("if isWikiHopNavigationLocked,"))
+        #expect(appState.contains("navigationSplitViewVisibility = .detailOnly"))
         #expect(navigation.contains("guard !isWikiHopNavigationLocked else { return }"))
         #expect(!navigation.contains("listsSidebarVisible.toggle()"))
         #expect(!navigation.contains("directoryColumnVisible.toggle()"))

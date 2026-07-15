@@ -33,14 +33,6 @@ struct MainWindowReaderToolbar: CustomizableToolbarContent {
         ToolbarItem(id: MainWindowReaderToolbarIdentifier.navigation) {
             ControlGroup("Navigation") {
                 Button(
-                    appState.listsSidebarVisible ? "Hide Lists" : "Show Lists",
-                    systemImage: "sidebar.leading"
-                ) {
-                    appState.toggleListsSidebarVisibility()
-                }
-                .disabled(appState.isWikiHopNavigationLocked)
-
-                Button(
                     appState.directoryColumnVisible ? "Hide List Contents" : "Show List Contents",
                     systemImage: "sidebar.squares.leading"
                 ) {

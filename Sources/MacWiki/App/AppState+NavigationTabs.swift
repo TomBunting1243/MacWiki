@@ -2,37 +2,6 @@ import Foundation
 import SwiftUI
 
 extension AppState {
-    var navigationSplitViewVisibility: NavigationSplitViewVisibility {
-        get {
-            switch workspaceNavigationColumns {
-            case .all:
-                .all
-            case .listContentsAndReader:
-                .doubleColumn
-            case .readerOnly:
-                .detailOnly
-            }
-        }
-        set {
-            if newValue == .all {
-                applyUserNavigationColumnVisibility(
-                    listsVisible: true,
-                    directoryVisible: true
-                )
-            } else if newValue == .doubleColumn {
-                applyUserNavigationColumnVisibility(
-                    listsVisible: false,
-                    directoryVisible: true
-                )
-            } else if newValue == .detailOnly {
-                applyUserNavigationColumnVisibility(
-                    listsVisible: false,
-                    directoryVisible: false
-                )
-            }
-        }
-    }
-
     func setNavigationColumnsVisible(_ isVisible: Bool) {
         workspaceNavigationColumns = isVisible ? .all : .readerOnly
     }
@@ -50,32 +19,6 @@ extension AppState {
             workspaceNavigationColumns = .all
         } else {
             workspaceNavigationColumns = .listContentsAndReader
-        }
-    }
-
-    /// Applies a collapse request originating from NavigationSplitView. The
-    /// system sidebar command can write this binding directly, so enforce the
-    /// same Wiki-Hop lock used by MacWiki's explicit toolbar and menu actions.
-    func applyUserNavigationColumnVisibility(
-        listsVisible: Bool,
-        directoryVisible: Bool
-    ) {
-        guard !isWikiHopNavigationLocked else { return }
-        setNavigationColumnVisibility(
-            listsVisible: listsVisible,
-            directoryVisible: directoryVisible
-        )
-    }
-
-    func toggleListsSidebarVisibility() {
-        guard !isWikiHopNavigationLocked else { return }
-        if listsSidebarVisible {
-            workspaceNavigationColumns = .listContentsAndReader
-        } else {
-            setNavigationColumnVisibility(
-                listsVisible: true,
-                directoryVisible: true
-            )
         }
     }
 

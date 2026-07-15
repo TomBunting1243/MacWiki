@@ -16,7 +16,7 @@ struct ReaderTopChromeLayoutTests {
         #expect(toolbar.contains("main-window-native-toolbar-v1"))
         #expect(toolbar.contains("ControlGroup(\"Navigation\")"))
         #expect(shell.contains(".toolbar(id: MainWindowReaderToolbarIdentifier.configuration)"))
-        #expect(shell.contains(".toolbar(removing: .sidebarToggle)"))
+        #expect(!shell.contains(".toolbar(removing: .sidebarToggle)"))
         #expect(shell.contains("TabBarView("))
         #expect(shell.contains("ReaderColumnView()"))
         #expect(!toolbar.contains("NSButton"))

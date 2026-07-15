@@ -123,10 +123,6 @@ private struct MainWorkspaceShell: View {
                     range: MainWindowColumnWidth.inspectorRange
                 )
         }
-        // The toolbar has a Lists-specific native control. Remove SwiftUI's
-        // automatic generic sidebar item so the window never exposes two
-        // competing buttons for the same NavigationSplitView column.
-        .toolbar(removing: .sidebarToggle)
         .toolbar(id: MainWindowReaderToolbarIdentifier.configuration) {
             MainWindowReaderToolbar(
                 appState: appState,

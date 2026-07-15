@@ -366,12 +366,23 @@ do {
         throw JourneyError.missing("The native window toolbar omitted its List Contents control.")
     }
     let listsControlReport: String
-    if button(in: initialToolbar, label: "Hide Lists") != nil {
-        listsControlReport = "Hide Lists"
-    } else if button(in: initialToolbar, label: "Show Lists") != nil {
-        listsControlReport = "Show Lists"
+    if button(in: initialToolbar, label: "Hide Sidebar") != nil {
+        listsControlReport = "Hide Sidebar"
+    } else if button(in: initialToolbar, label: "Show Sidebar") != nil {
+        listsControlReport = "Show Sidebar"
     } else {
         throw JourneyError.missing("The native window toolbar omitted its Lists control.")
+    }
+    if button(in: initialToolbar, label: "Hide Lists") != nil
+        || button(in: initialToolbar, label: "Show Lists") != nil {
+        throw JourneyError.missing("A duplicate custom Lists control competed with the native sidebar item.")
+    }
+    guard element(
+        in: contentWindow,
+        role: kAXStaticTextRole as String,
+        label: "Tab History"
+    ) != nil else {
+        throw JourneyError.missing("The seeded List Contents pane was not initially visible.")
     }
     if modeGroup == nil {
         guard wait(condition: {
@@ -615,8 +626,13 @@ do {
     settleAccessibility(for: 0.45)
     guard wait(condition: {
         (try? toolbarButton("Show List Contents")) != nil
+            && element(
+                in: contentWindow,
+                role: kAXStaticTextRole as String,
+                label: "Tab History"
+            ) == nil
     }) else {
-        throw JourneyError.missing("Hide List Contents did not collapse the directory pane.")
+        throw JourneyError.missing("Hide List Contents changed state without collapsing the directory pane.")
     }
 
     let narrowWidth: CGFloat = 900
@@ -641,6 +657,11 @@ do {
     guard wait(condition: {
         inspectorModeGroup(in: contentWindow) != nil
             && (try? toolbarButton("Hide List Contents")) != nil
+            && element(
+                in: contentWindow,
+                role: kAXStaticTextRole as String,
+                label: "Tab History"
+            ) != nil
     }) else {
         throw JourneyError.missing("The narrow window did not restore both auxiliary panes.")
     }
