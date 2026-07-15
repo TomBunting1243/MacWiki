@@ -16,11 +16,16 @@ BUILD_INFO_PLIST="$APP_BUNDLE_PATH/Contents/Resources/BuildInfo.plist"
 ARTICLE_TITLE="${ARTICLE_TITLE:-Ada Lovelace}"
 ARTICLE_HTML='<main><h1>Ada Lovelace</h1><p>A deterministic public-domain QA fixture for MacWiki reader and inspector checks.</p><h2 id="legacy">Legacy</h2><p>Ada Lovelace wrote notes on the Analytical Engine.</p></main>'
 
-# This journey uses AX actions and PID-targeted key events only. Launching the
-# candidate without activation keeps the user's current app in front while the
-# isolated MacWiki window remains fully inspectable through Accessibility.
-MACWIKI_QA_LAUNCH_BACKGROUND="${MACWIKI_QA_LAUNCH_BACKGROUND:-1}"
+# The shared launcher supports background activation for compatible harnesses,
+# but SwiftUI does not publish this window scene to AX until first activation.
+MACWIKI_QA_LAUNCH_BACKGROUND="${MACWIKI_QA_LAUNCH_BACKGROUND:-0}"
+MACWIKI_QA_VISUAL_HOLD_SECONDS="${MACWIKI_QA_VISUAL_HOLD_SECONDS:-0}"
 export MACWIKI_QA_LAUNCH_BACKGROUND
+
+[[ "$MACWIKI_QA_VISUAL_HOLD_SECONDS" =~ ^[0-9]+$ ]] || {
+  echo "Visual hold must be a non-negative whole number of seconds." >&2
+  exit 1
+}
 
 # shellcheck source=scripts/lib/qa_process_safety.sh
 source "$SCRIPT_DIR/lib/qa_process_safety.sh"
@@ -98,6 +103,10 @@ jq -n \
   }' >"$STATE_FILE"
 
 qa_launch_candidate "$APP_LOG"
+if (( MACWIKI_QA_VISUAL_HOLD_SECONDS > 0 )); then
+  echo "Visual inspection hold: PID $QA_APP_PID for ${MACWIKI_QA_VISUAL_HOLD_SECONDS}s" >&2
+  sleep "$MACWIKI_QA_VISUAL_HOLD_SECONDS"
+fi
 if ! MACWIKI_QA_APP_LOG="$APP_LOG" qa_run_command_with_timeout 90 "$AX_DRIVER_BIN" \
   "$QA_APP_PID" "$ARTICLE_TITLE" >"$AX_RESULT"; then
   echo "Reader/inspector AX journey failed." >&2

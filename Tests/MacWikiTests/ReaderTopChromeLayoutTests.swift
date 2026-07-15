@@ -46,11 +46,25 @@ struct ReaderTopChromeLayoutTests {
         #expect(chrome.contains("reader-top-chrome-regular"))
         #expect(chrome.contains("reader-top-chrome-compact"))
         #expect(chrome.contains("reader-find-in-page"))
-        #expect(chrome.contains(".accessibilityAction"))
+        #expect(chrome.contains("NativeReaderToolbarButton("))
+        #expect(chrome.contains(".controlSize(.regular)"))
         #expect(chrome.contains(".popover(isPresented: $showingSavePopover)"))
         #expect(chrome.contains("presentSavePopover()"))
         #expect(chrome.contains("presentReaderStylePopover()"))
         #expect(chrome.contains("presentPageViewsPopover()"))
+    }
+
+    @Test("native reader action dispatches its target action")
+    @MainActor
+    func nativeReaderActionDispatchesTargetAction() {
+        var actionCount = 0
+        let coordinator = NativeReaderToolbarButton.Coordinator {
+            actionCount += 1
+        }
+
+        coordinator.performAction()
+
+        #expect(actionCount == 1)
     }
 
     @Test("List Contents search is an embedded native AppKit search field")

@@ -117,6 +117,34 @@ struct NativeWorkspaceSplitViewTests {
         #expect(!fixture.controller.splitViewItems[1].isCollapsed)
         #expect(!fixture.controller.splitViewItems[3].isCollapsed)
         #expect(fixture.reader.view.bounds.width >= 300)
+        #expect(fixture.controller.splitViewItems[2].minimumThickness == 300)
+        try await waitUntil(timeout: .seconds(1)) {
+            reportedVisibility == WorkspacePaneVisibility(
+                sidebarVisible: false,
+                directoryVisible: true,
+                inspectorVisible: true
+            )
+        }
+    }
+
+    @Test func ordinaryDesktopWidthProtectsTheReadingSurface() async throws {
+        let fixture = makeFixture(width: 1_700)
+        fixture.window.setContentSize(NSSize(width: 1_100, height: 800))
+        var reportedVisibility: WorkspacePaneVisibility?
+        fixture.controller.onPaneVisibilityChange = { reportedVisibility = $0 }
+
+        fixture.controller.setPaneVisibility(
+            sidebarVisible: true,
+            directoryVisible: true,
+            inspectorVisible: true,
+            animated: false
+        )
+        layout(fixture.controller, size: NSSize(width: 1_100, height: 800))
+
+        #expect(fixture.controller.splitViewItems[0].isCollapsed)
+        #expect(!fixture.controller.splitViewItems[1].isCollapsed)
+        #expect(!fixture.controller.splitViewItems[3].isCollapsed)
+        #expect(fixture.reader.view.bounds.width >= MainWindowLayout.minimumReaderWidth)
         try await waitUntil(timeout: .seconds(1)) {
             reportedVisibility == WorkspacePaneVisibility(
                 sidebarVisible: false,
@@ -269,18 +297,18 @@ struct NativeWorkspaceSplitViewTests {
         layout(fixture.controller, size: NSSize(width: 1_300, height: 800))
         fixture.controller.restoreInitialVisibleWidthsIfFeasible()
 
-        fixture.controller.splitView.setPosition(210, ofDividerAt: 0)
+        fixture.controller.splitView.setPosition(200, ofDividerAt: 0)
         layout(fixture.controller, size: NSSize(width: 1_300, height: 800))
         let directoryLeadingEdge = fixture.directory.view.convert(
             .zero,
             to: fixture.controller.splitView
         ).x
         fixture.controller.splitView.setPosition(
-            directoryLeadingEdge + 300,
+            directoryLeadingEdge + 270,
             ofDividerAt: 1
         )
         fixture.controller.splitView.setPosition(
-            fixture.controller.splitView.bounds.width - 310,
+            fixture.controller.splitView.bounds.width - 300,
             ofDividerAt: 2
         )
         layout(fixture.controller, size: NSSize(width: 1_300, height: 800))
@@ -292,13 +320,13 @@ struct NativeWorkspaceSplitViewTests {
         )
 
         try await waitUntil(timeout: .seconds(2)) {
-            abs(defaults.double(forKey: AppStorageKey.MainWindow.sidebarWidth) - 210) < 0.5
-                && abs(defaults.double(forKey: AppStorageKey.MainWindow.directoryWidth) - 300) < 0.5
-                && abs(defaults.double(forKey: AppStorageKey.MainWindow.inspectorWidth) - 310) < 0.5
+            abs(defaults.double(forKey: AppStorageKey.MainWindow.sidebarWidth) - 200) < 0.5
+                && abs(defaults.double(forKey: AppStorageKey.MainWindow.directoryWidth) - 270) < 0.5
+                && abs(defaults.double(forKey: AppStorageKey.MainWindow.inspectorWidth) - 300) < 0.5
         }
-        #expect(abs(defaults.double(forKey: AppStorageKey.MainWindow.sidebarWidth) - 210) < 0.5)
-        #expect(abs(defaults.double(forKey: AppStorageKey.MainWindow.directoryWidth) - 300) < 0.5)
-        #expect(abs(defaults.double(forKey: AppStorageKey.MainWindow.inspectorWidth) - 310) < 0.5)
+        #expect(abs(defaults.double(forKey: AppStorageKey.MainWindow.sidebarWidth) - 200) < 0.5)
+        #expect(abs(defaults.double(forKey: AppStorageKey.MainWindow.directoryWidth) - 270) < 0.5)
+        #expect(abs(defaults.double(forKey: AppStorageKey.MainWindow.inspectorWidth) - 300) < 0.5)
     }
 
     private func makeFixture(

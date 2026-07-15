@@ -94,7 +94,9 @@ struct QAProcessSafetyShellTests {
 
         #expect(launcher.contains("MACWIKI_QA_LAUNCH_BACKGROUND"))
         #expect(launcher.contains("open_arguments=(-g \"${open_arguments[@]}\")"))
-        #expect(journey.contains("MACWIKI_QA_LAUNCH_BACKGROUND=\"${MACWIKI_QA_LAUNCH_BACKGROUND:-1}\""))
+        #expect(journey.contains("MACWIKI_QA_LAUNCH_BACKGROUND=\"${MACWIKI_QA_LAUNCH_BACKGROUND:-0}\""))
+        #expect(journey.contains("MACWIKI_QA_VISUAL_HOLD_SECONDS"))
+        #expect(journey.contains("sleep \"$MACWIKI_QA_VISUAL_HOLD_SECONDS\""))
     }
 
     private func runBash(

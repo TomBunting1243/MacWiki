@@ -599,6 +599,7 @@ struct BetaReadinessRegressionTests {
         #expect(!contentSource.contains("WindowToolbarCustomizationPersistenceBridge()"))
         #expect(!readerColumnSource.contains("ReaderArticleToolbar()"))
         #expect(readerChromeSource.contains("ViewThatFits(in: .horizontal)"))
+        #expect(readerChromeSource.contains("NativeReaderToolbarButton("))
         #expect(readerChromeSource.contains("ControlGroup"))
         #expect(readerChromeSource.contains("TabBarView("))
         #expect(!readerChromeSource.contains("NSToolbar"))

@@ -60,8 +60,8 @@ private struct ReaderToolbarAccessoryView: View {
             compactControls.id("reader-top-chrome-compact")
         }
         .padding(.horizontal, 8)
-        .padding(.vertical, 5)
-        .controlSize(.small)
+        .padding(.vertical, 6)
+        .controlSize(.regular)
         .onChange(of: article?.id) { _, _ in
             showingSavePopover = false
             showingReaderStylePopover = false
@@ -189,14 +189,13 @@ private struct ReaderToolbarAccessoryView: View {
     }
 
     private var findButton: some View {
-        Button("Find in Page", systemImage: "text.magnifyingglass", action: presentFindOnPage)
-            .labelStyle(.iconOnly)
-            .disabled(article == nil)
-            .help("Find in Page")
-            .accessibilityIdentifier("reader-find-in-page")
-            .accessibilityAction {
-                presentFindOnPage()
-            }
+        NativeReaderToolbarButton(
+            title: "Find in Page",
+            systemImage: "text.magnifyingglass",
+            accessibilityIdentifier: "reader-find-in-page",
+            isEnabled: article != nil,
+            action: presentFindOnPage
+        )
     }
 
     private var readerPresentationControls: some View {

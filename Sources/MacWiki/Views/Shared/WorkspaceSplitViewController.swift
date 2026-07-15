@@ -138,6 +138,7 @@ final class WorkspaceSplitViewController: NSSplitViewController {
 
     override func viewDidLayout() {
         super.viewDidLayout()
+        reconcileAdaptiveVisibilityAfterLayout()
         scheduleInitialWidthRestore(after: WidthPersistence.restoreDelay)
     }
 
@@ -177,6 +178,7 @@ final class WorkspaceSplitViewController: NSSplitViewController {
             inspectorVisible: inspectorVisible
         )
         let target = adaptiveVisibility(for: requestedVisibility)
+        updateReaderMinimumThickness(for: target)
         if target != requestedVisibility {
             reportAdaptiveVisibility(target)
         }
@@ -351,7 +353,7 @@ final class WorkspaceSplitViewController: NSSplitViewController {
             requested.directoryVisible,
             requested.inspectorVisible
         ].filter { $0 }.count
-        let requiredWidth = PaneLayout.emergencyReaderMinimum
+        let requiredWidth = MainWindowLayout.minimumReaderWidth
             + visibleAuxiliaryWidths
             + (CGFloat(visibleAuxiliaryCount) * splitView.dividerThickness)
         guard splitWidth < requiredWidth else { return requested }
@@ -373,6 +375,51 @@ final class WorkspaceSplitViewController: NSSplitViewController {
             }
             onPaneVisibilityChange?(visibility)
         }
+    }
+
+    /// The representable's first visibility request can arrive before AppKit
+    /// has assigned the split view its window width. Re-evaluate once layout is
+    /// concrete so a launch at an ordinary desktop width cannot strand the
+    /// reader at its emergency minimum merely to preserve every auxiliary pane.
+    private func reconcileAdaptiveVisibilityAfterLayout() {
+        guard !isApplyingRequestedVisibility,
+              let requested = desiredVisibility else {
+            return
+        }
+        let target = adaptiveVisibility(for: requested)
+        updateReaderMinimumThickness(for: target)
+        guard target != requested else { return }
+        setPaneVisibility(
+            sidebarVisible: requested.sidebarVisible,
+            directoryVisible: requested.directoryVisible,
+            inspectorVisible: requested.inspectorVisible,
+            animated: false
+        )
+    }
+
+    private func updateReaderMinimumThickness(for visibility: WorkspacePaneVisibility) {
+        let visibleAuxiliaryWidths = (visibility.sidebarVisible
+            ? MainWindowColumnWidth.sidebarRange.lowerBound : 0)
+            + (visibility.directoryVisible
+                ? MainWindowColumnWidth.directoryRange.lowerBound : 0)
+            + (visibility.inspectorVisible
+                ? MainWindowColumnWidth.inspectorRange.lowerBound : 0)
+        let visibleAuxiliaryCount = [
+            visibility.sidebarVisible,
+            visibility.directoryVisible,
+            visibility.inspectorVisible
+        ].filter { $0 }.count
+        let normalReadingWidthRequirement = MainWindowLayout.minimumReaderWidth
+            + visibleAuxiliaryWidths
+            + (CGFloat(visibleAuxiliaryCount) * splitView.dividerThickness)
+        let splitWidth = splitView.bounds.width
+        let minimum = splitWidth.isFinite && splitWidth >= normalReadingWidthRequirement
+            ? MainWindowLayout.minimumReaderWidth
+            : PaneLayout.emergencyReaderMinimum
+        guard abs(readerItem.minimumThickness - minimum) >= WidthPersistence.tolerance else {
+            return
+        }
+        readerItem.minimumThickness = minimum
     }
 
     private static func clampedInitialWidth(
