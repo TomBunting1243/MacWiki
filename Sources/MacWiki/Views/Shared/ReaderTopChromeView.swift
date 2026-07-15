@@ -93,7 +93,7 @@ private struct ReaderToolbarAccessoryView: View {
             navigationControls
             articleStateControls
             Spacer(minLength: 8)
-            Button("Find in Page", systemImage: "text.magnifyingglass", action: toggleFindOnPage)
+            Button("Find in Page", systemImage: "text.magnifyingglass", action: presentFindOnPage)
                 .labelStyle(.iconOnly)
                 .disabled(article == nil)
                 .help("Find in Page")
@@ -192,7 +192,7 @@ private struct ReaderToolbarAccessoryView: View {
 
     private var readerControls: some View {
         ControlGroup {
-            Button("Find in Page", systemImage: "text.magnifyingglass", action: toggleFindOnPage)
+            Button("Find in Page", systemImage: "text.magnifyingglass", action: presentFindOnPage)
                 .labelStyle(.iconOnly)
                 .disabled(article == nil)
 
@@ -255,7 +255,7 @@ private struct ReaderToolbarAccessoryView: View {
                 Divider()
             }
 
-            Button("Find in Page", action: toggleFindOnPage)
+            Button("Find in Page", action: presentFindOnPage)
                 .disabled(article == nil)
             Button("Reader Style") {
                 presentReaderStylePopover()
@@ -334,16 +334,8 @@ private struct ReaderToolbarAccessoryView: View {
         )
     }
 
-    private func toggleFindOnPage() {
+    private func presentFindOnPage() {
         guard article != nil else { return }
-        if appState.showFindOnPage,
-           let tabID = appState.activeTabId {
-            appState.dismissFindOnPage(
-                activeTabID: tabID,
-                clearsWebSelection: true
-            )
-        } else {
-            appState.presentFindOnPage()
-        }
+        appState.presentFindOnPage()
     }
 }

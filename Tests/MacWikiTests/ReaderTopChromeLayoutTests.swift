@@ -40,6 +40,8 @@ struct ReaderTopChromeLayoutTests {
         #expect(chrome.contains("toggleInspectorVisibility"))
         #expect(chrome.contains("readerStylePresentationRequestID"))
         #expect(chrome.contains("readerPageViewsPresentationRequestID"))
+        #expect(chrome.contains("action: presentFindOnPage"))
+        #expect(!chrome.contains("toggleFindOnPage"))
         #expect(chrome.contains(".popover(isPresented: $showingSavePopover)"))
         #expect(chrome.contains("presentSavePopover()"))
         #expect(chrome.contains("presentReaderStylePopover()"))
