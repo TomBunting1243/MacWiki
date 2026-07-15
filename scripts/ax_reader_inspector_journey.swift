@@ -623,17 +623,19 @@ do {
     try press(findButton, label: "Find in Page")
     settleAccessibility(for: 0.4)
     guard wait(condition: {
-        guard let reader = readerPane(in: contentWindow) else { return false }
         return matchingElements(
-            in: reader,
+            in: contentWindow,
             role: kAXTextFieldRole as String,
             label: "Find in page"
         ).count == 1 &&
-            button(in: reader, label: "Done") != nil
+            button(in: contentWindow, label: "Done") != nil
     }) else {
-        if traceEnabled, let reader = readerPane(in: contentWindow) {
-            let summary = elements(in: reader, limit: 700).map { element in
+        if traceEnabled {
+            let summary = elements(in: contentWindow, limit: 2_000).compactMap { element -> String? in
                 let role = stringAttribute(kAXRoleAttribute as CFString, from: element)
+                guard role == kAXTextFieldRole as String || role == kAXButtonRole as String else {
+                    return nil
+                }
                 return "\(role)|\(accessibilityLabels(of: element).joined(separator: ","))"
             }
             trace("find AX: \(summary)")
@@ -641,22 +643,18 @@ do {
         throw JourneyError.missing("Reader did not expose exactly one Find field and its Done action.")
     }
     let requiredFindActions = ["Previous", "Next", "Done"]
-    guard let readerWithFindBar = readerPane(in: contentWindow) else {
-        throw JourneyError.missing("The reader disappeared while Find was presented.")
-    }
-    let missingFindActions = requiredFindActions.filter { button(in: readerWithFindBar, label: $0) == nil }
+    let missingFindActions = requiredFindActions.filter { button(in: contentWindow, label: $0) == nil }
     guard missingFindActions.isEmpty else {
         throw JourneyError.missing("Find bar omitted actions: \(missingFindActions.joined(separator: ", "))")
     }
     let findBar = ["Exactly one Find in page field"] + requiredFindActions
-    guard let doneButton = button(in: readerWithFindBar, label: "Done") else {
+    guard let doneButton = button(in: contentWindow, label: "Done") else {
         throw JourneyError.missing("Find bar omitted Done.")
     }
     try press(doneButton, label: "Done")
     settleAccessibility(for: 0.35)
     guard wait(condition: {
-        guard let reader = readerPane(in: contentWindow) else { return false }
-        return element(in: reader, role: kAXTextFieldRole as String, label: "Find in page") == nil
+        element(in: contentWindow, role: kAXTextFieldRole as String, label: "Find in page") == nil
     }) else {
         throw JourneyError.missing("Find bar did not dismiss.")
     }

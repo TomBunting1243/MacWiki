@@ -110,50 +110,57 @@ private struct ReaderToolbarAccessoryView: View {
     }
 
     private var inspectorButton: some View {
-        Button(
-            appState.inspectorVisible ? "Hide Inspector" : "Show Inspector",
-            systemImage: "sidebar.trailing"
-        ) {
-            appState.toggleInspectorVisibility()
-        }
-        .labelStyle(.iconOnly)
-        .help(appState.inspectorVisible ? "Hide Inspector" : "Show Inspector")
+        NativeReaderToolbarButton(
+            title: appState.inspectorVisible ? "Hide Inspector" : "Show Inspector",
+            systemImage: "sidebar.trailing",
+            accessibilityIdentifier: "reader-toggle-inspector",
+            isEnabled: true,
+            action: appState.toggleInspectorVisibility
+        )
     }
 
     private var navigationControls: some View {
-        ControlGroup {
-            Button(
-                appState.listsSidebarVisible ? "Hide Lists" : "Show Lists",
-                systemImage: "sidebar.leading"
+        HStack(spacing: 2) {
+            NativeReaderToolbarButton(
+                title: appState.listsSidebarVisible ? "Hide Lists" : "Show Lists",
+                systemImage: "sidebar.leading",
+                accessibilityIdentifier: "reader-toggle-lists",
+                isEnabled: true,
+                action: appState.toggleListsSidebarVisibility
+            )
+
+            NativeReaderToolbarButton(
+                title: appState.directoryColumnVisible ? "Hide List Contents" : "Show List Contents",
+                systemImage: "sidebar.squares.leading",
+                accessibilityIdentifier: "reader-toggle-list-contents",
+                isEnabled: true,
+                action: appState.toggleDirectoryColumnVisibility
+            )
+
+            NativeReaderToolbarButton(
+                title: "Back",
+                systemImage: "chevron.left",
+                accessibilityIdentifier: "reader-go-back",
+                isEnabled: appState.currentTab?.canGoBack == true,
+                action: appState.goBack
+            )
+
+            NativeReaderToolbarButton(
+                title: "Forward",
+                systemImage: "chevron.right",
+                accessibilityIdentifier: "reader-go-forward",
+                isEnabled: appState.currentTab?.canGoForward == true,
+                action: appState.goForward
+            )
+
+            NativeReaderToolbarButton(
+                title: "Search Wikipedia",
+                systemImage: "magnifyingglass",
+                accessibilityIdentifier: "reader-search-wikipedia",
+                isEnabled: true
             ) {
-                appState.toggleListsSidebarVisibility()
-            }
-            .labelStyle(.iconOnly)
-
-            Button(
-                appState.directoryColumnVisible ? "Hide List Contents" : "Show List Contents",
-                systemImage: "sidebar.squares.leading"
-            ) {
-                appState.toggleDirectoryColumnVisibility()
-            }
-            .labelStyle(.iconOnly)
-
-            Button("Back", systemImage: "chevron.left") {
-                appState.goBack()
-            }
-            .labelStyle(.iconOnly)
-            .disabled(appState.currentTab?.canGoBack != true)
-
-            Button("Forward", systemImage: "chevron.right") {
-                appState.goForward()
-            }
-            .labelStyle(.iconOnly)
-            .disabled(appState.currentTab?.canGoForward != true)
-
-            Button("Search Wikipedia", systemImage: "magnifyingglass") {
                 appState.startSearch(context: .navigation)
             }
-            .labelStyle(.iconOnly)
         }
     }
 
