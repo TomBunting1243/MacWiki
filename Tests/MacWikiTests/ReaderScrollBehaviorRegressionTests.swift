@@ -42,6 +42,63 @@ struct ReaderScrollBehaviorRegressionTests {
         #expect(userIntent.contains("clearTimeout(programmaticScrollForcePostTimer)"))
     }
 
+    @Test func tocScrollCompletionIsAwaitedAndIntermediateSectionsStayMuted() throws {
+        let script = try webViewScript()
+        let tocScroll = sourceSection(
+            script,
+            startingAt: "window.scrollToSection = function (id)",
+            endingBefore: "window.scrollToAnchor"
+        )
+        let telemetry = sourceSection(
+            script,
+            startingAt: "function postScroll(force)",
+            endingBefore: "window.addEventListener('scroll'"
+        )
+
+        #expect(tocScroll.contains("return Promise.resolve(false)"))
+        #expect(tocScroll.contains("return new Promise(function (resolve)"))
+        #expect(tocScroll.contains("onComplete: resolve"))
+        #expect(telemetry.contains("!inProgrammaticMode && sectionTrackingEnabled"))
+        #expect(telemetry.contains("!inProgrammaticMode &&\n                    sectionTrackingEnabled"))
+        #expect(telemetry.contains("!inProgrammaticMode && sectionTrackingEnabled && window.currentVisibleSectionId"))
+    }
+
+    @Test func visibleSectionStartsEmptyBeforeFirstHeadingThreshold() throws {
+        let script = try webViewScript()
+        let visibleSection = sourceSection(
+            script,
+            startingAt: "window.currentVisibleSectionId = function ()",
+            endingBefore: "// Invalidate cache on layout events"
+        )
+
+        #expect(visibleSection.contains("var activeId = null"))
+        #expect(!visibleSection.contains("_cachedHeadings[0].id"))
+        #expect(!visibleSection.contains("upper 60%"))
+    }
+
+    @Test func tocRowOnlyEnqueuesAndNativeBridgeAwaitsSuccessfulSettlement() throws {
+        let inspector = try source("Sources/MacWiki/Views/Inspector/InspectorPanel.swift")
+        let rowAction = sourceSection(
+            inspector,
+            startingAt: "return Button {",
+            endingBefore: "} label: {"
+        )
+        let webView = try source("Sources/MacWiki/Views/Components/WebView.swift")
+        let nativeRequest = sourceSection(
+            webView,
+            startingAt: "// Scroll to a specific heading from Table of Contents",
+            endingBefore: "// In-page find (Search on Page)."
+        )
+
+        #expect(rowAction.contains("pendingTableOfContentsScrollTarget = item.id"))
+        #expect(!rowAction.contains("currentVisibleTableOfContentsSectionId"))
+        #expect(nativeRequest.contains("try? await webView.callAsyncJavaScript"))
+        #expect(nativeRequest.contains("return await window.scrollToSection(sectionID)"))
+        #expect(nativeRequest.contains("didReachTarget: result as? Bool == true"))
+        #expect(nativeRequest.contains("case .succeeded"))
+        #expect(nativeRequest.contains("case .failed"))
+    }
+
     @Test func highlightNavigationSharesReducedMotionAwareScrollPath() throws {
         let script = try webViewScript()
         let highlightScroll = sourceSection(

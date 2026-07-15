@@ -16,6 +16,75 @@ enum ReaderDocumentRevision {
     }
 }
 
+struct WebViewTableOfContentsScrollRequest: Equatable {
+    let sequence: UInt64
+    let sectionID: String
+    let articleTitle: String
+    let contentRevision: UInt64
+}
+
+enum WebViewTableOfContentsScrollCompletion: Equatable {
+    case ignored
+    case succeeded(sectionID: String)
+    case failed(sectionID: String)
+}
+
+/// Orders asynchronous TOC scroll completions so a cancelled scroll, rapid
+/// second click, or article switch cannot publish stale inspector selection.
+final class WebViewTableOfContentsScrollRequestTracker {
+    private var nextSequence: UInt64 = 0
+    private(set) var activeRequest: WebViewTableOfContentsScrollRequest?
+
+    func begin(
+        sectionID: String,
+        articleTitle: String,
+        contentRevision: UInt64
+    ) -> WebViewTableOfContentsScrollRequest? {
+        if let activeRequest,
+           activeRequest.sectionID == sectionID,
+           activeRequest.articleTitle == articleTitle,
+           activeRequest.contentRevision == contentRevision {
+            return nil
+        }
+
+        nextSequence &+= 1
+        let request = WebViewTableOfContentsScrollRequest(
+            sequence: nextSequence,
+            sectionID: sectionID,
+            articleTitle: articleTitle,
+            contentRevision: contentRevision
+        )
+        activeRequest = request
+        return request
+    }
+
+    func finish(
+        _ request: WebViewTableOfContentsScrollRequest,
+        didReachTarget: Bool,
+        pendingSectionID: String?,
+        currentArticleTitle: String,
+        currentContentRevision: UInt64
+    ) -> WebViewTableOfContentsScrollCompletion {
+        guard activeRequest == request else { return .ignored }
+        activeRequest = nil
+
+        guard pendingSectionID == request.sectionID,
+              currentArticleTitle == request.articleTitle,
+              currentContentRevision == request.contentRevision else {
+            return .ignored
+        }
+
+        return didReachTarget
+            ? .succeeded(sectionID: request.sectionID)
+            : .failed(sectionID: request.sectionID)
+    }
+
+    func invalidate() {
+        nextSequence &+= 1
+        activeRequest = nil
+    }
+}
+
 private enum ReaderChromeDefaults {
     static let defaultTopInset: CGFloat = 56
 }
@@ -240,6 +309,7 @@ struct WebView: NSViewRepresentable {
         context.coordinator.onSelectionCleared = onSelectionCleared
         context.coordinator.highlights = highlights
         context.coordinator.articleTitle = articleTitle
+        context.coordinator.currentContentRevision = contentRevision
         context.coordinator.readerAppearance = readerAppearance
         context.coordinator.reduceTransparency = reduceTransparency
         context.coordinator.differentiateWithoutColor = differentiateWithoutColor
@@ -309,12 +379,54 @@ struct WebView: NSViewRepresentable {
         // Scroll to a specific heading from Table of Contents
         if let sectionId = appState?.pendingTableOfContentsScrollTarget,
            !context.coordinator.isContentLoadInFlight,
-           context.coordinator.canRunDocumentJavaScript(on: webView) {
-            let script = "window.scrollToSection('\(sectionId)');"
-            webView.evaluateJavaScript(script)
-            DispatchQueue.main.async {
-                self.appState?.currentVisibleTableOfContentsSectionId = sectionId
-                self.appState?.pendingTableOfContentsScrollTarget = nil
+           context.coordinator.canRunDocumentJavaScript(on: webView),
+           context.coordinator.lastLoadedArticleTitle == articleTitle,
+           context.coordinator.lastLoadedHTMLSignature == contentRevision,
+           let request = context.coordinator.tableOfContentsScrollRequestTracker.begin(
+               sectionID: sectionId,
+               articleTitle: articleTitle,
+               contentRevision: contentRevision
+           ) {
+            let coordinator = context.coordinator
+            let appState = appState
+            Task { @MainActor [weak webView, weak coordinator] in
+                guard let webView, let coordinator else { return }
+                guard coordinator.tableOfContentsScrollRequestTracker.activeRequest == request else {
+                    return
+                }
+                guard appState?.pendingTableOfContentsScrollTarget == request.sectionID,
+                      appState?.currentArticle?.title == request.articleTitle,
+                      coordinator.articleTitle == request.articleTitle,
+                      coordinator.currentContentRevision == request.contentRevision,
+                      coordinator.lastLoadedArticleTitle == request.articleTitle,
+                      coordinator.lastLoadedHTMLSignature == request.contentRevision else {
+                    coordinator.tableOfContentsScrollRequestTracker.invalidate()
+                    return
+                }
+                let result = try? await webView.callAsyncJavaScript(
+                    "return await window.scrollToSection(sectionID);",
+                    arguments: ["sectionID": sectionId],
+                    in: nil,
+                    contentWorld: .page
+                )
+                let completion = coordinator.tableOfContentsScrollRequestTracker.finish(
+                    request,
+                    didReachTarget: result as? Bool == true,
+                    pendingSectionID: appState?.pendingTableOfContentsScrollTarget,
+                    currentArticleTitle: appState?.currentArticle?.title ?? "",
+                    currentContentRevision: coordinator.currentContentRevision
+                )
+                switch completion {
+                case .ignored:
+                    break
+                case .succeeded(let completedSectionID):
+                    appState?.currentVisibleTableOfContentsSectionId = completedSectionID
+                    appState?.pendingTableOfContentsScrollTarget = nil
+                case .failed:
+                    // The request was consumed, but a missing/cancelled target
+                    // must not become the inspector's visible selection.
+                    appState?.pendingTableOfContentsScrollTarget = nil
+                }
             }
             didProcessPendingAction = true
         }
@@ -459,6 +571,7 @@ struct WebView: NSViewRepresentable {
             context.coordinator.lastLoadedHTMLSignature != htmlSignature
 
         if shouldReloadContent {
+            context.coordinator.tableOfContentsScrollRequestTracker.invalidate()
             let preparedHTMLContent = context.coordinator.prepareHTMLForInitialLoad(
                 htmlContent,
                 articleTitle: articleTitle,
@@ -579,6 +692,7 @@ struct WebView: NSViewRepresentable {
         var modelContext: ModelContext?
         var highlights: [Highlight] = []
         var articleTitle: String = ""
+        var currentContentRevision: UInt64 = 0
         var highlightsApplied = false
         var lastAppliedHighlightIds: Set<UUID> = []
         var readerAppearance: ReaderAppearance
@@ -613,6 +727,7 @@ struct WebView: NSViewRepresentable {
         var lastHighlightDiffCheckTimestamp: TimeInterval = 0
         var lastKnownHighlightsCount: Int = 0
         let inspectorPublisher = WebViewInspectorPublisher()
+        let tableOfContentsScrollRequestTracker = WebViewTableOfContentsScrollRequestTracker()
         var lastReportedProgress: Double = -1
         var lastProgressTimestamp: TimeInterval = 0
         var lastKnownScrollY: CGFloat = 0
@@ -717,6 +832,7 @@ struct WebView: NSViewRepresentable {
         }
 
         func attachReusedWebView(_ webView: WKWebView) {
+            tableOfContentsScrollRequestTracker.invalidate()
             dismissLinkHoverPreview(immediate: true)
             cancelScriptedScrollRestore(on: webView)
             isContentLoadInFlight = false
@@ -871,6 +987,7 @@ struct WebView: NSViewRepresentable {
         }
 
         func cleanup() {
+            tableOfContentsScrollRequestTracker.invalidate()
             findRequestTimeoutWorkItem?.cancel()
             findRequestTimeoutWorkItem = nil
             dismissLinkHoverPreview(immediate: true)

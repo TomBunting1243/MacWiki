@@ -153,6 +153,12 @@ struct MacWikiCommands: Commands {
 
         CommandGroup(after: .toolbar) {
             if supports(.workspaceNavigation) {
+                Button(appState.listsSidebarVisible ? "Hide Lists" : "Show Lists") {
+                    appState.toggleListsSidebarVisibility()
+                }
+                .keyboardShortcut("s", modifiers: [.command, .control])
+                .disabled(appState.isWikiHopNavigationLocked)
+
                 Button(appState.directoryColumnVisible ? "Hide List Contents" : "Show List Contents") {
                     appState.toggleDirectoryColumnVisibility()
                 }

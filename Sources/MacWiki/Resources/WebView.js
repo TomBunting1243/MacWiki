@@ -710,6 +710,7 @@ document.addEventListener('contextmenu', function (e) {
     var maxScrollDirty = true;
     var maxScrollRecomputeScheduled = false;
     var smoothScrollSequence = 0;
+    var activeSmoothScrollCompletion = null;
     var sectionEndDebounceTimer = null;
 
     if (window.PerformanceObserver) {
@@ -938,6 +939,10 @@ document.addEventListener('contextmenu', function (e) {
             clearTimeout(programmaticScrollForcePostTimer);
             programmaticScrollForcePostTimer = null;
         }
+        if (sectionEndDebounceTimer) {
+            clearTimeout(sectionEndDebounceTimer);
+            sectionEndDebounceTimer = null;
+        }
         programmaticScrollForcePostTimer = setTimeout(function () {
             schedulePostScroll(true);
             programmaticScrollForcePostTimer = null;
@@ -948,12 +953,21 @@ document.addEventListener('contextmenu', function (e) {
         return -(Math.cos(Math.PI * t) - 1) / 2;
     }
 
+    function completeSmoothScroll(didReachTarget) {
+        var completion = activeSmoothScrollCompletion;
+        activeSmoothScrollCompletion = null;
+        if (completion) {
+            completion(!!didReachTarget);
+        }
+    }
+
     function cancelSmoothScrollAnimation() {
         smoothScrollSequence += 1;
         if (window._macwikiSmoothScrollRAF) {
             cancelAnimationFrame(window._macwikiSmoothScrollRAF);
             window._macwikiSmoothScrollRAF = null;
         }
+        completeSmoothScroll(false);
     }
 
     function monitorProgrammaticScroll(targetY, durationMs, options) {
@@ -1018,13 +1032,21 @@ document.addEventListener('contextmenu', function (e) {
 
     function smoothScrollToY(targetY, options) {
         options = options || {};
+        cancelSmoothScrollAnimation();
+        activeSmoothScrollCompletion =
+            typeof options.onComplete === 'function' ? options.onComplete : null;
+        var sequenceId = smoothScrollSequence;
         var maxScroll = getMaxScroll(true);
         var clampedTarget = clamp(targetY, 0, maxScroll);
         var startY = currentScrollY();
         var distance = clampedTarget - startY;
         if (Math.abs(distance) < 2) {
             window.scrollTo(0, clampedTarget);
-            schedulePostScroll(true);
+            setTimeout(function () {
+                if (sequenceId !== smoothScrollSequence) return;
+                schedulePostScroll(true);
+                completeSmoothScroll(true);
+            }, 28);
             return true;
         }
 
@@ -1062,19 +1084,21 @@ document.addEventListener('contextmenu', function (e) {
 
         if (prefersReducedMotion) {
             window.scrollTo(0, clampedTarget);
-            setTimeout(function () { schedulePostScroll(true); }, 28);
+            setTimeout(function () {
+                if (sequenceId !== smoothScrollSequence) return;
+                schedulePostScroll(true);
+                completeSmoothScroll(true);
+            }, 28);
             return true;
         }
-
-        cancelSmoothScrollAnimation();
-        var sequenceId = smoothScrollSequence;
 
         var nativeSmoothEnabled = options.nativeSmooth !== false;
         if (nativeSmoothEnabled && supportsNativeSmoothScroll()) {
             window.scrollTo({ top: clampedTarget, behavior: 'smooth' });
             monitorProgrammaticScroll(clampedTarget, durationMs, {
                 emitPost: true,
-                sequenceId: sequenceId
+                sequenceId: sequenceId,
+                onComplete: function () { completeSmoothScroll(true); }
             });
             return true;
         }
@@ -1103,6 +1127,7 @@ document.addEventListener('contextmenu', function (e) {
             window._macwikiSmoothScrollRAF = null;
             window.scrollTo(0, clampedTarget);
             schedulePostScroll(true);
+            completeSmoothScroll(true);
         }
 
         window._macwikiSmoothScrollRAF = requestAnimationFrame(step);
@@ -1203,7 +1228,8 @@ document.addEventListener('contextmenu', function (e) {
             var burstDelta = Math.abs(y - lastBurstHeartbeatY);
             if ((now - lastBurstHeartbeatSentAt) < 460 && burstDelta < 96) {
                 // Send section updates at reduced frequency during burst (300ms)
-                if (sectionTrackingEnabled &&
+                if (!inProgrammaticMode &&
+                    sectionTrackingEnabled &&
                     window.currentVisibleSectionId &&
                     (now - lastSectionSentAt) >= 300) {
                     lastSectionSentAt = now;
@@ -1233,7 +1259,8 @@ document.addEventListener('contextmenu', function (e) {
         }
         if (!force && !burstHeartbeat && now - lastSentAt < effectiveThrottleMs && Math.abs(y - lastSentY) < effectiveDelta) {
             // Same - section updates at reduced frequency during throttle
-            if (sectionTrackingEnabled &&
+            if (!inProgrammaticMode &&
+                sectionTrackingEnabled &&
                 window.currentVisibleSectionId &&
                 (now - lastSectionSentAt) >= 300) {
                 lastSectionSentAt = now;
@@ -1289,7 +1316,7 @@ document.addEventListener('contextmenu', function (e) {
             // Schedule a debounced final section update for when scrolling stops.
             // This ensures we always send the sectionId after scroll ends, even
             // if velocity was too high during active scrolling.
-            if (sectionTrackingEnabled && window.currentVisibleSectionId) {
+            if (!inProgrammaticMode && sectionTrackingEnabled && window.currentVisibleSectionId) {
                 if (sectionEndDebounceTimer) {
                     clearTimeout(sectionEndDebounceTimer);
                 }
@@ -2059,23 +2086,27 @@ window.extractTableOfContents = function () {
 };
 
 window.scrollToSection = function (id) {
-    if (!id) return false;
+    if (!id) return Promise.resolve(false);
     var target = document.getElementById(id);
-    if (!target) return false;
+    if (!target) return Promise.resolve(false);
 
     var offset = 84;
     var top = target.getBoundingClientRect().top + window.scrollY - offset;
     if (window._macwikiSmoothScrollToY) {
-        return window._macwikiSmoothScrollToY(top, {
-            reason: 'toc',
-            nativeSmooth: true,
-            pixelsPerMs: 2.0,
-            minDurationMs: 320,
-            maxDurationMs: 1400
+        return new Promise(function (resolve) {
+            var didStart = window._macwikiSmoothScrollToY(top, {
+                reason: 'toc',
+                nativeSmooth: true,
+                pixelsPerMs: 2.0,
+                minDurationMs: 320,
+                maxDurationMs: 1400,
+                onComplete: resolve
+            });
+            if (!didStart) resolve(false);
         });
     }
-    window.scrollTo({ top: top, behavior: 'smooth' });
-    return true;
+    window.scrollTo({ top: top, behavior: 'auto' });
+    return Promise.resolve(true);
 };
 
 window.scrollToAnchor = function (fragment) {
@@ -2390,7 +2421,7 @@ window._macwikiTagReferenceSections();
         var scrollTop = window.scrollY + 110; // threshold from top
         // Binary search: find last heading with offsetTop <= scrollTop
         var lo = 0, hi = _cachedHeadings.length - 1;
-        var activeId = _cachedHeadings[0].id;
+        var activeId = null;
         while (lo <= hi) {
             var mid = (lo + hi) >>> 1;
             if (_cachedHeadings[mid].offsetTop <= scrollTop) {
@@ -2399,12 +2430,6 @@ window._macwikiTagReferenceSections();
             } else {
                 hi = mid - 1;
             }
-        }
-
-        // If nothing is past the threshold yet, use the first heading if it's
-        // in the upper 60% of the viewport.
-        if (lo === 0 && _cachedHeadings[0].offsetTop - window.scrollY < window.innerHeight * 0.6) {
-            activeId = _cachedHeadings[0].id;
         }
 
         return activeId || null;

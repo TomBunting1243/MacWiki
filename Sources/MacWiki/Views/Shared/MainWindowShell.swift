@@ -30,14 +30,15 @@ struct MainWindowShell: View {
     }
 }
 
-/// The main window uses SwiftUI's platform-owned navigation and inspector
-/// containers. This keeps collapse, resize, keyboard, and accessibility
-/// behavior on the same native state path instead of mirroring it through a
-/// custom AppKit split-controller bridge.
+/// The main window uses one platform-owned AppKit navigation split plus
+/// SwiftUI's standard Inspector. This gives Lists and List Contents independent
+/// native collapse behavior while keeping the Reader and its WebView mounted.
 private struct MainWorkspaceShell: View {
     @Environment(AppState.self) private var appState
     @Environment(\.modelContext) private var modelContext
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.openURL) private var openURL
+    @Environment(\.macWikiAccessibilityPersonalization) private var accessibilityPersonalization
     @AppStorage(AppStorageKey.MainWindow.sidebarWidth) private var sidebarWidth = AppStorageKey.MainWindow.sidebarWidthDefault
     @AppStorage(AppStorageKey.MainWindow.directoryWidth) private var directoryWidth = AppStorageKey.MainWindow.directoryWidthDefault
     @AppStorage(AppStorageKey.MainWindow.inspectorWidth) private var inspectorWidth = AppStorageKey.MainWindow.inspectorWidthDefault
@@ -59,58 +60,51 @@ private struct MainWorkspaceShell: View {
     var body: some View {
         @Bindable var appState = appState
 
-        NavigationSplitView(columnVisibility: $appState.navigationSplitViewVisibility) {
-            ListsColumnView(
-                selectedList: $selectedList,
-                selectedLabel: $selectedLabel,
-                selectedTag: $selectedTag,
-                rootSelection: $rootSelection,
-                sidebarSearchModel: sidebarSearchModel,
-                onEditLabel: onEditLabel,
-                onAddNewLabel: onAddNewLabel
-            )
-            .navigationSplitViewColumnWidth(
-                min: MainWindowColumnWidth.sidebarRange.lowerBound,
-                ideal: CGFloat(sidebarWidth),
-                max: MainWindowColumnWidth.sidebarRange.upperBound
-            )
-            .persistedColumnWidth(
-                key: AppStorageKey.MainWindow.sidebarWidth,
-                range: MainWindowColumnWidth.sidebarRange
-            )
-        } content: {
-            DirectoryColumnView(
-                selectedList: $selectedList,
-                rootSelection: $rootSelection,
-                selectedLabel: selectedLabel,
-                selectedTag: selectedTag,
-                sidebarSearchModel: sidebarSearchModel,
-                onNewLabelWithArticle: onNewLabelWithArticle,
-                onNewTagWithArticle: onNewTagWithArticle
-            )
-            .navigationSplitViewColumnWidth(
-                min: MainWindowColumnWidth.directoryRange.lowerBound,
-                ideal: CGFloat(directoryWidth),
-                max: MainWindowColumnWidth.directoryRange.upperBound
-            )
-            .persistedColumnWidth(
-                key: AppStorageKey.MainWindow.directoryWidth,
-                range: MainWindowColumnWidth.directoryRange
-            )
-        } detail: {
-            VStack(spacing: 0) {
-                TabBarView(
-                    showsTopDivider: false,
-                    onNewLabelWithArticle: onNewLabelWithArticle
+        AppKitWorkspaceNavigationSplitView(
+            listsVisible: $appState.listsSidebarVisible,
+            directoryVisible: $appState.directoryColumnVisible,
+            reduceMotion: accessibilityPersonalization.reduceMotion,
+            initialListsWidth: CGFloat(sidebarWidth),
+            initialDirectoryWidth: CGFloat(directoryWidth),
+            listsRevision: workspaceAppearanceRevision,
+            directoryRevision: directoryContentRevision,
+            readerRevision: workspaceAppearanceRevision,
+            lists: workspaceEnvironment(
+                ListsColumnView(
+                    selectedList: $selectedList,
+                    selectedLabel: $selectedLabel,
+                    selectedTag: $selectedTag,
+                    rootSelection: $rootSelection,
+                    sidebarSearchModel: sidebarSearchModel,
+                    onEditLabel: onEditLabel,
+                    onAddNewLabel: onAddNewLabel
                 )
+            ),
+            directory: workspaceEnvironment(
+                DirectoryColumnView(
+                    selectedList: $selectedList,
+                    rootSelection: $rootSelection,
+                    selectedLabel: selectedLabel,
+                    selectedTag: selectedTag,
+                    sidebarSearchModel: sidebarSearchModel,
+                    onNewLabelWithArticle: onNewLabelWithArticle,
+                    onNewTagWithArticle: onNewTagWithArticle
+                )
+            ),
+            reader: workspaceEnvironment(
+                VStack(spacing: 0) {
+                    TabBarView(
+                        showsTopDivider: false,
+                        onNewLabelWithArticle: onNewLabelWithArticle
+                    )
 
-                Divider()
+                    Divider()
 
-                ReaderColumnView()
-                    .id("main-reader-column")
-            }
-        }
-        .navigationSplitViewStyle(.balanced)
+                    ReaderColumnView()
+                        .id("main-reader-column")
+                }
+            )
+        )
         .inspector(isPresented: $appState.inspectorVisible) {
             InspectorColumnView()
                 .inspectorColumnWidth(
@@ -159,5 +153,36 @@ private struct MainWorkspaceShell: View {
             showsReaderStylePopover = false
             showsPageViewsPopover = true
         }
+    }
+
+    private func workspaceEnvironment<Content: View>(_ content: Content) -> some View {
+        content
+            .defaultAppStorage(MacWikiDefaults.current)
+            .environment(appState)
+            .environment(\.modelContext, modelContext)
+            .environment(\.workspaceOpenWindowHandler, openWindowHandler)
+            .environment(\.openURL, openURL)
+            .environment(\.macWikiAccessibilityPersonalization, accessibilityPersonalization)
+    }
+
+    private var directoryContentRevision: String {
+        [
+            selectedList?.id.uuidString ?? "",
+            selectedLabel?.id.uuidString ?? "",
+            selectedTag?.id.uuidString ?? "",
+            String(describing: rootSelection),
+            workspaceAppearanceRevision
+        ].joined(separator: "|")
+    }
+
+    private var workspaceAppearanceRevision: String {
+        [
+            accessibilityPersonalization.reduceMotion ? "reduce-motion" : "motion",
+            accessibilityPersonalization.reduceTransparency ? "opaque" : "transparent",
+            accessibilityPersonalization.differentiateWithoutColor ? "differentiated" : "color",
+            accessibilityPersonalization.colorSchemeContrast == .increased
+                ? "high-contrast"
+                : "standard-contrast"
+        ].joined(separator: "|")
     }
 }

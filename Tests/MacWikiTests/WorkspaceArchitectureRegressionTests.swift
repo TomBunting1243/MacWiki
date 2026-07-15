@@ -19,24 +19,27 @@ struct WorkspaceArchitectureRegressionTests {
         #expect(contextMenu.contains("workspaceOpenWindowHandler?.open(windowArticle) != true"))
     }
 
-    @Test func mainWorkspaceUsesPlatformOwnedNavigationAndInspectorContainers() throws {
+    @Test func mainWorkspaceUsesOneAppKitNavigationSplitAndTheStandardInspector() throws {
         let shell = try source("Sources/MacWiki/Views/Shared/MainWindowShell.swift")
+        let bridge = try source("Sources/MacWiki/Views/Shared/AppKitWorkspaceNavigationSplitView.swift")
 
-        #expect(shell.contains("NavigationSplitView(columnVisibility: $appState.navigationSplitViewVisibility)"))
-        #expect(shell.contains("} content: {"))
-        #expect(shell.contains("} detail: {"))
-        #expect(shell.contains(".navigationSplitViewStyle(.balanced)"))
+        #expect(shell.contains("AppKitWorkspaceNavigationSplitView("))
+        #expect(!shell.contains("NavigationSplitView(columnVisibility:"))
+        #expect(bridge.contains("NSViewControllerRepresentable"))
+        #expect(bridge.contains("final class AppKitWorkspaceNavigationController: NSSplitViewController"))
+        #expect(bridge.contains("NSSplitViewItem(sidebarWithViewController:"))
+        #expect(bridge.contains("NSSplitViewItem(contentListWithViewController:"))
         #expect(shell.contains(".inspector(isPresented: $appState.inspectorVisible)"))
-        #expect(shell.components(separatedBy: ".navigationSplitViewColumnWidth(").count - 1 == 2)
-        #expect(shell.components(separatedBy: ".persistedColumnWidth(").count - 1 == 3)
+        #expect(shell.components(separatedBy: ".persistedColumnWidth(").count - 1 == 1)
         #expect(shell.contains(".inspectorColumnWidth("))
         #expect(!shell.contains(".toolbar(removing: .sidebarToggle)"))
         #expect(shell.contains(".toolbar {"))
     }
 
-    @Test func readerTabsRemainInsideTheDetailColumn() throws {
+    @Test func readerTabsAndReaderStayInsideOneStableHostedPane() throws {
         let shell = try source("Sources/MacWiki/Views/Shared/MainWindowShell.swift")
-        let detail = try #require(shell.range(of: "} detail: {"))
+        let bridge = try source("Sources/MacWiki/Views/Shared/AppKitWorkspaceNavigationSplitView.swift")
+        let detail = try #require(shell.range(of: "reader: workspaceEnvironment("))
         let inspector = try #require(shell.range(of: ".inspector(isPresented:"))
         let detailSource = String(shell[detail.lowerBound..<inspector.lowerBound])
         let tabs = try #require(detailSource.range(of: "TabBarView("))
@@ -44,22 +47,25 @@ struct WorkspaceArchitectureRegressionTests {
 
         #expect(tabs.lowerBound < reader.lowerBound)
         #expect(detailSource.contains("VStack(spacing: 0)"))
+        #expect(bridge.contains("readerController = NSHostingController("))
+        #expect(bridge.contains("readerController.sizingOptions = []"))
+        #expect(!bridge.contains("readerController.rootView ="))
     }
 
-    @Test func visibilityIsOneInvariantStateBoundByKeyPath() throws {
+    @Test func navigationVisibilityUsesTwoIndependentStoredBindings() throws {
         let appState = try source("Sources/MacWiki/App/AppState.swift")
         let navigation = try source("Sources/MacWiki/App/AppState+NavigationTabs.swift")
+        let shell = try source("Sources/MacWiki/Views/Shared/MainWindowShell.swift")
 
-        #expect(appState.contains("var navigationSplitViewVisibility: NavigationSplitViewVisibility = .all"))
-        #expect(appState.contains("var workspaceNavigationColumns: WorkspaceNavigationColumns {"))
-        #expect(appState.contains("var listsSidebarVisible: Bool"))
-        #expect(appState.contains("var directoryColumnVisible: Bool"))
-        #expect(appState.contains("SDK 27 intentionally considers `.automatic` equal to"))
-        #expect(appState.contains("if isWikiHopNavigationLocked,"))
-        #expect(appState.contains("navigationSplitViewVisibility = .detailOnly"))
+        #expect(appState.contains("var listsSidebarVisible = true"))
+        #expect(appState.contains("var directoryColumnVisible = true"))
+        #expect(!appState.contains("NavigationSplitViewVisibility"))
+        #expect(!appState.contains("WorkspaceNavigationColumns"))
+        #expect(shell.contains("listsVisible: $appState.listsSidebarVisible"))
+        #expect(shell.contains("directoryVisible: $appState.directoryColumnVisible"))
         #expect(navigation.contains("guard !isWikiHopNavigationLocked else { return }"))
-        #expect(!navigation.contains("listsSidebarVisible.toggle()"))
-        #expect(!navigation.contains("directoryColumnVisible.toggle()"))
+        #expect(navigation.contains("listsSidebarVisible.toggle()"))
+        #expect(navigation.contains("directoryColumnVisible.toggle()"))
     }
 
     @Test func obsoleteSplitAndWindowMinimumBridgesAreGone() {

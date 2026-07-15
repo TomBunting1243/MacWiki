@@ -263,7 +263,6 @@ struct InspectorPanel: View {
 
         return Button {
             appState.pendingTableOfContentsScrollTarget = item.id
-            appState.currentVisibleTableOfContentsSectionId = item.id
         } label: {
             HStack(spacing: 6) {
                 if item.level > 2 {

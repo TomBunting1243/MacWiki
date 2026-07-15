@@ -59,34 +59,39 @@ struct AppStateBoundaryTests {
         #expect(appState.tabSessionStore.hasPendingSaveForTesting == false)
     }
 
-    @Test func listContentsTogglePreservesTheNativeNavigationHierarchy() {
+    @Test func listContentsToggleLeavesTheIndependentListsPaneUnchanged() {
         let appState = AppState(persistenceMode: .ephemeral)
         appState.setNavigationColumnsVisible(true)
 
         appState.toggleDirectoryColumnVisibility()
 
-        #expect(appState.listsSidebarVisible == false)
+        #expect(appState.listsSidebarVisible == true)
         #expect(appState.directoryColumnVisible == false)
-        #expect(appState.navigationSplitViewVisibility == .detailOnly)
 
         appState.toggleDirectoryColumnVisibility()
 
-        #expect(appState.listsSidebarVisible == false)
+        #expect(appState.listsSidebarVisible == true)
         #expect(appState.directoryColumnVisible == true)
-        #expect(appState.navigationSplitViewVisibility == .doubleColumn)
     }
 
-    @Test func invalidNavigationCombinationNormalizesToReaderOnly() {
+    @Test func everyIndependentNavigationCombinationIsRepresentable() {
         let appState = AppState(persistenceMode: .ephemeral)
+        let combinations = [
+            (lists: true, directory: true),
+            (lists: true, directory: false),
+            (lists: false, directory: true),
+            (lists: false, directory: false)
+        ]
 
-        appState.setNavigationColumnVisibility(
-            listsVisible: true,
-            directoryVisible: false
-        )
+        for combination in combinations {
+            appState.setNavigationColumnVisibility(
+                listsVisible: combination.lists,
+                directoryVisible: combination.directory
+            )
 
-        #expect(appState.workspaceNavigationColumns == .readerOnly)
-        #expect(!appState.listsSidebarVisible)
-        #expect(!appState.directoryColumnVisible)
+            #expect(appState.listsSidebarVisible == combination.lists)
+            #expect(appState.directoryColumnVisible == combination.directory)
+        }
     }
 
     @Test func wikiHopLockRejectsNativeAndExplicitNavigationRevealRequests() {
@@ -98,10 +103,15 @@ struct AppStateBoundaryTests {
             target: Article(id: "objective-c", title: "Objective-C")
         )
 
+        appState.toggleListsSidebarVisibility()
         appState.toggleDirectoryColumnVisibility()
-        appState.navigationSplitViewVisibility = .all
+        appState.setNavigationColumnVisibility(
+            listsVisible: true,
+            directoryVisible: true
+        )
 
-        #expect(appState.workspaceNavigationColumns == .readerOnly)
+        #expect(!appState.listsSidebarVisible)
+        #expect(!appState.directoryColumnVisible)
     }
 
     @Test func readerPresentationRequestsRequireAnUnlockedArticle() {

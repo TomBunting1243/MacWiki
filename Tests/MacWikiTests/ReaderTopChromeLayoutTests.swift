@@ -59,12 +59,14 @@ struct ReaderTopChromeLayoutTests {
         let toolbar = try source("Sources/MacWiki/Views/Shared/MainWindowReaderToolbar.swift")
 
         for action in [
-            "Hide List Contents", "Show List Contents", "Back", "Forward",
+            "Hide Lists", "Show Lists", "Hide List Contents", "Show List Contents", "Back", "Forward",
             "Search Wikipedia", "Save Article", "Mark as Read", "Find in Page",
             "Reader Style", "Page Views", "Open in Browser", "Share"
         ] {
             #expect(toolbar.contains(action))
         }
+        #expect(toolbar.contains("appState.toggleListsSidebarVisibility()"))
+        #expect(toolbar.contains("systemImage: \"sidebar.left\""))
         #expect(toolbar.contains("reader-find-in-page"))
         #expect(toolbar.contains("SaveToListPopover(article: article)"))
         #expect(toolbar.contains("ReaderStylePopover()"))
