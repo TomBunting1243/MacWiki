@@ -153,12 +153,15 @@ struct NativeDesignRegressionTests {
     @Test func readerToolbarsCommandsAndStyleControlsStayNativeReachableAndLockedSafely() throws {
         let toolbar = try source("Sources/MacWiki/Views/Shared/MainWindowReaderToolbar.swift")
         let articleToolbar = try source("Sources/MacWiki/Views/Shared/ArticleWindowReaderToolbar.swift")
-        let articlePresenter = try source("Sources/MacWiki/Views/Shared/ArticleWindowReaderCommandPresenter.swift")
+        let articleWindow = try source("Sources/MacWiki/Views/Shared/ArticleWindowRootView.swift")
         let commands = try source("Sources/MacWiki/App/MacWikiCommands.swift")
         let style = try source("Sources/MacWiki/Views/Components/ReaderStylePopover.swift")
 
-        #expect(toolbar.contains("CustomizableToolbarContent"))
+        #expect(toolbar.contains("ToolbarContent"))
+        #expect(!toolbar.contains("CustomizableToolbarContent"))
         #expect(toolbar.contains("ControlGroup"))
+        #expect(toolbar.components(separatedBy: "ToolbarSpacer(.flexible)").count - 1 == 1)
+        #expect(!toolbar.contains("ToolbarSpacer(.fixed)"))
         #expect(toolbar.contains(".disabled(article == nil)"))
         #expect(toolbar.contains("appState.canGoBack"))
         #expect(!toolbar.contains("toggleListsSidebarVisibility"))
@@ -166,7 +169,10 @@ struct NativeDesignRegressionTests {
         #expect(toolbar.contains("toggleDirectoryColumnVisibility"))
         #expect(toolbar.contains("toggleInspectorVisibility"))
         #expect(toolbar.contains("reader-find-in-page"))
-        #expect(articleToolbar.contains("CustomizableToolbarContent"))
+        #expect(articleToolbar.contains("ToolbarContent"))
+        #expect(!articleToolbar.contains("CustomizableToolbarContent"))
+        #expect(articleToolbar.components(separatedBy: "ToolbarSpacer(.flexible)").count - 1 == 1)
+        #expect(!articleToolbar.contains("ToolbarSpacer(.fixed)"))
         for action in ["Save Article", "Mark as Read", "Find in Page", "Reader Style", "Page Views", "Open in Browser", "Share"] {
             #expect(toolbar.contains(action))
             #expect(articleToolbar.contains(action))
@@ -183,9 +189,18 @@ struct NativeDesignRegressionTests {
         #expect(commands.contains(".keyboardShortcut(.tab, modifiers: .control)"))
         #expect(commands.contains(".keyboardShortcut(.tab, modifiers: [.control, .shift])"))
         #expect(!commands.contains("CommandGroup(after: .windowSize)"))
-        #expect(articlePresenter.contains("window.toolbar?.visibleItems?"))
-        #expect(articlePresenter.contains("presenter.showReaderStyle(in: window)"))
-        #expect(articlePresenter.contains("presenter.showPageViews(for: article, in: window)"))
+        #expect(articleWindow.contains(".onChange(of: appState.readerStylePresentationRequestID)"))
+        #expect(articleWindow.contains("showsReaderStylePopover = true"))
+        #expect(articleWindow.contains(".onChange(of: appState.readerPageViewsPresentationRequestID)"))
+        #expect(articleWindow.contains("showsPageViewsPopover = true"))
+        for obsoletePath in [
+            "Sources/MacWiki/Views/Shared/ArticleWindowReaderCommandPresenter.swift",
+            "Sources/MacWiki/Views/Shared/ReaderToolbarPopoverPresenter.swift"
+        ] {
+            #expect(!FileManager.default.fileExists(
+                atPath: repositoryRoot().appendingPathComponent(obsoletePath).path
+            ))
+        }
         #expect(style.contains("SwiftUI.Label(\"Apply Preset\", systemImage:"))
         #expect(style.contains(".accessibilityLabel(\"Apply Reader Preset\")"))
         #expect(style.contains(".accessibilityLabel(Text(title))"))

@@ -7,21 +7,42 @@ import Testing
 
 @Suite("Reader toolbar and search layout")
 struct ReaderTopChromeLayoutTests {
-    @Test("main reader commands use a full-width customizable native toolbar")
+    @Test("main reader commands use a full-width stable native toolbar")
     func mainReaderUsesNativeWindowToolbar() throws {
         let toolbar = try source("Sources/MacWiki/Views/Shared/MainWindowReaderToolbar.swift")
         let shell = try source("Sources/MacWiki/Views/Shared/MainWindowShell.swift")
 
-        #expect(toolbar.contains("struct MainWindowReaderToolbar: CustomizableToolbarContent"))
-        #expect(toolbar.contains("main-window-native-toolbar-v1"))
+        #expect(toolbar.contains("struct MainWindowReaderToolbar: ToolbarContent"))
+        #expect(!toolbar.contains("CustomizableToolbarContent"))
+        #expect(!toolbar.contains("ToolbarItem(id:"))
         #expect(toolbar.contains("ControlGroup(\"Navigation\")"))
-        #expect(shell.contains(".toolbar(id: MainWindowReaderToolbarIdentifier.configuration)"))
+        #expect(toolbar.components(separatedBy: "ToolbarSpacer(.flexible)").count - 1 == 1)
+        #expect(!toolbar.contains("ToolbarSpacer(.fixed)"))
+        #expect(shell.contains(".toolbar {"))
         #expect(!shell.contains(".toolbar(removing: .sidebarToggle)"))
         #expect(shell.contains("TabBarView("))
         #expect(shell.contains("ReaderColumnView()"))
         #expect(!toolbar.contains("NSButton"))
         #expect(!toolbar.contains(".controlSize(.small)"))
         #expect(!toolbar.contains(".frame(width:"))
+    }
+
+    @Test("navigation remains leading and reader actions remain trailing")
+    func readerToolbarUsesStableEdgeAlignment() throws {
+        for path in [
+            "Sources/MacWiki/Views/Shared/MainWindowReaderToolbar.swift",
+            "Sources/MacWiki/Views/Shared/ArticleWindowReaderToolbar.swift"
+        ] {
+            let toolbar = try source(path)
+            let leadingControl = try #require(toolbar.range(of: "ControlGroup("))
+            let flexibleSpacer = try #require(toolbar.range(of: "ToolbarSpacer(.flexible)"))
+            let saveAction = try #require(toolbar.range(of: "Button(\"Save Article\""))
+            let inspectorAction = try #require(toolbar.range(of: "appState.inspectorVisible"))
+
+            #expect(leadingControl.lowerBound < flexibleSpacer.lowerBound)
+            #expect(flexibleSpacer.lowerBound < saveAction.lowerBound)
+            #expect(saveAction.lowerBound < inspectorAction.lowerBound)
+        }
     }
 
     @Test("every main reader command remains natively reachable")
@@ -47,11 +68,16 @@ struct ReaderTopChromeLayoutTests {
     @Test("menu presentation requests reach native toolbar popovers")
     func menuRequestsReachToolbarPopovers() throws {
         let shell = try source("Sources/MacWiki/Views/Shared/MainWindowShell.swift")
+        let mainToolbar = try source("Sources/MacWiki/Views/Shared/MainWindowReaderToolbar.swift")
+        let articleToolbar = try source("Sources/MacWiki/Views/Shared/ArticleWindowReaderToolbar.swift")
 
         #expect(shell.contains(".onChange(of: appState.readerStylePresentationRequestID)"))
         #expect(shell.contains("showsReaderStylePopover = true"))
         #expect(shell.contains(".onChange(of: appState.readerPageViewsPresentationRequestID)"))
         #expect(shell.contains("showsPageViewsPopover = true"))
+        for toolbar in [mainToolbar, articleToolbar] {
+            #expect(toolbar.components(separatedBy: "dismissOtherPopovers(keeping:").count - 1 == 3)
+        }
     }
 
     @Test("List Contents search is an embedded native AppKit search field")

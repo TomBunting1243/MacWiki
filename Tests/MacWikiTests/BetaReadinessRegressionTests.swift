@@ -526,9 +526,18 @@ struct BetaReadinessRegressionTests {
         #expect(articleWindowSource.contains(".focusedSceneValue(\\.macWikiInspectorCommandsAvailable, true)"))
         #expect(!articleWindowSource.contains(".toolbarBackgroundVisibility(.hidden, for: .windowToolbar)"))
         #expect(articleWindowSource.contains(".toolbar(removing: .sidebarToggle)"))
-        #expect(articleWindowSource.contains(".toolbar(id: ArticleWindowReaderToolbarIdentifier.configuration)"))
+        #expect(articleWindowSource.contains(".toolbar {"))
         #expect(articleWindowSource.contains("ArticleWindowReaderToolbar("))
-        #expect(articleWindowSource.contains("ArticleWindowReaderCommandPresenter("))
+        #expect(articleWindowSource.contains(".onChange(of: appState.readerStylePresentationRequestID)"))
+        #expect(articleWindowSource.contains(".onChange(of: appState.readerPageViewsPresentationRequestID)"))
+        for obsoletePath in [
+            "Sources/MacWiki/Views/Shared/ArticleWindowReaderCommandPresenter.swift",
+            "Sources/MacWiki/Views/Shared/ReaderToolbarPopoverPresenter.swift"
+        ] {
+            #expect(!FileManager.default.fileExists(
+                atPath: repositoryRoot().appendingPathComponent(obsoletePath).path
+            ))
+        }
         #expect(articleWindowSource.contains(".focusedSceneValue(\\.macWikiCommandModelContext, modelContext)"))
         #expect(!appSource.contains(".toolbar(removing: .sidebarToggle)"))
         #expect(!FileManager.default.fileExists(
@@ -609,7 +618,7 @@ struct BetaReadinessRegressionTests {
         #expect(shellSource.contains("NavigationSplitView(columnVisibility: $appState.navigationSplitViewVisibility)"))
         #expect(shellSource.contains(".navigationSplitViewStyle(.balanced)"))
         #expect(shellSource.contains(".inspector(isPresented: $appState.inspectorVisible)"))
-        #expect(shellSource.contains(".toolbar(id: MainWindowReaderToolbarIdentifier.configuration)"))
+        #expect(shellSource.contains(".toolbar {"))
         #expect(shellSource.contains("TabBarView("))
         #expect(shellSource.contains(".id(\"main-reader-column\")"))
         #expect(shellSource.contains("InspectorColumnView()"))
@@ -618,8 +627,12 @@ struct BetaReadinessRegressionTests {
         #expect(!readerColumnSource.contains("TabBarView("))
         #expect(tabBarSource.contains("Color.clear"))
         #expect(!tabBarSource.contains("ReaderTabLaneBackground()"))
-        #expect(mainToolbarSource.contains("CustomizableToolbarContent"))
-        #expect(articleToolbarSource.contains("CustomizableToolbarContent"))
+        #expect(mainToolbarSource.contains("ToolbarContent"))
+        #expect(articleToolbarSource.contains("ToolbarContent"))
+        #expect(!mainToolbarSource.contains("CustomizableToolbarContent"))
+        #expect(!articleToolbarSource.contains("CustomizableToolbarContent"))
+        #expect(mainToolbarSource.components(separatedBy: "ToolbarSpacer(.flexible)").count - 1 == 1)
+        #expect(articleToolbarSource.components(separatedBy: "ToolbarSpacer(.flexible)").count - 1 == 1)
         #expect(!mainToolbarSource.contains("appState.toggleListsSidebarVisibility()"))
         #expect(!mainToolbarSource.contains("sidebar.leading"))
         #expect(mainToolbarSource.contains("appState.toggleDirectoryColumnVisibility()"))

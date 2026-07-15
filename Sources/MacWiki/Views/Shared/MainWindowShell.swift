@@ -123,7 +123,7 @@ private struct MainWorkspaceShell: View {
                     range: MainWindowColumnWidth.inspectorRange
                 )
         }
-        .toolbar(id: MainWindowReaderToolbarIdentifier.configuration) {
+        .toolbar {
             MainWindowReaderToolbar(
                 appState: appState,
                 modelContext: modelContext,

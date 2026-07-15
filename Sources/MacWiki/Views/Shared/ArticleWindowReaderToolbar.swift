@@ -1,24 +1,10 @@
 import SwiftData
 import SwiftUI
 
-enum ArticleWindowReaderToolbarIdentifier {
-    static let configuration = "article-window-reader-toolbar-v1"
-    static let history = "article-window.history"
-    static let save = "article-window.save"
-    static let readState = "article-window.read-state"
-    static let find = "article-window.find"
-    static let style = "article-window.style"
-    static let pageViews = "article-window.page-views"
-    static let openInBrowser = "article-window.open-in-browser"
-    static let share = "article-window.share"
-    static let inspector = "article-window.inspector"
-}
-
-/// A reader-only customizable toolbar for standalone article windows. The main
-/// window instead scopes its chrome to the reader split item; this surface has
-/// only reader actions plus its inspector.
+/// A stable reader-only toolbar for standalone article windows. History stays
+/// leading while article actions and Inspector remain trailing.
 @MainActor
-struct ArticleWindowReaderToolbar: CustomizableToolbarContent {
+struct ArticleWindowReaderToolbar: ToolbarContent {
     let appState: AppState
     let modelContext: ModelContext
     @Binding var showsSavePopover: Bool
@@ -30,8 +16,8 @@ struct ArticleWindowReaderToolbar: CustomizableToolbarContent {
         appState.currentArticle
     }
 
-    var body: some CustomizableToolbarContent {
-        ToolbarItem(id: ArticleWindowReaderToolbarIdentifier.history) {
+    var body: some ToolbarContent {
+        ToolbarItem {
             ControlGroup("History") {
                 Button("Back", systemImage: "chevron.left") {
                     appState.goBack()
@@ -46,10 +32,11 @@ struct ArticleWindowReaderToolbar: CustomizableToolbarContent {
             .labelStyle(.iconOnly)
         }
 
-        ToolbarSpacer(.fixed)
+        ToolbarSpacer(.flexible)
 
-        ToolbarItem(id: ArticleWindowReaderToolbarIdentifier.save) {
+        ToolbarItem {
             Button("Save Article", systemImage: "bookmark") {
+                dismissOtherPopovers(keeping: .save)
                 showsSavePopover = true
             }
             .labelStyle(.iconOnly)
@@ -61,7 +48,7 @@ struct ArticleWindowReaderToolbar: CustomizableToolbarContent {
             }
         }
 
-        ToolbarItem(id: ArticleWindowReaderToolbarIdentifier.readState) {
+        ToolbarItem {
             Button(
                 article?.isRead == true ? "Mark as Unread" : "Mark as Read",
                 systemImage: article?.isRead == true ? "checkmark.circle.fill" : "circle"
@@ -72,7 +59,7 @@ struct ArticleWindowReaderToolbar: CustomizableToolbarContent {
             .disabled(article == nil)
         }
 
-        ToolbarItem(id: ArticleWindowReaderToolbarIdentifier.find) {
+        ToolbarItem {
             Button("Find in Page", systemImage: "text.magnifyingglass") {
                 appState.presentFindOnPage()
             }
@@ -80,8 +67,9 @@ struct ArticleWindowReaderToolbar: CustomizableToolbarContent {
             .disabled(article == nil)
         }
 
-        ToolbarItem(id: ArticleWindowReaderToolbarIdentifier.style) {
+        ToolbarItem {
             Button("Reader Style", systemImage: "textformat.size") {
+                dismissOtherPopovers(keeping: .style)
                 showsReaderStylePopover = true
             }
             .labelStyle(.iconOnly)
@@ -91,8 +79,9 @@ struct ArticleWindowReaderToolbar: CustomizableToolbarContent {
             }
         }
 
-        ToolbarItem(id: ArticleWindowReaderToolbarIdentifier.pageViews) {
+        ToolbarItem {
             Button("Page Views", systemImage: "chart.xyaxis.line") {
+                dismissOtherPopovers(keeping: .pageViews)
                 showsPageViewsPopover = true
             }
             .labelStyle(.iconOnly)
@@ -107,9 +96,7 @@ struct ArticleWindowReaderToolbar: CustomizableToolbarContent {
             }
         }
 
-        ToolbarSpacer(.flexible)
-
-        ToolbarItem(id: ArticleWindowReaderToolbarIdentifier.openInBrowser) {
+        ToolbarItem {
             Button("Open in Browser", systemImage: "safari") {
                 if let article {
                     openURL(article.url)
@@ -119,7 +106,7 @@ struct ArticleWindowReaderToolbar: CustomizableToolbarContent {
             .disabled(article == nil)
         }
 
-        ToolbarItem(id: ArticleWindowReaderToolbarIdentifier.share) {
+        ToolbarItem {
             if let article {
                 ShareLink(item: article.url) {
                     SwiftUI.Label("Share", systemImage: "square.and.arrow.up")
@@ -132,7 +119,7 @@ struct ArticleWindowReaderToolbar: CustomizableToolbarContent {
             }
         }
 
-        ToolbarItem(id: ArticleWindowReaderToolbarIdentifier.inspector) {
+        ToolbarItem {
             Button(
                 appState.inspectorVisible ? "Hide Inspector" : "Show Inspector",
                 systemImage: "sidebar.trailing"
@@ -141,6 +128,18 @@ struct ArticleWindowReaderToolbar: CustomizableToolbarContent {
             }
             .labelStyle(.iconOnly)
         }
+    }
+
+    private enum PopoverKind {
+        case save
+        case style
+        case pageViews
+    }
+
+    private func dismissOtherPopovers(keeping kind: PopoverKind) {
+        if kind != .save { showsSavePopover = false }
+        if kind != .style { showsReaderStylePopover = false }
+        if kind != .pageViews { showsPageViewsPopover = false }
     }
 
     private func toggleReadState() {

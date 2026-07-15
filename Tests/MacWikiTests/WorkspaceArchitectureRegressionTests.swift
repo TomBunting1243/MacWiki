@@ -31,7 +31,7 @@ struct WorkspaceArchitectureRegressionTests {
         #expect(shell.components(separatedBy: ".persistedColumnWidth(").count - 1 == 3)
         #expect(shell.contains(".inspectorColumnWidth("))
         #expect(!shell.contains(".toolbar(removing: .sidebarToggle)"))
-        #expect(shell.contains(".toolbar(id: MainWindowReaderToolbarIdentifier.configuration)"))
+        #expect(shell.contains(".toolbar {"))
     }
 
     @Test func readerTabsRemainInsideTheDetailColumn() throws {

@@ -5,8 +5,6 @@ import SwiftUI
 struct ArticleWindowRootView: View {
     let initialArticle: Article
     @Environment(\.modelContext) private var modelContext
-    @Environment(\.openURL) private var openURL
-    @Environment(\.macWikiAccessibilityPersonalization) private var accessibilityPersonalization
     @AppStorage(AppStorageKey.ArticleWindow.inspectorWidth) private var inspectorWidth = AppStorageKey.ArticleWindow.inspectorWidthDefault
     @State private var appState: AppState
     @State private var showNewLabelSheet = false
@@ -49,7 +47,7 @@ struct ArticleWindowRootView: View {
             )
             .toolbar(removing: .title)
             .toolbar(removing: .sidebarToggle)
-            .toolbar(id: ArticleWindowReaderToolbarIdentifier.configuration) {
+            .toolbar {
                 ArticleWindowReaderToolbar(
                     appState: appState,
                     modelContext: modelContext,
@@ -63,16 +61,22 @@ struct ArticleWindowRootView: View {
             .focusedSceneValue(\.macWikiCommandCapabilities, .articleWindow)
             .focusedSceneValue(\.macWikiCommandModelContext, modelContext)
             .environment(appState)
-            .background {
-                ArticleWindowReaderCommandPresenter(
-                    appState: appState,
-                    modelContext: modelContext,
-                    openURL: openURL,
-                    accessibilityPersonalization: accessibilityPersonalization,
-                    readerStyleRequestID: appState.readerStylePresentationRequestID,
-                    pageViewsRequestID: appState.readerPageViewsPresentationRequestID
-                )
-                .frame(width: 0, height: 0)
+            .onChange(of: appState.currentArticle?.id) { _, _ in
+                showsSavePopover = false
+                showsReaderStylePopover = false
+                showsPageViewsPopover = false
+            }
+            .onChange(of: appState.readerStylePresentationRequestID) { _, requestID in
+                guard requestID != nil, appState.currentArticle != nil else { return }
+                showsSavePopover = false
+                showsPageViewsPopover = false
+                showsReaderStylePopover = true
+            }
+            .onChange(of: appState.readerPageViewsPresentationRequestID) { _, requestID in
+                guard requestID != nil, appState.currentArticle != nil else { return }
+                showsSavePopover = false
+                showsReaderStylePopover = false
+                showsPageViewsPopover = true
             }
             .task(id: initialArticle) {
                 appState.inspectorVisible = true

@@ -1,23 +1,10 @@
 import SwiftData
 import SwiftUI
 
-enum MainWindowReaderToolbarIdentifier {
-    static let configuration = "main-window-native-toolbar-v1"
-    static let navigation = "main-window.navigation"
-    static let save = "main-window.save"
-    static let readState = "main-window.read-state"
-    static let find = "main-window.find"
-    static let style = "main-window.style"
-    static let pageViews = "main-window.page-views"
-    static let openInBrowser = "main-window.open-in-browser"
-    static let share = "main-window.share"
-    static let inspector = "main-window.inspector"
-}
-
 /// The main window's Apple-owned toolbar. Commands span the window while tabs
 /// remain scoped to the Reader detail column below it.
 @MainActor
-struct MainWindowReaderToolbar: CustomizableToolbarContent {
+struct MainWindowReaderToolbar: ToolbarContent {
     let appState: AppState
     let modelContext: ModelContext
     @Binding var showsSavePopover: Bool
@@ -29,8 +16,8 @@ struct MainWindowReaderToolbar: CustomizableToolbarContent {
         appState.currentArticle
     }
 
-    var body: some CustomizableToolbarContent {
-        ToolbarItem(id: MainWindowReaderToolbarIdentifier.navigation) {
+    var body: some ToolbarContent {
+        ToolbarItem {
             ControlGroup("Navigation") {
                 Button(
                     appState.directoryColumnVisible ? "Hide List Contents" : "Show List Contents",
@@ -57,9 +44,11 @@ struct MainWindowReaderToolbar: CustomizableToolbarContent {
             .labelStyle(.iconOnly)
         }
 
-        ToolbarSpacer(.fixed)
+        // Navigation remains leading; article actions form one stable trailing
+        // cluster instead of exposing a fragile customizable arrangement.
+        ToolbarSpacer(.flexible)
 
-        ToolbarItem(id: MainWindowReaderToolbarIdentifier.save) {
+        ToolbarItem {
             Button("Save Article", systemImage: "bookmark") {
                 dismissOtherPopovers(keeping: .save)
                 showsSavePopover = true
@@ -73,7 +62,7 @@ struct MainWindowReaderToolbar: CustomizableToolbarContent {
             }
         }
 
-        ToolbarItem(id: MainWindowReaderToolbarIdentifier.readState) {
+        ToolbarItem {
             Button(
                 article?.isRead == true ? "Mark as Unread" : "Mark as Read",
                 systemImage: article?.isRead == true ? "checkmark.circle.fill" : "circle"
@@ -84,7 +73,7 @@ struct MainWindowReaderToolbar: CustomizableToolbarContent {
             .disabled(article == nil)
         }
 
-        ToolbarItem(id: MainWindowReaderToolbarIdentifier.find) {
+        ToolbarItem {
             Button("Find in Page", systemImage: "text.magnifyingglass") {
                 appState.presentFindOnPage()
             }
@@ -93,7 +82,7 @@ struct MainWindowReaderToolbar: CustomizableToolbarContent {
             .accessibilityIdentifier("reader-find-in-page")
         }
 
-        ToolbarItem(id: MainWindowReaderToolbarIdentifier.style) {
+        ToolbarItem {
             Button("Reader Style", systemImage: "textformat.size") {
                 dismissOtherPopovers(keeping: .style)
                 showsReaderStylePopover = true
@@ -105,7 +94,7 @@ struct MainWindowReaderToolbar: CustomizableToolbarContent {
             }
         }
 
-        ToolbarItem(id: MainWindowReaderToolbarIdentifier.pageViews) {
+        ToolbarItem {
             Button("Page Views", systemImage: "chart.xyaxis.line") {
                 dismissOtherPopovers(keeping: .pageViews)
                 showsPageViewsPopover = true
@@ -122,9 +111,7 @@ struct MainWindowReaderToolbar: CustomizableToolbarContent {
             }
         }
 
-        ToolbarSpacer(.flexible)
-
-        ToolbarItem(id: MainWindowReaderToolbarIdentifier.openInBrowser) {
+        ToolbarItem {
             Button("Open in Browser", systemImage: "safari") {
                 if let article {
                     openURL(article.url)
@@ -134,7 +121,7 @@ struct MainWindowReaderToolbar: CustomizableToolbarContent {
             .disabled(article == nil)
         }
 
-        ToolbarItem(id: MainWindowReaderToolbarIdentifier.share) {
+        ToolbarItem {
             if let article {
                 ShareLink(item: article.url) {
                     SwiftUI.Label("Share", systemImage: "square.and.arrow.up")
@@ -147,7 +134,7 @@ struct MainWindowReaderToolbar: CustomizableToolbarContent {
             }
         }
 
-        ToolbarItem(id: MainWindowReaderToolbarIdentifier.inspector) {
+        ToolbarItem {
             Button(
                 appState.inspectorVisible ? "Hide Inspector" : "Show Inspector",
                 systemImage: "sidebar.trailing"
