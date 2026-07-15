@@ -347,7 +347,7 @@ struct BetaReadinessRegressionTests {
         let contents = sourceSection(
             inspectorSource,
             startingAt: "private var tableOfContentsPane",
-            endingBefore: "private var tableOfContentsSelection"
+            endingBefore: "private var tableOfContentsSection"
         )
 
         #expect(infoContent.contains("VSplitView"))
@@ -356,10 +356,13 @@ struct BetaReadinessRegressionTests {
         #expect(!infoContent.contains("ScrollView"))
         #expect(details.contains("ScrollView {"))
         #expect(details.contains("LazyVStack"))
-        #expect(contents.contains("List(selection: tableOfContentsSelection)"))
-        #expect(contents.contains("Text(\"Contents\")"))
-        #expect(contents.contains(".listStyle(.plain)"))
-        #expect(!inspectorSource.contains("Image(systemName: \"chevron.right\")"))
+        #expect(contents.contains("ScrollViewReader"))
+        #expect(contents.contains("ScrollView {"))
+        #expect(contents.contains("tableOfContentsSection"))
+        #expect(inspectorSource.contains("Text(\"Contents\")"))
+        #expect(inspectorSource.contains("LazyVStack"))
+        #expect(inspectorSource.contains("Image(systemName: \"chevron.right\")"))
+        #expect(inspectorSource.contains(".buttonStyle(.plain)"))
         #expect(!inspectorSource.contains("Form {"))
         #expect(!inspectorSource.contains("DisclosureGroup(\"Contents\""))
         #expect(!inspectorSource.contains("standardTOCTransition"))

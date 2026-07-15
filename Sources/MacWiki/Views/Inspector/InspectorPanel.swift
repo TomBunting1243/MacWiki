@@ -224,71 +224,96 @@ struct InspectorPanel: View {
     }
 
     private var tableOfContentsPane: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        ScrollViewReader { proxy in
+            ScrollView {
+                tableOfContentsSection
+                    .padding(14)
+            }
+            .onChange(of: appState.currentVisibleTableOfContentsSectionId) { _, newID in
+                guard let newID else { return }
+                withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2)) {
+                    proxy.scrollTo(newID, anchor: .center)
+                }
+            }
+        }
+        .accessibilityLabel("Article contents")
+    }
+
+    private var tableOfContentsSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
             Text("Contents")
                 .font(MacWikiTypography.inspectorSectionLabel)
                 .foregroundStyle(.primary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
 
-            Divider()
-
-            if appState.currentArticleTableOfContents.isEmpty {
-                ContentUnavailableView(
-                    "No Contents",
-                    systemImage: "list.bullet.indent",
-                    description: Text("This article has no section headings.")
-                )
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                List(selection: tableOfContentsSelection) {
-                    ForEach(appState.currentArticleTableOfContents, id: \.id) { item in
-                        tableOfContentsRow(item: item)
-                            .tag(item.id)
-                    }
+            LazyVStack(alignment: .leading, spacing: 4) {
+                ForEach(appState.currentArticleTableOfContents, id: \.id) { item in
+                    tableOfContentsRow(item: item)
                 }
-                .listStyle(.plain)
-                .accessibilityLabel("Article contents")
             }
+        }
+        .padding(12)
+        .background {
+            inspectorSectionBackground()
         }
     }
 
-    private var tableOfContentsSelection: Binding<String?> {
-        Binding(
-            get: { appState.currentVisibleTableOfContentsSectionId },
-            set: { newID in
-                guard let newID else { return }
-                appState.pendingTableOfContentsScrollTarget = newID
-                appState.currentVisibleTableOfContentsSectionId = newID
-            }
-        )
-    }
-
     private func tableOfContentsRow(item: ArticleTableOfContentsItem) -> some View {
-        let depth = max(item.level - 2, 0)
+        let isActive = appState.currentVisibleTableOfContentsSectionId == item.id
+        let indent = CGFloat(max(item.level - 2, 0)) * 14
 
-        return Text(item.title)
-            .font(
-                depth == 0
-                    ? .callout.weight(.medium)
-                    : MacWikiTypography.inspectorTOCItem
+        return Button {
+            appState.pendingTableOfContentsScrollTarget = item.id
+            appState.currentVisibleTableOfContentsSectionId = item.id
+        } label: {
+            HStack(spacing: 6) {
+                if item.level > 2 {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 8, weight: .semibold))
+                        .foregroundStyle(
+                            isActive
+                                ? AnyShapeStyle(SidebarRowSelectionVisuals.tint)
+                                : AnyShapeStyle(.tertiary)
+                        )
+                }
+
+                Text(item.title)
+                    .font(isActive ? MacWikiTypography.inspectorTOCItemActive : MacWikiTypography.inspectorTOCItem)
+                    .foregroundStyle(
+                        isActive
+                            ? AnyShapeStyle(SidebarRowSelectionVisuals.tint)
+                            : AnyShapeStyle(.secondary)
+                    )
+                    .contentTransition(.interpolate)
+                    .lineLimit(1)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.leading, indent)
+            .padding(.vertical, 4)
+            .padding(.horizontal, 6)
+            .background(
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .fill(SidebarRowSelectionVisuals.tint.opacity(isActive ? 0.14 : 0))
             )
-            .foregroundStyle(depth == 0 ? .primary : .secondary)
-            .lineLimit(1)
-            .padding(.leading, CGFloat(depth) * 14)
-            .padding(.vertical, depth == 0 ? 2 : 1)
-            .listRowInsets(
-                EdgeInsets(
-                    top: 2,
-                    leading: 12,
-                    bottom: 2,
-                    trailing: 12
-                )
+            .overlay(
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .strokeBorder(SidebarRowSelectionVisuals.tint.opacity(0.28), lineWidth: 0.8)
+                    .opacity(isActive ? 1 : 0)
             )
-            .listRowSeparator(.hidden)
-            .help(item.title)
-            .accessibilityLabel(item.title)
+            .scaleEffect(reduceMotion ? 1 : (isActive ? 1.015 : 1), anchor: .leading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .animation(
+            reduceMotion
+                ? nil
+                : .interactiveSpring(
+                    response: 0.22,
+                    dampingFraction: 0.74,
+                    blendDuration: 0.06
+                ),
+            value: isActive
+        )
+        .id(item.id)
     }
 
     private var metadataSection: some View {
