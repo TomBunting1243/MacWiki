@@ -89,8 +89,9 @@ struct NativeDesignRegressionTests {
         #expect(inspectorModes.contains("showsSpinner || toast.isSuccess ? .medium : .high"))
         #expect(inspectorPanel.contains("appState.isHighlightRehydrateInProgress"))
         #expect(inspectorPanel.contains("result.success ? \"Rehydrate succeeded\" : \"Rehydrate failed\""))
-        #expect(inspectorPanel.contains("private var standardTOCTransition: AnyTransition"))
-        #expect(inspectorPanel.contains("reduceMotion\n            ? .opacity\n            : .asymmetric("))
+        #expect(inspectorPanel.contains("Form {"))
+        #expect(inspectorPanel.contains("DisclosureGroup(\"Contents\""))
+        #expect(!inspectorPanel.contains("private var standardTOCTransition: AnyTransition"))
     }
 
     @Test func readerTabsAndFindBarHonorWindowAndAccessibilityPersonalization() throws {

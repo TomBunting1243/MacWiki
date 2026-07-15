@@ -63,7 +63,6 @@ struct ReaderInspectorSurfacePolicyTests {
             "Sources/MacWiki/Views/Inspector/ReferenceListView.swift",
             "Sources/MacWiki/Views/Inspector/ReferenceExportBarView.swift",
             "Sources/MacWiki/Views/Inspector/ReferenceRowView.swift",
-            "Sources/MacWiki/Views/Inspector/InspectorTagStatusBox.swift",
             "Sources/MacWiki/Views/Components/HighlightListView.swift",
             "Sources/MacWiki/Views/Components/HighlightRowView.swift"
         ]

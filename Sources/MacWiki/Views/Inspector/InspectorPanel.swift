@@ -17,6 +17,7 @@ struct InspectorPanel: View {
     @State private var showStaleHighlights = true
     @State private var showArchivedHighlights = false
     @State private var selectedReferenceIDs: Set<String> = []
+    @State private var isContentsExpanded = true
 
     init(
         currentArticle: Article?
@@ -35,32 +36,6 @@ struct InspectorPanel: View {
                 state.articleURLString == scopedURLString
             }
         )
-    }
-
-    private enum InspectorLayout {
-        static let contentTopPadding: CGFloat = 8
-        static let sectionSpacing: CGFloat = 14
-        static let sectionCornerRadius: CGFloat = 12
-        static let metadataTransitionAnimation = Animation.easeOut(duration: 0.22)
-    }
-
-    private var standardTOCTransition: AnyTransition {
-        reduceMotion
-            ? .opacity
-            : .asymmetric(
-                insertion: .opacity
-                    .combined(with: .move(edge: .bottom))
-                    .combined(with: .scale(scale: 0.985, anchor: .top)),
-                removal: .opacity
-                    .combined(with: .move(edge: .bottom))
-                    .combined(with: .scale(scale: 0.985, anchor: .top))
-            )
-    }
-
-    private var metadataSectionTransition: AnyTransition {
-        reduceMotion
-            ? .opacity
-            : .opacity.combined(with: .scale(scale: 0.992, anchor: .top))
     }
 
     private var toastTransition: AnyTransition {
@@ -91,14 +66,6 @@ struct InspectorPanel: View {
         )
     }
 
-    private var sectionFillOpacity: Double {
-        colorScheme == .dark ? 0.22 : 0.30
-    }
-
-    private var sectionStrokeOpacity: Double {
-        colorScheme == .dark ? 0.10 : 0.08
-    }
-
     var body: some View {
         @Bindable var appState = appState
 
@@ -107,7 +74,6 @@ struct InspectorPanel: View {
 
             inspectorContent
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                .padding(.top, InspectorLayout.contentTopPadding)
                 .transaction { transaction in
                     transaction.animation = nil
                 }
@@ -177,33 +143,53 @@ struct InspectorPanel: View {
         Group {
             if let article = appState.currentArticle {
                 ScrollViewReader { proxy in
-                    ScrollView {
-                        LazyVStack(alignment: .leading, spacing: InspectorLayout.sectionSpacing) {
-                            infoTopModules(article)
+                    Form {
+                        Section("Article") {
+                            articleSummaryHeader(article)
+                        }
 
-                            if !appState.currentArticleMetadata.isEmpty {
-                                metadataSection
-                                    .transition(metadataSectionTransition)
+                        Section("Organization") {
+                            LabeledContent("Label") {
+                                InspectorLabelSection(
+                                    article: article,
+                                    allLabels: allLabels.map(InspectorLabelSnapshot.init)
+                                )
                             }
 
-                            if !appState.currentArticleTableOfContents.isEmpty {
-                                tableOfContentsSection
-                                    .transition(standardTOCTransition)
+                            InspectorTagStatusBox(
+                                article: article,
+                                tags: displayedArticleSnapshot.tags,
+                                allTags: allTags.map(InspectorTagSnapshot.init),
+                                highlightIDs: displayedArticleSnapshot.highlights.map(\.id)
+                            )
+                        }
+
+                        if !appState.currentArticleMetadata.isEmpty {
+                            Section("Metadata") {
+                                metadataContent
                             }
                         }
-                        .padding(.horizontal, 14)
-                        .padding(.top, 12)
-                        .padding(.bottom, 14)
+
+                        if !appState.currentArticleTableOfContents.isEmpty {
+                            Section {
+                                DisclosureGroup("Contents", isExpanded: $isContentsExpanded) {
+                                    ForEach(appState.currentArticleTableOfContents, id: \.id) { item in
+                                        tableOfContentsRow(item: item)
+                                    }
+                                }
+                            }
+                        }
                     }
+                    .formStyle(.grouped)
                     .onChange(of: appState.currentVisibleTableOfContentsSectionId) { _, newID in
                         guard let newID else { return }
+                        isContentsExpanded = true
                         withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2)) {
                             proxy.scrollTo(newID, anchor: .center)
                         }
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                .animation(reduceMotion ? nil : InspectorLayout.metadataTransitionAnimation, value: appState.currentArticleMetadata.isEmpty)
             } else {
                 ColumnEmptyStateView(
                     title: "No Article",
@@ -216,44 +202,6 @@ struct InspectorPanel: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
-    private func infoTopModules(_ article: Article) -> some View {
-        VStack(alignment: .leading, spacing: InspectorLayout.sectionSpacing) {
-            articleSummaryHeader(article)
-
-            InspectorLabelSection(
-                article: article,
-                allLabels: allLabels.map(InspectorLabelSnapshot.init)
-            )
-
-            InspectorTagStatusBox(
-                article: article,
-                tags: displayedArticleSnapshot.tags,
-                allTags: allTags.map(InspectorTagSnapshot.init),
-                highlightIDs: displayedArticleSnapshot.highlights.map(\.id)
-            )
-        }
-    }
-
-    private var tableOfContentsSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 10) {
-                Text("Contents")
-                    .font(MacWikiTypography.inspectorSectionLabel)
-                    .foregroundStyle(.primary)
-            }
-
-            LazyVStack(alignment: .leading, spacing: 4) {
-                ForEach(appState.currentArticleTableOfContents, id: \.id) { item in
-                    tableOfContentsRow(item: item)
-                }
-            }
-        }
-        .padding(12)
-        .background {
-            inspectorSectionBackground()
-        }
-    }
-
     private func tableOfContentsRow(item: ArticleTableOfContentsItem) -> some View {
         let isActive = appState.currentVisibleTableOfContentsSectionId == item.id
         let indent = CGFloat(max(item.level - 2, 0)) * 14
@@ -262,70 +210,26 @@ struct InspectorPanel: View {
             appState.pendingTableOfContentsScrollTarget = item.id
             appState.currentVisibleTableOfContentsSectionId = item.id
         } label: {
-            HStack(spacing: 6) {
-                if item.level > 2 {
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 8, weight: .semibold))
-                        .foregroundStyle(
-                            isActive
-                                ? AnyShapeStyle(SidebarRowSelectionVisuals.tint)
-                                : AnyShapeStyle(.tertiary)
-                        )
-                }
-
-                Text(item.title)
-                    .font(isActive ? MacWikiTypography.inspectorTOCItemActive : MacWikiTypography.inspectorTOCItem)
+            HStack(spacing: 8) {
+                Image(systemName: isActive ? "circle.fill" : "circle")
+                    .imageScale(.small)
                     .foregroundStyle(
                         isActive
-                            ? AnyShapeStyle(SidebarRowSelectionVisuals.tint)
-                            : AnyShapeStyle(.secondary)
+                            ? AnyShapeStyle(.tint)
+                            : AnyShapeStyle(.tertiary)
                     )
-                    .contentTransition(.interpolate)
-                    .lineLimit(1)
+
+                Text(item.title)
+                    .font(isActive ? .body.weight(.semibold) : .body)
+                    .foregroundStyle(isActive ? .primary : .secondary)
+                    .lineLimit(2)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.leading, indent)
-            .padding(.vertical, 4)
-            .padding(.horizontal, 6)
-            .background(
-                RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .fill(SidebarRowSelectionVisuals.tint.opacity(isActive ? 0.14 : 0))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .strokeBorder(SidebarRowSelectionVisuals.tint.opacity(0.28), lineWidth: 0.8)
-                    .opacity(isActive ? 1 : 0)
-            )
-            .scaleEffect(reduceMotion ? 1 : (isActive ? 1.015 : 1), anchor: .leading)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .animation(
-            reduceMotion
-                ? nil
-                : .interactiveSpring(
-                    response: 0.22,
-                    dampingFraction: 0.74,
-                    blendDuration: 0.06
-                ),
-            value: isActive
-        )
         .id(item.id)
-    }
-
-    private var metadataSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Metadata")
-                .font(MacWikiTypography.inspectorSectionLabel)
-                .foregroundStyle(.primary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-            metadataContent
-        }
-        .padding(12)
-        .background {
-            inspectorSectionBackground()
-        }
     }
 
     private var metadataContent: some View {
@@ -399,15 +303,6 @@ struct InspectorPanel: View {
                 }
             }
         }
-    }
-
-    private func inspectorSectionBackground() -> some View {
-        RoundedRectangle(cornerRadius: InspectorLayout.sectionCornerRadius, style: .continuous)
-            .fill(.quaternary.opacity(sectionFillOpacity))
-            .overlay {
-                RoundedRectangle(cornerRadius: InspectorLayout.sectionCornerRadius, style: .continuous)
-                    .strokeBorder(Color.primary.opacity(sectionStrokeOpacity), lineWidth: 0.8)
-            }
     }
 
     @MainActor

@@ -335,12 +335,17 @@ struct BetaReadinessRegressionTests {
         let infoContent = sourceSection(
             inspectorSource,
             startingAt: "private var infoContent",
-            endingBefore: "private func infoTopModules"
+            endingBefore: "private func tableOfContentsRow"
         )
 
         #expect(infoContent.contains("ScrollViewReader"))
-        #expect(infoContent.contains("ScrollView {"))
-        #expect(infoContent.contains("LazyVStack"))
+        #expect(infoContent.contains("Form {"))
+        #expect(infoContent.contains("Section(\"Article\")"))
+        #expect(infoContent.contains("Section(\"Organization\")"))
+        #expect(infoContent.contains("LabeledContent(\"Label\")"))
+        #expect(infoContent.contains("DisclosureGroup(\"Contents\""))
+        #expect(!infoContent.contains("ScrollView {"))
+        #expect(!infoContent.contains("LazyVStack"))
         #expect(!infoContent.contains(".clipped()"))
         #expect(!inspectorSource.contains("SectionResizeHandle"))
         #expect(!inspectorSource.contains("infoSplitFallbackBudget"))
