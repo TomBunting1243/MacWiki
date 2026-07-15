@@ -27,7 +27,7 @@ struct WorkspaceArchitectureRegressionTests {
 
         #expect(shell.contains("sidebarRevision: workspaceAppearanceRevision"))
         #expect(shell.contains("directoryRevision: directoryContentRevision"))
-        #expect(shell.contains("readerRevision: workspaceAppearanceRevision"))
+        #expect(shell.contains("readerRevision: readerPresentationRevision"))
         #expect(shell.contains("inspectorRevision: workspaceAppearanceRevision"))
         #expect(split.contains("lastSidebarRevision != sidebarRevision"))
         #expect(split.contains("lastDirectoryRevision != directoryRevision"))

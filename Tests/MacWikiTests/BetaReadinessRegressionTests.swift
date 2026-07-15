@@ -615,7 +615,7 @@ struct BetaReadinessRegressionTests {
         #expect(shellSource.contains("NativeWorkspaceSplitView("))
         #expect(shellSource.contains("sidebarRevision: workspaceAppearanceRevision"))
         #expect(shellSource.contains("directoryRevision: directoryContentRevision"))
-        #expect(shellSource.contains("readerRevision: workspaceAppearanceRevision"))
+        #expect(shellSource.contains("readerRevision: readerPresentationRevision"))
         #expect(shellSource.contains("inspectorRevision: workspaceAppearanceRevision"))
         #expect(nativeSplitSource.contains("lastDirectoryRevision"))
         #expect(nativeSplitSource.contains("lastReaderRevision"))

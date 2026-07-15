@@ -67,7 +67,7 @@ private struct MainWorkspaceShell: View {
             initialInspectorWidth: CGFloat(inspectorWidth),
             sidebarRevision: workspaceAppearanceRevision,
             directoryRevision: directoryContentRevision,
-            readerRevision: workspaceAppearanceRevision,
+            readerRevision: readerPresentationRevision,
             inspectorRevision: workspaceAppearanceRevision,
             readerChromeVisible: !appState.isWikiHopNavigationLocked,
             sidebar: workspaceEnvironment(
@@ -139,6 +139,18 @@ private struct MainWorkspaceShell: View {
             accessibilityPersonalization.reduceTransparency ? "opaque" : "transparent",
             accessibilityPersonalization.differentiateWithoutColor ? "differentiated" : "color",
             accessibilityPersonalization.colorSchemeContrast == .increased ? "high-contrast" : "standard-contrast"
+        ].joined(separator: "|")
+    }
+
+    /// The Reader and its controls live in separate native hosting controllers.
+    /// Include cross-host presentation signals in the bridge revision so an
+    /// accessory action invalidates Reader chrome without changing the stable
+    /// reader/WebView identity.
+    private var readerPresentationRevision: String {
+        [
+            workspaceAppearanceRevision,
+            appState.showFindOnPage ? "find-visible" : "find-hidden",
+            appState.findOnPageFocusRequestID?.uuidString ?? ""
         ].joined(separator: "|")
     }
 }

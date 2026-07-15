@@ -399,6 +399,14 @@ do {
     } else {
         throw JourneyError.missing("The reader accessory omitted its List Contents control.")
     }
+    let listsControlReport: String
+    if button(in: initialReader, label: "Hide Lists") != nil {
+        listsControlReport = "Hide Lists"
+    } else if button(in: initialReader, label: "Show Lists") != nil {
+        listsControlReport = "Show Lists"
+    } else {
+        throw JourneyError.missing("The reader accessory omitted its Lists control.")
+    }
     if modeGroup == nil {
         guard wait(condition: {
             guard let reader = try? refreshReaderChrome(),
@@ -423,7 +431,7 @@ do {
     trace("window, reader accessory, and inspector ready")
 
     let expectedReaderControls = [
-        "Hide Lists", "Back", "Forward", "Search Wikipedia", "Save Article",
+        "Back", "Forward", "Search Wikipedia", "Save Article",
         "Mark as Read", "Find in Page", "Reader Style",
         "Page Views", "Open in Browser", "Share", "Hide Inspector"
     ]
@@ -478,7 +486,7 @@ do {
         throw JourneyError.missing("Reader accessory omitted accessible controls: \(missing.joined(separator: ", "))")
     }
 
-    let reportedReaderControls = [listContentsControlReport] + expectedReaderControls.map { label in
+    let reportedReaderControls = [listsControlReport, listContentsControlReport] + expectedReaderControls.map { label in
         menuReaderControls.contains(label) ? "\(label) (More menu)" : label
     }
     trace("reader accessory contract verified")
@@ -624,6 +632,13 @@ do {
         ).count == 1 &&
             button(in: reader, label: "Done") != nil
     }) else {
+        if traceEnabled, let reader = readerPane(in: contentWindow) {
+            let summary = elements(in: reader, limit: 700).map { element in
+                let role = stringAttribute(kAXRoleAttribute as CFString, from: element)
+                return "\(role)|\(accessibilityLabels(of: element).joined(separator: ","))"
+            }
+            trace("find AX: \(summary)")
+        }
         throw JourneyError.missing("Reader did not expose exactly one Find field and its Done action.")
     }
     let requiredFindActions = ["Previous", "Next", "Done"]

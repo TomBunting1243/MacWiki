@@ -20,6 +20,9 @@ struct ReaderTopChromeLayoutTests {
         #expect(bridge.contains("hostingController.sizingOptions = [.intrinsicContentSize, .preferredContentSize]"))
         #expect(bridge.contains("lastRequestedReaderChromeVisible"))
         #expect(shell.contains("readerChromeVisible: !appState.isWikiHopNavigationLocked"))
+        #expect(shell.contains("readerRevision: readerPresentationRevision"))
+        #expect(shell.contains("appState.showFindOnPage ? \"find-visible\" : \"find-hidden\""))
+        #expect(shell.contains("appState.findOnPageFocusRequestID?.uuidString"))
         #expect(!workspace.contains("window.toolbar"))
         #expect(!shell.contains("ReaderToolbarEnvironment("))
     }
