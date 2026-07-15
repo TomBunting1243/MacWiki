@@ -248,7 +248,7 @@ struct InspectorPanel: View {
                             .tag(item.id)
                     }
                 }
-                .listStyle(.sidebar)
+                .listStyle(.plain)
                 .accessibilityLabel("Article contents")
             }
         }
@@ -266,19 +266,29 @@ struct InspectorPanel: View {
     }
 
     private func tableOfContentsRow(item: ArticleTableOfContentsItem) -> some View {
-        HStack(spacing: 6) {
-            if item.level > 2 {
-                Image(systemName: "chevron.right")
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(.tertiary)
-            }
+        let depth = max(item.level - 2, 0)
 
-            Text(item.title)
-                .font(MacWikiTypography.inspectorTOCItem)
-                .lineLimit(1)
-        }
-        .padding(.leading, CGFloat(max(item.level - 2, 0)) * 12)
-        .accessibilityLabel(item.title)
+        return Text(item.title)
+            .font(
+                depth == 0
+                    ? .callout.weight(.medium)
+                    : MacWikiTypography.inspectorTOCItem
+            )
+            .foregroundStyle(depth == 0 ? .primary : .secondary)
+            .lineLimit(1)
+            .padding(.leading, CGFloat(depth) * 14)
+            .padding(.vertical, depth == 0 ? 2 : 1)
+            .listRowInsets(
+                EdgeInsets(
+                    top: 2,
+                    leading: 12,
+                    bottom: 2,
+                    trailing: 12
+                )
+            )
+            .listRowSeparator(.hidden)
+            .help(item.title)
+            .accessibilityLabel(item.title)
     }
 
     private var metadataSection: some View {

@@ -91,6 +91,7 @@ struct NativeDesignRegressionTests {
         #expect(inspectorPanel.contains("result.success ? \"Rehydrate succeeded\" : \"Rehydrate failed\""))
         #expect(inspectorPanel.contains("VSplitView"))
         #expect(inspectorPanel.contains("List(selection: tableOfContentsSelection)"))
+        #expect(inspectorPanel.contains(".listStyle(.plain)"))
         #expect(inspectorPanel.contains(".frame(minHeight: InspectorLayout.contentsMinimumHeight)"))
         #expect(!inspectorPanel.contains("standardTOCTransition"))
         #expect(!inspectorPanel.contains("Form {"))

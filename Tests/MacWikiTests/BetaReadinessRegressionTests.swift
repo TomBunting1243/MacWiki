@@ -358,6 +358,8 @@ struct BetaReadinessRegressionTests {
         #expect(details.contains("LazyVStack"))
         #expect(contents.contains("List(selection: tableOfContentsSelection)"))
         #expect(contents.contains("Text(\"Contents\")"))
+        #expect(contents.contains(".listStyle(.plain)"))
+        #expect(!inspectorSource.contains("Image(systemName: \"chevron.right\")"))
         #expect(!inspectorSource.contains("Form {"))
         #expect(!inspectorSource.contains("DisclosureGroup(\"Contents\""))
         #expect(!inspectorSource.contains("standardTOCTransition"))
