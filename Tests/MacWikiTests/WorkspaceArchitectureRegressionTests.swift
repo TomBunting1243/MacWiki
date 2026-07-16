@@ -19,7 +19,7 @@ struct WorkspaceArchitectureRegressionTests {
         #expect(contextMenu.contains("workspaceOpenWindowHandler?.open(windowArticle) != true"))
     }
 
-    @Test func mainWorkspaceUsesOneAppKitNavigationSplitAndTheStandardInspector() throws {
+    @Test func mainWorkspaceUsesOneFourPaneAppKitSplitWithAFullHeightInspector() throws {
         let shell = try source("Sources/MacWiki/Views/Shared/MainWindowShell.swift")
         let bridge = try source("Sources/MacWiki/Views/Shared/AppKitWorkspaceNavigationSplitView.swift")
 
@@ -29,9 +29,14 @@ struct WorkspaceArchitectureRegressionTests {
         #expect(bridge.contains("final class AppKitWorkspaceNavigationController: NSSplitViewController"))
         #expect(bridge.contains("NSSplitViewItem(sidebarWithViewController:"))
         #expect(bridge.contains("NSSplitViewItem(contentListWithViewController:"))
-        #expect(shell.contains(".inspector(isPresented: $appState.inspectorVisible)"))
-        #expect(shell.components(separatedBy: ".persistedColumnWidth(").count - 1 == 1)
-        #expect(shell.contains(".inspectorColumnWidth("))
+        #expect(bridge.contains("NSSplitViewItem(inspectorWithViewController:"))
+        #expect(bridge.contains("inspectorItem.allowsFullHeightLayout = true"))
+        #expect(bridge.contains("inspectorItem.canCollapseFromWindowResize = false"))
+        #expect(shell.contains("inspectorVisible: $appState.inspectorVisible"))
+        #expect(shell.contains("inspector: workspaceEnvironment("))
+        #expect(!shell.contains(".inspector(isPresented:"))
+        #expect(!shell.contains(".inspectorColumnWidth("))
+        #expect(!shell.contains(".persistedColumnWidth("))
         #expect(!shell.contains(".toolbar(removing: .sidebarToggle)"))
         #expect(shell.contains(".toolbar {"))
     }
@@ -40,7 +45,7 @@ struct WorkspaceArchitectureRegressionTests {
         let shell = try source("Sources/MacWiki/Views/Shared/MainWindowShell.swift")
         let bridge = try source("Sources/MacWiki/Views/Shared/AppKitWorkspaceNavigationSplitView.swift")
         let detail = try #require(shell.range(of: "reader: workspaceEnvironment("))
-        let inspector = try #require(shell.range(of: ".inspector(isPresented:"))
+        let inspector = try #require(shell.range(of: "inspector: workspaceEnvironment("))
         let detailSource = String(shell[detail.lowerBound..<inspector.lowerBound])
         let tabs = try #require(detailSource.range(of: "TabBarView("))
         let reader = try #require(detailSource.range(of: "ReaderColumnView()"))
@@ -50,6 +55,23 @@ struct WorkspaceArchitectureRegressionTests {
         #expect(bridge.contains("readerController = NSHostingController("))
         #expect(bridge.contains("readerController.sizingOptions = []"))
         #expect(!bridge.contains("readerController.rootView ="))
+    }
+
+    @Test func mainAndArticleWindowsKeepTheirDistinctInspectorPolicies() throws {
+        let shell = try source("Sources/MacWiki/Views/Shared/MainWindowShell.swift")
+        let articleWindow = try source("Sources/MacWiki/Views/Shared/ArticleWindowRootView.swift")
+        let policy = try source("Sources/MacWiki/Views/Shared/FixedWindowToolbarPolicy.swift")
+
+        #expect(!shell.contains(".inspector(isPresented:"))
+        #expect(shell.contains("FixedWindowToolbarPolicy()"))
+        #expect(articleWindow.contains(".inspector(isPresented: $appState.inspectorVisible)"))
+        #expect(articleWindow.contains(".inspectorColumnWidth("))
+        #expect(articleWindow.contains("FixedWindowToolbarPolicy()"))
+        #expect(policy.contains("NSToolbarItem.Identifier.toggleInspector"))
+        #expect(policy.contains("NSToolbarItem.Identifier.inspectorTrackingSeparator"))
+        let toggleIndex = try #require(policy.range(of: "toolbar.insertItem(withItemIdentifier: toggle"))
+        let separatorIndex = try #require(policy.range(of: "withItemIdentifier: separator"))
+        #expect(toggleIndex.lowerBound < separatorIndex.lowerBound)
     }
 
     @Test func navigationVisibilityUsesTwoIndependentStoredBindings() throws {

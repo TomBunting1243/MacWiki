@@ -5,39 +5,52 @@ import SwiftUI
 struct WorkspaceNavigationPaneVisibility: Equatable, Sendable {
     let listsVisible: Bool
     let directoryVisible: Bool
+    let inspectorVisible: Bool
 }
 
-/// A narrow SwiftUI/AppKit boundary for the two independently collapsible
-/// navigation panes. SwiftUI owns pane content and the Inspector; AppKit owns
-/// the semantic sidebar/content-list split items, dividers, and collapse
-/// animations. The Reader remains mounted in one stable hosting controller.
-struct AppKitWorkspaceNavigationSplitView<Lists: View, Directory: View, Reader: View>:
+/// A narrow SwiftUI/AppKit boundary for the three independently collapsible
+/// auxiliary panes. SwiftUI owns pane content; AppKit owns the semantic
+/// sidebar, content-list, Reader, and full-height Inspector split items.
+/// The Reader remains mounted in one stable hosting controller.
+struct AppKitWorkspaceNavigationSplitView<
+    Lists: View,
+    Directory: View,
+    Reader: View,
+    Inspector: View
+>:
     NSViewControllerRepresentable
 {
     @Binding var listsVisible: Bool
     @Binding var directoryVisible: Bool
+    @Binding var inspectorVisible: Bool
 
     let reduceMotion: Bool
     let initialListsWidth: CGFloat
     let initialDirectoryWidth: CGFloat
+    let initialInspectorWidth: CGFloat
     var widthDefaults: UserDefaults = MacWikiDefaults.current
     let listsRevision: String
     let directoryRevision: String
     let readerRevision: String
+    let inspectorRevision: String
     let lists: Lists
     let directory: Directory
     let reader: Reader
+    let inspector: Inspector
 
     func makeCoordinator() -> Coordinator {
         Coordinator(
             listsVisible: $listsVisible,
             directoryVisible: $directoryVisible,
+            inspectorVisible: $inspectorVisible,
             listsRevision: listsRevision,
             directoryRevision: directoryRevision,
             readerRevision: readerRevision,
+            inspectorRevision: inspectorRevision,
             lists: lists,
             directory: directory,
-            reader: reader
+            reader: reader,
+            inspector: inspector
         )
     }
 
@@ -46,8 +59,10 @@ struct AppKitWorkspaceNavigationSplitView<Lists: View, Directory: View, Reader: 
             listsController: context.coordinator.listsController,
             directoryController: context.coordinator.directoryController,
             readerController: context.coordinator.readerController,
+            inspectorController: context.coordinator.inspectorController,
             initialListsWidth: initialListsWidth,
             initialDirectoryWidth: initialDirectoryWidth,
+            initialInspectorWidth: initialInspectorWidth,
             widthDefaults: widthDefaults
         )
         controller.onPaneVisibilityChange = { [weak coordinator = context.coordinator] visibility in
@@ -57,6 +72,7 @@ struct AppKitWorkspaceNavigationSplitView<Lists: View, Directory: View, Reader: 
         controller.setPaneVisibility(
             listsVisible: listsVisible,
             directoryVisible: directoryVisible,
+            inspectorVisible: inspectorVisible,
             animated: false
         )
         return controller
@@ -68,20 +84,24 @@ struct AppKitWorkspaceNavigationSplitView<Lists: View, Directory: View, Reader: 
     ) {
         context.coordinator.updateBindings(
             listsVisible: $listsVisible,
-            directoryVisible: $directoryVisible
+            directoryVisible: $directoryVisible,
+            inspectorVisible: $inspectorVisible
         )
         context.coordinator.updateContent(
             lists: lists,
             directory: directory,
             reader: reader,
+            inspector: inspector,
             listsRevision: listsRevision,
             directoryRevision: directoryRevision,
-            readerRevision: readerRevision
+            readerRevision: readerRevision,
+            inspectorRevision: inspectorRevision
         )
         context.coordinator.requestVisibility(
             WorkspaceNavigationPaneVisibility(
                 listsVisible: listsVisible,
-                directoryVisible: directoryVisible
+                directoryVisible: directoryVisible,
+                inspectorVisible: inspectorVisible
             ),
             controller: controller,
             animated: !reduceMotion
@@ -115,15 +135,19 @@ struct AppKitWorkspaceNavigationSplitView<Lists: View, Directory: View, Reader: 
         fileprivate let listsController: NSHostingController<WorkspaceHostingRoot<Lists>>
         fileprivate let directoryController: NSHostingController<WorkspaceHostingRoot<Directory>>
         fileprivate let readerController: NSHostingController<WorkspaceHostingRoot<Reader>>
+        fileprivate let inspectorController: NSHostingController<WorkspaceHostingRoot<Inspector>>
 
         private let listsBox: WorkspaceHostingBox<Lists>
         private let directoryBox: WorkspaceHostingBox<Directory>
         private let readerBox: WorkspaceHostingBox<Reader>
+        private let inspectorBox: WorkspaceHostingBox<Inspector>
         private var listsVisibility: Binding<Bool>
         private var directoryVisibility: Binding<Bool>
+        private var inspectorVisibility: Binding<Bool>
         private var lastListsRevision: String
         private var lastDirectoryRevision: String
         private var lastReaderRevision: String
+        private var lastInspectorRevision: String
         private var lastRequestedVisibility: WorkspaceNavigationPaneVisibility
         private var contentUpdate: Task<Void, Never>?
         private var visibilityUpdate: Task<Void, Never>?
@@ -132,57 +156,72 @@ struct AppKitWorkspaceNavigationSplitView<Lists: View, Directory: View, Reader: 
         init(
             listsVisible: Binding<Bool>,
             directoryVisible: Binding<Bool>,
+            inspectorVisible: Binding<Bool>,
             listsRevision: String,
             directoryRevision: String,
             readerRevision: String,
+            inspectorRevision: String,
             lists: Lists,
             directory: Directory,
-            reader: Reader
+            reader: Reader,
+            inspector: Inspector
         ) {
             listsVisibility = listsVisible
             directoryVisibility = directoryVisible
+            inspectorVisibility = inspectorVisible
             lastListsRevision = listsRevision
             lastDirectoryRevision = directoryRevision
             lastReaderRevision = readerRevision
+            lastInspectorRevision = inspectorRevision
             lastRequestedVisibility = WorkspaceNavigationPaneVisibility(
                 listsVisible: listsVisible.wrappedValue,
-                directoryVisible: directoryVisible.wrappedValue
+                directoryVisible: directoryVisible.wrappedValue,
+                inspectorVisible: inspectorVisible.wrappedValue
             )
 
             let listsBox = WorkspaceHostingBox(content: lists)
             let directoryBox = WorkspaceHostingBox(content: directory)
             let readerBox = WorkspaceHostingBox(content: reader)
+            let inspectorBox = WorkspaceHostingBox(content: inspector)
             self.listsBox = listsBox
             self.directoryBox = directoryBox
             self.readerBox = readerBox
+            self.inspectorBox = inspectorBox
             listsController = NSHostingController(rootView: WorkspaceHostingRoot(box: listsBox))
             directoryController = NSHostingController(rootView: WorkspaceHostingRoot(box: directoryBox))
             readerController = NSHostingController(rootView: WorkspaceHostingRoot(box: readerBox))
+            inspectorController = NSHostingController(rootView: WorkspaceHostingRoot(box: inspectorBox))
             listsController.sizingOptions = []
             directoryController.sizingOptions = []
             readerController.sizingOptions = []
+            inspectorController.sizingOptions = []
         }
 
         func updateBindings(
             listsVisible: Binding<Bool>,
-            directoryVisible: Binding<Bool>
+            directoryVisible: Binding<Bool>,
+            inspectorVisible: Binding<Bool>
         ) {
             listsVisibility = listsVisible
             directoryVisibility = directoryVisible
+            inspectorVisibility = inspectorVisible
         }
 
         func updateContent(
             lists: Lists,
             directory: Directory,
             reader: Reader,
+            inspector: Inspector,
             listsRevision: String,
             directoryRevision: String,
-            readerRevision: String
+            readerRevision: String,
+            inspectorRevision: String
         ) {
             let listsChanged = lastListsRevision != listsRevision
             let directoryChanged = lastDirectoryRevision != directoryRevision
             let readerChanged = lastReaderRevision != readerRevision
-            guard listsChanged || directoryChanged || readerChanged else { return }
+            let inspectorChanged = lastInspectorRevision != inspectorRevision
+            guard listsChanged || directoryChanged || readerChanged || inspectorChanged else { return }
 
             contentUpdate?.cancel()
             contentUpdate = Task { @MainActor [weak self] in
@@ -199,6 +238,10 @@ struct AppKitWorkspaceNavigationSplitView<Lists: View, Directory: View, Reader: 
                 if readerChanged {
                     lastReaderRevision = readerRevision
                     readerBox.content = reader
+                }
+                if inspectorChanged {
+                    lastInspectorRevision = inspectorRevision
+                    inspectorBox.content = inspector
                 }
             }
         }
@@ -220,6 +263,7 @@ struct AppKitWorkspaceNavigationSplitView<Lists: View, Directory: View, Reader: 
                 controller.setPaneVisibility(
                     listsVisible: visibility.listsVisible,
                     directoryVisible: visibility.directoryVisible,
+                    inspectorVisible: visibility.inspectorVisible,
                     animated: animated
                 )
             }
@@ -236,6 +280,9 @@ struct AppKitWorkspaceNavigationSplitView<Lists: View, Directory: View, Reader: 
                 }
                 if directoryVisibility.wrappedValue != visibility.directoryVisible {
                     directoryVisibility.wrappedValue = visibility.directoryVisible
+                }
+                if inspectorVisibility.wrappedValue != visibility.inspectorVisible {
+                    inspectorVisibility.wrappedValue = visibility.inspectorVisible
                 }
             }
         }
@@ -272,9 +319,9 @@ private struct WorkspaceHostingRoot<Content: View>: View {
     }
 }
 
-/// The single platform-owned navigation split. It deliberately excludes the
-/// Inspector, which remains SwiftUI's standard window Inspector so AppKit and
-/// SwiftUI never compete for the same trailing toolbar section.
+/// The single platform-owned workspace split. Semantic AppKit items give the
+/// leading Sidebar and trailing Inspector full-height native presentation
+/// while keeping the Reader controller permanently mounted between them.
 @MainActor
 final class AppKitWorkspaceNavigationController: NSSplitViewController {
     private enum WidthPersistence {
@@ -285,10 +332,11 @@ final class AppKitWorkspaceNavigationController: NSSplitViewController {
     }
 
     private enum PaneLayout {
-        /// Explicit pane restoration must never resize the window. The window
-        /// owns its readable minimum; this split minimum only keeps the Reader
-        /// mounted when both navigation panes are intentionally visible.
-        static let emergencyReaderMinimum: CGFloat = 1
+        enum LeadingPane {
+            case lists
+            case directory
+        }
+
         static let auxiliaryHoldingPriority = NSLayoutConstraint.Priority(
             rawValue: NSLayoutConstraint.Priority.defaultLow.rawValue + 1
         )
@@ -299,15 +347,19 @@ final class AppKitWorkspaceNavigationController: NSSplitViewController {
     private let listsItem: NSSplitViewItem
     private let directoryItem: NSSplitViewItem
     private let readerItem: NSSplitViewItem
+    private let inspectorItem: NSSplitViewItem
     private let initialListsWidth: CGFloat
     private let initialDirectoryWidth: CGFloat
+    private let initialInspectorWidth: CGFloat
     private let widthDefaults: UserDefaults
     private var didRestoreListsWidth = false
     private var didRestoreDirectoryWidth = false
+    private var didRestoreInspectorWidth = false
     private var requestedVisibility: WorkspaceNavigationPaneVisibility?
     private var lastReportedVisibility: WorkspaceNavigationPaneVisibility?
     private var visibilityTransitionGeneration = 0
     private var isApplyingRequestedVisibility = false
+    private var isEnforcingReadableLayout = false
     private var pendingInitialWidthRestore: Task<Void, Never>?
     private var pendingWidthPersistence: Task<Void, Never>?
 
@@ -315,13 +367,16 @@ final class AppKitWorkspaceNavigationController: NSSplitViewController {
         listsController: NSViewController,
         directoryController: NSViewController,
         readerController: NSViewController,
+        inspectorController: NSViewController,
         initialListsWidth: CGFloat,
         initialDirectoryWidth: CGFloat,
+        initialInspectorWidth: CGFloat,
         widthDefaults: UserDefaults = MacWikiDefaults.current
     ) {
         listsItem = NSSplitViewItem(sidebarWithViewController: listsController)
         directoryItem = NSSplitViewItem(contentListWithViewController: directoryController)
         readerItem = NSSplitViewItem(viewController: readerController)
+        inspectorItem = NSSplitViewItem(inspectorWithViewController: inspectorController)
         self.initialListsWidth = Self.clamped(
             initialListsWidth,
             to: MainWindowColumnWidth.sidebarRange,
@@ -331,6 +386,11 @@ final class AppKitWorkspaceNavigationController: NSSplitViewController {
             initialDirectoryWidth,
             to: MainWindowColumnWidth.directoryRange,
             fallback: AppStorageKey.MainWindow.directoryWidthDefault
+        )
+        self.initialInspectorWidth = Self.clamped(
+            initialInspectorWidth,
+            to: MainWindowColumnWidth.inspectorRange,
+            fallback: AppStorageKey.MainWindow.inspectorWidthDefault
         )
         self.widthDefaults = widthDefaults
         super.init(nibName: nil, bundle: nil)
@@ -353,7 +413,10 @@ final class AppKitWorkspaceNavigationController: NSSplitViewController {
             holdingPriority: PaneLayout.auxiliaryHoldingPriority,
             canCollapse: true
         )
-        listsItem.canCollapseFromWindowResize = false
+        // Preserve AppKit's native Sidebar behavior at compact window widths.
+        // The Inspector remains pinned, so the two leading navigation panes
+        // must be allowed to yield before the Reader is compressed.
+        listsItem.canCollapseFromWindowResize = true
         listsItem.allowsFullHeightLayout = true
         configureAuxiliaryCollapseBehavior(listsItem)
 
@@ -364,24 +427,39 @@ final class AppKitWorkspaceNavigationController: NSSplitViewController {
             holdingPriority: PaneLayout.auxiliaryHoldingPriority,
             canCollapse: true
         )
-        directoryItem.canCollapseFromWindowResize = false
+        directoryItem.canCollapseFromWindowResize = true
         configureAuxiliaryCollapseBehavior(directoryItem)
 
         configure(
             readerItem,
-            minimum: PaneLayout.emergencyReaderMinimum,
+            minimum: MainWindowLayout.minimumCompactReaderWidth,
             maximum: 10_000,
             holdingPriority: .defaultLow,
             canCollapse: false
         )
 
+        configure(
+            inspectorItem,
+            minimum: MainWindowColumnWidth.inspectorRange.lowerBound,
+            maximum: MainWindowColumnWidth.inspectorRange.upperBound,
+            holdingPriority: PaneLayout.auxiliaryHoldingPriority,
+            canCollapse: true
+        )
+        inspectorItem.canCollapseFromWindowResize = false
+        inspectorItem.allowsFullHeightLayout = true
+        configureAuxiliaryCollapseBehavior(inspectorItem)
+
         addSplitViewItem(listsItem)
         addSplitViewItem(directoryItem)
         addSplitViewItem(readerItem)
+        addSplitViewItem(inspectorItem)
     }
 
     override func viewDidLayout() {
         super.viewDidLayout()
+        if collapseLeadingPanesForReadableLayoutIfNeeded() {
+            reportUserDrivenVisibilityIfNeeded()
+        }
         scheduleInitialWidthRestore(after: WidthPersistence.restoreDelay)
     }
 
@@ -394,32 +472,40 @@ final class AppKitWorkspaceNavigationController: NSSplitViewController {
     func setPaneVisibility(
         listsVisible: Bool,
         directoryVisible: Bool,
+        inspectorVisible: Bool,
         animated: Bool
     ) {
-        let target = WorkspaceNavigationPaneVisibility(
+        let requested = WorkspaceNavigationPaneVisibility(
             listsVisible: listsVisible,
-            directoryVisible: directoryVisible
+            directoryVisible: directoryVisible,
+            inspectorVisible: inspectorVisible
         )
-        requestedVisibility = target
+        let target = readableVisibility(
+            requested,
+            preservingNewlyRevealedPaneComparedTo: currentVisibility
+        )
+        requestedVisibility = requested
         visibilityTransitionGeneration &+= 1
         let generation = visibilityTransitionGeneration
 
-        let listsChanged = listsItem.isCollapsed == listsVisible
-        let directoryChanged = directoryItem.isCollapsed == directoryVisible
-        guard listsChanged || directoryChanged else {
-            isApplyingRequestedVisibility = false
-            lastReportedVisibility = target
-            scheduleInitialWidthRestore(after: WidthPersistence.restoreDelay)
+        let listsChanged = listsItem.isCollapsed == target.listsVisible
+        let directoryChanged = directoryItem.isCollapsed == target.directoryVisible
+        let inspectorChanged = inspectorItem.isCollapsed == target.inspectorVisible
+        guard listsChanged || directoryChanged || inspectorChanged else {
+            finishVisibilityUpdate(generation: generation, animated: false)
             return
         }
 
         isApplyingRequestedVisibility = true
         let apply = {
             if listsChanged {
-                self.listsItem.isCollapsed = !listsVisible
+                self.listsItem.isCollapsed = !target.listsVisible
             }
             if directoryChanged {
-                self.directoryItem.isCollapsed = !directoryVisible
+                self.directoryItem.isCollapsed = !target.directoryVisible
+            }
+            if inspectorChanged {
+                self.inspectorItem.isCollapsed = !target.inspectorVisible
             }
         }
 
@@ -433,10 +519,13 @@ final class AppKitWorkspaceNavigationController: NSSplitViewController {
             context.duration = 0.18
             context.allowsImplicitAnimation = true
             if listsChanged {
-                listsItem.animator().isCollapsed = !listsVisible
+                listsItem.animator().isCollapsed = !target.listsVisible
             }
             if directoryChanged {
-                directoryItem.animator().isCollapsed = !directoryVisible
+                directoryItem.animator().isCollapsed = !target.directoryVisible
+            }
+            if inspectorChanged {
+                inspectorItem.animator().isCollapsed = !target.inspectorVisible
             }
         } completionHandler: { [weak self] in
             Task { @MainActor in
@@ -453,14 +542,24 @@ final class AppKitWorkspaceNavigationController: NSSplitViewController {
     private var currentVisibility: WorkspaceNavigationPaneVisibility {
         WorkspaceNavigationPaneVisibility(
             listsVisible: !listsItem.isCollapsed,
-            directoryVisible: !directoryItem.isCollapsed
+            directoryVisible: !directoryItem.isCollapsed,
+            inspectorVisible: !inspectorItem.isCollapsed
         )
     }
 
     private func finishVisibilityUpdate(generation: Int, animated: Bool) {
         guard visibilityTransitionGeneration == generation else { return }
         isApplyingRequestedVisibility = false
-        lastReportedVisibility = currentVisibility
+        let visibility = currentVisibility
+        if visibility != requestedVisibility {
+            requestedVisibility = visibility
+            if visibility != lastReportedVisibility {
+                lastReportedVisibility = visibility
+                onPaneVisibilityChange?(visibility)
+            }
+        } else {
+            lastReportedVisibility = visibility
+        }
         scheduleInitialWidthRestore(
             after: animated
                 ? WidthPersistence.animatedRestoreDelay
@@ -473,9 +572,11 @@ final class AppKitWorkspaceNavigationController: NSSplitViewController {
         let visibility = currentVisibility
         let visibleAuxiliaryWidth = (visibility.listsVisible ? initialListsWidth : 0)
             + (visibility.directoryVisible ? initialDirectoryWidth : 0)
+            + (visibility.inspectorVisible ? initialInspectorWidth : 0)
         let visibleAuxiliaryCount = [
             visibility.listsVisible,
-            visibility.directoryVisible
+            visibility.directoryVisible,
+            visibility.inspectorVisible
         ].filter { $0 }.count
         let required = MainWindowLayout.minimumReaderWidth
             + visibleAuxiliaryWidth
@@ -488,6 +589,7 @@ final class AppKitWorkspaceNavigationController: NSSplitViewController {
 
         let shouldRestoreLists = visibility.listsVisible && !didRestoreListsWidth
         let shouldRestoreDirectory = visibility.directoryVisible && !didRestoreDirectoryWidth
+        let shouldRestoreInspector = visibility.inspectorVisible && !didRestoreInspectorWidth
 
         if shouldRestoreLists {
             listsItem.minimumThickness = initialListsWidth
@@ -497,7 +599,11 @@ final class AppKitWorkspaceNavigationController: NSSplitViewController {
             directoryItem.minimumThickness = initialDirectoryWidth
             directoryItem.maximumThickness = initialDirectoryWidth
         }
-        if shouldRestoreLists || shouldRestoreDirectory {
+        if shouldRestoreInspector {
+            inspectorItem.minimumThickness = initialInspectorWidth
+            inspectorItem.maximumThickness = initialInspectorWidth
+        }
+        if shouldRestoreLists || shouldRestoreDirectory || shouldRestoreInspector {
             splitView.adjustSubviews()
             splitView.layoutSubtreeIfNeeded()
         }
@@ -508,6 +614,10 @@ final class AppKitWorkspaceNavigationController: NSSplitViewController {
         if shouldRestoreDirectory {
             directoryItem.maximumThickness = MainWindowColumnWidth.directoryRange.upperBound
             directoryItem.minimumThickness = MainWindowColumnWidth.directoryRange.lowerBound
+        }
+        if shouldRestoreInspector {
+            inspectorItem.maximumThickness = MainWindowColumnWidth.inspectorRange.upperBound
+            inspectorItem.minimumThickness = MainWindowColumnWidth.inspectorRange.lowerBound
         }
 
         if visibility.listsVisible {
@@ -522,10 +632,16 @@ final class AppKitWorkspaceNavigationController: NSSplitViewController {
                 initialDirectoryWidth
             )
         }
+        if visibility.inspectorVisible {
+            didRestoreInspectorWidth = Self.matches(
+                inspectorItem.viewController.view.bounds.width,
+                initialInspectorWidth
+            )
+        }
     }
 
     private func reportUserDrivenVisibilityIfNeeded() {
-        guard !isApplyingRequestedVisibility else { return }
+        guard !isApplyingRequestedVisibility, !isEnforcingReadableLayout else { return }
         let visibility = currentVisibility
         guard visibility != requestedVisibility else {
             lastReportedVisibility = visibility
@@ -542,7 +658,8 @@ final class AppKitWorkspaceNavigationController: NSSplitViewController {
         replacingPending: Bool = false
     ) {
         guard (!listsItem.isCollapsed && !didRestoreListsWidth)
-                || (!directoryItem.isCollapsed && !didRestoreDirectoryWidth) else {
+                || (!directoryItem.isCollapsed && !didRestoreDirectoryWidth)
+                || (!inspectorItem.isCollapsed && !didRestoreInspectorWidth) else {
             return
         }
         if replacingPending {
@@ -560,6 +677,75 @@ final class AppKitWorkspaceNavigationController: NSSplitViewController {
         }
     }
 
+    private func readableVisibility(
+        _ visibility: WorkspaceNavigationPaneVisibility,
+        preservingNewlyRevealedPaneComparedTo current: WorkspaceNavigationPaneVisibility? = nil
+    ) -> WorkspaceNavigationPaneVisibility {
+        let availableWidth = splitView.bounds.width
+        guard availableWidth.isFinite, availableWidth > 0 else { return visibility }
+
+        let protectedLeadingPane: PaneLayout.LeadingPane? = if let current {
+            if visibility.listsVisible, !current.listsVisible {
+                .lists
+            } else if visibility.directoryVisible, !current.directoryVisible {
+                .directory
+            } else {
+                nil
+            }
+        } else {
+            nil
+        }
+
+        var listsVisible = visibility.listsVisible
+        var directoryVisible = visibility.directoryVisible
+        let inspectorVisible = visibility.inspectorVisible
+
+        func requiredWidth() -> CGFloat {
+            MainWindowLayout.minimumCompactContentWidth(
+                listsSidebarVisible: listsVisible,
+                directoryVisible: directoryVisible,
+                inspectorVisible: inspectorVisible
+            )
+        }
+
+        while requiredWidth() > availableWidth {
+            if listsVisible, protectedLeadingPane != .lists {
+                listsVisible = false
+            } else if directoryVisible, protectedLeadingPane != .directory {
+                directoryVisible = false
+            } else if listsVisible {
+                listsVisible = false
+            } else if directoryVisible {
+                directoryVisible = false
+            } else {
+                break
+            }
+        }
+
+        return WorkspaceNavigationPaneVisibility(
+            listsVisible: listsVisible,
+            directoryVisible: directoryVisible,
+            inspectorVisible: inspectorVisible
+        )
+    }
+
+    private func collapseLeadingPanesForReadableLayoutIfNeeded() -> Bool {
+        guard !isApplyingRequestedVisibility, !isEnforcingReadableLayout else { return false }
+        let visibility = currentVisibility
+        let target = readableVisibility(visibility)
+        guard target != visibility else { return false }
+
+        isEnforcingReadableLayout = true
+        if visibility.listsVisible != target.listsVisible {
+            listsItem.isCollapsed = !target.listsVisible
+        }
+        if visibility.directoryVisible != target.directoryVisible {
+            directoryItem.isCollapsed = !target.directoryVisible
+        }
+        isEnforcingReadableLayout = false
+        return true
+    }
+
     private func scheduleWidthPersistence() {
         pendingWidthPersistence?.cancel()
         pendingWidthPersistence = Task { @MainActor [weak self] in
@@ -575,7 +761,7 @@ final class AppKitWorkspaceNavigationController: NSSplitViewController {
         let minimumAdaptiveWidth = MainWindowLayout.minimumContentWidth(
             listsSidebarVisible: visibility.listsVisible,
             directoryVisible: visibility.directoryVisible,
-            inspectorVisible: false
+            inspectorVisible: visibility.inspectorVisible
         )
         guard splitView.bounds.width >= minimumAdaptiveWidth else { return }
 
@@ -593,6 +779,13 @@ final class AppKitWorkspaceNavigationController: NSSplitViewController {
            ) {
             didRestoreDirectoryWidth = true
         }
+        if visibility.inspectorVisible,
+           Self.isPersistable(
+               inspectorItem.viewController.view.bounds.width,
+               in: MainWindowColumnWidth.inspectorRange
+           ) {
+            didRestoreInspectorWidth = true
+        }
     }
 
     private func persistVisibleWidths() {
@@ -607,6 +800,12 @@ final class AppKitWorkspaceNavigationController: NSSplitViewController {
             didRestoreInitialWidth: didRestoreDirectoryWidth,
             key: AppStorageKey.MainWindow.directoryWidth,
             range: MainWindowColumnWidth.directoryRange
+        )
+        persistWidth(
+            of: inspectorItem,
+            didRestoreInitialWidth: didRestoreInspectorWidth,
+            key: AppStorageKey.MainWindow.inspectorWidth,
+            range: MainWindowColumnWidth.inspectorRange
         )
     }
 

@@ -46,8 +46,20 @@ private struct JourneyResult: Codable {
     let readerControls: [String]
     let inspectorStates: [String: [String]]
     let findBar: [String]
+    let workspaceStructure: String
+    let auxiliaryPaneMatrix: String
     let inspectorToggleCycle: String
     let narrowPaneRestoreCycle: String
+}
+
+private struct PaneVisibilityState: Equatable {
+    let lists: Bool
+    let directory: Bool
+    let inspector: Bool
+
+    var summary: String {
+        "Lists=\(lists), List Contents=\(directory), Inspector=\(inspector)"
+    }
 }
 
 private func attributeValue(_ name: CFString, from element: AXUIElement) -> CFTypeRef? {
@@ -153,6 +165,37 @@ private func readerPane(in window: AXUIElement, articleTitle: String) -> AXUIEle
         candidate = parent(of: current)
     }
     return nil
+}
+
+private func readerWebArea(in window: AXUIElement, articleTitle: String) -> AXUIElement? {
+    guard let reader = readerPane(in: window, articleTitle: articleTitle) else { return nil }
+    return elements(in: reader, limit: 1_000).first {
+        hasRole($0, "AXWebArea")
+    }
+}
+
+private func workspaceSplitGroup(
+    in window: AXUIElement,
+    articleTitle: String
+) -> AXUIElement? {
+    elements(in: window, limit: 2_000).first { candidate in
+        guard hasRole(candidate, kAXSplitGroupRole as String),
+              containsLabel("Explore", in: candidate),
+              containsLabel("Tab History", in: candidate),
+              containsLabel(articleTitle, in: candidate),
+              inspectorModeGroup(in: candidate) != nil else {
+            return false
+        }
+        return directChildren(of: candidate).filter {
+            hasRole($0, kAXGroupRole as String)
+        }.count == 4
+    }
+}
+
+private func visibleWorkspacePaneGroups(in splitGroup: AXUIElement) -> [AXUIElement] {
+    directChildren(of: splitGroup)
+        .filter { hasRole($0, kAXGroupRole as String) }
+        .filter { elementSize($0).map { $0.width > 1 && $0.height > 1 } == true }
 }
 
 private func nativeSplitPaneSizes(in window: AXUIElement) -> String {
@@ -288,6 +331,21 @@ private func elementSize(_ element: AXUIElement) -> CGSize? {
     return size
 }
 
+private func elementPosition(_ element: AXUIElement) -> CGPoint? {
+    guard let rawValue = attributeValue(kAXPositionAttribute as CFString, from: element),
+          CFGetTypeID(rawValue) == AXValueGetTypeID() else {
+        return nil
+    }
+    var position = CGPoint.zero
+    guard AXValueGetValue(rawValue as! AXValue, .cgPoint, &position) else { return nil }
+    return position
+}
+
+private func elementFrame(_ element: AXUIElement) -> CGRect? {
+    guard let position = elementPosition(element), let size = elementSize(element) else { return nil }
+    return CGRect(origin: position, size: size)
+}
+
 private func wait(
     timeout: TimeInterval = 20,
     condition: () -> Bool
@@ -366,16 +424,12 @@ do {
         throw JourneyError.missing("The native window toolbar omitted its List Contents control.")
     }
     let listsControlReport: String
-    if button(in: initialToolbar, label: "Hide Sidebar") != nil {
-        listsControlReport = "Hide Sidebar"
-    } else if button(in: initialToolbar, label: "Show Sidebar") != nil {
-        listsControlReport = "Show Sidebar"
+    if button(in: initialToolbar, label: "Hide Lists") != nil {
+        listsControlReport = "Hide Lists"
+    } else if button(in: initialToolbar, label: "Show Lists") != nil {
+        listsControlReport = "Show Lists"
     } else {
         throw JourneyError.missing("The native window toolbar omitted its Lists control.")
-    }
-    if button(in: initialToolbar, label: "Hide Lists") != nil
-        || button(in: initialToolbar, label: "Show Lists") != nil {
-        throw JourneyError.missing("A duplicate custom Lists control competed with the native sidebar item.")
     }
     guard element(
         in: contentWindow,
@@ -405,7 +459,121 @@ do {
         throw JourneyError.missing("The native inspector did not become accessible.")
     }
     traceRuntimeDiagnostics("inspector readiness")
-    trace("native window toolbar, NavigationSplitView Reader, and inspector ready")
+    trace("native window toolbar and four-pane AppKit workspace ready")
+
+    guard let initialReaderWebArea = readerWebArea(
+        in: contentWindow,
+        articleTitle: articleTitle
+    ) else {
+        throw JourneyError.missing("The seeded Reader did not expose a stable Web area.")
+    }
+    guard let initialWorkspaceSplit = workspaceSplitGroup(
+        in: contentWindow,
+        articleTitle: articleTitle
+    ) else {
+        throw JourneyError.missing("The main window did not expose four visible workspace pane groups.")
+    }
+    let initialPaneFrames = visibleWorkspacePaneGroups(in: initialWorkspaceSplit)
+        .compactMap(elementFrame)
+        .sorted { $0.minX < $1.minX }
+    guard initialPaneFrames.count == 4 else {
+        throw JourneyError.missing(
+            "The workspace exposed \(initialPaneFrames.count) visible pane frames instead of four."
+        )
+    }
+    let readerFrame = initialPaneFrames[2]
+    let inspectorFrame = initialPaneFrames[3]
+    let paneAlignmentTolerance: CGFloat = 2
+    guard inspectorFrame.minY <= readerFrame.minY + paneAlignmentTolerance,
+          inspectorFrame.maxY >= readerFrame.maxY - paneAlignmentTolerance,
+          inspectorFrame.height + paneAlignmentTolerance >= readerFrame.height else {
+        throw JourneyError.missing(
+            "The Inspector pane region did not span the full Reader pane height: "
+                + "Reader=\(readerFrame), Inspector=\(inspectorFrame)."
+        )
+    }
+    let workspaceStructure = "four visible AppKit pane regions; Inspector spans the full Reader pane height"
+
+    func readerWebAreaIdentityIsStable() -> Bool {
+        guard let current = readerWebArea(in: contentWindow, articleTitle: articleTitle) else {
+            return false
+        }
+        return CFEqual(current, initialReaderWebArea)
+    }
+
+    func paneStateMatches(_ expected: PaneVisibilityState) -> Bool {
+        guard let toolbar = try? refreshNativeToolbar() else { return false }
+        let listsVisible = element(
+            in: contentWindow,
+            role: kAXStaticTextRole as String,
+            label: "Explore"
+        ) != nil
+        let directoryVisible = element(
+            in: contentWindow,
+            role: kAXStaticTextRole as String,
+            label: "Tab History"
+        ) != nil
+        let inspectorVisible = inspectorModeGroup(in: contentWindow) != nil
+        let expectedListsControl = expected.lists ? "Hide Lists" : "Show Lists"
+        let expectedDirectoryControl = expected.directory ? "Hide List Contents" : "Show List Contents"
+        let expectedInspectorControl = expected.inspector ? "Hide Inspector" : "Show Inspector"
+        return listsVisible == expected.lists
+            && directoryVisible == expected.directory
+            && inspectorVisible == expected.inspector
+            && button(in: toolbar, label: expectedListsControl) != nil
+            && button(in: toolbar, label: expectedDirectoryControl) != nil
+            && button(in: toolbar, label: expectedInspectorControl) != nil
+            && readerWebAreaIdentityIsStable()
+    }
+
+    var currentPaneState = PaneVisibilityState(lists: true, directory: true, inspector: true)
+
+    func movePanes(to target: PaneVisibilityState, context: String) throws {
+        let widthBefore = windowSize(contentWindow)?.width
+        if currentPaneState.lists != target.lists {
+            let label = currentPaneState.lists ? "Hide Lists" : "Show Lists"
+            try press(try toolbarButton(label), label: label)
+            currentPaneState = PaneVisibilityState(
+                lists: target.lists,
+                directory: currentPaneState.directory,
+                inspector: currentPaneState.inspector
+            )
+            guard wait(timeout: 4, condition: { paneStateMatches(currentPaneState) }) else {
+                throw JourneyError.missing("\(context) did not settle after \(label).")
+            }
+        }
+        if currentPaneState.directory != target.directory {
+            let label = currentPaneState.directory ? "Hide List Contents" : "Show List Contents"
+            try press(try toolbarButton(label), label: label)
+            currentPaneState = PaneVisibilityState(
+                lists: currentPaneState.lists,
+                directory: target.directory,
+                inspector: currentPaneState.inspector
+            )
+            guard wait(timeout: 4, condition: { paneStateMatches(currentPaneState) }) else {
+                throw JourneyError.missing("\(context) did not settle after \(label).")
+            }
+        }
+        if currentPaneState.inspector != target.inspector {
+            let label = currentPaneState.inspector ? "Hide Inspector" : "Show Inspector"
+            try press(try toolbarButton(label), label: label)
+            currentPaneState = PaneVisibilityState(
+                lists: currentPaneState.lists,
+                directory: currentPaneState.directory,
+                inspector: target.inspector
+            )
+            guard wait(timeout: 4, condition: { paneStateMatches(currentPaneState) }) else {
+                throw JourneyError.missing("\(context) did not settle after \(label).")
+            }
+        }
+        guard paneStateMatches(target) else {
+            throw JourneyError.missing("\(context) did not reach \(target.summary).")
+        }
+        if let widthBefore, let widthAfter = windowSize(contentWindow)?.width,
+           abs(widthAfter - widthBefore) >= 2 {
+            throw JourneyError.missing("\(context) resized the whole window from \(widthBefore) to \(widthAfter).")
+        }
+    }
 
     let expectedReaderControls = [
         "Back", "Forward", "Search Wikipedia", "Save Article",
@@ -545,9 +713,8 @@ do {
     trace("inspector stress cycle verified")
     traceRuntimeDiagnostics("inspector stress cycle")
 
-    // The inspector is a native scene modifier now. Exercise its actual toolbar
-    // visibility path repeatedly, refreshing both the toolbar item and inspector
-    // AX subtree after every structural transition.
+    // Exercise the standard Inspector responder-chain action against the fourth
+    // semantic AppKit split item, refreshing both toolbar and pane AX state.
     for cycle in 1...6 {
         let hideInspector = try toolbarButton("Hide Inspector")
         try press(hideInspector, label: "Hide Inspector")
@@ -563,6 +730,7 @@ do {
         guard wait(timeout: 4, condition: {
             inspectorModeGroup(in: contentWindow) != nil
                 && (try? toolbarButton("Hide Inspector")) != nil
+                && readerWebAreaIdentityIsStable()
         }) else {
             throw JourneyError.missing("Inspector visibility cycle \(cycle) did not restore the native inspector.")
         }
@@ -570,6 +738,36 @@ do {
     }
     trace("native inspector visibility stress cycle verified")
     traceRuntimeDiagnostics("inspector visibility stress cycle")
+
+    let visibilityMatrix = [
+        PaneVisibilityState(lists: true, directory: true, inspector: true),
+        PaneVisibilityState(lists: false, directory: true, inspector: true),
+        PaneVisibilityState(lists: false, directory: false, inspector: true),
+        PaneVisibilityState(lists: false, directory: false, inspector: false),
+        PaneVisibilityState(lists: true, directory: false, inspector: false),
+        PaneVisibilityState(lists: true, directory: false, inspector: true),
+        PaneVisibilityState(lists: true, directory: true, inspector: false),
+        PaneVisibilityState(lists: true, directory: true, inspector: true)
+    ]
+    for (index, state) in visibilityMatrix.enumerated() {
+        try movePanes(to: state, context: "Visibility matrix state \(index + 1)")
+    }
+
+    for cycle in 1...20 {
+        let hiddenState = cycle.isMultiple(of: 2)
+            ? PaneVisibilityState(lists: true, directory: false, inspector: true)
+            : PaneVisibilityState(lists: false, directory: true, inspector: true)
+        try movePanes(to: hiddenState, context: "Independent navigation pane cycle \(cycle) hide")
+        try movePanes(
+            to: PaneVisibilityState(lists: true, directory: true, inspector: true),
+            context: "Independent navigation pane cycle \(cycle) restore"
+        )
+    }
+    guard readerWebAreaIdentityIsStable() else {
+        throw JourneyError.missing("The Reader Web area changed identity during auxiliary-pane transitions.")
+    }
+    trace("all eight pane visibility states and 20 independent navigation-pane cycles verified")
+    traceRuntimeDiagnostics("auxiliary pane visibility matrix")
 
     let findButton = try toolbarButton("Find in Page")
     try press(findButton, label: "Find in Page")
@@ -613,27 +811,11 @@ do {
     trace("single Find UI verified")
     traceRuntimeDiagnostics("Find UI")
 
-    let hideInspector = try toolbarButton("Hide Inspector")
-    try press(hideInspector, label: "Hide Inspector")
-    settleAccessibility(for: 0.45)
-    guard wait(condition: { inspectorModeGroup(in: contentWindow) == nil }) else {
-        throw JourneyError.missing("Hide Inspector did not remove the native inspector.")
-    }
-    traceRuntimeDiagnostics("inspector hide")
-
-    let hideListContents = try toolbarButton("Hide List Contents")
-    try press(hideListContents, label: "Hide List Contents")
-    settleAccessibility(for: 0.45)
-    guard wait(condition: {
-        (try? toolbarButton("Show List Contents")) != nil
-            && element(
-                in: contentWindow,
-                role: kAXStaticTextRole as String,
-                label: "Tab History"
-            ) == nil
-    }) else {
-        throw JourneyError.missing("Hide List Contents changed state without collapsing the directory pane.")
-    }
+    try movePanes(
+        to: PaneVisibilityState(lists: false, directory: false, inspector: false),
+        context: "Prepare narrow window"
+    )
+    traceRuntimeDiagnostics("auxiliary panes hidden before narrow resize")
 
     let narrowWidth: CGFloat = 900
     try setWindowSize(CGSize(width: narrowWidth, height: 780), for: contentWindow)
@@ -648,22 +830,25 @@ do {
         throw JourneyError.missing("The native toolbar or Reader detail disappeared at 900 points.")
     }
 
-    let showListContents = try toolbarButton("Show List Contents")
-    try press(showListContents, label: "Show List Contents")
-    settleAccessibility(for: 0.3)
-    let showInspector = try toolbarButton("Show Inspector")
-    try press(showInspector, label: "Show Inspector")
-    settleAccessibility(for: 0.5)
+    try movePanes(
+        to: PaneVisibilityState(lists: false, directory: true, inspector: false),
+        context: "Narrow List Contents restore"
+    )
+    try movePanes(
+        to: PaneVisibilityState(lists: false, directory: true, inspector: true),
+        context: "Narrow Inspector restore"
+    )
     guard wait(condition: {
         inspectorModeGroup(in: contentWindow) != nil
             && (try? toolbarButton("Hide List Contents")) != nil
+            && (try? toolbarButton("Show Lists")) != nil
             && element(
                 in: contentWindow,
                 role: kAXStaticTextRole as String,
                 label: "Tab History"
             ) != nil
     }) else {
-        throw JourneyError.missing("The narrow window did not restore both auxiliary panes.")
+        throw JourneyError.missing("The narrow window did not restore List Contents and Inspector with Lists hidden.")
     }
     for _ in 0..<8 {
         guard let restoredWindowSize = windowSize(contentWindow),
@@ -693,7 +878,7 @@ do {
         Thread.sleep(forTimeInterval: 0.12)
     }
     traceRuntimeDiagnostics("inspector restore")
-    trace("narrow inspector and list-contents restore verified without a window jump")
+    trace("narrow List Contents and Inspector restore verified with Lists intentionally hidden")
 
     let result = JourneyResult(
         pid: pid,
@@ -701,8 +886,10 @@ do {
         readerControls: reportedReaderControls,
         inspectorStates: inspectorStates,
         findBar: findBar,
+        workspaceStructure: workspaceStructure,
+        auxiliaryPaneMatrix: "all eight visibility states plus 20 independent Lists/List Contents hide-restore cycles; Reader Web area identity preserved",
         inspectorToggleCycle: "native inspector hidden and restored through six rapid cycles",
-        narrowPaneRestoreCycle: "900-point window preserved while native List Contents and Inspector restored around a usable Reader"
+        narrowPaneRestoreCycle: "900-point window preserved with Lists hidden while List Contents and Inspector restored around a usable Reader"
     )
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.prettyPrinted, .sortedKeys]

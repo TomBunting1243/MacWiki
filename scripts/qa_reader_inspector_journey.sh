@@ -136,8 +136,10 @@ fi
   printf -- '- Isolated QA home: `%s`\n' "$QA_HOME"
   printf -- '- Seeded public article: `%s`\n' "$ARTICLE_TITLE"
   printf -- '- Reader assertions: full-width native toolbar command reachability, no retired custom More control, exactly one Find field, native Find actions, dismissal\n'
-  printf -- '- Inspector assertions: native Info/Notes/References selection and content, 12 rapid mode cycles, six native hide/restore cycles\n'
-  printf -- '- Narrow-window assertion: restoring native List Contents and Inspector preserves the 900-point window and a usable Reader\n'
+  printf -- '- Workspace assertions: four visible AppKit pane regions, Inspector spanning the full Reader pane height, all eight auxiliary visibility states, 20 independent Lists/List Contents cycles, and stable Reader Web-area identity\n'
+  printf -- '- Inspector assertions: Info/Notes/References selection and content, 12 rapid mode cycles, and six standard Inspector hide/restore cycles\n'
+  printf -- '- Narrow-window assertion: with Lists intentionally hidden, restoring List Contents and Inspector preserves the 900-point window and a usable Reader\n'
+  printf -- '- Visual-only follow-up: Reader-edge toggle alignment, materials, animation quality, and perceived jank require fresh Computer Use evidence and are not inferred from AX geometry.\n'
   printf -- '- AX evidence: `%s`\n' "$AX_RESULT"
   printf -- '- Production preferences/data touched: **No** — state, defaults, persistence, and caches were isolated.\n'
 } >"$REPORT_PATH"

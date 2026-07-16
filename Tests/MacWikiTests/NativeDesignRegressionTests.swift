@@ -177,6 +177,8 @@ struct NativeDesignRegressionTests {
         #expect(!toolbar.contains("sidebar.leading"))
         #expect(toolbar.contains("toggleDirectoryColumnVisibility"))
         #expect(toolbar.contains("reader-find-in-page"))
+        #expect(!toolbar.contains("toggle-reader-inspector"))
+        #expect(!toolbar.contains("toggleInspectorVisibility"))
         #expect(articleToolbar.contains("ToolbarContent"))
         #expect(!articleToolbar.contains("CustomizableToolbarContent"))
         #expect(articleToolbar.contains("ToolbarItem(placement: .navigation)"))
@@ -184,6 +186,7 @@ struct NativeDesignRegressionTests {
         #expect(!articleToolbar.contains("ToolbarSpacer("))
         #expect(toolbarPolicy.contains("NSToolbarItem.Identifier.inspectorTrackingSeparator"))
         #expect(toolbarPolicy.contains("NSToolbarItem.Identifier.toggleInspector"))
+        #expect(toolbarPolicy.contains("identifiers.suffix(2) == [toggle, separator]"))
         #expect(toolbarPolicy.contains("toolbar.allowsUserCustomization = false"))
         for action in ["Save Article", "Mark as Read", "Find in Page", "Reader Style", "Page Views", "Open in Browser", "Share"] {
             #expect(toolbar.contains(action))

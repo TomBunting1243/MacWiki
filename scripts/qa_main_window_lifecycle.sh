@@ -120,7 +120,7 @@ MAX_REOPEN_LATENCY="$(jq -r '[.cycles[].reopenLatencyMilliseconds] | max' "$AX_R
   printf -- '- Cold launch: one main window with one native full-width toolbar remained stable for more than three seconds in the empty workspace\n'
   printf -- '- Native lifecycle: five minimize and LaunchServices reopen cycles retained the same PID, AX window identity, frame, and single-toolbar structure\n'
   printf -- '- Red close: the app remained resident without windows for 2.5 seconds, then LaunchServices recreated one native main window in the same PID and frame\n'
-  printf -- '- NavigationSplitView ownership and toolbar command reachability are guarded by source regressions; this lifecycle driver intentionally validates the stable native window and toolbar graph without inferring SwiftUI control state from accessibility overflow descendants\n'
+  printf -- '- Four-pane AppKit split ownership and toolbar command reachability are guarded by focused regressions; this lifecycle driver intentionally validates the stable native window and toolbar graph without inferring pane state or visual placement from accessibility overflow descendants\n'
   printf -- '- Maximum minimize latency: `%s ms`\n' "$MAX_MINIMIZE_LATENCY"
   printf -- '- Maximum reopen latency: `%s ms`\n' "$MAX_REOPEN_LATENCY"
   printf -- '- AX evidence: `%s`\n' "$AX_RESULT"

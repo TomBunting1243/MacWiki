@@ -9,21 +9,16 @@ import Testing
 struct NativeWorkspaceLayoutTests {
     @Test func appStateRoundTripsEveryIndependentNavigationCombination() {
         let appState = AppState(persistenceMode: .ephemeral)
-        let combinations = [
-            WorkspaceNavigationPaneVisibility(listsVisible: true, directoryVisible: true),
-            WorkspaceNavigationPaneVisibility(listsVisible: true, directoryVisible: false),
-            WorkspaceNavigationPaneVisibility(listsVisible: false, directoryVisible: true),
-            WorkspaceNavigationPaneVisibility(listsVisible: false, directoryVisible: false)
-        ]
-
-        for visibility in combinations {
+        for visibility in Self.everyAuxiliaryVisibilityCombination {
             appState.setNavigationColumnVisibility(
                 listsVisible: visibility.listsVisible,
                 directoryVisible: visibility.directoryVisible
             )
+            appState.inspectorVisible = visibility.inspectorVisible
 
             #expect(appState.listsSidebarVisible == visibility.listsVisible)
             #expect(appState.directoryColumnVisible == visibility.directoryVisible)
+            #expect(appState.inspectorVisible == visibility.inspectorVisible)
         }
     }
 
@@ -33,26 +28,33 @@ struct NativeWorkspaceLayoutTests {
         layout(fixture)
 
         let items = fixture.controller.splitViewItems
-        #expect(items.count == 3)
+        #expect(items.count == 4)
         #expect(items[0].behavior == .sidebar)
         #expect(items[1].behavior == .contentList)
         #expect(items[2].behavior == .default)
+        #expect(items[3].behavior == .inspector)
 
         #expect(items[0].canCollapse)
         #expect(items[1].canCollapse)
         #expect(!items[2].canCollapse)
-        #expect(!items[0].canCollapseFromWindowResize)
-        #expect(!items[1].canCollapseFromWindowResize)
+        #expect(items[3].canCollapse)
+        #expect(items[0].canCollapseFromWindowResize)
+        #expect(items[1].canCollapseFromWindowResize)
+        #expect(!items[3].canCollapseFromWindowResize)
         #expect(items[0].collapseBehavior == .preferResizingSiblingsWithFixedSplitView)
         #expect(items[1].collapseBehavior == .preferResizingSiblingsWithFixedSplitView)
+        #expect(items[3].collapseBehavior == .preferResizingSiblingsWithFixedSplitView)
         #expect(items[0].allowsFullHeightLayout)
+        #expect(items[3].allowsFullHeightLayout)
 
         #expect(items[0].minimumThickness == MainWindowColumnWidth.sidebarRange.lowerBound)
         #expect(items[0].maximumThickness == MainWindowColumnWidth.sidebarRange.upperBound)
         #expect(items[1].minimumThickness == MainWindowColumnWidth.directoryRange.lowerBound)
         #expect(items[1].maximumThickness == MainWindowColumnWidth.directoryRange.upperBound)
-        #expect(items[2].minimumThickness == 1)
+        #expect(items[2].minimumThickness == MainWindowLayout.minimumCompactReaderWidth)
         #expect(items[2].holdingPriority == .defaultLow)
+        #expect(items[3].minimumThickness == MainWindowColumnWidth.inspectorRange.lowerBound)
+        #expect(items[3].maximumThickness == MainWindowColumnWidth.inspectorRange.upperBound)
     }
 
     @Test func appKitControllerSupportsEveryIndependentVisibilityCombination() {
@@ -60,17 +62,11 @@ struct NativeWorkspaceLayoutTests {
         defer { fixture.tearDown() }
         layout(fixture)
 
-        let combinations = [
-            WorkspaceNavigationPaneVisibility(listsVisible: true, directoryVisible: true),
-            WorkspaceNavigationPaneVisibility(listsVisible: true, directoryVisible: false),
-            WorkspaceNavigationPaneVisibility(listsVisible: false, directoryVisible: true),
-            WorkspaceNavigationPaneVisibility(listsVisible: false, directoryVisible: false)
-        ]
-
-        for visibility in combinations {
+        for visibility in Self.everyAuxiliaryVisibilityCombination {
             fixture.controller.setPaneVisibility(
                 listsVisible: visibility.listsVisible,
                 directoryVisible: visibility.directoryVisible,
+                inspectorVisible: visibility.inspectorVisible,
                 animated: false
             )
             layout(fixture)
@@ -78,7 +74,125 @@ struct NativeWorkspaceLayoutTests {
             #expect(fixture.controller.splitViewItems[0].isCollapsed == !visibility.listsVisible)
             #expect(fixture.controller.splitViewItems[1].isCollapsed == !visibility.directoryVisible)
             #expect(!fixture.controller.splitViewItems[2].isCollapsed)
+            #expect(fixture.controller.splitViewItems[3].isCollapsed == !visibility.inspectorVisible)
         }
+    }
+
+    @Test func standardResponderChainInspectorToggleControlsTheSemanticInspectorPane() {
+        let fixture = makeFixture(width: 1_500)
+        defer { fixture.tearDown() }
+        layout(fixture)
+
+        #expect(!fixture.controller.splitViewItems[3].isCollapsed)
+
+        fixture.controller.toggleInspector(nil)
+        layout(fixture)
+        #expect(fixture.controller.splitViewItems[3].isCollapsed)
+
+        fixture.controller.toggleInspector(nil)
+        layout(fixture)
+        #expect(!fixture.controller.splitViewItems[3].isCollapsed)
+        #expect(!fixture.controller.splitViewItems[2].isCollapsed)
+    }
+
+    @Test func userInspectorToggleDuringAnotherPaneAnimationReconcilesNativeState() async throws {
+        let fixture = makeFixture(width: 1_500)
+        let window = NSWindow(contentViewController: fixture.controller)
+        defer {
+            window.close()
+            fixture.tearDown()
+        }
+        window.setContentSize(fixture.size)
+        layout(fixture)
+
+        var reportedVisibility: WorkspaceNavigationPaneVisibility?
+        fixture.controller.onPaneVisibilityChange = { visibility in
+            reportedVisibility = visibility
+        }
+
+        fixture.controller.setPaneVisibility(
+            listsVisible: false,
+            directoryVisible: true,
+            inspectorVisible: true,
+            animated: true
+        )
+        fixture.controller.toggleInspector(nil)
+
+        try await Task.sleep(for: .milliseconds(350))
+        layout(fixture)
+
+        #expect(fixture.controller.splitViewItems[3].isCollapsed)
+        #expect(reportedVisibility?.listsVisible == false)
+        #expect(reportedVisibility?.directoryVisible == true)
+        #expect(reportedVisibility?.inspectorVisible == false)
+    }
+
+    @Test func compactWindowYieldsLeadingNavigationPanesBeforeCrushingReader() {
+        let fixture = makeFixture(width: 1_500)
+        let window = NSWindow(contentViewController: fixture.controller)
+        defer {
+            window.close()
+            fixture.tearDown()
+        }
+        window.setContentSize(fixture.size)
+        layout(fixture)
+
+        window.setContentSize(NSSize(width: MainWindowLayout.minimumWindowWidth, height: 800))
+        window.contentView?.layoutSubtreeIfNeeded()
+        fixture.controller.view.layoutSubtreeIfNeeded()
+
+        let items = fixture.controller.splitViewItems
+        #expect(items[0].isCollapsed || items[1].isCollapsed)
+        #expect(!items[2].isCollapsed)
+        #expect(items[2].viewController.view.bounds.width >= MainWindowLayout.minimumCompactReaderWidth)
+        #expect(!items[3].isCollapsed)
+    }
+
+    @Test func compactWindowPreservesTheLeadingPaneTheUserExplicitlyReveals() {
+        let fixture = makeFixture(width: MainWindowLayout.minimumWindowWidth)
+        defer { fixture.tearDown() }
+        layout(fixture)
+        fixture.controller.setPaneVisibility(
+            listsVisible: false,
+            directoryVisible: true,
+            inspectorVisible: true,
+            animated: false
+        )
+
+        var reportedVisibility: WorkspaceNavigationPaneVisibility?
+        fixture.controller.onPaneVisibilityChange = { visibility in
+            reportedVisibility = visibility
+        }
+        fixture.controller.setPaneVisibility(
+            listsVisible: true,
+            directoryVisible: true,
+            inspectorVisible: true,
+            animated: false
+        )
+        layout(fixture)
+
+        let items = fixture.controller.splitViewItems
+        #expect(!items[0].isCollapsed)
+        #expect(items[1].isCollapsed)
+        #expect(!items[2].isCollapsed)
+        #expect(!items[3].isCollapsed)
+        #expect(reportedVisibility?.listsVisible == true)
+        #expect(reportedVisibility?.directoryVisible == false)
+        #expect(reportedVisibility?.inspectorVisible == true)
+    }
+
+    @Test func supportedWindowMinimumCanPresentEitherLeadingPaneWithInspector() {
+        let minimum = MainWindowLayout.minimumWindowWidth
+        #expect(minimum >= MainWindowLayout.minimumCompactContentWidth(
+            listsSidebarVisible: true,
+            directoryVisible: false,
+            inspectorVisible: true
+        ))
+        #expect(minimum >= MainWindowLayout.minimumCompactContentWidth(
+            listsSidebarVisible: false,
+            directoryVisible: true,
+            inspectorVisible: true
+        ))
     }
 
     @Test func readerControllerAndViewIdentitySurviveTwentyPaneToggleCycles() {
@@ -93,6 +207,7 @@ struct NativeWorkspaceLayoutTests {
             fixture.controller.setPaneVisibility(
                 listsVisible: index.isMultiple(of: 2),
                 directoryVisible: index.isMultiple(of: 3),
+                inspectorVisible: index.isMultiple(of: 5),
                 animated: false
             )
             layout(fixture)
@@ -107,7 +222,8 @@ struct NativeWorkspaceLayoutTests {
         let fixture = makeFixture(
             width: 1_500,
             initialListsWidth: 220,
-            initialDirectoryWidth: 330
+            initialDirectoryWidth: 330,
+            initialInspectorWidth: 310
         )
         defer { fixture.tearDown() }
         layout(fixture)
@@ -118,6 +234,7 @@ struct NativeWorkspaceLayoutTests {
         #expect(MainWindowColumnWidth.sidebarRange.contains(items[0].viewController.view.bounds.width))
         #expect(MainWindowColumnWidth.directoryRange.contains(items[1].viewController.view.bounds.width))
         #expect(items[2].viewController.view.bounds.width >= MainWindowLayout.minimumReaderWidth)
+        #expect(MainWindowColumnWidth.inspectorRange.contains(items[3].viewController.view.bounds.width))
     }
 
     @Test func widthPersistenceWritesOnlyToTheInjectedDefaultsBoundary() async throws {
@@ -126,10 +243,12 @@ struct NativeWorkspaceLayoutTests {
         #expect(!bridge.contains("UserDefaults.standard"))
         #expect(bridge.contains("AppStorageKey.MainWindow.sidebarWidth"))
         #expect(bridge.contains("AppStorageKey.MainWindow.directoryWidth"))
+        #expect(bridge.contains("AppStorageKey.MainWindow.inspectorWidth"))
 
-        // This intentionally takes the adaptive-baseline path before either
-        // pane is resized, matching a compact but valid application window.
-        let fixture = makeFixture(width: 1_000)
+        // This width is above the all-pane adaptive minimum but below the sum
+        // of the three ideal widths, exercising persistence from valid native
+        // split geometry instead of depending on exact ideal-width rounding.
+        let fixture = makeFixture(width: 1_300)
         defer { fixture.tearDown() }
         layout(fixture)
         fixture.controller.restoreInitialVisibleWidthsIfFeasible()
@@ -137,13 +256,19 @@ struct NativeWorkspaceLayoutTests {
 
         let sidebarKey = AppStorageKey.MainWindow.sidebarWidth
         let directoryKey = AppStorageKey.MainWindow.directoryWidth
+        let inspectorKey = AppStorageKey.MainWindow.inspectorWidth
         let standardSidebarBefore = UserDefaults.standard.object(forKey: sidebarKey) as? Double
         let standardDirectoryBefore = UserDefaults.standard.object(forKey: directoryKey) as? Double
+        let standardInspectorBefore = UserDefaults.standard.object(forKey: inspectorKey) as? Double
 
         fixture.controller.splitView.setPosition(210, ofDividerAt: 0)
         fixture.controller.splitView.layoutSubtreeIfNeeded()
         let directoryOrigin = fixture.directory.view.convert(.zero, to: fixture.controller.splitView).x
         fixture.controller.splitView.setPosition(directoryOrigin + 300, ofDividerAt: 1)
+        fixture.controller.splitView.setPosition(
+            fixture.controller.splitView.bounds.width - 310,
+            ofDividerAt: 2
+        )
         layout(fixture)
 
         fixture.controller.splitViewDidResizeSubviews(
@@ -154,6 +279,7 @@ struct NativeWorkspaceLayoutTests {
 
         let persistedSidebarWidth = fixture.widthDefaults.object(forKey: sidebarKey) as? Double
         let persistedDirectoryWidth = fixture.widthDefaults.object(forKey: directoryKey) as? Double
+        let persistedInspectorWidth = fixture.widthDefaults.object(forKey: inspectorKey) as? Double
         let expectedSidebarWidth = MainWindowColumnWidth.clampedStorageValue(
             fixture.lists.view.bounds.width,
             range: MainWindowColumnWidth.sidebarRange
@@ -162,14 +288,21 @@ struct NativeWorkspaceLayoutTests {
             fixture.directory.view.bounds.width,
             range: MainWindowColumnWidth.directoryRange
         )
+        let expectedInspectorWidth = MainWindowColumnWidth.clampedStorageValue(
+            fixture.inspector.view.bounds.width,
+            range: MainWindowColumnWidth.inspectorRange
+        )
 
         #expect(persistedSidebarWidth != nil)
         #expect(persistedDirectoryWidth != nil)
+        #expect(persistedInspectorWidth != nil)
         #expect(abs((persistedSidebarWidth ?? 0) - (expectedSidebarWidth ?? 0)) < 1)
         #expect(abs((persistedDirectoryWidth ?? 0) - (expectedDirectoryWidth ?? 0)) < 1)
+        #expect(abs((persistedInspectorWidth ?? 0) - (expectedInspectorWidth ?? 0)) < 1)
 
         #expect((UserDefaults.standard.object(forKey: sidebarKey) as? Double) == standardSidebarBefore)
         #expect((UserDefaults.standard.object(forKey: directoryKey) as? Double) == standardDirectoryBefore)
+        #expect((UserDefaults.standard.object(forKey: inspectorKey) as? Double) == standardInspectorBefore)
     }
 
     @Test func columnWidthStorageRejectsInvalidValuesAndClampsExtremes() {
@@ -182,11 +315,13 @@ struct NativeWorkspaceLayoutTests {
     private func makeFixture(
         width: CGFloat,
         initialListsWidth: CGFloat = 220,
-        initialDirectoryWidth: CGFloat = 320
+        initialDirectoryWidth: CGFloat = 320,
+        initialInspectorWidth: CGFloat = 320
     ) -> WorkspaceFixture {
         let lists = makePaneController()
         let directory = makePaneController()
         let reader = makePaneController()
+        let inspector = makePaneController()
 
         let defaultsSuiteName = MacWikiDefaults.qaSuitePrefix
             + "NativeWorkspaceLayoutTests."
@@ -200,8 +335,10 @@ struct NativeWorkspaceLayoutTests {
             listsController: lists,
             directoryController: directory,
             readerController: reader,
+            inspectorController: inspector,
             initialListsWidth: initialListsWidth,
             initialDirectoryWidth: initialDirectoryWidth,
+            initialInspectorWidth: initialInspectorWidth,
             widthDefaults: widthDefaults
         )
         return WorkspaceFixture(
@@ -210,6 +347,7 @@ struct NativeWorkspaceLayoutTests {
             lists: lists,
             directory: directory,
             reader: reader,
+            inspector: inspector,
             widthDefaults: widthDefaults,
             defaultsSuiteName: defaultsSuiteName
         )
@@ -241,6 +379,17 @@ struct NativeWorkspaceLayoutTests {
             .deletingLastPathComponent()
             .deletingLastPathComponent()
     }
+
+    private static let everyAuxiliaryVisibilityCombination = [
+        WorkspaceNavigationPaneVisibility(listsVisible: true, directoryVisible: true, inspectorVisible: true),
+        WorkspaceNavigationPaneVisibility(listsVisible: true, directoryVisible: true, inspectorVisible: false),
+        WorkspaceNavigationPaneVisibility(listsVisible: true, directoryVisible: false, inspectorVisible: true),
+        WorkspaceNavigationPaneVisibility(listsVisible: true, directoryVisible: false, inspectorVisible: false),
+        WorkspaceNavigationPaneVisibility(listsVisible: false, directoryVisible: true, inspectorVisible: true),
+        WorkspaceNavigationPaneVisibility(listsVisible: false, directoryVisible: true, inspectorVisible: false),
+        WorkspaceNavigationPaneVisibility(listsVisible: false, directoryVisible: false, inspectorVisible: true),
+        WorkspaceNavigationPaneVisibility(listsVisible: false, directoryVisible: false, inspectorVisible: false)
+    ]
 }
 
 @MainActor
@@ -250,6 +399,7 @@ private struct WorkspaceFixture {
     let lists: NSViewController
     let directory: NSViewController
     let reader: NSViewController
+    let inspector: NSViewController
     let widthDefaults: UserDefaults
     let defaultsSuiteName: String
 

@@ -30,9 +30,9 @@ struct MainWindowShell: View {
     }
 }
 
-/// The main window uses one platform-owned AppKit navigation split plus
-/// SwiftUI's standard Inspector. This gives Lists and List Contents independent
-/// native collapse behavior while keeping the Reader and its WebView mounted.
+/// The main window uses one platform-owned AppKit split for Lists, List
+/// Contents, Reader, and a full-height Inspector. Every auxiliary pane remains
+/// independently collapsible while the Reader and its WebView stay mounted.
 private struct MainWorkspaceShell: View {
     @Environment(AppState.self) private var appState
     @Environment(\.modelContext) private var modelContext
@@ -63,12 +63,15 @@ private struct MainWorkspaceShell: View {
         AppKitWorkspaceNavigationSplitView(
             listsVisible: $appState.listsSidebarVisible,
             directoryVisible: $appState.directoryColumnVisible,
+            inspectorVisible: $appState.inspectorVisible,
             reduceMotion: accessibilityPersonalization.reduceMotion,
             initialListsWidth: CGFloat(sidebarWidth),
             initialDirectoryWidth: CGFloat(directoryWidth),
+            initialInspectorWidth: CGFloat(inspectorWidth),
             listsRevision: workspaceAppearanceRevision,
             directoryRevision: directoryContentRevision,
             readerRevision: workspaceAppearanceRevision,
+            inspectorRevision: workspaceAppearanceRevision,
             lists: workspaceEnvironment(
                 ListsColumnView(
                     selectedList: $selectedList,
@@ -103,20 +106,11 @@ private struct MainWorkspaceShell: View {
                     ReaderColumnView()
                         .id("main-reader-column")
                 }
+            ),
+            inspector: workspaceEnvironment(
+                InspectorColumnView()
             )
         )
-        .inspector(isPresented: $appState.inspectorVisible) {
-            InspectorColumnView()
-                .inspectorColumnWidth(
-                    min: MainWindowColumnWidth.inspectorRange.lowerBound,
-                    ideal: CGFloat(inspectorWidth),
-                    max: MainWindowColumnWidth.inspectorRange.upperBound
-                )
-                .persistedColumnWidth(
-                    key: AppStorageKey.MainWindow.inspectorWidth,
-                    range: MainWindowColumnWidth.inspectorRange
-                )
-        }
         .toolbar {
             MainWindowReaderToolbar(
                 appState: appState,

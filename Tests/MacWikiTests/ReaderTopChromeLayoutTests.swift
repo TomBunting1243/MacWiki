@@ -32,6 +32,9 @@ struct ReaderTopChromeLayoutTests {
         #expect(policy.contains("toolbar.autosavesConfiguration = false"))
         #expect(policy.contains("NSToolbarItem.Identifier.inspectorTrackingSeparator"))
         #expect(policy.contains("NSToolbarItem.Identifier.toggleInspector"))
+        #expect(policy.contains("identifiers.suffix(2) == [toggle, separator]"))
+        #expect(!toolbar.contains("toggle-reader-inspector"))
+        #expect(!toolbar.contains("appState.toggleInspectorVisibility()"))
     }
 
     @Test("navigation remains leading and reader actions remain trailing")
@@ -75,6 +78,8 @@ struct ReaderTopChromeLayoutTests {
         #expect(toolbar.contains("ShareLink(item: article.url)"))
         let policy = try source("Sources/MacWiki/Views/Shared/FixedWindowToolbarPolicy.swift")
         #expect(policy.contains("NSToolbarItem.Identifier.toggleInspector"))
+        #expect(policy.contains("NSToolbarItem.Identifier.inspectorTrackingSeparator"))
+        #expect(policy.contains("identifiers.suffix(2) == [toggle, separator]"))
     }
 
     @Test("menu presentation requests reach native toolbar popovers")
