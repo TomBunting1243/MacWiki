@@ -54,6 +54,8 @@ struct WorkspaceArchitectureRegressionTests {
         let shell = try source("Sources/MacWiki/Views/Shared/MainWindowShell.swift")
         let bridge = try source("Sources/MacWiki/Views/Shared/AppKitWorkspaceNavigationSplitView.swift")
         let inspectorPanel = try source("Sources/MacWiki/Views/Inspector/InspectorPanel.swift")
+        let reader = try source("Sources/MacWiki/Views/Reader/ReaderView.swift")
+        let webView = try source("Sources/MacWiki/Views/Components/WebView.swift")
         let detail = try #require(shell.range(of: "reader: workspaceEnvironment("))
         let inspector = try #require(shell.range(of: "inspector: workspaceEnvironment("))
         let readerAccessory = try #require(shell.range(of: "readerAccessory: workspaceEnvironment("))
@@ -70,6 +72,9 @@ struct WorkspaceArchitectureRegressionTests {
         #expect(bridge.contains("readerController = NSHostingController("))
         #expect(bridge.contains("readerController.sizingOptions = []"))
         #expect(!bridge.contains("readerController.rootView ="))
+        #expect(!reader.contains("inspectorMode: appState.inspectorMode"))
+        #expect(webView.contains("private func observeInspectorDemand()"))
+        #expect(webView.contains("withObservationTracking"))
     }
 
     @Test func mainAndArticleWindowsKeepTheirDistinctInspectorPolicies() throws {

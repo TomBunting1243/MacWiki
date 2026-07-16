@@ -2,6 +2,7 @@ import SwiftUI
 import AppKit
 import WebKit
 import SwiftData
+import Observation
 
 enum ReaderDocumentRevision {
     /// Deterministic full-document digest computed when article state is
@@ -182,11 +183,6 @@ struct WebView: NSViewRepresentable {
     // Dependencies for Context Menu
     var appState: AppState?
 
-    // Explicit dependencies for reactivity
-    // Since AppState is a reference type, changes to its properties don't invalidate
-    // the WebView struct unless we bind specific values we care about.
-    var inspectorVisible: Bool = false
-    var inspectorMode: InspectorMode = .info
     var findOnPageRequestID: UUID?
 
     private static let scriptMessageHandlerNames = [
@@ -303,7 +299,7 @@ struct WebView: NSViewRepresentable {
         context.coordinator.scrollPosition = $scrollPosition
         context.coordinator.onScrollProgress = onScrollProgress
         context.coordinator.fallbackScrollProgress = fallbackScrollProgress
-        context.coordinator.appState = appState
+        context.coordinator.updateAppState(appState)
         context.coordinator.modelContext = modelContext
         context.coordinator.onTextSelected = onTextSelected
         context.coordinator.onSelectionCleared = onSelectionCleared
@@ -324,10 +320,6 @@ struct WebView: NSViewRepresentable {
         context.coordinator.linkPreviewImmediateModifier = linkPreviewImmediateModifier
         context.coordinator.nativeHighlightingMenuEnabled = nativeHighlightingMenuEnabled
         context.coordinator.openTimer = openTimer
-        context.coordinator.isSectionTrackingRequested =
-            inspectorVisible && inspectorMode == .info
-        context.coordinator.isReferencesRequested =
-            inspectorVisible && inspectorMode == .references
         context.coordinator.syncLinkHoverPreviewOverlayState(
             isHovering: linkHoverPreviewOverlayHovering,
             presentedSignature: activeLinkHoverPreviewSignature
@@ -829,6 +821,58 @@ struct WebView: NSViewRepresentable {
             self.onLinkHoverPreviewChange = onLinkHoverPreviewChange
             self.linkPreviewImmediateModifier = linkPreviewImmediateModifier
             self.nativeHighlightingMenuEnabled = nativeHighlightingMenuEnabled
+            super.init()
+            Task { @MainActor [weak self] in
+                self?.observeInspectorDemand()
+            }
+        }
+
+        @MainActor
+        func updateAppState(_ appState: AppState?) {
+            guard self.appState !== appState else { return }
+            self.appState = appState
+            observeInspectorDemand()
+        }
+
+        /// Inspector selection controls WebKit telemetry, but it must not
+        /// invalidate the SwiftUI Reader hierarchy. Observe that narrow demand
+        /// outside the view graph and apply it on the next main-actor turn.
+        @MainActor
+        private func observeInspectorDemand() {
+            guard let appState else {
+                applyInspectorDemand(isVisible: false, mode: .info)
+                return
+            }
+
+            withObservationTracking {
+                applyInspectorDemand(
+                    isVisible: appState.inspectorVisible,
+                    mode: appState.inspectorMode
+                )
+            } onChange: { [weak self] in
+                Task { @MainActor [weak self] in
+                    self?.observeInspectorDemand()
+                }
+            }
+        }
+
+        @MainActor
+        private func applyInspectorDemand(
+            isVisible: Bool,
+            mode: InspectorMode
+        ) {
+            let tracksSections = isVisible && mode == .info
+            let requestsReferences = isVisible && mode == .references
+            guard tracksSections != isSectionTrackingRequested
+                    || requestsReferences != isReferencesRequested else {
+                return
+            }
+
+            isSectionTrackingRequested = tracksSections
+            isReferencesRequested = requestsReferences
+            guard let webView else { return }
+            syncScrollTelemetryMode(on: webView)
+            refreshDeferredInspectorContentIfNeeded(on: webView)
         }
 
         func attachReusedWebView(_ webView: WKWebView) {

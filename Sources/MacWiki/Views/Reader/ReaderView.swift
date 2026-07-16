@@ -663,8 +663,6 @@ struct ArticleView: View {
                 nativeHighlightingMenuEnabled: false,
                 openTimer: $openTimer,
                 appState: appState,
-                inspectorVisible: appState.inspectorVisible,
-                inspectorMode: appState.inspectorMode,
                 findOnPageRequestID: appState.pendingFindOnPageRequest?.requestID
             )
             .id(tabId)
