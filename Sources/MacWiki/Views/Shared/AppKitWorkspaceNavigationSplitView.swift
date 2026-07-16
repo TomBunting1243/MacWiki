@@ -588,6 +588,7 @@ final class AppKitWorkspaceNavigationController: NSSplitViewController {
         if let window = view.window {
             WorkspaceSplitControllerRegistry.unregister(self, from: window)
         }
+        cancelWindowGeometryTransition(resetObservedWidth: true)
         super.viewWillDisappear()
     }
 
@@ -612,6 +613,11 @@ final class AppKitWorkspaceNavigationController: NSSplitViewController {
             directoryVisible: directoryVisible,
             inspectorVisible: inspectorVisible
         )
+        // A direct pane command during a resize is newer intent than the
+        // snapshot captured at the beginning of that geometry transition.
+        if windowGeometryVisibilitySnapshot != nil {
+            windowGeometryVisibilitySnapshot = requested
+        }
         let target = readableVisibility(
             requested,
             preservingNewlyRevealedPaneComparedTo: currentVisibility
@@ -918,7 +924,11 @@ final class AppKitWorkspaceNavigationController: NSSplitViewController {
         pendingWindowGeometryReconciliation?.cancel()
         pendingWindowGeometryReconciliation = Task { @MainActor [weak self] in
             try? await Task.sleep(for: WindowGeometry.reconciliationDelay)
-            guard let self, !Task.isCancelled, let window = view.window else { return }
+            guard let self, !Task.isCancelled else { return }
+            guard let window = view.window else {
+                cancelWindowGeometryTransition(resetObservedWidth: true)
+                return
+            }
 
             let currentWindowWidth = window.contentLayoutRect.width
             if window.inLiveResize {
@@ -928,12 +938,18 @@ final class AppKitWorkspaceNavigationController: NSSplitViewController {
             }
             guard splitView.bounds.width.isFinite,
                   splitView.bounds.width > 0 else {
-                pendingWindowGeometryReconciliation = nil
+                cancelWindowGeometryTransition(resetObservedWidth: false)
                 return
             }
             guard abs(currentWindowWidth - expectedWindowWidth)
                     <= WindowGeometry.widthTolerance else {
                 lastObservedWindowContentWidth = currentWindowWidth
+                pendingWindowGeometryReconciliation = nil
+                scheduleWindowGeometryReconciliation(expectedWindowWidth: currentWindowWidth)
+                return
+            }
+            guard abs(splitView.bounds.width - currentWindowWidth)
+                    <= WindowGeometry.widthTolerance else {
                 pendingWindowGeometryReconciliation = nil
                 scheduleWindowGeometryReconciliation(expectedWindowWidth: currentWindowWidth)
                 return
@@ -974,6 +990,15 @@ final class AppKitWorkspaceNavigationController: NSSplitViewController {
             after: WidthPersistence.restoreDelay,
             replacingPending: true
         )
+    }
+
+    private func cancelWindowGeometryTransition(resetObservedWidth: Bool) {
+        pendingWindowGeometryReconciliation?.cancel()
+        pendingWindowGeometryReconciliation = nil
+        windowGeometryVisibilitySnapshot = nil
+        if resetObservedWidth {
+            lastObservedWindowContentWidth = nil
+        }
     }
 
     private func scheduleWidthPersistence() {

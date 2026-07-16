@@ -218,6 +218,76 @@ struct NativeWorkspaceLayoutTests {
         #expect(reportedVisibility == nil)
     }
 
+    @Test func paneCommandDuringResizeSupersedesTheGeometrySnapshot() async {
+        let fixture = makeFixture(width: 1_500)
+        let window = NSWindow(contentViewController: fixture.controller)
+        defer {
+            window.close()
+            fixture.tearDown()
+        }
+        window.setContentSize(fixture.size)
+        layout(fixture)
+
+        window.setContentSize(NSSize(width: 1_760, height: 900))
+        window.contentView?.layoutSubtreeIfNeeded()
+        fixture.controller.view.layoutSubtreeIfNeeded()
+        fixture.controller.setPaneVisibility(
+            listsVisible: false,
+            directoryVisible: true,
+            inspectorVisible: false,
+            animated: false
+        )
+
+        let didSettle = await waitForNativeCondition(timeout: 3) {
+            let items = fixture.controller.splitViewItems
+            return items[0].isCollapsed
+                && !items[1].isCollapsed
+                && !items[2].isCollapsed
+                && items[3].isCollapsed
+        }
+        try? await Task.sleep(for: .milliseconds(180))
+
+        let items = fixture.controller.splitViewItems
+        #expect(didSettle)
+        #expect(items[0].isCollapsed)
+        #expect(!items[1].isCollapsed)
+        #expect(!items[2].isCollapsed)
+        #expect(items[3].isCollapsed)
+    }
+
+    @Test func detachedWindowCannotLeaveGeometryReconciliationPermanentlyPending() async {
+        let fixture = makeFixture(width: 1_500)
+        var window: NSWindow? = NSWindow(contentViewController: fixture.controller)
+        window?.setContentSize(fixture.size)
+        layout(fixture)
+
+        window?.setContentSize(NSSize(width: 1_760, height: 900))
+        window?.contentView?.layoutSubtreeIfNeeded()
+        fixture.controller.view.layoutSubtreeIfNeeded()
+        window?.contentViewController = NSViewController()
+        window?.close()
+        window = nil
+        try? await Task.sleep(for: .milliseconds(180))
+
+        let replacement = NSWindow(contentViewController: fixture.controller)
+        defer {
+            replacement.close()
+            fixture.tearDown()
+        }
+        replacement.setContentSize(
+            NSSize(width: MainWindowLayout.minimumWindowWidth, height: 800)
+        )
+        replacement.contentView?.layoutSubtreeIfNeeded()
+        fixture.controller.view.layoutSubtreeIfNeeded()
+
+        let didAdapt = await waitForNativeCondition(timeout: 3) {
+            let items = fixture.controller.splitViewItems
+            return items[0].isCollapsed || items[1].isCollapsed
+        }
+        #expect(didAdapt)
+        #expect(!fixture.controller.splitViewItems[2].isCollapsed)
+    }
+
     @Test func compactWindowPreservesTheLeadingPaneTheUserExplicitlyReveals() {
         let fixture = makeFixture(width: MainWindowLayout.minimumWindowWidth)
         defer { fixture.tearDown() }
