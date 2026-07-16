@@ -50,26 +50,23 @@ struct WorkspaceArchitectureRegressionTests {
         #expect(shell.contains(".toolbar {"))
     }
 
-    @Test func readerTabsAndInspectorModesUseNativePlaneAccessoriesAroundAStableReader() throws {
+    @Test func readerTabsUseANativePlaneAccessoryWhileInspectorModesStayInsideTheInspector() throws {
         let shell = try source("Sources/MacWiki/Views/Shared/MainWindowShell.swift")
         let bridge = try source("Sources/MacWiki/Views/Shared/AppKitWorkspaceNavigationSplitView.swift")
+        let inspectorPanel = try source("Sources/MacWiki/Views/Inspector/InspectorPanel.swift")
         let detail = try #require(shell.range(of: "reader: workspaceEnvironment("))
         let inspector = try #require(shell.range(of: "inspector: workspaceEnvironment("))
         let readerAccessory = try #require(shell.range(of: "readerAccessory: workspaceEnvironment("))
-        let inspectorAccessory = try #require(shell.range(of: "inspectorAccessory: workspaceEnvironment("))
-        let inspectorModeHost = try #require(shell.range(of: "private struct InspectorModeAccessoryHost"))
         let detailSource = String(shell[detail.lowerBound..<inspector.lowerBound])
-        let readerAccessorySource = String(shell[readerAccessory.lowerBound..<inspectorAccessory.lowerBound])
-        let parentShellSource = String(shell[..<inspectorModeHost.lowerBound])
-        let inspectorModeHostSource = String(shell[inspectorModeHost.lowerBound...])
+        let readerAccessorySource = String(shell[readerAccessory.lowerBound...])
 
         #expect(detailSource.contains("ReaderColumnView()"))
         #expect(!detailSource.contains("TabBarView("))
         #expect(readerAccessorySource.contains("TabBarView("))
-        #expect(shell.contains("InspectorModeAccessoryHost()"))
-        #expect(!parentShellSource.contains("$appState.inspectorMode"))
-        #expect(inspectorModeHostSource.contains("InspectorHeaderBar(selection: $appState.inspectorMode)"))
-        #expect(shell.contains("InspectorColumnView(includesHeader: false)"))
+        #expect(shell.contains("InspectorColumnView()"))
+        #expect(!shell.contains("InspectorModeAccessoryHost"))
+        #expect(!shell.contains("inspectorAccessory: workspaceEnvironment("))
+        #expect(inspectorPanel.contains("InspectorHeaderBar(selection: $appState.inspectorMode)"))
         #expect(bridge.contains("readerController = NSHostingController("))
         #expect(bridge.contains("readerController.sizingOptions = []"))
         #expect(!bridge.contains("readerController.rootView ="))

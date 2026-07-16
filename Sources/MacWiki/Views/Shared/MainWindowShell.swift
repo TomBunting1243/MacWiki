@@ -73,7 +73,6 @@ private struct MainWorkspaceShell: View {
             readerRevision: workspaceAppearanceRevision,
             inspectorRevision: workspaceAppearanceRevision,
             readerAccessoryRevision: workspaceAppearanceRevision,
-            inspectorAccessoryRevision: workspaceAppearanceRevision,
             lists: workspaceEnvironment(
                 ListsColumnView(
                     selectedList: $selectedList,
@@ -101,16 +100,13 @@ private struct MainWorkspaceShell: View {
                     .id("main-reader-column")
             ),
             inspector: workspaceEnvironment(
-                InspectorColumnView(includesHeader: false)
+                InspectorColumnView()
             ),
             readerAccessory: workspaceEnvironment(
                 TabBarView(
                     showsTopDivider: false,
                     onNewLabelWithArticle: onNewLabelWithArticle
                 )
-            ),
-            inspectorAccessory: workspaceEnvironment(
-                InspectorModeAccessoryHost()
             )
         )
         // The semantic AppKit Sidebar and Inspector own full-height titlebar
@@ -184,17 +180,5 @@ private struct MainWorkspaceShell: View {
                 ? "high-contrast"
                 : "standard-contrast"
         ].joined(separator: "|")
-    }
-}
-
-/// Keep Inspector-mode observation inside the Inspector accessory graph.
-/// The parent shell also owns the window toolbar; reading `inspectorMode` there
-/// makes AppKit briefly recompute toolbar placement on every mode selection.
-private struct InspectorModeAccessoryHost: View {
-    @Environment(AppState.self) private var appState
-
-    var body: some View {
-        @Bindable var appState = appState
-        InspectorHeaderBar(selection: $appState.inspectorMode)
     }
 }

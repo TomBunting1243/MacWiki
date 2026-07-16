@@ -17,8 +17,7 @@ struct AppKitWorkspaceNavigationSplitView<
     Directory: View,
     Reader: View,
     Inspector: View,
-    ReaderAccessory: View,
-    InspectorAccessory: View
+    ReaderAccessory: View
 >:
     NSViewControllerRepresentable
 {
@@ -36,13 +35,11 @@ struct AppKitWorkspaceNavigationSplitView<
     let readerRevision: String
     let inspectorRevision: String
     let readerAccessoryRevision: String
-    let inspectorAccessoryRevision: String
     let lists: Lists
     let directory: Directory
     let reader: Reader
     let inspector: Inspector
     let readerAccessory: ReaderAccessory
-    let inspectorAccessory: InspectorAccessory
 
     func makeCoordinator() -> Coordinator {
         Coordinator(
@@ -54,13 +51,11 @@ struct AppKitWorkspaceNavigationSplitView<
             readerRevision: readerRevision,
             inspectorRevision: inspectorRevision,
             readerAccessoryRevision: readerAccessoryRevision,
-            inspectorAccessoryRevision: inspectorAccessoryRevision,
             lists: lists,
             directory: directory,
             reader: reader,
             inspector: inspector,
-            readerAccessory: readerAccessory,
-            inspectorAccessory: inspectorAccessory
+            readerAccessory: readerAccessory
         )
     }
 
@@ -71,7 +66,6 @@ struct AppKitWorkspaceNavigationSplitView<
             readerController: context.coordinator.readerController,
             inspectorController: context.coordinator.inspectorController,
             readerAccessoryController: context.coordinator.readerAccessoryController,
-            inspectorAccessoryController: context.coordinator.inspectorAccessoryController,
             initialListsWidth: initialListsWidth,
             initialDirectoryWidth: initialDirectoryWidth,
             initialInspectorWidth: initialInspectorWidth,
@@ -105,13 +99,11 @@ struct AppKitWorkspaceNavigationSplitView<
             reader: reader,
             inspector: inspector,
             readerAccessory: readerAccessory,
-            inspectorAccessory: inspectorAccessory,
             listsRevision: listsRevision,
             directoryRevision: directoryRevision,
             readerRevision: readerRevision,
             inspectorRevision: inspectorRevision,
-            readerAccessoryRevision: readerAccessoryRevision,
-            inspectorAccessoryRevision: inspectorAccessoryRevision
+            readerAccessoryRevision: readerAccessoryRevision
         )
         context.coordinator.requestVisibility(
             WorkspaceNavigationPaneVisibility(
@@ -153,14 +145,12 @@ struct AppKitWorkspaceNavigationSplitView<
         fileprivate let readerController: NSHostingController<WorkspaceHostingRoot<Reader>>
         fileprivate let inspectorController: WorkspaceInspectorHostingController<Inspector>
         fileprivate let readerAccessoryController: WorkspaceSplitItemAccessoryController<ReaderAccessory>
-        fileprivate let inspectorAccessoryController: WorkspaceSplitItemAccessoryController<InspectorAccessory>
 
         private let listsBox: WorkspaceHostingBox<Lists>
         private let directoryBox: WorkspaceHostingBox<Directory>
         private let readerBox: WorkspaceHostingBox<Reader>
         private let inspectorBox: WorkspaceHostingBox<Inspector>
         private let readerAccessoryBox: WorkspaceHostingBox<ReaderAccessory>
-        private let inspectorAccessoryBox: WorkspaceHostingBox<InspectorAccessory>
         private var listsVisibility: Binding<Bool>
         private var directoryVisibility: Binding<Bool>
         private var inspectorVisibility: Binding<Bool>
@@ -169,7 +159,6 @@ struct AppKitWorkspaceNavigationSplitView<
         private var lastReaderRevision: String
         private var lastInspectorRevision: String
         private var lastReaderAccessoryRevision: String
-        private var lastInspectorAccessoryRevision: String
         private var lastRequestedVisibility: WorkspaceNavigationPaneVisibility
         private var contentUpdate: Task<Void, Never>?
         private var visibilityUpdate: Task<Void, Never>?
@@ -184,13 +173,11 @@ struct AppKitWorkspaceNavigationSplitView<
             readerRevision: String,
             inspectorRevision: String,
             readerAccessoryRevision: String,
-            inspectorAccessoryRevision: String,
             lists: Lists,
             directory: Directory,
             reader: Reader,
             inspector: Inspector,
-            readerAccessory: ReaderAccessory,
-            inspectorAccessory: InspectorAccessory
+            readerAccessory: ReaderAccessory
         ) {
             listsVisibility = listsVisible
             directoryVisibility = directoryVisible
@@ -200,7 +187,6 @@ struct AppKitWorkspaceNavigationSplitView<
             lastReaderRevision = readerRevision
             lastInspectorRevision = inspectorRevision
             lastReaderAccessoryRevision = readerAccessoryRevision
-            lastInspectorAccessoryRevision = inspectorAccessoryRevision
             lastRequestedVisibility = WorkspaceNavigationPaneVisibility(
                 listsVisible: listsVisible.wrappedValue,
                 directoryVisible: directoryVisible.wrappedValue,
@@ -212,23 +198,17 @@ struct AppKitWorkspaceNavigationSplitView<
             let readerBox = WorkspaceHostingBox(content: reader)
             let inspectorBox = WorkspaceHostingBox(content: inspector)
             let readerAccessoryBox = WorkspaceHostingBox(content: readerAccessory)
-            let inspectorAccessoryBox = WorkspaceHostingBox(content: inspectorAccessory)
             self.listsBox = listsBox
             self.directoryBox = directoryBox
             self.readerBox = readerBox
             self.inspectorBox = inspectorBox
             self.readerAccessoryBox = readerAccessoryBox
-            self.inspectorAccessoryBox = inspectorAccessoryBox
             listsController = NSHostingController(rootView: WorkspaceHostingRoot(box: listsBox))
             directoryController = NSHostingController(rootView: WorkspaceHostingRoot(box: directoryBox))
             readerController = NSHostingController(rootView: WorkspaceHostingRoot(box: readerBox))
             inspectorController = WorkspaceInspectorHostingController(box: inspectorBox)
             readerAccessoryController = WorkspaceSplitItemAccessoryController(
                 box: readerAccessoryBox,
-                height: ColumnChromeMetrics.secondaryBarHeight
-            )
-            inspectorAccessoryController = WorkspaceSplitItemAccessoryController(
-                box: inspectorAccessoryBox,
                 height: ColumnChromeMetrics.secondaryBarHeight
             )
             listsController.sizingOptions = []
@@ -252,22 +232,19 @@ struct AppKitWorkspaceNavigationSplitView<
             reader: Reader,
             inspector: Inspector,
             readerAccessory: ReaderAccessory,
-            inspectorAccessory: InspectorAccessory,
             listsRevision: String,
             directoryRevision: String,
             readerRevision: String,
             inspectorRevision: String,
-            readerAccessoryRevision: String,
-            inspectorAccessoryRevision: String
+            readerAccessoryRevision: String
         ) {
             let listsChanged = lastListsRevision != listsRevision
             let directoryChanged = lastDirectoryRevision != directoryRevision
             let readerChanged = lastReaderRevision != readerRevision
             let inspectorChanged = lastInspectorRevision != inspectorRevision
             let readerAccessoryChanged = lastReaderAccessoryRevision != readerAccessoryRevision
-            let inspectorAccessoryChanged = lastInspectorAccessoryRevision != inspectorAccessoryRevision
             guard listsChanged || directoryChanged || readerChanged || inspectorChanged
-                    || readerAccessoryChanged || inspectorAccessoryChanged else {
+                    || readerAccessoryChanged else {
                 return
             }
 
@@ -294,10 +271,6 @@ struct AppKitWorkspaceNavigationSplitView<
                 if readerAccessoryChanged {
                     lastReaderAccessoryRevision = readerAccessoryRevision
                     readerAccessoryBox.content = readerAccessory
-                }
-                if inspectorAccessoryChanged {
-                    lastInspectorAccessoryRevision = inspectorAccessoryRevision
-                    inspectorAccessoryBox.content = inspectorAccessory
                 }
             }
         }
