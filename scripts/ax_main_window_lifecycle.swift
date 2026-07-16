@@ -48,7 +48,10 @@ private struct CycleRecord: Codable {
     let minimizeLatencyMilliseconds: Double
     let reopenLatencyMilliseconds: Double
     let sameWindowIdentity: Bool
+    let sameToolbarIdentity: Bool
     let framePreserved: Bool
+    let toolbarFramePreserved: Bool
+    let settledSampleCount: Int
     let totalWindowCount: Int
     let mainWindowCount: Int
     let toolbarCount: Int
@@ -90,6 +93,7 @@ private struct CloseAuditRecord: Codable {
 private struct WindowSnapshot {
     let windows: [AXUIElement]
     let mainWindows: [AXUIElement]
+    let toolbar: AXUIElement?
     let toolbarCount: Int
 
     var mainWindow: AXUIElement? {
@@ -144,15 +148,16 @@ private func snapshot(of application: AXUIElement) -> WindowSnapshot {
     let mainWindows = windows.filter {
         stringAttribute(kAXTitleAttribute as CFString, from: $0) == "MacWiki"
     }
-    let toolbarCount = mainWindows.count == 1
+    let toolbars = mainWindows.count == 1
         ? directChildren(of: mainWindows[0]).filter {
             stringAttribute(kAXRoleAttribute as CFString, from: $0) == kAXToolbarRole as String
-        }.count
-        : 0
+        }
+        : []
     return WindowSnapshot(
         windows: windows,
         mainWindows: mainWindows,
-        toolbarCount: toolbarCount
+        toolbar: toolbars.count == 1 ? toolbars[0] : nil,
+        toolbarCount: toolbars.count
     )
 }
 
@@ -281,7 +286,9 @@ private func run() throws {
         initialSnapshot = snapshot(of: application)
         return initialSnapshot.isReady
             && runningPIDs(bundleIdentifier: bundleIdentifier) == [pid]
-    }), let initialWindow = initialSnapshot.mainWindow else {
+    }), let initialWindow = initialSnapshot.mainWindow,
+          let initialToolbar = initialSnapshot.toolbar,
+          let initialToolbarFrame = frame(of: initialToolbar) else {
         throw LifecycleError.failure(
             "The native main window did not become uniquely ready: \(describe(initialSnapshot))."
         )
@@ -295,7 +302,11 @@ private func run() throws {
         let current = snapshot(of: application)
         guard current.isReady,
               let currentWindow = current.mainWindow,
+              let currentToolbar = current.toolbar,
               CFEqual(currentWindow, initialWindow),
+              CFEqual(currentToolbar, initialToolbar),
+              RectRecord(frame(of: currentToolbar) ?? .zero)
+                .approximatelyEquals(RectRecord(initialToolbarFrame)),
               runningPIDs(bundleIdentifier: bundleIdentifier) == [pid],
               !runningApplication.isTerminated else {
             throw LifecycleError.failure(
@@ -311,8 +322,11 @@ private func run() throws {
         let before = snapshot(of: application)
         guard before.isReady,
               let beforeWindow = before.mainWindow,
+              let beforeToolbar = before.toolbar,
               CFEqual(beforeWindow, initialWindow),
+              CFEqual(beforeToolbar, initialToolbar),
               let beforeFrame = frame(of: beforeWindow),
+              let beforeToolbarFrame = frame(of: beforeToolbar),
               let minimizeButton = attributeValue(
                 kAXMinimizeButtonAttribute as CFString,
                 from: beforeWindow
@@ -353,7 +367,9 @@ private func run() throws {
                 && runningPIDs(bundleIdentifier: bundleIdentifier) == [pid]
                 && !runningApplication.isTerminated
         }), let reopenedWindow = reopened.mainWindow,
-              let reopenedFrame = frame(of: reopenedWindow) else {
+              let reopenedToolbar = reopened.toolbar,
+              let reopenedFrame = frame(of: reopenedWindow),
+              let reopenedToolbarFrame = frame(of: reopenedToolbar) else {
             throw LifecycleError.failure(
                 "Cycle \(cycle) did not reopen the original native window: "
                     + describeReopenState(
@@ -369,22 +385,45 @@ private func run() throws {
         let reopenLatency = milliseconds(since: reopenStart)
         let beforeRecord = RectRecord(beforeFrame)
         let afterRecord = RectRecord(reopenedFrame)
+        let toolbarBeforeRecord = RectRecord(beforeToolbarFrame)
+        let toolbarAfterRecord = RectRecord(reopenedToolbarFrame)
         guard beforeRecord.approximatelyEquals(afterRecord) else {
             throw LifecycleError.failure(
                 "Cycle \(cycle) changed the main-window frame from \(beforeRecord) to \(afterRecord)."
             )
         }
-
-        let settled = wait(timeout: 0.6, pollInterval: 0.1) {
-            let current = snapshot(of: application)
-            guard current.isReady, let currentWindow = current.mainWindow else { return false }
-            return CFEqual(currentWindow, initialWindow)
-                && boolAttribute(kAXMinimizedAttribute as CFString, from: currentWindow) == false
-                && runningPIDs(bundleIdentifier: bundleIdentifier) == [pid]
-        }
-        guard settled else {
+        guard CFEqual(reopenedToolbar, initialToolbar),
+              toolbarBeforeRecord.approximatelyEquals(toolbarAfterRecord) else {
             throw LifecycleError.failure(
-                "Cycle \(cycle) did not settle with one native window and one full-width native toolbar."
+                "Cycle \(cycle) replaced or moved the native pane-tracking toolbar."
+            )
+        }
+
+        let settleDeadline = ProcessInfo.processInfo.systemUptime + 0.6
+        var settledSampleCount = 0
+        while ProcessInfo.processInfo.systemUptime < settleDeadline {
+            let current = snapshot(of: application)
+            guard current.isReady,
+                  let currentWindow = current.mainWindow,
+                  let currentToolbar = current.toolbar,
+                  let currentWindowFrame = frame(of: currentWindow),
+                  let currentToolbarFrame = frame(of: currentToolbar),
+                  CFEqual(currentWindow, initialWindow),
+                  CFEqual(currentToolbar, initialToolbar),
+                  boolAttribute(kAXMinimizedAttribute as CFString, from: currentWindow) == false,
+                  RectRecord(currentWindowFrame).approximatelyEquals(afterRecord),
+                  RectRecord(currentToolbarFrame).approximatelyEquals(toolbarAfterRecord),
+                  runningPIDs(bundleIdentifier: bundleIdentifier) == [pid] else {
+                throw LifecycleError.failure(
+                    "Cycle \(cycle) became unstable during the post-reopen observation window."
+                )
+            }
+            settledSampleCount += 1
+            pause(0.1)
+        }
+        guard settledSampleCount >= 5 else {
+            throw LifecycleError.failure(
+                "Cycle \(cycle) produced only \(settledSampleCount) stable post-reopen samples."
             )
         }
 
@@ -395,7 +434,10 @@ private func run() throws {
                 minimizeLatencyMilliseconds: minimizeLatency,
                 reopenLatencyMilliseconds: reopenLatency,
                 sameWindowIdentity: CFEqual(reopenedWindow, initialWindow),
+                sameToolbarIdentity: CFEqual(reopenedToolbar, initialToolbar),
                 framePreserved: beforeRecord.approximatelyEquals(afterRecord),
+                toolbarFramePreserved: toolbarBeforeRecord.approximatelyEquals(toolbarAfterRecord),
+                settledSampleCount: settledSampleCount,
                 totalWindowCount: reopened.windows.count,
                 mainWindowCount: reopened.mainWindows.count,
                 toolbarCount: reopened.toolbarCount,
@@ -408,7 +450,9 @@ private func run() throws {
     let finalSnapshot = snapshot(of: application)
     guard finalSnapshot.isReady,
           let finalWindow = finalSnapshot.mainWindow,
+          let finalToolbar = finalSnapshot.toolbar,
           CFEqual(finalWindow, initialWindow),
+          CFEqual(finalToolbar, initialToolbar),
           runningPIDs(bundleIdentifier: bundleIdentifier) == [pid] else {
         throw LifecycleError.failure(
             "The final main-window graph is not unique and stable: \(describe(finalSnapshot))."

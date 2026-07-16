@@ -22,6 +22,7 @@ struct WorkspaceArchitectureRegressionTests {
     @Test func mainWorkspaceUsesOneFourPaneAppKitSplitWithAFullHeightInspector() throws {
         let shell = try source("Sources/MacWiki/Views/Shared/MainWindowShell.swift")
         let bridge = try source("Sources/MacWiki/Views/Shared/AppKitWorkspaceNavigationSplitView.swift")
+        let toolbar = try source("Sources/MacWiki/Views/Shared/WorkspaceToolbarController.swift")
 
         #expect(shell.contains("AppKitWorkspaceNavigationSplitView("))
         #expect(!shell.contains("NavigationSplitView(columnVisibility:"))
@@ -32,7 +33,7 @@ struct WorkspaceArchitectureRegressionTests {
         #expect(bridge.contains("NSSplitViewItem(inspectorWithViewController:"))
         #expect(bridge.contains("NSSplitViewItemAccessoryViewController"))
         #expect(bridge.contains("readerItem.addTopAlignedAccessoryViewController("))
-        #expect(!bridge.contains("inspectorItem.addTopAlignedAccessoryViewController("))
+        #expect(bridge.contains("inspectorItem.addTopAlignedAccessoryViewController("))
         #expect(bridge.contains("listsItem.allowsFullHeightLayout = true"))
         #expect(bridge.contains("inspectorItem.allowsFullHeightLayout = true"))
         #expect(!bridge.contains("automaticallyAppliesContentInsets = false"))
@@ -47,10 +48,19 @@ struct WorkspaceArchitectureRegressionTests {
         #expect(!shell.contains(".inspectorColumnWidth("))
         #expect(!shell.contains(".persistedColumnWidth("))
         #expect(!shell.contains(".toolbar(removing: .sidebarToggle)"))
-        #expect(shell.contains(".toolbar {"))
+        #expect(!shell.contains(".toolbar {"))
+        #expect(shell.contains("toolbarConfiguration: WorkspaceToolbarConfiguration("))
+        #expect(bridge.contains("toolbarController = WorkspaceToolbarController("))
+        #expect(bridge.contains("toolbarController?.update(configuration: configuration)"))
+        #expect(toolbar.contains("let toolbar = NSToolbar(identifier: WorkspaceToolbarLayout.toolbarIdentifier)"))
+        #expect(toolbar.contains("NSTrackingSeparatorToolbarItem("))
+        #expect(toolbar.contains("dividerIndex: 0"))
+        #expect(toolbar.contains("dividerIndex: 1"))
+        #expect(toolbar.contains("dividerIndex: 2"))
+        #expect(!toolbar.contains("NSHostingView"))
     }
 
-    @Test func readerTabsUseANativePlaneAccessoryWhileInspectorModesStayInsideTheInspector() throws {
+    @Test func readerTabsAndInspectorModesUseTheirOwnNativePlaneAccessories() throws {
         let shell = try source("Sources/MacWiki/Views/Shared/MainWindowShell.swift")
         let bridge = try source("Sources/MacWiki/Views/Shared/AppKitWorkspaceNavigationSplitView.swift")
         let inspectorPanel = try source("Sources/MacWiki/Views/Inspector/InspectorPanel.swift")
@@ -59,16 +69,23 @@ struct WorkspaceArchitectureRegressionTests {
         let detail = try #require(shell.range(of: "reader: workspaceEnvironment("))
         let inspector = try #require(shell.range(of: "inspector: workspaceEnvironment("))
         let readerAccessory = try #require(shell.range(of: "readerAccessory: workspaceEnvironment("))
+        let inspectorAccessory = try #require(shell.range(of: "inspectorAccessory: workspaceEnvironment("))
         let detailSource = String(shell[detail.lowerBound..<inspector.lowerBound])
-        let readerAccessorySource = String(shell[readerAccessory.lowerBound...])
+        let readerAccessorySource = String(shell[readerAccessory.lowerBound..<inspectorAccessory.lowerBound])
+        let inspectorAccessorySource = String(shell[inspectorAccessory.lowerBound...])
 
         #expect(detailSource.contains("ReaderColumnView()"))
         #expect(!detailSource.contains("TabBarView("))
         #expect(readerAccessorySource.contains("TabBarView("))
-        #expect(shell.contains("InspectorColumnView()"))
+        #expect(!readerAccessorySource.contains("InspectorHeaderBar("))
+        #expect(shell.contains("InspectorColumnView(includesHeader: false)"))
         #expect(!shell.contains("InspectorModeAccessoryHost"))
-        #expect(!shell.contains("inspectorAccessory: workspaceEnvironment("))
+        #expect(inspectorAccessorySource.contains("InspectorHeaderBar(selection: $appState.inspectorMode)"))
+        #expect(bridge.contains("inspectorAccessoryController = WorkspaceSplitItemAccessoryController("))
+        #expect(bridge.contains("inspectorItem.addTopAlignedAccessoryViewController(inspectorAccessoryController)"))
+        // Standalone article windows still use the Inspector panel's embedded header.
         #expect(inspectorPanel.contains("InspectorHeaderBar(selection: $appState.inspectorMode)"))
+        #expect(inspectorPanel.contains("if includesHeader"))
         #expect(bridge.contains("readerController = NSHostingController("))
         #expect(bridge.contains("readerController.sizingOptions = []"))
         #expect(!bridge.contains("readerController.rootView ="))
@@ -79,13 +96,28 @@ struct WorkspaceArchitectureRegressionTests {
 
     @Test func mainAndArticleWindowsKeepTheirDistinctInspectorPolicies() throws {
         let shell = try source("Sources/MacWiki/Views/Shared/MainWindowShell.swift")
+        let app = try source("Sources/MacWiki/App/MacWikiApp.swift")
+        let workspaceToolbar = try source("Sources/MacWiki/Views/Shared/WorkspaceToolbarController.swift")
         let articleWindow = try source("Sources/MacWiki/Views/Shared/ArticleWindowRootView.swift")
         let policy = try source("Sources/MacWiki/Views/Shared/FixedWindowToolbarPolicy.swift")
 
         #expect(!shell.contains(".inspector(isPresented:"))
-        #expect(shell.contains("FixedWindowToolbarPolicy()"))
+        #expect(!shell.contains(".toolbar {"))
+        #expect(!shell.contains("FixedWindowToolbarPolicy()"))
+        #expect(shell.contains("toolbarConfiguration: WorkspaceToolbarConfiguration("))
+        // Only the standalone Article scene retains SwiftUI's toolbar style.
+        #expect(
+            app.components(separatedBy: ".windowToolbarStyle(.unified(showsTitle: false))").count - 1 == 1
+        )
+        #expect(workspaceToolbar.contains("guard window.toolbar == nil else"))
+        #expect(workspaceToolbar.contains("window.toolbar = toolbar"))
+        #expect(workspaceToolbar.contains("let stillOwnsWindowChrome = stillOwnsToolbar || window?.toolbar == nil"))
+        #expect(workspaceToolbar.contains("if stillOwnsWindowChrome"))
+        #expect(workspaceToolbar.contains("window.toolbar = nil"))
         #expect(articleWindow.contains(".inspector(isPresented: $appState.inspectorVisible)"))
         #expect(articleWindow.contains(".inspectorColumnWidth("))
+        #expect(articleWindow.contains(".toolbar {"))
+        #expect(articleWindow.contains("ArticleWindowReaderToolbar("))
         #expect(articleWindow.contains("FixedWindowToolbarPolicy()"))
         #expect(!policy.contains("insertItem"))
         #expect(!policy.contains("removeItem"))

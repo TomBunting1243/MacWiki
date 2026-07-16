@@ -438,7 +438,7 @@ struct BetaReadinessRegressionTests {
         #expect(harness.contains("qa_assert_candidate_manifest_matches_executable"))
         #expect(harness.contains("Set APP_BIN to a packaged candidate executable."))
         #expect(harness.contains("qa_prepare_isolated_home"))
-        #expect(harness.contains("qa_run_command_with_timeout 90"))
+        #expect(harness.contains("qa_run_command_with_timeout 180"))
         #expect(harness.contains("trap cleanup EXIT INT TERM"))
         #expect(harness.contains("EXC_BAD_ACCESS"))
         #expect(harness.contains("(.cycles | length) == 5"))
@@ -450,7 +450,10 @@ struct BetaReadinessRegressionTests {
         #expect(harness.contains(".finalToolbarCount == 1"))
         #expect(harness.contains(".closeAudit.reopenedToolbarCount == 1"))
         #expect(harness.contains(".toolbarCount == 1"))
-        #expect(harness.contains("one native full-width toolbar"))
+        #expect(harness.contains("one native pane-tracking toolbar"))
+        #expect(harness.contains(".sameToolbarIdentity == true"))
+        #expect(harness.contains(".toolbarFramePreserved == true"))
+        #expect(harness.contains(".settledSampleCount >= 5"))
         #expect(harness.contains("ownership and toolbar command reachability"))
         #expect(driver.contains("stableObservationSeconds: TimeInterval = 3.25"))
         #expect(driver.contains("residencyObservationSeconds: TimeInterval = 2.5"))
@@ -458,7 +461,10 @@ struct BetaReadinessRegressionTests {
         #expect(driver.contains("kAXCloseButtonAttribute"))
         #expect(driver.contains("kAXToolbarRole"))
         #expect(driver.contains("toolbarCount == 1"))
-        #expect(driver.contains("one full-width native toolbar"))
+        #expect(driver.contains("CFEqual(reopenedToolbar, initialToolbar)"))
+        #expect(driver.contains("became unstable during the post-reopen observation window"))
+        #expect(driver.contains("settledSampleCount >= 5"))
+        #expect(driver.contains("replaced or moved the native pane-tracking toolbar"))
         #expect(driver.contains("CFEqual(reopenedWindow, initialWindow)"))
         #expect(driver.contains("/usr/bin/open"))
         #expect(driver.contains("Cycle count must be between one and five."))
@@ -634,8 +640,15 @@ struct BetaReadinessRegressionTests {
         let contentSource = try source("Sources/MacWiki/Views/ContentView.swift")
         let shellSource = try source("Sources/MacWiki/Views/Shared/MainWindowShell.swift")
         let navigationSplitSource = try source("Sources/MacWiki/Views/Shared/AppKitWorkspaceNavigationSplitView.swift")
-        let mainToolbarSource = try source("Sources/MacWiki/Views/Shared/MainWindowReaderToolbar.swift")
+        let workspaceToolbarSource = try source("Sources/MacWiki/Views/Shared/WorkspaceToolbarController.swift")
+        let workspaceToolbarLayoutSource = try source(
+            "Sources/MacWiki/Views/Shared/WorkspaceToolbarLayout.swift"
+        )
+        let workspaceToolbarPopoverSource = try source(
+            "Sources/MacWiki/Views/Shared/WorkspaceToolbarPopoverPresenter.swift"
+        )
         let articleToolbarSource = try source("Sources/MacWiki/Views/Shared/ArticleWindowReaderToolbar.swift")
+        let articleWindowSource = try source("Sources/MacWiki/Views/Shared/ArticleWindowRootView.swift")
         let toolbarPolicySource = try source("Sources/MacWiki/Views/Shared/FixedWindowToolbarPolicy.swift")
         let nativeSearchSource = try source("Sources/MacWiki/Views/Sidebar/Search/NativeSidebarSearchField.swift")
         let searchHeaderSource = try source("Sources/MacWiki/Views/Sidebar/Search/SidebarSearchHeaderView.swift")
@@ -651,7 +664,14 @@ struct BetaReadinessRegressionTests {
         #expect(nativeSearchSource.contains("sendsSearchStringImmediately = true"))
         #expect(nativeSearchSource.contains("sidebar-search-field"))
         #expect(searchHeaderSource.contains("NativeSidebarSearchField("))
-        #expect(appSource.contains(".windowToolbarStyle(.unified(showsTitle: false))"))
+        let articleSceneStart = try #require(appSource.range(of: "WindowGroup(\"Article\""))
+        let mainSceneSource = String(appSource[..<articleSceneStart.lowerBound])
+        let articleAndSettingsSource = appSource[articleSceneStart.lowerBound...]
+        let settingsSceneStart = try #require(articleAndSettingsSource.range(of: "Settings {"))
+        let articleSceneSource = String(articleAndSettingsSource[..<settingsSceneStart.lowerBound])
+        #expect(appSource.components(separatedBy: ".windowToolbarStyle(").count - 1 == 1)
+        #expect(!mainSceneSource.contains(".windowToolbarStyle("))
+        #expect(articleSceneSource.contains(".windowToolbarStyle(.unified(showsTitle: false))"))
         #expect(!appSource.contains(".toolbarBackgroundVisibility(.hidden, for: .windowToolbar)"))
 
         #expect(shellSource.contains("MainWorkspaceShell("))
@@ -663,21 +683,28 @@ struct BetaReadinessRegressionTests {
         #expect(navigationSplitSource.contains("NSSplitViewItem(inspectorWithViewController:"))
         #expect(navigationSplitSource.contains("NSSplitViewItemAccessoryViewController"))
         #expect(navigationSplitSource.contains("addTopAlignedAccessoryViewController"))
+        #expect(navigationSplitSource.contains("readerItem.addTopAlignedAccessoryViewController("))
+        #expect(navigationSplitSource.contains("inspectorItem.addTopAlignedAccessoryViewController("))
         #expect(navigationSplitSource.contains("inspectorItem.allowsFullHeightLayout = true"))
         #expect(navigationSplitSource.contains("final class WorkspaceInspectorHostingController"))
         #expect(navigationSplitSource.contains("surface.material = .sidebar"))
         #expect(navigationSplitSource.contains("surface.blendingMode = .behindWindow"))
         #expect(navigationSplitSource.contains("inspectorItem.canCollapseFromWindowResize = false"))
+        #expect(navigationSplitSource.contains("context.coordinator.attachToolbar(to: controller)"))
+        #expect(navigationSplitSource.contains("context.coordinator.updateToolbar(configuration: toolbarConfiguration)"))
         #expect(shellSource.contains("inspectorVisible: $appState.inspectorVisible"))
+        #expect(shellSource.contains("toolbarConfiguration: WorkspaceToolbarConfiguration("))
         #expect(!shellSource.contains(".inspector(isPresented:"))
         #expect(!shellSource.contains(".inspectorColumnWidth("))
         #expect(!shellSource.contains(".persistedColumnWidth("))
-        #expect(shellSource.contains(".toolbar {"))
+        #expect(!shellSource.contains(".toolbar {"))
+        #expect(!shellSource.contains("FixedWindowToolbarPolicy()"))
         #expect(shellSource.contains("TabBarView("))
         #expect(shellSource.contains(".id(\"main-reader-column\")"))
-        #expect(shellSource.contains("InspectorColumnView()"))
+        #expect(shellSource.contains("InspectorColumnView(includesHeader: false)"))
         #expect(shellSource.contains("readerAccessory: workspaceEnvironment("))
-        #expect(!shellSource.contains("inspectorAccessory: workspaceEnvironment("))
+        #expect(shellSource.contains("inspectorAccessory: workspaceEnvironment("))
+        #expect(shellSource.contains("InspectorHeaderBar(selection: $appState.inspectorMode)"))
         #expect(!shellSource.contains("InspectorModeAccessoryHost"))
         #expect(inspectorColumnSource.contains("InspectorPanel("))
         #expect(!inspectorColumnSource.contains("ignoresSafeArea"))
@@ -685,31 +712,95 @@ struct BetaReadinessRegressionTests {
         #expect(!readerColumnSource.contains("TabBarView("))
         #expect(tabBarSource.contains("Color.clear"))
         #expect(!tabBarSource.contains("ReaderTabLaneBackground()"))
-        #expect(mainToolbarSource.contains("ToolbarContent"))
+
+        #expect(workspaceToolbarSource.contains("final class WorkspaceToolbarController: NSObject"))
+        #expect(workspaceToolbarSource.contains("NSToolbarDelegate"))
+        #expect(workspaceToolbarSource.contains("NSToolbarItemValidation"))
+        #expect(workspaceToolbarSource.contains("let toolbar = NSToolbar(identifier: WorkspaceToolbarLayout.toolbarIdentifier)"))
+        #expect(workspaceToolbarSource.contains("guard window.toolbar == nil else"))
+        #expect(workspaceToolbarSource.contains("NSToolbarItem(itemIdentifier: identifier)"))
+        #expect(workspaceToolbarSource.contains("NSSharingServicePickerToolbarItem(itemIdentifier: itemIdentifier)"))
+        #expect(workspaceToolbarSource.contains("NSTrackingSeparatorToolbarItem("))
+        #expect(workspaceToolbarSource.components(separatedBy: "return trackingSeparator(").count - 1 == 3)
+        #expect(!workspaceToolbarSource.contains("NSHostingView"))
+
+        func toolbarSwitchCase(_ identifier: String, endingAt nextIdentifier: String) throws -> String {
+            let start = try #require(workspaceToolbarSource.range(of: "case \(identifier):"))
+            let remainder = start.upperBound..<workspaceToolbarSource.endIndex
+            let end = try #require(
+                workspaceToolbarSource.range(of: "case \(nextIdentifier):", range: remainder)
+            )
+            return String(workspaceToolbarSource[start.lowerBound..<end.lowerBound])
+        }
+        let listsBoundaryCase = try toolbarSwitchCase(
+            ".workspaceListsDirectoryBoundary",
+            endingAt: ".workspaceDirectoryReaderBoundary"
+        )
+        let directoryBoundaryCase = try toolbarSwitchCase(
+            ".workspaceDirectoryReaderBoundary",
+            endingAt: ".workspaceReaderInspectorBoundary"
+        )
+        let inspectorBoundaryCase = try toolbarSwitchCase(
+            ".workspaceReaderInspectorBoundary",
+            endingAt: ".workspaceLists"
+        )
+        #expect(listsBoundaryCase.contains("dividerIndex: 0"))
+        #expect(directoryBoundaryCase.contains("dividerIndex: 1"))
+        #expect(inspectorBoundaryCase.contains("dividerIndex: 2"))
+
+        let defaultItemsStart = try #require(
+            workspaceToolbarLayoutSource.range(of: "static let defaultItemIdentifiers")
+        )
+        let readerItemsStart = try #require(
+            workspaceToolbarLayoutSource.range(
+                of: "static let readerItemIdentifiers",
+                range: defaultItemsStart.upperBound..<workspaceToolbarLayoutSource.endIndex
+            )
+        )
+        let defaultItemsSource = String(
+            workspaceToolbarLayoutSource[defaultItemsStart.lowerBound..<readerItemsStart.lowerBound]
+        )
+        let inspectorToggle = try #require(defaultItemsSource.range(of: ".workspaceInspectorToggle"))
+        let inspectorBoundary = try #require(defaultItemsSource.range(of: ".workspaceReaderInspectorBoundary"))
+        #expect(inspectorToggle.lowerBound < inspectorBoundary.lowerBound)
+        #expect(defaultItemsSource.contains(
+            ".workspaceInspectorToggle,\n        .workspaceReaderInspectorBoundary\n    ]"
+        ))
+        for readerItem in [
+            ".workspaceBack", ".workspaceForward", ".workspaceSearch", ".workspaceSave",
+            ".workspaceReadState", ".workspaceFind", ".workspaceReaderStyle",
+            ".workspacePageViews", ".workspaceOpenBrowser", ".workspaceShare",
+            ".workspaceInspectorToggle"
+        ] {
+            let item = try #require(defaultItemsSource.range(of: readerItem))
+            #expect(item.lowerBound < inspectorBoundary.lowerBound)
+        }
+
         #expect(articleToolbarSource.contains("ToolbarContent"))
-        #expect(!mainToolbarSource.contains("CustomizableToolbarContent"))
         #expect(!articleToolbarSource.contains("CustomizableToolbarContent"))
-        #expect(mainToolbarSource.contains("ToolbarItem(placement: .navigation)"))
         #expect(articleToolbarSource.contains("ToolbarItem(placement: .navigation)"))
-        #expect(mainToolbarSource.contains("ControlGroup(\"Reader Actions\")"))
         #expect(articleToolbarSource.contains("ControlGroup(\"Reader Actions\")"))
-        #expect(mainToolbarSource.contains("ToolbarSpacer(.flexible, placement: .primaryAction)"))
         #expect(articleToolbarSource.contains("ToolbarSpacer(.flexible, placement: .primaryAction)"))
-        #expect(mainToolbarSource.contains("appState.toggleListsSidebarVisibility()"))
-        #expect(mainToolbarSource.contains("appState.listsSidebarVisible ? \"Hide Lists\" : \"Show Lists\""))
-        #expect(!mainToolbarSource.contains("sidebar.leading"))
-        #expect(mainToolbarSource.contains("appState.toggleDirectoryColumnVisibility()"))
+        #expect(articleWindowSource.contains(".toolbar {"))
+        #expect(articleWindowSource.contains("ArticleWindowReaderToolbar("))
+        #expect(articleWindowSource.contains("FixedWindowToolbarPolicy()"))
+        #expect(workspaceToolbarSource.contains("configuration.appState.toggleListsSidebarVisibility()"))
+        #expect(workspaceToolbarSource.contains("configuration.appState.toggleDirectoryColumnVisibility()"))
+        #expect(workspaceToolbarSource.contains("snapshot.listsVisible ? \"Hide Lists\" : \"Show Lists\""))
+        #expect(!workspaceToolbarSource.contains("sidebar.leading"))
         #expect(!toolbarPolicySource.contains("toolbar.items"))
         #expect(!toolbarPolicySource.contains("insertItem"))
         #expect(!toolbarPolicySource.contains("removeItem"))
         #expect(!toolbarPolicySource.contains("WorkspaceInspectorResponder"))
         #expect(!toolbarPolicySource.contains("NSWindow.didUpdateNotification"))
         #expect(toolbarPolicySource.contains("toolbar.allowsUserCustomization = false"))
-        #expect(tabAccessorySource.contains("appState.toggleInspectorVisibility()"))
-        #expect(tabAccessorySource.contains("toggle-reader-inspector"))
-        #expect(mainToolbarSource.contains("appState.goBack()"))
-        #expect(mainToolbarSource.contains("appState.goForward()"))
-        #expect(mainToolbarSource.contains("appState.startSearch(context: .navigation)"))
+        #expect(!tabAccessorySource.contains("appState.toggleInspectorVisibility()"))
+        #expect(!tabAccessorySource.contains("toggle-reader-inspector"))
+        #expect(workspaceToolbarSource.contains("configuration.appState.toggleInspectorVisibility()"))
+        #expect(workspaceToolbarSource.contains("action: #selector(toggleInspector(_:))"))
+        #expect(workspaceToolbarSource.contains("configuration.appState.goBack()"))
+        #expect(workspaceToolbarSource.contains("configuration.appState.goForward()"))
+        #expect(workspaceToolbarSource.contains("configuration.appState.startSearch(context: .navigation)"))
         #expect(contentSource.contains(".focusedSceneValue(\\.macWikiInspectorCommandsAvailable, true)"))
         #expect(commandSource.contains("@FocusedValue(\\.macWikiInspectorCommandsAvailable)"))
         #expect(commandSource.contains("appState.listsSidebarVisible ? \"Hide Lists\" : \"Show Lists\""))
@@ -718,19 +809,21 @@ struct BetaReadinessRegressionTests {
         #expect(commandSource.contains("appState.toggleDirectoryColumnVisibility()"))
         #expect(commandSource.contains("inspectorCommandsAvailable != true"))
         #expect(commandSource.contains("|| !supports(.inspector)"))
-        #expect(mainToolbarSource.contains("SaveToListPopover(article: article)"))
-        #expect(mainToolbarSource.contains("ReaderStylePopover()"))
-        #expect(mainToolbarSource.contains("SidebarPageViewsPopoverContent("))
-        #expect(mainToolbarSource.contains("ReadStateSync.applyReadState("))
-        #expect(mainToolbarSource.contains("openURL(article.url)"))
-        #expect(mainToolbarSource.contains("ShareLink(item: article.url)"))
-        #expect(!mainToolbarSource.contains("toggle-reader-inspector"))
-        #expect(!mainToolbarSource.contains("toggleInspectorVisibility"))
+        #expect(workspaceToolbarPopoverSource.contains("SaveToListPopover(article: article)"))
+        #expect(workspaceToolbarPopoverSource.contains("ReaderStylePopover()"))
+        #expect(workspaceToolbarPopoverSource.contains("SidebarPageViewsPopoverContent("))
+        #expect(workspaceToolbarSource.contains("ReadStateSync.applyReadState("))
+        #expect(workspaceToolbarSource.contains("configuration.openURL(url)"))
+        #expect(workspaceToolbarSource.contains("NSSharingServicePickerToolbarItemDelegate"))
+        #expect(workspaceToolbarSource.contains("return [url]"))
+        #expect(workspaceToolbarSource.contains("popoverPresenter.close()"))
+        #expect(workspaceToolbarPopoverSource.contains("func close()"))
         #expect(navigationSource.contains("func toggleListsSidebarVisibility()"))
         #expect(navigationSource.contains("func toggleDirectoryColumnVisibility()"))
         for obsoletePath in [
             "Sources/MacWiki/Views/Shared/NativeWorkspaceSplitView.swift",
             "Sources/MacWiki/Views/Shared/WorkspaceSplitViewController.swift",
+            "Sources/MacWiki/Views/Shared/MainWindowReaderToolbar.swift",
             "Sources/MacWiki/Views/Shared/ReaderTopChromeView.swift",
             "Sources/MacWiki/Views/Shared/NativeReaderToolbarButton.swift"
         ] {
@@ -789,11 +882,12 @@ struct BetaReadinessRegressionTests {
 
     @Test func customChromeHonorsTransparencyAndContrastPersonalization() throws {
         let columnChrome = try source("Sources/MacWiki/Views/Shared/ColumnTopBar.swift")
-        let mainToolbar = try source("Sources/MacWiki/Views/Shared/MainWindowReaderToolbar.swift")
+        let mainToolbar = try source("Sources/MacWiki/Views/Shared/WorkspaceToolbarController.swift")
         let tabItem = try source("Sources/MacWiki/Views/Components/ReaderTabItemView.swift")
         let appSource = try source("Sources/MacWiki/App/MacWikiApp.swift")
         let qaPersonalizationSource = try source("Sources/MacWiki/App/MacWikiQAPersonalization.swift")
 
+        #expect(appSource.components(separatedBy: ".windowToolbarStyle(").count - 1 == 1)
         #expect(appSource.contains(".windowToolbarStyle(.unified(showsTitle: false))"))
         #expect(!appSource.contains(".toolbarBackgroundVisibility(.hidden, for: .windowToolbar)"))
 
@@ -1533,7 +1627,7 @@ struct BetaReadinessRegressionTests {
         #expect(harness.contains("qa_launch_candidate \"$APP_LOG\""))
         #expect(harness.contains("[[ \"$VERSION\" == 1.0* ]]"))
         #expect(harness.contains("swiftc \"$SCRIPT_DIR/ax_reader_inspector_journey.swift\" -o \"$AX_DRIVER_BIN\""))
-        #expect(harness.contains("if ! MACWIKI_QA_APP_LOG=\"$APP_LOG\" qa_run_command_with_timeout 90 \"$AX_DRIVER_BIN\""))
+        #expect(harness.contains("if ! MACWIKI_QA_APP_LOG=\"$APP_LOG\" qa_run_command_with_timeout 180 \"$AX_DRIVER_BIN\""))
         #expect(harness.contains("\"$QA_APP_PID\" \"$ARTICLE_TITLE\""))
         #expect(harness.contains("READER_PID=\"$QA_APP_PID\""))
         #expect(harness.contains("Exact candidate PID: `%s`\\n' \"$READER_PID\""))
@@ -1582,14 +1676,27 @@ struct BetaReadinessRegressionTests {
         #expect(driver.contains("private func nativeSplitPaneSizes(in window:"))
         #expect(driver.contains("private func inspectorPane(in window:"))
         #expect(driver.contains("private func readerPane(in window: AXUIElement, articleTitle: String)"))
-        #expect(driver.contains("let refreshed = try? inspectorButton(label)"))
         #expect(driver.contains("in: contentWindow,\n            role: kAXTextFieldRole"))
         #expect(!driver.contains("labels(in: contentWindow"))
         #expect(!driver.contains("MACWIKI_QA_AX_PAUSE_BEFORE_RESIZE"))
         #expect(driver.contains("workspaceSplitGroup("))
         #expect(driver.contains("macOS 26 exposes each native split-item accessory as a sibling AXGroup"))
         #expect(driver.contains("$0.height >= referenceHeight * 0.5"))
-        #expect(harness.contains("Reader-edge toggle alignment"))
+        #expect(harness.contains("every Reader control stays between dividers 1 and 2"))
+        #expect(harness.contains("live toolbar identity/frame sampling"))
+        #expect(driver.contains("frame.maxX <= inspectorFrame.minX + paneAlignmentTolerance"))
+        #expect(driver.contains("toolbarModeSwitchSampleCount"))
+        #expect(driver.contains("verifyToolbarStabilityDuringInspectorTransition(untilSelected:"))
+        #expect(driver.contains("transitionSampleCount >= 5"))
+        #expect(harness.contains(".toolbarModeSwitchSampleCount >= 195"))
+        #expect(driver.contains("kAXMenuButtonRole"))
+        #expect(driver.contains("supportsAction(kAXPressAction"))
+        #expect(driver.contains("let readStateControlCycle: String"))
+        #expect(driver.contains("try press(initialReadControl, label: \"Mark as Read\")"))
+        #expect(driver.contains("toolbarControl(in: toolbar, label: \"Mark as Unread\") != nil"))
+        #expect(driver.contains("without replacing the toolbar"))
+        #expect(harness.contains(".readStateControlCycle | contains(\"Mark as Unread\")"))
+        #expect(harness.contains("Read/Unread changes in place and restores"))
         #expect(harness.contains("require fresh Computer Use evidence"))
     }
 
@@ -1805,10 +1912,12 @@ struct BetaReadinessRegressionTests {
         #expect(splitSource.contains("NSSplitViewItem(inspectorWithViewController:"))
         #expect(splitSource.contains("NSSplitViewItemAccessoryViewController"))
         #expect(splitSource.contains("readerItem.addTopAlignedAccessoryViewController("))
-        #expect(!shellSource.contains("inspectorAccessory: workspaceEnvironment("))
+        #expect(splitSource.contains("inspectorItem.addTopAlignedAccessoryViewController("))
+        #expect(shellSource.contains("inspectorAccessory: workspaceEnvironment("))
+        #expect(shellSource.contains("InspectorHeaderBar(selection: $appState.inspectorMode)"))
         #expect(splitSource.contains("readerController.sizingOptions = []"))
         #expect(!splitSource.contains("readerController.rootView ="))
-        #expect(shellSource.contains("InspectorColumnView()"))
+        #expect(shellSource.contains("InspectorColumnView(includesHeader: false)"))
         #expect(shellSource.contains("inspectorVisible: $appState.inspectorVisible"))
         #expect(!shellSource.contains(".inspector(isPresented:"))
         #expect(!shellSource.contains(".persistedColumnWidth("))

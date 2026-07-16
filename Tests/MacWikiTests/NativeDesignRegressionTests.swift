@@ -156,7 +156,18 @@ struct NativeDesignRegressionTests {
     }
 
     @Test func readerToolbarsCommandsAndStyleControlsStayNativeReachableAndLockedSafely() throws {
-        let toolbar = try source("Sources/MacWiki/Views/Shared/MainWindowReaderToolbar.swift")
+        let app = try source("Sources/MacWiki/App/MacWikiApp.swift")
+        let shell = try source("Sources/MacWiki/Views/Shared/MainWindowShell.swift")
+        let toolbar = try source("Sources/MacWiki/Views/Shared/WorkspaceToolbarController.swift")
+        let toolbarConfiguration = try source(
+            "Sources/MacWiki/Views/Shared/WorkspaceToolbarConfiguration.swift"
+        )
+        let toolbarLayout = try source(
+            "Sources/MacWiki/Views/Shared/WorkspaceToolbarLayout.swift"
+        )
+        let toolbarPopoverPresenter = try source(
+            "Sources/MacWiki/Views/Shared/WorkspaceToolbarPopoverPresenter.swift"
+        )
         let articleToolbar = try source("Sources/MacWiki/Views/Shared/ArticleWindowReaderToolbar.swift")
         let articleWindow = try source("Sources/MacWiki/Views/Shared/ArticleWindowRootView.swift")
         let toolbarPolicy = try source("Sources/MacWiki/Views/Shared/FixedWindowToolbarPolicy.swift")
@@ -164,24 +175,65 @@ struct NativeDesignRegressionTests {
         let commands = try source("Sources/MacWiki/App/MacWikiCommands.swift")
         let style = try source("Sources/MacWiki/Views/Components/ReaderStylePopover.swift")
 
-        #expect(toolbar.contains("ToolbarContent"))
-        #expect(!toolbar.contains("CustomizableToolbarContent"))
-        #expect(toolbar.contains("ControlGroup"))
-        #expect(toolbar.contains("ToolbarItem(placement: .navigation)"))
-        #expect(toolbar.contains("ControlGroup(\"Workspace\")"))
-        #expect(toolbar.contains("ControlGroup(\"History and Search\")"))
-        #expect(toolbar.contains("ControlGroup(\"Reader Actions\")"))
-        #expect(toolbar.contains("ToolbarSpacer(.flexible, placement: .primaryAction)"))
-        #expect(toolbar.contains(".disabled(article == nil)"))
-        #expect(toolbar.contains("appState.canGoBack"))
-        #expect(toolbar.contains("toggleListsSidebarVisibility"))
-        #expect(toolbar.contains("appState.listsSidebarVisible ? \"Hide Lists\" : \"Show Lists\""))
-        #expect(toolbar.contains("systemImage: \"sidebar.left\""))
+        // The main window has one AppKit-owned, fixed toolbar made entirely
+        // from standard bordered toolbar items and native split separators.
+        #expect(toolbar.contains("final class WorkspaceToolbarController: NSObject"))
+        #expect(toolbar.contains("NSToolbarDelegate"))
+        #expect(toolbar.contains("NSToolbarItemValidation"))
+        #expect(toolbar.contains("NSSharingServicePickerToolbarItemDelegate"))
+        #expect(toolbar.contains("NSToolbarItem(itemIdentifier: identifier)"))
+        #expect(toolbar.contains("NSSharingServicePickerToolbarItem(itemIdentifier: itemIdentifier)"))
+        #expect(toolbar.contains("NSTrackingSeparatorToolbarItem("))
+        for dividerIndex in 0...2 {
+            #expect(toolbar.contains("dividerIndex: \(dividerIndex)"))
+        }
+        #expect(toolbar.contains("item.isBordered = true"))
+        #expect(toolbar.contains("item.style = .plain"))
+        #expect(toolbar.contains("toolbar.allowsUserCustomization = false"))
+        #expect(toolbar.contains("toolbar.allowsDisplayModeCustomization = false"))
+        #expect(toolbar.contains("toolbar.autosavesConfiguration = false"))
+        #expect(toolbar.contains("toolbarImmovableItemIdentifiers"))
+        #expect(toolbarLayout.contains(".flexibleSpace"))
+        #expect(toolbarPopoverPresenter.contains("popover.show(relativeTo: item)"))
+
+        // Toolbar controls must not recreate native chrome with hosted views,
+        // custom buttons, visual-effect planes, or hand-applied glass.
+        #expect(!toolbar.contains("NSHostingView"))
+        #expect(!toolbar.contains("NSButton"))
+        #expect(!toolbar.contains("ControlGroup"))
+        #expect(!toolbar.contains("NSVisualEffectView"))
+        #expect(!toolbar.contains("MacWikiGlassGroup"))
+        #expect(!toolbar.contains(".glassEffect("))
+        #expect(!toolbar.contains(".view ="))
+
+        // Reader tabs and the Inspector selector are split-item accessories;
+        // they are not competing SwiftUI toolbar lanes.
+        #expect(shell.contains("toolbarConfiguration: WorkspaceToolbarConfiguration("))
+        #expect(shell.contains("readerAccessory: workspaceEnvironment("))
+        #expect(shell.contains("inspectorAccessory: workspaceEnvironment("))
+        #expect(shell.contains("InspectorHeaderBar(selection: $appState.inspectorMode)"))
+        #expect(shell.contains("InspectorColumnView(includesHeader: false)"))
+        #expect(!shell.contains(".toolbar {"))
+        #expect(!shell.contains("FixedWindowToolbarPolicy()"))
+        #expect(!toolbarConfiguration.contains("inspectorMode"))
+
+        // Only the SwiftUI-owned Article window retains SwiftUI toolbar style
+        // and policy. The main window leaves toolbar ownership entirely AppKit.
+        let articleSceneBoundary = "WindowGroup(\"Article\", for: Article.self)"
+        let appScenes = app.components(separatedBy: articleSceneBoundary)
+        #expect(appScenes.count == 2)
+        let mainScene = try #require(appScenes.first)
+        let articleScene = try #require(appScenes.dropFirst().first)
+        #expect(!mainScene.contains(".windowToolbarStyle(.unified(showsTitle: false))"))
+        #expect(articleScene.contains(".windowToolbarStyle(.unified(showsTitle: false))"))
+        #expect(articleWindow.contains("FixedWindowToolbarPolicy()"))
+
+        #expect(toolbar.contains("snapshot.canGoBack"))
+        #expect(toolbar.contains("configuration.appState.toggleListsSidebarVisibility()"))
+        #expect(toolbar.contains("symbol: \"sidebar.left\""))
         #expect(!toolbar.contains("sidebar.leading"))
-        #expect(toolbar.contains("toggleDirectoryColumnVisibility"))
-        #expect(toolbar.contains("reader-find-in-page"))
-        #expect(!toolbar.contains("toggle-reader-inspector"))
-        #expect(!toolbar.contains("toggleInspectorVisibility"))
+        #expect(toolbar.contains("configuration.appState.toggleDirectoryColumnVisibility()"))
+        #expect(toolbar.contains("configuration.appState.toggleInspectorVisibility()"))
         #expect(articleToolbar.contains("ToolbarContent"))
         #expect(!articleToolbar.contains("CustomizableToolbarContent"))
         #expect(articleToolbar.contains("ToolbarItem(placement: .navigation)"))
@@ -191,8 +243,8 @@ struct NativeDesignRegressionTests {
         #expect(!toolbarPolicy.contains("insertItem"))
         #expect(!toolbarPolicy.contains("removeItem"))
         #expect(toolbarPolicy.contains("toolbar.allowsUserCustomization = false"))
-        #expect(tabAccessories.contains("appState.toggleInspectorVisibility()"))
-        #expect(tabAccessories.contains("toggle-reader-inspector"))
+        #expect(!tabAccessories.contains("appState.toggleInspectorVisibility()"))
+        #expect(!tabAccessories.contains("toggle-reader-inspector"))
         for action in ["Save Article", "Mark as Read", "Find in Page", "Reader Style", "Page Views", "Open in Browser", "Share"] {
             #expect(toolbar.contains(action))
             #expect(articleToolbar.contains(action))
@@ -217,6 +269,7 @@ struct NativeDesignRegressionTests {
         #expect(articleWindow.contains(".onChange(of: appState.readerPageViewsPresentationRequestID)"))
         #expect(articleWindow.contains("showsPageViewsPopover = true"))
         for obsoletePath in [
+            "Sources/MacWiki/Views/Shared/MainWindowReaderToolbar.swift",
             "Sources/MacWiki/Views/Shared/ArticleWindowReaderCommandPresenter.swift",
             "Sources/MacWiki/Views/Shared/ReaderToolbarPopoverPresenter.swift"
         ] {

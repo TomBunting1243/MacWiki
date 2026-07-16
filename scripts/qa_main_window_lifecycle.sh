@@ -55,7 +55,7 @@ swiftc "$SCRIPT_DIR/ax_main_window_lifecycle.swift" -o "$AX_DRIVER_BIN"
 
 qa_launch_candidate "$APP_LOG"
 LIFECYCLE_PID="$QA_APP_PID"
-qa_run_command_with_timeout 90 "$AX_DRIVER_BIN" \
+qa_run_command_with_timeout 180 "$AX_DRIVER_BIN" \
   "$QA_APP_PID" "$APP_BUNDLE_PATH" 5 --audit-close >"$AX_RESULT"
 kill -0 "$QA_APP_PID"
 
@@ -82,7 +82,10 @@ jq -e --argjson pid "$LIFECYCLE_PID" '
   and all(.cycles[];
     .pid == $pid
     and .sameWindowIdentity == true
+    and .sameToolbarIdentity == true
     and .framePreserved == true
+    and .toolbarFramePreserved == true
+    and .settledSampleCount >= 5
     and .totalWindowCount == 1
     and .mainWindowCount == 1
     and .toolbarCount == 1
@@ -117,8 +120,8 @@ MAX_REOPEN_LATENCY="$(jq -r '[.cycles[].reopenLatencyMilliseconds] | max' "$AX_R
     "$QA_XCODE_VERSION" "$QA_BINARY_MIN_OS" "$QA_BINARY_SDK"
   printf -- '- Exact lifecycle PID: `%s`\n' "$LIFECYCLE_PID"
   printf -- '- Isolated QA home: `%s`\n' "$QA_HOME"
-  printf -- '- Cold launch: one main window with one native full-width toolbar remained stable for more than three seconds in the empty workspace\n'
-  printf -- '- Native lifecycle: five minimize and LaunchServices reopen cycles retained the same PID, AX window identity, frame, and single-toolbar structure\n'
+  printf -- '- Cold launch: one main window with one native pane-tracking toolbar remained stable for more than three seconds in the empty workspace\n'
+  printf -- '- Native lifecycle: five minimize and LaunchServices reopen cycles retained the same PID, AX window and toolbar identities, window frame, toolbar frame, and single-toolbar structure\n'
   printf -- '- Red close: the app remained resident without windows for 2.5 seconds, then LaunchServices recreated one native main window in the same PID and frame\n'
   printf -- '- Four-pane AppKit split ownership and toolbar command reachability are guarded by focused regressions; this lifecycle driver intentionally validates the stable native window and toolbar graph without inferring pane state or visual placement from accessibility overflow descendants\n'
   printf -- '- Maximum minimize latency: `%s ms`\n' "$MAX_MINIMIZE_LATENCY"

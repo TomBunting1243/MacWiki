@@ -302,7 +302,6 @@ struct MacWikiApp: App {
         .modelContainer(bootstrap.modelContainer)
         .restorationBehavior(.disabled)
         .windowBackgroundDragBehavior(.enabled)
-        .windowToolbarStyle(.unified(showsTitle: false))
         .defaultWindowPlacement { _, context in
             WindowPlacement(.center, size: context.defaultDisplay.visibleRect.size)
         }

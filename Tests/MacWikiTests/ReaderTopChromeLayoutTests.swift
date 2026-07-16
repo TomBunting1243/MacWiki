@@ -7,108 +7,166 @@ import Testing
 
 @Suite("Reader toolbar and search layout")
 struct ReaderTopChromeLayoutTests {
-    @Test("main reader commands use a full-width stable native toolbar")
+    @Test("main reader commands use one directly owned native AppKit toolbar")
     func mainReaderUsesNativeWindowToolbar() throws {
-        let toolbar = try source("Sources/MacWiki/Views/Shared/MainWindowReaderToolbar.swift")
+        let toolbar = try source("Sources/MacWiki/Views/Shared/WorkspaceToolbarController.swift")
+        let configuration = try source("Sources/MacWiki/Views/Shared/WorkspaceToolbarConfiguration.swift")
+        let bridge = try source("Sources/MacWiki/Views/Shared/AppKitWorkspaceNavigationSplitView.swift")
         let shell = try source("Sources/MacWiki/Views/Shared/MainWindowShell.swift")
-        let policy = try source("Sources/MacWiki/Views/Shared/FixedWindowToolbarPolicy.swift")
         let tabAccessories = try source("Sources/MacWiki/Views/Components/ReaderTabAccessoryCluster.swift")
 
-        #expect(toolbar.contains("struct MainWindowReaderToolbar: ToolbarContent"))
-        #expect(!toolbar.contains("CustomizableToolbarContent"))
-        #expect(!toolbar.contains("ToolbarItem(id:"))
-        #expect(toolbar.contains("ControlGroup(\"Workspace\")"))
-        #expect(toolbar.contains("ControlGroup(\"History and Search\")"))
-        #expect(toolbar.contains("ToolbarItem(placement: .navigation)"))
-        #expect(toolbar.contains("ControlGroup(\"Reader Actions\")"))
-        #expect(toolbar.contains("ToolbarItem(placement: .primaryAction)"))
-        #expect(toolbar.contains("ToolbarSpacer(.flexible, placement: .primaryAction)"))
-        #expect(!toolbar.contains("ToolbarSpacer(.fixed)"))
-        #expect(shell.contains(".toolbar {"))
-        #expect(!shell.contains(".toolbar(removing: .sidebarToggle)"))
+        #expect(toolbar.contains("final class WorkspaceToolbarController: NSObject,"))
+        #expect(toolbar.contains("NSToolbarDelegate"))
+        #expect(toolbar.contains("NSToolbarItemValidation"))
+        #expect(toolbar.contains("NSSharingServicePickerToolbarItemDelegate"))
+        #expect(toolbar.contains("let toolbar = NSToolbar(identifier: WorkspaceToolbarLayout.toolbarIdentifier)"))
+        #expect(toolbar.contains("guard window.toolbar == nil else"))
+        #expect(toolbar.contains("window.toolbar = toolbar"))
+        #expect(toolbar.contains("toolbar.allowsUserCustomization = false"))
+        #expect(toolbar.contains("toolbar.autosavesConfiguration = false"))
+        #expect(toolbar.contains("NSToolbarItem(itemIdentifier: identifier)"))
+        #expect(toolbar.contains("NSSharingServicePickerToolbarItem(itemIdentifier: itemIdentifier)"))
+        #expect(toolbar.contains("item.target = self"))
+        #expect(toolbar.contains("item.action = action"))
+        #expect(!toolbar.contains("NSHostingView"))
+        #expect(configuration.contains("struct WorkspaceToolbarSnapshot: Equatable"))
+        #expect(configuration.contains("mode and Reader/WebKit projection state are deliberately absent"))
+        #expect(bridge.contains("toolbarController = WorkspaceToolbarController("))
+        #expect(bridge.contains("toolbarController?.update(configuration: configuration)"))
+        #expect(shell.contains("toolbarConfiguration: WorkspaceToolbarConfiguration("))
+        #expect(!shell.contains(".toolbar {"))
+        #expect(!shell.contains("FixedWindowToolbarPolicy()"))
         #expect(shell.contains("TabBarView("))
         #expect(shell.contains("ReaderColumnView()"))
         #expect(shell.contains("readerAccessory: workspaceEnvironment("))
-        #expect(shell.contains("InspectorColumnView()"))
-        #expect(!shell.contains("inspectorAccessory: workspaceEnvironment("))
-        #expect(!toolbar.contains("NSButton"))
-        #expect(!toolbar.contains(".controlSize(.small)"))
-        #expect(!toolbar.contains(".frame(width:"))
-        #expect(policy.contains("toolbar.allowsUserCustomization = false"))
-        #expect(policy.contains("toolbar.autosavesConfiguration = false"))
-        #expect(!policy.contains("toolbar.items"))
-        #expect(!policy.contains("insertItem"))
-        #expect(!policy.contains("toolbar.removeItem(at:"))
-        #expect(!policy.contains("NSWindow.didUpdateNotification"))
-        #expect(!policy.contains("override func layout"))
-        #expect(shell.contains("FixedWindowToolbarPolicy()"))
-        #expect(tabAccessories.contains("appState.toggleInspectorVisibility()"))
-        #expect(tabAccessories.contains("toggle-reader-inspector"))
-        #expect(!toolbar.contains("toggle-reader-inspector"))
-        #expect(!toolbar.contains("appState.toggleInspectorVisibility()"))
+        #expect(shell.contains("InspectorColumnView(includesHeader: false)"))
+        #expect(shell.contains("inspectorAccessory: workspaceEnvironment("))
+        #expect(shell.contains("InspectorHeaderBar(selection: $appState.inspectorMode)"))
+        #expect(!tabAccessories.contains("appState.toggleInspectorVisibility()"))
+        #expect(!tabAccessories.contains("toggle-reader-inspector"))
+        #expect(toolbar.contains("configuration.appState.toggleInspectorVisibility()"))
+        #expect(!FileManager.default.fileExists(
+            atPath: repositoryRoot
+                .appending(path: "Sources/MacWiki/Views/Shared/MainWindowReaderToolbar.swift")
+                .path
+        ))
     }
 
-    @Test("navigation remains leading and reader actions remain trailing")
+    @Test("native boundaries keep every Reader item before the Inspector plane")
     func readerToolbarUsesStableEdgeAlignment() throws {
-        for path in [
-            "Sources/MacWiki/Views/Shared/MainWindowReaderToolbar.swift",
-            "Sources/MacWiki/Views/Shared/ArticleWindowReaderToolbar.swift"
-        ] {
-            let toolbar = try source(path)
-            let leadingPlacement = try #require(toolbar.range(of: "ToolbarItem(placement: .navigation)"))
-            let leadingControl = try #require(toolbar.range(of: "ControlGroup("))
-            let flexibleSpacer = try #require(toolbar.range(of: "ToolbarSpacer(.flexible, placement: .primaryAction)"))
-            let trailingPlacement = try #require(toolbar.range(of: "ToolbarItem(placement: .primaryAction)"))
-            let trailingControl = try #require(toolbar.range(of: "ControlGroup(\"Reader Actions\")"))
-            let saveAction = try #require(toolbar.range(of: "Button(\"Save Article\""))
-            let shareAction = try #require(toolbar.range(of: "ShareLink(item: article.url)"))
+        let identifiers = WorkspaceToolbarLayout.defaultItemIdentifiers
+        let listsIndex = try #require(identifiers.firstIndex(of: .workspaceLists))
+        let listsBoundaryIndex = try #require(
+            identifiers.firstIndex(of: .workspaceListsDirectoryBoundary)
+        )
+        let directoryIndex = try #require(identifiers.firstIndex(of: .workspaceDirectory))
+        let directoryBoundaryIndex = try #require(
+            identifiers.firstIndex(of: .workspaceDirectoryReaderBoundary)
+        )
+        let flexibleSpaceIndex = try #require(identifiers.firstIndex(of: .flexibleSpace))
+        let saveIndex = try #require(identifiers.firstIndex(of: .workspaceSave))
+        let inspectorToggleIndex = try #require(
+            identifiers.firstIndex(of: .workspaceInspectorToggle)
+        )
+        let inspectorBoundaryIndex = try #require(
+            identifiers.firstIndex(of: .workspaceReaderInspectorBoundary)
+        )
 
-            #expect(leadingPlacement.lowerBound < leadingControl.lowerBound)
-            #expect(leadingControl.lowerBound < flexibleSpacer.lowerBound)
-            #expect(flexibleSpacer.lowerBound < trailingPlacement.lowerBound)
-            #expect(trailingPlacement.lowerBound < trailingControl.lowerBound)
-            #expect(trailingPlacement.lowerBound < saveAction.lowerBound)
-            #expect(saveAction.lowerBound < shareAction.lowerBound)
+        #expect(Set(identifiers).count == identifiers.count)
+        #expect(listsIndex < listsBoundaryIndex)
+        #expect(listsBoundaryIndex < directoryIndex)
+        #expect(directoryIndex < directoryBoundaryIndex)
+        #expect(directoryBoundaryIndex < flexibleSpaceIndex)
+        #expect(flexibleSpaceIndex < saveIndex)
+        #expect(saveIndex < inspectorToggleIndex)
+        #expect(inspectorToggleIndex + 1 == inspectorBoundaryIndex)
+        for identifier in WorkspaceToolbarLayout.readerItemIdentifiers {
+            let index = try #require(identifiers.firstIndex(of: identifier))
+            #expect(index > directoryBoundaryIndex)
+            #expect(index < inspectorBoundaryIndex)
         }
+
+        let toolbar = try source("Sources/MacWiki/Views/Shared/WorkspaceToolbarController.swift")
+        #expect(toolbar.components(separatedBy: "NSTrackingSeparatorToolbarItem(").count - 1 == 1)
+        #expect(toolbar.contains("dividerIndex: 0"))
+        #expect(toolbar.contains("dividerIndex: 1"))
+        #expect(toolbar.contains("dividerIndex: 2"))
+        #expect(toolbar.contains("item.visibilityPriority = .high"))
+
+        // Standalone article windows intentionally retain SwiftUI toolbar placement.
+        let articleToolbar = try source("Sources/MacWiki/Views/Shared/ArticleWindowReaderToolbar.swift")
+        let leadingPlacement = try #require(articleToolbar.range(of: "ToolbarItem(placement: .navigation)"))
+        let flexibleSpacer = try #require(
+            articleToolbar.range(of: "ToolbarSpacer(.flexible, placement: .primaryAction)")
+        )
+        let trailingPlacement = try #require(
+            articleToolbar.range(of: "ToolbarItem(placement: .primaryAction)")
+        )
+        let saveAction = try #require(articleToolbar.range(of: "Button(\"Save Article\""))
+        let shareAction = try #require(articleToolbar.range(of: "ShareLink(item: article.url)"))
+        #expect(leadingPlacement.lowerBound < flexibleSpacer.lowerBound)
+        #expect(flexibleSpacer.lowerBound < trailingPlacement.lowerBound)
+        #expect(trailingPlacement.lowerBound < saveAction.lowerBound)
+        #expect(saveAction.lowerBound < shareAction.lowerBound)
     }
 
     @Test("every main reader command remains natively reachable")
     func mainReaderToolbarPreservesEveryCommandPath() throws {
-        let toolbar = try source("Sources/MacWiki/Views/Shared/MainWindowReaderToolbar.swift")
+        let toolbar = try source("Sources/MacWiki/Views/Shared/WorkspaceToolbarController.swift")
+        let popoverPresenter = try source(
+            "Sources/MacWiki/Views/Shared/WorkspaceToolbarPopoverPresenter.swift"
+        )
         let tabAccessories = try source("Sources/MacWiki/Views/Components/ReaderTabAccessoryCluster.swift")
 
         for action in [
-            "Hide Lists", "Show Lists", "Hide List Contents", "Show List Contents", "Back", "Forward",
+            "Lists", "List Contents", "Back", "Forward",
             "Search Wikipedia", "Save Article", "Mark as Read", "Find in Page",
             "Reader Style", "Page Views", "Open in Browser", "Share"
         ] {
             #expect(toolbar.contains(action))
         }
-        #expect(toolbar.contains("appState.toggleListsSidebarVisibility()"))
-        #expect(toolbar.contains("systemImage: \"sidebar.left\""))
-        #expect(toolbar.contains("reader-find-in-page"))
-        #expect(toolbar.contains("SaveToListPopover(article: article)"))
-        #expect(toolbar.contains("ReaderStylePopover()"))
-        #expect(toolbar.contains("SidebarPageViewsPopoverContent("))
+        #expect(toolbar.contains("configuration.appState.toggleListsSidebarVisibility()"))
+        #expect(toolbar.contains("configuration.appState.toggleDirectoryColumnVisibility()"))
+        #expect(toolbar.contains("configuration.appState.goBack()"))
+        #expect(toolbar.contains("configuration.appState.goForward()"))
+        #expect(toolbar.contains("configuration.appState.startSearch(context: .navigation)"))
+        #expect(toolbar.contains("configuration.appState.presentFindOnPage()"))
+        #expect(toolbar.contains("configuration.appState.toggleInspectorVisibility()"))
+        #expect(popoverPresenter.contains("SaveToListPopover(article: article)"))
+        #expect(popoverPresenter.contains("ReaderStylePopover()"))
+        #expect(popoverPresenter.contains("SidebarPageViewsPopoverContent("))
         #expect(toolbar.contains("ReadStateSync.applyReadState("))
-        #expect(toolbar.contains("ShareLink(item: article.url)"))
-        #expect(tabAccessories.contains("Hide Inspector"))
-        #expect(tabAccessories.contains("Show Inspector"))
+        #expect(toolbar.contains("NSSharingServicePickerToolbarItem"))
+        #expect(toolbar.contains("configuration.openURL(url)"))
+        #expect(toolbar.contains("func validateToolbarItem(_ item: NSToolbarItem) -> Bool"))
+        #expect(toolbar.contains("toolbar.validateVisibleItems()"))
+        #expect(toolbar.contains("? \"Hide Inspector\""))
+        #expect(toolbar.contains(": \"Show Inspector\""))
+        #expect(!tabAccessories.contains("Hide Inspector"))
+        #expect(!tabAccessories.contains("Show Inspector"))
     }
 
     @Test("menu presentation requests reach native toolbar popovers")
     func menuRequestsReachToolbarPopovers() throws {
-        let shell = try source("Sources/MacWiki/Views/Shared/MainWindowShell.swift")
-        let mainToolbar = try source("Sources/MacWiki/Views/Shared/MainWindowReaderToolbar.swift")
+        let configuration = try source("Sources/MacWiki/Views/Shared/WorkspaceToolbarConfiguration.swift")
+        let mainToolbar = try source("Sources/MacWiki/Views/Shared/WorkspaceToolbarController.swift")
+        let popoverPresenter = try source(
+            "Sources/MacWiki/Views/Shared/WorkspaceToolbarPopoverPresenter.swift"
+        )
         let articleToolbar = try source("Sources/MacWiki/Views/Shared/ArticleWindowReaderToolbar.swift")
 
-        #expect(shell.contains(".onChange(of: appState.readerStylePresentationRequestID)"))
-        #expect(shell.contains("showsReaderStylePopover = true"))
-        #expect(shell.contains(".onChange(of: appState.readerPageViewsPresentationRequestID)"))
-        #expect(shell.contains("showsPageViewsPopover = true"))
-        for toolbar in [mainToolbar, articleToolbar] {
-            #expect(toolbar.components(separatedBy: "dismissOtherPopovers(keeping:").count - 1 == 3)
-        }
+        #expect(configuration.contains("readerStyleRequestID: appState.readerStylePresentationRequestID"))
+        #expect(configuration.contains("pageViewsRequestID: appState.readerPageViewsPresentationRequestID"))
+        #expect(popoverPresenter.contains("private var activePopover: NSPopover?"))
+        #expect(popoverPresenter.contains("NSPopoverDelegate"))
+        #expect(popoverPresenter.contains("func popoverDidClose(_ notification: Notification)"))
+        #expect(mainToolbar.contains("private func consumePresentationRequests()"))
+        #expect(mainToolbar.contains("presentPopover(.readerStyle, relativeTo: .workspaceReaderStyle)"))
+        #expect(mainToolbar.contains("presentPopover(.pageViews, relativeTo: .workspacePageViews)"))
+        #expect(mainToolbar.contains("popoverPresenter.close()"))
+        #expect(popoverPresenter.contains("popover.behavior = .transient"))
+        #expect(popoverPresenter.contains("popover.show(relativeTo: item)"))
+        #expect(articleToolbar.components(separatedBy: "dismissOtherPopovers(keeping:").count - 1 == 3)
     }
 
     @Test("List Contents search is an embedded native AppKit search field")

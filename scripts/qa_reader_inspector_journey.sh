@@ -134,12 +134,22 @@ if (( MACWIKI_QA_VISUAL_HOLD_SECONDS > 0 )); then
   echo "Visual inspection hold: PID $QA_APP_PID for ${MACWIKI_QA_VISUAL_HOLD_SECONDS}s" >&2
   sleep "$MACWIKI_QA_VISUAL_HOLD_SECONDS"
 fi
-if ! MACWIKI_QA_APP_LOG="$APP_LOG" qa_run_command_with_timeout 90 "$AX_DRIVER_BIN" \
+if ! MACWIKI_QA_APP_LOG="$APP_LOG" qa_run_command_with_timeout 180 "$AX_DRIVER_BIN" \
   "$QA_APP_PID" "$ARTICLE_TITLE" >"$AX_RESULT"; then
   echo "Reader/inspector AX journey failed." >&2
   exit 1
 fi
 kill -0 "$QA_APP_PID"
+if ! jq -e '
+  (.toolbarPlaneContainment | contains("Reader controls"))
+  and (.toolbarModeSwitchStability | contains("live samples"))
+  and (.toolbarModeSwitchSampleCount >= 195)
+  and (.inspectorAccessoryAlignment | contains("Inspector plane"))
+  and (.readStateControlCycle | contains("Mark as Unread"))
+' "$AX_RESULT" >/dev/null; then
+  echo "Reader/inspector AX evidence omitted native toolbar geometry or stability proof." >&2
+  exit 1
+fi
 READER_PID="$QA_APP_PID"
 qa_stop_exact
 if rg -n "fatal error|precondition failed|assertion failed|AttributeGraph: cycle detected" "$APP_LOG"; then
@@ -163,11 +173,11 @@ fi
   printf -- '- Isolated QA home: `%s`\n' "$QA_HOME"
   printf -- '- Seeded public article: `%s`\n' "$ARTICLE_TITLE"
   printf -- '- Reader fixture source: isolated production `ArticleBodyCache`; network: forced offline\n'
-  printf -- '- Reader assertions: full-width native toolbar command reachability, no retired custom More control, exactly one Find field, native Find actions, dismissal\n'
+  printf -- '- Reader assertions: native pane-tracking toolbar command reachability; every Reader control stays between dividers 1 and 2; Inspector toggle stays right-aligned inside the Reader; Read/Unread changes in place and restores; exactly one native Find UI\n'
   printf -- '- Workspace assertions: four visible AppKit pane regions, Inspector spanning the full Reader pane height, all eight auxiliary visibility states, 20 independent Lists/List Contents cycles, and stable Reader Web-area identity\n'
-  printf -- '- Inspector assertions: Info/Notes/References selection and content, 12 rapid mode cycles, and six standard Inspector hide/restore cycles\n'
+  printf -- '- Inspector assertions: selector aligned in the Inspector top accessory; Info/Notes/References content; live toolbar identity/frame sampling during 12 rapid mode cycles; six native Inspector hide/restore cycles\n'
   printf -- '- Narrow-window assertion: with Lists intentionally hidden, restoring List Contents and Inspector preserves the 900-point window and a usable Reader\n'
-  printf -- '- Visual-only follow-up: Reader-edge toggle alignment, materials, animation quality, and perceived jank require fresh Computer Use evidence and are not inferred from AX geometry.\n'
+  printf -- '- Visual-only follow-up: materials, hover/pressed treatment, animation quality, and perceived jank still require fresh Computer Use evidence; placement and transition stability are independently asserted through AX geometry.\n'
   printf -- '- AX evidence: `%s`\n' "$AX_RESULT"
   printf -- '- Production preferences/data touched: **No** — state, defaults, persistence, and caches were isolated.\n'
 } >"$REPORT_PATH"

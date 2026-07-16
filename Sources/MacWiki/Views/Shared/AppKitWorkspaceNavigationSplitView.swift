@@ -17,7 +17,8 @@ struct AppKitWorkspaceNavigationSplitView<
     Directory: View,
     Reader: View,
     Inspector: View,
-    ReaderAccessory: View
+    ReaderAccessory: View,
+    InspectorAccessory: View
 >:
     NSViewControllerRepresentable
 {
@@ -35,11 +36,14 @@ struct AppKitWorkspaceNavigationSplitView<
     let readerRevision: String
     let inspectorRevision: String
     let readerAccessoryRevision: String
+    let inspectorAccessoryRevision: String
+    let toolbarConfiguration: WorkspaceToolbarConfiguration
     let lists: Lists
     let directory: Directory
     let reader: Reader
     let inspector: Inspector
     let readerAccessory: ReaderAccessory
+    let inspectorAccessory: InspectorAccessory
 
     func makeCoordinator() -> Coordinator {
         Coordinator(
@@ -51,11 +55,14 @@ struct AppKitWorkspaceNavigationSplitView<
             readerRevision: readerRevision,
             inspectorRevision: inspectorRevision,
             readerAccessoryRevision: readerAccessoryRevision,
+            inspectorAccessoryRevision: inspectorAccessoryRevision,
+            toolbarConfiguration: toolbarConfiguration,
             lists: lists,
             directory: directory,
             reader: reader,
             inspector: inspector,
-            readerAccessory: readerAccessory
+            readerAccessory: readerAccessory,
+            inspectorAccessory: inspectorAccessory
         )
     }
 
@@ -66,6 +73,7 @@ struct AppKitWorkspaceNavigationSplitView<
             readerController: context.coordinator.readerController,
             inspectorController: context.coordinator.inspectorController,
             readerAccessoryController: context.coordinator.readerAccessoryController,
+            inspectorAccessoryController: context.coordinator.inspectorAccessoryController,
             initialListsWidth: initialListsWidth,
             initialDirectoryWidth: initialDirectoryWidth,
             initialInspectorWidth: initialInspectorWidth,
@@ -75,6 +83,7 @@ struct AppKitWorkspaceNavigationSplitView<
             coordinator?.receiveNativeVisibility(visibility)
         }
         _ = controller.view
+        context.coordinator.attachToolbar(to: controller)
         controller.setPaneVisibility(
             listsVisible: listsVisible,
             directoryVisible: directoryVisible,
@@ -99,12 +108,15 @@ struct AppKitWorkspaceNavigationSplitView<
             reader: reader,
             inspector: inspector,
             readerAccessory: readerAccessory,
+            inspectorAccessory: inspectorAccessory,
             listsRevision: listsRevision,
             directoryRevision: directoryRevision,
             readerRevision: readerRevision,
             inspectorRevision: inspectorRevision,
-            readerAccessoryRevision: readerAccessoryRevision
+            readerAccessoryRevision: readerAccessoryRevision,
+            inspectorAccessoryRevision: inspectorAccessoryRevision
         )
+        context.coordinator.updateToolbar(configuration: toolbarConfiguration)
         context.coordinator.requestVisibility(
             WorkspaceNavigationPaneVisibility(
                 listsVisible: listsVisible,
@@ -135,6 +147,7 @@ struct AppKitWorkspaceNavigationSplitView<
         coordinator: Coordinator
     ) {
         controller.onPaneVisibilityChange = nil
+        controller.installWorkspaceToolbar = nil
         coordinator.cancelPendingWork()
     }
 
@@ -145,12 +158,14 @@ struct AppKitWorkspaceNavigationSplitView<
         fileprivate let readerController: NSHostingController<WorkspaceHostingRoot<Reader>>
         fileprivate let inspectorController: WorkspaceInspectorHostingController<Inspector>
         fileprivate let readerAccessoryController: WorkspaceSplitItemAccessoryController<ReaderAccessory>
+        fileprivate let inspectorAccessoryController: WorkspaceSplitItemAccessoryController<InspectorAccessory>
 
         private let listsBox: WorkspaceHostingBox<Lists>
         private let directoryBox: WorkspaceHostingBox<Directory>
         private let readerBox: WorkspaceHostingBox<Reader>
         private let inspectorBox: WorkspaceHostingBox<Inspector>
         private let readerAccessoryBox: WorkspaceHostingBox<ReaderAccessory>
+        private let inspectorAccessoryBox: WorkspaceHostingBox<InspectorAccessory>
         private var listsVisibility: Binding<Bool>
         private var directoryVisibility: Binding<Bool>
         private var inspectorVisibility: Binding<Bool>
@@ -159,10 +174,13 @@ struct AppKitWorkspaceNavigationSplitView<
         private var lastReaderRevision: String
         private var lastInspectorRevision: String
         private var lastReaderAccessoryRevision: String
+        private var lastInspectorAccessoryRevision: String
+        private var toolbarConfiguration: WorkspaceToolbarConfiguration
         private var lastRequestedVisibility: WorkspaceNavigationPaneVisibility
         private var contentUpdate: Task<Void, Never>?
         private var visibilityUpdate: Task<Void, Never>?
         private var nativeVisibilityUpdate: Task<Void, Never>?
+        private var toolbarController: WorkspaceToolbarController?
 
         init(
             listsVisible: Binding<Bool>,
@@ -173,11 +191,14 @@ struct AppKitWorkspaceNavigationSplitView<
             readerRevision: String,
             inspectorRevision: String,
             readerAccessoryRevision: String,
+            inspectorAccessoryRevision: String,
+            toolbarConfiguration: WorkspaceToolbarConfiguration,
             lists: Lists,
             directory: Directory,
             reader: Reader,
             inspector: Inspector,
-            readerAccessory: ReaderAccessory
+            readerAccessory: ReaderAccessory,
+            inspectorAccessory: InspectorAccessory
         ) {
             listsVisibility = listsVisible
             directoryVisibility = directoryVisible
@@ -187,6 +208,8 @@ struct AppKitWorkspaceNavigationSplitView<
             lastReaderRevision = readerRevision
             lastInspectorRevision = inspectorRevision
             lastReaderAccessoryRevision = readerAccessoryRevision
+            lastInspectorAccessoryRevision = inspectorAccessoryRevision
+            self.toolbarConfiguration = toolbarConfiguration
             lastRequestedVisibility = WorkspaceNavigationPaneVisibility(
                 listsVisible: listsVisible.wrappedValue,
                 directoryVisible: directoryVisible.wrappedValue,
@@ -198,17 +221,23 @@ struct AppKitWorkspaceNavigationSplitView<
             let readerBox = WorkspaceHostingBox(content: reader)
             let inspectorBox = WorkspaceHostingBox(content: inspector)
             let readerAccessoryBox = WorkspaceHostingBox(content: readerAccessory)
+            let inspectorAccessoryBox = WorkspaceHostingBox(content: inspectorAccessory)
             self.listsBox = listsBox
             self.directoryBox = directoryBox
             self.readerBox = readerBox
             self.inspectorBox = inspectorBox
             self.readerAccessoryBox = readerAccessoryBox
+            self.inspectorAccessoryBox = inspectorAccessoryBox
             listsController = NSHostingController(rootView: WorkspaceHostingRoot(box: listsBox))
             directoryController = NSHostingController(rootView: WorkspaceHostingRoot(box: directoryBox))
             readerController = NSHostingController(rootView: WorkspaceHostingRoot(box: readerBox))
             inspectorController = WorkspaceInspectorHostingController(box: inspectorBox)
             readerAccessoryController = WorkspaceSplitItemAccessoryController(
                 box: readerAccessoryBox,
+                height: ColumnChromeMetrics.secondaryBarHeight
+            )
+            inspectorAccessoryController = WorkspaceSplitItemAccessoryController(
+                box: inspectorAccessoryBox,
                 height: ColumnChromeMetrics.secondaryBarHeight
             )
             listsController.sizingOptions = []
@@ -232,19 +261,22 @@ struct AppKitWorkspaceNavigationSplitView<
             reader: Reader,
             inspector: Inspector,
             readerAccessory: ReaderAccessory,
+            inspectorAccessory: InspectorAccessory,
             listsRevision: String,
             directoryRevision: String,
             readerRevision: String,
             inspectorRevision: String,
-            readerAccessoryRevision: String
+            readerAccessoryRevision: String,
+            inspectorAccessoryRevision: String
         ) {
             let listsChanged = lastListsRevision != listsRevision
             let directoryChanged = lastDirectoryRevision != directoryRevision
             let readerChanged = lastReaderRevision != readerRevision
             let inspectorChanged = lastInspectorRevision != inspectorRevision
             let readerAccessoryChanged = lastReaderAccessoryRevision != readerAccessoryRevision
+            let inspectorAccessoryChanged = lastInspectorAccessoryRevision != inspectorAccessoryRevision
             guard listsChanged || directoryChanged || readerChanged || inspectorChanged
-                    || readerAccessoryChanged else {
+                    || readerAccessoryChanged || inspectorAccessoryChanged else {
                 return
             }
 
@@ -272,7 +304,28 @@ struct AppKitWorkspaceNavigationSplitView<
                     lastReaderAccessoryRevision = readerAccessoryRevision
                     readerAccessoryBox.content = readerAccessory
                 }
+                if inspectorAccessoryChanged {
+                    lastInspectorAccessoryRevision = inspectorAccessoryRevision
+                    inspectorAccessoryBox.content = inspectorAccessory
+                }
             }
+        }
+
+        func attachToolbar(to controller: AppKitWorkspaceNavigationController) {
+            toolbarController?.invalidate()
+            let toolbarController = WorkspaceToolbarController(
+                splitController: controller,
+                configuration: toolbarConfiguration
+            )
+            self.toolbarController = toolbarController
+            controller.installWorkspaceToolbar = { [weak toolbarController] window in
+                toolbarController?.install(on: window)
+            }
+        }
+
+        func updateToolbar(configuration: WorkspaceToolbarConfiguration) {
+            toolbarConfiguration = configuration
+            toolbarController?.update(configuration: configuration)
         }
 
         func requestVisibility(
@@ -320,6 +373,8 @@ struct AppKitWorkspaceNavigationSplitView<
             contentUpdate?.cancel()
             visibilityUpdate?.cancel()
             nativeVisibilityUpdate?.cancel()
+            toolbarController?.invalidate()
+            toolbarController = nil
         }
 
         deinit {
@@ -454,12 +509,14 @@ final class AppKitWorkspaceNavigationController: NSSplitViewController {
     }
 
     var onPaneVisibilityChange: ((WorkspaceNavigationPaneVisibility) -> Void)?
+    var installWorkspaceToolbar: ((NSWindow) -> Void)?
 
     private let listsItem: NSSplitViewItem
     private let directoryItem: NSSplitViewItem
     private let readerItem: NSSplitViewItem
     private let inspectorItem: NSSplitViewItem
     private let readerAccessoryController: NSSplitViewItemAccessoryViewController?
+    private let inspectorAccessoryController: NSSplitViewItemAccessoryViewController?
     private let initialListsWidth: CGFloat
     private let initialDirectoryWidth: CGFloat
     private let initialInspectorWidth: CGFloat
@@ -485,6 +542,7 @@ final class AppKitWorkspaceNavigationController: NSSplitViewController {
         readerController: NSViewController,
         inspectorController: NSViewController,
         readerAccessoryController: NSSplitViewItemAccessoryViewController? = nil,
+        inspectorAccessoryController: NSSplitViewItemAccessoryViewController? = nil,
         initialListsWidth: CGFloat,
         initialDirectoryWidth: CGFloat,
         initialInspectorWidth: CGFloat,
@@ -495,6 +553,7 @@ final class AppKitWorkspaceNavigationController: NSSplitViewController {
         readerItem = NSSplitViewItem(viewController: readerController)
         inspectorItem = NSSplitViewItem(inspectorWithViewController: inspectorController)
         self.readerAccessoryController = readerAccessoryController
+        self.inspectorAccessoryController = inspectorAccessoryController
         self.initialListsWidth = Self.clamped(
             initialListsWidth,
             to: MainWindowColumnWidth.sidebarRange,
@@ -573,6 +632,16 @@ final class AppKitWorkspaceNavigationController: NSSplitViewController {
         addSplitViewItem(inspectorItem)
         if let readerAccessoryController {
             readerItem.addTopAlignedAccessoryViewController(readerAccessoryController)
+        }
+        if let inspectorAccessoryController {
+            inspectorItem.addTopAlignedAccessoryViewController(inspectorAccessoryController)
+        }
+    }
+
+    override func viewDidAppear() {
+        super.viewDidAppear()
+        if let window = view.window {
+            installWorkspaceToolbar?(window)
         }
     }
 

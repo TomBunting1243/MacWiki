@@ -43,9 +43,6 @@ private struct MainWorkspaceShell: View {
     @AppStorage(AppStorageKey.MainWindow.directoryWidth) private var directoryWidth = AppStorageKey.MainWindow.directoryWidthDefault
     @AppStorage(AppStorageKey.MainWindow.inspectorWidth) private var inspectorWidth = AppStorageKey.MainWindow.inspectorWidthDefault
     @State private var openWindowHandler = WorkspaceOpenWindowHandler()
-    @State private var showsSavePopover = false
-    @State private var showsReaderStylePopover = false
-    @State private var showsPageViewsPopover = false
 
     @Binding var selectedList: ReadingList?
     @Binding var selectedLabel: Label?
@@ -73,6 +70,12 @@ private struct MainWorkspaceShell: View {
             readerRevision: workspaceAppearanceRevision,
             inspectorRevision: workspaceAppearanceRevision,
             readerAccessoryRevision: workspaceAppearanceRevision,
+            inspectorAccessoryRevision: workspaceAppearanceRevision,
+            toolbarConfiguration: WorkspaceToolbarConfiguration(
+                appState: appState,
+                modelContext: modelContext,
+                openURL: openURL
+            ),
             lists: workspaceEnvironment(
                 ListsColumnView(
                     selectedList: $selectedList,
@@ -100,54 +103,26 @@ private struct MainWorkspaceShell: View {
                     .id("main-reader-column")
             ),
             inspector: workspaceEnvironment(
-                InspectorColumnView()
+                InspectorColumnView(includesHeader: false)
             ),
             readerAccessory: workspaceEnvironment(
                 TabBarView(
                     showsTopDivider: false,
                     onNewLabelWithArticle: onNewLabelWithArticle
                 )
+            ),
+            inspectorAccessory: workspaceEnvironment(
+                InspectorHeaderBar(selection: $appState.inspectorMode)
             )
         )
         // The semantic AppKit Sidebar and Inspector own full-height titlebar
         // integration. Give the split the whole window surface; AppKit applies
         // native safe-area insets to pane content and accessory controls.
         .ignoresSafeArea(.container, edges: .top)
-        .toolbar {
-            MainWindowReaderToolbar(
-                appState: appState,
-                modelContext: modelContext,
-                showsSavePopover: $showsSavePopover,
-                showsReaderStylePopover: $showsReaderStylePopover,
-                showsPageViewsPopover: $showsPageViewsPopover
-            )
-        }
-        .background {
-            FixedWindowToolbarPolicy()
-                .frame(width: 0, height: 0)
-                .accessibilityHidden(true)
-        }
         .environment(\.workspaceOpenWindowHandler, openWindowHandler)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .task {
             openWindowHandler.update(action: openWindow)
-        }
-        .onChange(of: appState.currentArticle?.id) { _, _ in
-            showsSavePopover = false
-            showsReaderStylePopover = false
-            showsPageViewsPopover = false
-        }
-        .onChange(of: appState.readerStylePresentationRequestID) { _, requestID in
-            guard requestID != nil, appState.currentArticle != nil else { return }
-            showsSavePopover = false
-            showsPageViewsPopover = false
-            showsReaderStylePopover = true
-        }
-        .onChange(of: appState.readerPageViewsPresentationRequestID) { _, requestID in
-            guard requestID != nil, appState.currentArticle != nil else { return }
-            showsSavePopover = false
-            showsReaderStylePopover = false
-            showsPageViewsPopover = true
         }
     }
 

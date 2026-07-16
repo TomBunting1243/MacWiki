@@ -57,12 +57,15 @@ struct NativeWorkspaceLayoutTests {
         #expect(items[3].maximumThickness == MainWindowColumnWidth.inspectorRange.upperBound)
     }
 
-    @Test func onlyReaderTabsUseANativeTopAlignedSplitItemAccessory() {
+    @Test func readerTabsAndInspectorHeaderUseNativeTopAlignedSplitItemAccessories() {
         let readerAccessory = NSSplitViewItemAccessoryViewController()
         readerAccessory.view = NSView(frame: NSRect(x: 0, y: 0, width: 600, height: 36))
+        let inspectorAccessory = NSSplitViewItemAccessoryViewController()
+        inspectorAccessory.view = NSView(frame: NSRect(x: 0, y: 0, width: 320, height: 36))
         let fixture = makeFixture(
             width: 1_500,
-            readerAccessoryController: readerAccessory
+            readerAccessoryController: readerAccessory,
+            inspectorAccessoryController: inspectorAccessory
         )
         defer { fixture.tearDown() }
         layout(fixture)
@@ -70,7 +73,7 @@ struct NativeWorkspaceLayoutTests {
         #expect(fixture.controller.splitViewItems[0].topAlignedAccessoryViewControllers.isEmpty)
         #expect(fixture.controller.splitViewItems[1].topAlignedAccessoryViewControllers.isEmpty)
         #expect(fixture.controller.splitViewItems[2].topAlignedAccessoryViewControllers == [readerAccessory])
-        #expect(fixture.controller.splitViewItems[3].topAlignedAccessoryViewControllers.isEmpty)
+        #expect(fixture.controller.splitViewItems[3].topAlignedAccessoryViewControllers == [inspectorAccessory])
     }
 
     @Test func appKitControllerSupportsEveryIndependentVisibilityCombination() {
@@ -366,7 +369,7 @@ struct NativeWorkspaceLayoutTests {
         ))
     }
 
-    @Test func fixedToolbarPolicyNeverMutatesToolbarItems() throws {
+    @Test func articleWindowFixedToolbarPolicyNeverMutatesSwiftUIOwnedToolbarItems() throws {
         let host = NSViewController()
         host.view = NSView(frame: NSRect(x: 0, y: 0, width: 900, height: 700))
         let window = NSWindow(contentViewController: host)
@@ -390,6 +393,26 @@ struct NativeWorkspaceLayoutTests {
         #expect(!toolbar.allowsUserCustomization)
         #expect(!toolbar.autosavesConfiguration)
         #expect(!toolbar.allowsDisplayModeCustomization)
+    }
+
+    @Test func workspaceToolbarBridgeInstallsOnceAndTearsDownItsNativeOwner() throws {
+        let bridge = try source(
+            "Sources/MacWiki/Views/Shared/AppKitWorkspaceNavigationSplitView.swift"
+        )
+        let toolbar = try source(
+            "Sources/MacWiki/Views/Shared/WorkspaceToolbarController.swift"
+        )
+
+        #expect(!bridge.contains("override func viewWillAppear()"))
+        #expect(bridge.contains("override func viewDidAppear()"))
+        #expect(bridge.components(separatedBy: "installWorkspaceToolbar?(window)").count - 1 == 1)
+        #expect(bridge.contains("controller.installWorkspaceToolbar = nil"))
+        #expect(bridge.contains("toolbarController?.invalidate()"))
+
+        #expect(toolbar.contains("window.toolbar === installedToolbar"))
+        #expect(toolbar.contains("guard window.toolbar == nil else"))
+        #expect(toolbar.contains("toolbar?.delegate = nil"))
+        #expect(toolbar.contains("window.toolbar = nil"))
     }
 
     @Test func readerControllerAndViewIdentitySurviveTwentyPaneToggleCycles() {
@@ -529,7 +552,8 @@ struct NativeWorkspaceLayoutTests {
         initialListsWidth: CGFloat = 220,
         initialDirectoryWidth: CGFloat = 320,
         initialInspectorWidth: CGFloat = 320,
-        readerAccessoryController: NSSplitViewItemAccessoryViewController? = nil
+        readerAccessoryController: NSSplitViewItemAccessoryViewController? = nil,
+        inspectorAccessoryController: NSSplitViewItemAccessoryViewController? = nil
     ) -> WorkspaceFixture {
         let lists = makePaneController()
         let directory = makePaneController()
@@ -550,6 +574,7 @@ struct NativeWorkspaceLayoutTests {
             readerController: reader,
             inspectorController: inspector,
             readerAccessoryController: readerAccessoryController,
+            inspectorAccessoryController: inspectorAccessoryController,
             initialListsWidth: initialListsWidth,
             initialDirectoryWidth: initialDirectoryWidth,
             initialInspectorWidth: initialInspectorWidth,
