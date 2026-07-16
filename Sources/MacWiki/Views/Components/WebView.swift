@@ -290,6 +290,7 @@ struct WebView: NSViewRepresentable {
 
         // Register handlers
         Self.registerScriptMessageHandlers(on: webView, coordinator: context.coordinator)
+        context.coordinator.attachNewWebView(webView)
 
         return webView
     }
@@ -716,6 +717,7 @@ struct WebView: NSViewRepresentable {
         var lastAppliedSectionTrackingRequest: Bool?
         var lastAppliedRestoreTelemetryMode: Bool?
         weak var webView: WKWebView?
+        private var inspectorDemandTask: Task<Void, Never>?
         var lastHighlightDiffCheckTimestamp: TimeInterval = 0
         var lastKnownHighlightsCount: Int = 0
         let inspectorPublisher = WebViewInspectorPublisher()
@@ -822,59 +824,88 @@ struct WebView: NSViewRepresentable {
             self.linkPreviewImmediateModifier = linkPreviewImmediateModifier
             self.nativeHighlightingMenuEnabled = nativeHighlightingMenuEnabled
             super.init()
-            Task { @MainActor [weak self] in
-                self?.observeInspectorDemand()
-            }
+        }
+
+        deinit {
+            inspectorDemandTask?.cancel()
         }
 
         @MainActor
         func updateAppState(_ appState: AppState?) {
             guard self.appState !== appState else { return }
             self.appState = appState
-            observeInspectorDemand()
+            restartInspectorDemandObservation()
         }
 
         /// Inspector selection controls WebKit telemetry, but it must not
-        /// invalidate the SwiftUI Reader hierarchy. Observe that narrow demand
-        /// outside the view graph and apply it on the next main-actor turn.
+        /// invalidate the SwiftUI Reader hierarchy. A cancellable native
+        /// Observation sequence owns that narrow dependency outside the view
+        /// graph and publishes one coalesced demand snapshot at a time.
         @MainActor
-        private func observeInspectorDemand() {
+        private func restartInspectorDemandObservation() {
+            inspectorDemandTask?.cancel()
+            inspectorDemandTask = nil
+
             guard let appState else {
-                applyInspectorDemand(isVisible: false, mode: .info)
+                applyInspectorDemand(.inactive, forceSync: true)
                 return
             }
 
-            withObservationTracking {
-                applyInspectorDemand(
-                    isVisible: appState.inspectorVisible,
-                    mode: appState.inspectorMode
-                )
-            } onChange: { [weak self] in
-                Task { @MainActor [weak self] in
-                    self?.observeInspectorDemand()
+            inspectorDemandTask = Task { @MainActor [weak self, weak appState] in
+                guard let appState else { return }
+                let observations = Observations<InspectorDemand, Never> {
+                    let isVisible = appState.inspectorVisible
+                    let mode = appState.inspectorMode
+                    return InspectorDemand(
+                        tracksSections: isVisible && mode == .info,
+                        requestsReferences: isVisible && mode == .references
+                    )
+                }
+
+                var isFirstDemand = true
+                for await demand in observations {
+                    guard !Task.isCancelled, let self else { return }
+                    self.applyInspectorDemand(demand, forceSync: isFirstDemand)
+                    isFirstDemand = false
                 }
             }
         }
 
+        private struct InspectorDemand: Equatable, Sendable {
+            static let inactive = InspectorDemand(
+                tracksSections: false,
+                requestsReferences: false
+            )
+
+            let tracksSections: Bool
+            let requestsReferences: Bool
+        }
+
         @MainActor
         private func applyInspectorDemand(
-            isVisible: Bool,
-            mode: InspectorMode
+            _ demand: InspectorDemand,
+            forceSync: Bool = false
         ) {
-            let tracksSections = isVisible && mode == .info
-            let requestsReferences = isVisible && mode == .references
-            guard tracksSections != isSectionTrackingRequested
-                    || requestsReferences != isReferencesRequested else {
+            let didChange = demand.tracksSections != isSectionTrackingRequested
+                || demand.requestsReferences != isReferencesRequested
+            guard didChange || forceSync else {
                 return
             }
 
-            isSectionTrackingRequested = tracksSections
-            isReferencesRequested = requestsReferences
+            isSectionTrackingRequested = demand.tracksSections
+            isReferencesRequested = demand.requestsReferences
             guard let webView else { return }
-            syncScrollTelemetryMode(on: webView)
+            syncScrollTelemetryMode(on: webView, force: forceSync)
             refreshDeferredInspectorContentIfNeeded(on: webView)
         }
 
+        @MainActor
+        func attachNewWebView(_ webView: WKWebView) {
+            self.webView = webView
+            restartInspectorDemandObservation()
+        }
+
+        @MainActor
         func attachReusedWebView(_ webView: WKWebView) {
             tableOfContentsScrollRequestTracker.invalidate()
             dismissLinkHoverPreview(immediate: true)
@@ -887,8 +918,8 @@ struct WebView: NSViewRepresentable {
             lastAppliedReduceTransparency = nil
             lastAppliedDifferentiateWithoutColor = nil
             syncReaderAccessibilityStyle(on: webView)
-            syncScrollTelemetryMode(on: webView, force: true)
             syncRestoreTelemetryMode(on: webView, force: true)
+            restartInspectorDemandObservation()
             if webView.alphaValue < 1 {
                 webView.alphaValue = 1
             }
@@ -1030,7 +1061,12 @@ struct WebView: NSViewRepresentable {
             return nil
         }
 
+        @MainActor
         func cleanup() {
+            inspectorDemandTask?.cancel()
+            inspectorDemandTask = nil
+            appState = nil
+            webView = nil
             tableOfContentsScrollRequestTracker.invalidate()
             findRequestTimeoutWorkItem?.cancel()
             findRequestTimeoutWorkItem = nil
