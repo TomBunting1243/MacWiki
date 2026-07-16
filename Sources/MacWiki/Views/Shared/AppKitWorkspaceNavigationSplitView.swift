@@ -151,7 +151,7 @@ struct AppKitWorkspaceNavigationSplitView<
         fileprivate let listsController: NSHostingController<WorkspaceHostingRoot<Lists>>
         fileprivate let directoryController: NSHostingController<WorkspaceHostingRoot<Directory>>
         fileprivate let readerController: NSHostingController<WorkspaceHostingRoot<Reader>>
-        fileprivate let inspectorController: NSHostingController<WorkspaceHostingRoot<Inspector>>
+        fileprivate let inspectorController: WorkspaceInspectorHostingController<Inspector>
         fileprivate let readerAccessoryController: WorkspaceSplitItemAccessoryController<ReaderAccessory>
         fileprivate let inspectorAccessoryController: WorkspaceSplitItemAccessoryController<InspectorAccessory>
 
@@ -222,7 +222,7 @@ struct AppKitWorkspaceNavigationSplitView<
             listsController = NSHostingController(rootView: WorkspaceHostingRoot(box: listsBox))
             directoryController = NSHostingController(rootView: WorkspaceHostingRoot(box: directoryBox))
             readerController = NSHostingController(rootView: WorkspaceHostingRoot(box: readerBox))
-            inspectorController = NSHostingController(rootView: WorkspaceHostingRoot(box: inspectorBox))
+            inspectorController = WorkspaceInspectorHostingController(box: inspectorBox)
             readerAccessoryController = WorkspaceSplitItemAccessoryController(
                 box: readerAccessoryBox,
                 height: ColumnChromeMetrics.secondaryBarHeight
@@ -234,7 +234,6 @@ struct AppKitWorkspaceNavigationSplitView<
             listsController.sizingOptions = []
             directoryController.sizingOptions = []
             readerController.sizingOptions = []
-            inspectorController.sizingOptions = []
         }
 
         func updateBindings(
@@ -373,6 +372,44 @@ private struct WorkspaceHostingRoot<Content: View>: View {
 
     var body: some View {
         box.content
+    }
+}
+
+/// Inspector content is not an `NSTableView`-backed Sidebar, so it does not
+/// paint AppKit's full-height plane surface on its own. Host it over the native
+/// sidebar material; the effect view fills the split item while SwiftUI content
+/// continues to respect the window safe area.
+@MainActor
+final class WorkspaceInspectorHostingController<Content: View>: NSViewController {
+    private let hostingController: NSHostingController<WorkspaceHostingRoot<Content>>
+
+    fileprivate init(box: WorkspaceHostingBox<Content>) {
+        hostingController = NSHostingController(rootView: WorkspaceHostingRoot(box: box))
+        super.init(nibName: nil, bundle: nil)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func loadView() {
+        let surface = NSVisualEffectView(frame: .zero)
+        surface.material = .sidebar
+        surface.blendingMode = .behindWindow
+        surface.state = .followsWindowActiveState
+
+        hostingController.sizingOptions = []
+        hostingController.view.translatesAutoresizingMaskIntoConstraints = false
+        addChild(hostingController)
+        surface.addSubview(hostingController.view)
+        NSLayoutConstraint.activate([
+            hostingController.view.leadingAnchor.constraint(equalTo: surface.leadingAnchor),
+            hostingController.view.trailingAnchor.constraint(equalTo: surface.trailingAnchor),
+            hostingController.view.topAnchor.constraint(equalTo: surface.topAnchor),
+            hostingController.view.bottomAnchor.constraint(equalTo: surface.bottomAnchor)
+        ])
+        view = surface
     }
 }
 

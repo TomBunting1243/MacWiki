@@ -65,9 +65,11 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 qa_prepare_isolated_home
+qa_assert_isolated_path "$QA_HOME/Library/Caches/MacWiki" "$QA_HOME"
+mkdir -p "$STATE_DIR" "$QA_HOME/Library/Caches/MacWiki"
 qa_assert_isolated_path "$ARTICLE_CACHE_DIR" "$QA_HOME"
 qa_assert_no_conflicting_processes
-mkdir -p "$STATE_DIR" "$ARTICLE_CACHE_DIR"
+mkdir -p "$ARTICLE_CACHE_DIR"
 AX_DRIVER_BIN="$QA_HOME/ax-reader-inspector-journey"
 swiftc "$SCRIPT_DIR/ax_reader_inspector_journey.swift" -o "$AX_DRIVER_BIN"
 
