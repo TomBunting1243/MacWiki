@@ -676,6 +676,7 @@ document.addEventListener('contextmenu', function (e) {
     var lastSectionSentAt = 0;
     var sectionThrottleMs = 250;
     var sectionTrackingEnabled = false;
+    var lastPostedSectionId = null;
     var lastUserScrollIntentAt = 0;
     var programmaticScrollModeUntil = 0;
     var programmaticScrollForcePostTimer = null;
@@ -1154,7 +1155,10 @@ document.addEventListener('contextmenu', function (e) {
         instantPressure = clamp(instantPressure, 0, 1.2);
         recentPressureScore = (recentPressureScore * 0.72) + (instantPressure * 0.28);
 
-        var baseThrottle = sectionTrackingEnabled ? 150 : 210;
+        // Section lookup uses a cached binary search and has its own cadence;
+        // it must not increase native bridge traffic when the Inspector is not
+        // visible. Keep the reader's baseline telemetry budget independent.
+        var baseThrottle = 210;
         var targetThrottle = baseThrottle;
         if (perfLongTaskCount >= 2) targetThrottle += 30;
         if (avgVelocity > 1.2) targetThrottle += 20;
@@ -1234,7 +1238,8 @@ document.addEventListener('contextmenu', function (e) {
                     (now - lastSectionSentAt) >= 300) {
                     lastSectionSentAt = now;
                     var sid = window.currentVisibleSectionId();
-                    if (sid && window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.scrollChanged) {
+                    if (sid !== lastPostedSectionId && window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.scrollChanged) {
+                        lastPostedSectionId = sid;
                         window.webkit.messageHandlers.scrollChanged.postMessage({
                             y: y,
                             progress: currentProgress(y),
@@ -1263,10 +1268,11 @@ document.addEventListener('contextmenu', function (e) {
                 sectionTrackingEnabled &&
                 window.currentVisibleSectionId &&
                 (now - lastSectionSentAt) >= 300) {
-                lastSectionSentAt = now;
-                var sid = window.currentVisibleSectionId();
-                if (sid && window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.scrollChanged) {
-                    window.webkit.messageHandlers.scrollChanged.postMessage({
+                    lastSectionSentAt = now;
+                    var sid = window.currentVisibleSectionId();
+                    if (sid !== lastPostedSectionId && window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.scrollChanged) {
+                        lastPostedSectionId = sid;
+                        window.webkit.messageHandlers.scrollChanged.postMessage({
                         y: y,
                         progress: currentProgress(y),
                         userInitiated: true,
@@ -1310,7 +1316,10 @@ document.addEventListener('contextmenu', function (e) {
                 (force || (now - lastSectionSentAt) >= effectiveSectionThrottleMs)) {
                 lastSectionSentAt = now;
                 var sid = window.currentVisibleSectionId();
-                if (sid) msg.sectionId = sid;
+                if (sid !== lastPostedSectionId) {
+                    lastPostedSectionId = sid;
+                    msg.sectionId = sid;
+                }
             }
             window.webkit.messageHandlers.scrollChanged.postMessage(msg);
             // Schedule a debounced final section update for when scrolling stops.
@@ -1323,7 +1332,8 @@ document.addEventListener('contextmenu', function (e) {
                 sectionEndDebounceTimer = setTimeout(function () {
                     sectionEndDebounceTimer = null;
                     var finalSid = window.currentVisibleSectionId();
-                    if (finalSid && window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.scrollChanged) {
+                    if (finalSid !== lastPostedSectionId && window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.scrollChanged) {
+                        lastPostedSectionId = finalSid;
                         window.webkit.messageHandlers.scrollChanged.postMessage({
                             y: currentScrollY(),
                             progress: currentProgress(currentScrollY()),
@@ -1806,7 +1816,7 @@ document.addEventListener('contextmenu', function (e) {
 
     window.setScrollTelemetrySectionTrackingEnabled = function (enabled) {
         sectionTrackingEnabled = !!enabled;
-        throttleMs = sectionTrackingEnabled ? 150 : 210;
+        throttleMs = 210;
         // Send one immediate update so native state can sync quickly.
         schedulePostScroll(true);
     };
@@ -1819,7 +1829,7 @@ document.addEventListener('contextmenu', function (e) {
             throttleMs = Math.max(throttleMs, 390);
         } else {
             restoreTelemetryMutedUntil = 0;
-            throttleMs = sectionTrackingEnabled ? 150 : 210;
+            throttleMs = 210;
             schedulePostScroll(true);
         }
     };

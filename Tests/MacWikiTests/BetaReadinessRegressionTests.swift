@@ -6,7 +6,7 @@ import Testing
 @MainActor
 struct BetaReadinessRegressionTests {
     @Test func webViewPoolRetentionIsUnionedByWindowOwner() {
-        let pool = WebViewPool.shared
+        let pool = WebViewPool.makeForTesting()
         pool.resetForTesting()
 
         let mainOwner = UUID()
@@ -1748,6 +1748,9 @@ struct BetaReadinessRegressionTests {
         let appState = try source("Sources/MacWiki/App/AppState.swift")
         let tabSessionStore = try source("Sources/MacWiki/App/TabSessionStore.swift")
         let webView = try source("Sources/MacWiki/Views/Components/WebView.swift")
+        let contentLifecycle = try source("Sources/MacWiki/Views/Components/WebView/WebView+ContentLifecycle.swift")
+        let inspectorBridge = try source("Sources/MacWiki/Views/Components/WebView/WebView+Inspector.swift")
+        let scrollTelemetry = try source("Sources/MacWiki/Views/Components/WebView/WebView+ScrollTelemetry.swift")
         let projectionTests = try source("Tests/MacWikiTests/ActiveReaderProjectionTests.swift")
 
         #expect(reader.contains("let readerProjection = appState.activeReaderProjection"))
@@ -1755,11 +1758,18 @@ struct BetaReadinessRegressionTests {
         #expect(!reader.contains("appState.openTabs"))
         #expect(!reader.contains("inspectorVisible: appState.inspectorVisible"))
         #expect(!reader.contains("inspectorMode: appState.inspectorMode"))
-        #expect(webView.contains("Observations<InspectorDemand, Never>"))
-        #expect(webView.contains("private func restartInspectorDemandObservation()"))
-        #expect(webView.contains("inspectorDemandTask?.cancel()"))
         #expect(webView.contains("func attachNewWebView(_ webView: WKWebView)"))
+        #expect(!webView.contains("inspectorMode"))
+        #expect(!webView.contains("inspectorVisible"))
+        #expect(!webView.contains("InspectorDemand"))
         #expect(!webView.contains("withObservationTracking"))
+        #expect(contentLifecycle.contains("self.publishTableOfContents(from: webView)"))
+        #expect(contentLifecycle.contains("self.publishReferences(from: webView)"))
+        #expect(!contentLifecycle.contains("isReferencesRequested"))
+        #expect(inspectorBridge.contains("func restoreInspectorProjection("))
+        #expect(inspectorBridge.contains("projection.hasTableOfContentsResult"))
+        #expect(inspectorBridge.contains("projection.hasReferencesResult"))
+        #expect(scrollTelemetry.contains("let desired = inspectorPublisher.hasTableOfContents"))
         #expect(appState.contains("var activeReaderProjection: ActiveReaderProjection"))
         #expect(appState.contains("var openTabIDs: Set<UUID>"))
         #expect(tabSessionStore.contains("private(set) var activeReaderProjection: ActiveReaderProjection = .empty"))

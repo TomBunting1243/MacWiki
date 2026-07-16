@@ -150,6 +150,49 @@ struct ReaderScrollBehaviorRegressionTests {
         #expect(combined.contains("reportScrollProgressValue"))
     }
 
+    @Test func cachedSectionTrackingDoesNotIncreaseBridgeCadence() throws {
+        let script = try webViewScript()
+        let tuning = sourceSection(
+            script,
+            startingAt: "function maybeTuneAndReport(now)",
+            endingBefore: "function postScroll(force)"
+        )
+        let modeUpdate = sourceSection(
+            script,
+            startingAt: "window.setScrollTelemetrySectionTrackingEnabled = function (enabled)",
+            endingBefore: "window.setRestoreTelemetryMode"
+        )
+
+        #expect(tuning.contains("var baseThrottle = 210"))
+        #expect(!tuning.contains("sectionTrackingEnabled ? 150 : 210"))
+        #expect(modeUpdate.contains("throttleMs = 210"))
+        #expect(script.contains("var lastPostedSectionId = null"))
+        #expect(script.contains("sid !== lastPostedSectionId"))
+        #expect(script.contains("finalSid !== lastPostedSectionId"))
+    }
+
+    @Test func inspectorProjectionNormalizesTOCBeforeVisibleSectionAndRetriesInvalidResults() throws {
+        let lifecycle = try source("Sources/MacWiki/Views/Components/WebView/WebView+ContentLifecycle.swift")
+        let inspector = try source("Sources/MacWiki/Views/Components/WebView/WebView+Inspector.swift")
+        let projectionSchedule = sourceSection(
+            lifecycle,
+            startingAt: "runAfterReveal {",
+            endingBefore: "func webViewWebContentProcessDidTerminate"
+        )
+        let tocDelay = try #require(projectionSchedule.range(of: "after: 0.06"))
+        let referencesDelay = try #require(projectionSchedule.range(of: "after: 0.24"))
+        let finalRetry = try #require(projectionSchedule.range(of: "after: 0.90"))
+
+        #expect(tocDelay.lowerBound < referencesDelay.lowerBound)
+        #expect(referencesDelay.lowerBound < finalRetry.lowerBound)
+        #expect(!projectionSchedule[..<tocDelay.lowerBound].contains("publishVisibleSection"))
+        #expect(projectionSchedule.components(separatedBy: "isCurrentInspectorProjection").count - 1 == 5)
+        #expect(inspector.contains("guard error == nil,"))
+        #expect(inspector.components(separatedBy: "let rows = result as? [[String: Any]]").count - 1 == 2)
+        #expect(!inspector.contains("result as? [[String: Any]] ?? []"))
+        #expect(inspector.contains("self.publishVisibleSection(from: webView, force: true)"))
+    }
+
     private func webViewScript() throws -> String {
         try source("Sources/MacWiki/Resources/WebView.js")
     }

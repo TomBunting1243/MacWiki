@@ -61,6 +61,7 @@ struct WebViewLinkHoverPreviewEligibilityTests {
             onSelectionCleared: nil,
             highlights: [],
             articleTitle: currentArticleTitle,
+            contentRevision: 0,
             readerAppearance: .default,
             readerTopInset: 56,
             preferImmediateReveal: false,

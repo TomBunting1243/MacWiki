@@ -139,6 +139,7 @@ struct WebViewHighlightRehydrateTests {
             onSelectionCleared: nil,
             highlights: highlights,
             articleTitle: "Rehydration",
+            contentRevision: 0,
             readerAppearance: .default,
             readerTopInset: 56,
             preferImmediateReveal: false,

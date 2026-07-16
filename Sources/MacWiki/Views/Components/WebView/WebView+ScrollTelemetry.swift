@@ -119,11 +119,12 @@ extension WebView.Coordinator {
             }
         }
 
-        let shouldTrackVisibleSection =
-            inspectorPublisher.hasTableOfContents && isSectionTrackingRequested
+        let shouldTrackVisibleSection = inspectorPublisher.hasTableOfContents
         if !shouldSuppressProgrammaticSideEffects,
            shouldTrackVisibleSection,
-           let sectionId = data["sectionId"] as? String {
+           data.keys.contains("sectionId") {
+            let sectionId = data["sectionId"] as? String
+            inspectorProjection.visibleSectionID = sectionId
             if inspectorPublisher.shouldPublishVisibleSection(sectionId, force: false) {
                 onVisibleSectionChange?(sectionId)
             }
@@ -183,12 +184,18 @@ extension WebView.Coordinator {
 
     func syncScrollTelemetryMode(on webView: WKWebView, force: Bool = false) {
         guard canRunDocumentJavaScript(on: webView) else { return }
-        let desired = isSectionTrackingRequested
+        guard let identity = inspectorProjectionIdentity(for: webView) else { return }
+        // Heading lookup is cached and throttled in WebView.js. Its lifetime is
+        // tied to a non-empty document projection, never an Inspector mode.
+        let desired = inspectorPublisher.hasTableOfContents
         guard force || lastAppliedSectionTrackingRequest != desired else { return }
         let script = "window.setScrollTelemetrySectionTrackingEnabled && window.setScrollTelemetrySectionTrackingEnabled(\(desired ? "true" : "false"));"
-        webView.evaluateJavaScript(script) { [weak self] _, error in
-            guard error == nil else { return }
-            self?.lastAppliedSectionTrackingRequest = desired
+        webView.evaluateJavaScript(script) { [weak self, weak webView] _, error in
+            guard let self, let webView,
+                  error == nil,
+                  self.isCurrentInspectorProjection(identity, on: webView),
+                  self.inspectorPublisher.hasTableOfContents == desired else { return }
+            self.lastAppliedSectionTrackingRequest = desired
         }
     }
 

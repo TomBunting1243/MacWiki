@@ -2,7 +2,6 @@ import SwiftUI
 import AppKit
 import WebKit
 import SwiftData
-import Observation
 
 enum ReaderDocumentRevision {
     /// Deterministic full-document digest computed when article state is
@@ -219,7 +218,10 @@ struct WebView: NSViewRepresentable {
             context.coordinator.lastLoadedHTMLSignature = checkout.lastLoadedHTMLSignature
             Self.unregisterScriptMessageHandlers(from: webView)
             Self.registerScriptMessageHandlers(on: webView, coordinator: context.coordinator)
-            context.coordinator.attachReusedWebView(webView)
+            context.coordinator.attachReusedWebView(
+                webView,
+                inspectorProjection: checkout.inspectorProjection
+            )
             return webView
         }
 
@@ -300,7 +302,7 @@ struct WebView: NSViewRepresentable {
         context.coordinator.scrollPosition = $scrollPosition
         context.coordinator.onScrollProgress = onScrollProgress
         context.coordinator.fallbackScrollProgress = fallbackScrollProgress
-        context.coordinator.updateAppState(appState)
+        context.coordinator.appState = appState
         context.coordinator.modelContext = modelContext
         context.coordinator.onTextSelected = onTextSelected
         context.coordinator.onSelectionCleared = onSelectionCleared
@@ -584,7 +586,6 @@ struct WebView: NSViewRepresentable {
             context.coordinator.lastAppliedReaderTopInset = -1
             context.coordinator.lastKnownHighlightsCount = highlights.count
             context.coordinator.lastHighlightDiffCheckTimestamp = 0
-            context.coordinator.inspectorPublisher.resetForContentReload()
             context.coordinator.lastAppliedSectionTrackingRequest = nil
             context.coordinator.lastAppliedRestoreTelemetryMode = nil
             context.coordinator.prepareForContentReload()
@@ -606,7 +607,6 @@ struct WebView: NSViewRepresentable {
             context.coordinator.syncScrollTelemetryMode(on: webView)
             context.coordinator.syncRestoreTelemetryMode(on: webView)
             context.coordinator.maybeApplyHighlightsIfNeeded(to: webView, highlights: highlights)
-            context.coordinator.refreshDeferredInspectorContentIfNeeded(on: webView)
         }
     }
 
@@ -622,7 +622,8 @@ struct WebView: NSViewRepresentable {
             nsView,
             for: coordinator.tabID,
             lastLoadedArticleTitle: coordinator.lastLoadedArticleTitle,
-            lastLoadedHTMLSignature: coordinator.lastLoadedHTMLSignature
+            lastLoadedHTMLSignature: coordinator.lastLoadedHTMLSignature,
+            inspectorProjection: coordinator.inspectorProjection
         )
     }
 
@@ -640,6 +641,7 @@ struct WebView: NSViewRepresentable {
             onSelectionCleared: onSelectionCleared,
             highlights: highlights,
             articleTitle: articleTitle,
+            contentRevision: contentRevision,
             readerAppearance: readerAppearance,
             reduceTransparency: reduceTransparency,
             differentiateWithoutColor: differentiateWithoutColor,
@@ -712,15 +714,14 @@ struct WebView: NSViewRepresentable {
         var lastAppliedReaderTopInset: CGFloat = -1
         var lastAppliedLinkPreviewImmediateModifier: ReaderLinkPreviewImmediateModifier?
         var lastAppliedNativeHighlightingMenuEnabled: Bool?
-        var isSectionTrackingRequested: Bool = false
-        var isReferencesRequested: Bool = false
         var lastAppliedSectionTrackingRequest: Bool?
         var lastAppliedRestoreTelemetryMode: Bool?
         weak var webView: WKWebView?
-        private var inspectorDemandTask: Task<Void, Never>?
         var lastHighlightDiffCheckTimestamp: TimeInterval = 0
         var lastKnownHighlightsCount: Int = 0
         let inspectorPublisher = WebViewInspectorPublisher()
+        var inspectorProjection = WebViewPool.InspectorProjection.empty
+        var inspectorProjectionGeneration: UInt64 = 0
         let tableOfContentsScrollRequestTracker = WebViewTableOfContentsScrollRequestTracker()
         var lastReportedProgress: Double = -1
         var lastProgressTimestamp: TimeInterval = 0
@@ -784,6 +785,7 @@ struct WebView: NSViewRepresentable {
             onSelectionCleared: (() -> Void)?,
             highlights: [Highlight],
             articleTitle: String,
+            contentRevision: UInt64,
             readerAppearance: ReaderAppearance,
             reduceTransparency: Bool = false,
             differentiateWithoutColor: Bool = false,
@@ -810,6 +812,7 @@ struct WebView: NSViewRepresentable {
             self.onSelectionCleared = onSelectionCleared
             self.highlights = highlights
             self.articleTitle = articleTitle
+            self.currentContentRevision = contentRevision
             self.readerAppearance = readerAppearance
             self.reduceTransparency = reduceTransparency
             self.differentiateWithoutColor = differentiateWithoutColor
@@ -826,87 +829,16 @@ struct WebView: NSViewRepresentable {
             super.init()
         }
 
-        deinit {
-            inspectorDemandTask?.cancel()
-        }
-
-        @MainActor
-        func updateAppState(_ appState: AppState?) {
-            guard self.appState !== appState else { return }
-            self.appState = appState
-            restartInspectorDemandObservation()
-        }
-
-        /// Inspector selection controls WebKit telemetry, but it must not
-        /// invalidate the SwiftUI Reader hierarchy. A cancellable native
-        /// Observation sequence owns that narrow dependency outside the view
-        /// graph and publishes one coalesced demand snapshot at a time.
-        @MainActor
-        private func restartInspectorDemandObservation() {
-            inspectorDemandTask?.cancel()
-            inspectorDemandTask = nil
-
-            guard let appState else {
-                applyInspectorDemand(.inactive, forceSync: true)
-                return
-            }
-
-            inspectorDemandTask = Task { @MainActor [weak self, weak appState] in
-                guard let appState else { return }
-                let observations = Observations<InspectorDemand, Never> {
-                    let isVisible = appState.inspectorVisible
-                    let mode = appState.inspectorMode
-                    return InspectorDemand(
-                        tracksSections: isVisible && mode == .info,
-                        requestsReferences: isVisible && mode == .references
-                    )
-                }
-
-                var isFirstDemand = true
-                for await demand in observations {
-                    guard !Task.isCancelled, let self else { return }
-                    self.applyInspectorDemand(demand, forceSync: isFirstDemand)
-                    isFirstDemand = false
-                }
-            }
-        }
-
-        private struct InspectorDemand: Equatable, Sendable {
-            static let inactive = InspectorDemand(
-                tracksSections: false,
-                requestsReferences: false
-            )
-
-            let tracksSections: Bool
-            let requestsReferences: Bool
-        }
-
-        @MainActor
-        private func applyInspectorDemand(
-            _ demand: InspectorDemand,
-            forceSync: Bool = false
-        ) {
-            let didChange = demand.tracksSections != isSectionTrackingRequested
-                || demand.requestsReferences != isReferencesRequested
-            guard didChange || forceSync else {
-                return
-            }
-
-            isSectionTrackingRequested = demand.tracksSections
-            isReferencesRequested = demand.requestsReferences
-            guard let webView else { return }
-            syncScrollTelemetryMode(on: webView, force: forceSync)
-            refreshDeferredInspectorContentIfNeeded(on: webView)
-        }
-
         @MainActor
         func attachNewWebView(_ webView: WKWebView) {
             self.webView = webView
-            restartInspectorDemandObservation()
         }
 
         @MainActor
-        func attachReusedWebView(_ webView: WKWebView) {
+        func attachReusedWebView(
+            _ webView: WKWebView,
+            inspectorProjection: WebViewPool.InspectorProjection
+        ) {
             tableOfContentsScrollRequestTracker.invalidate()
             dismissLinkHoverPreview(immediate: true)
             cancelScriptedScrollRestore(on: webView)
@@ -919,7 +851,7 @@ struct WebView: NSViewRepresentable {
             lastAppliedDifferentiateWithoutColor = nil
             syncReaderAccessibilityStyle(on: webView)
             syncRestoreTelemetryMode(on: webView, force: true)
-            restartInspectorDemandObservation()
+            restoreInspectorProjection(inspectorProjection, on: webView)
             if webView.alphaValue < 1 {
                 webView.alphaValue = 1
             }
@@ -1063,8 +995,6 @@ struct WebView: NSViewRepresentable {
 
         @MainActor
         func cleanup() {
-            inspectorDemandTask?.cancel()
-            inspectorDemandTask = nil
             appState = nil
             webView = nil
             tableOfContentsScrollRequestTracker.invalidate()

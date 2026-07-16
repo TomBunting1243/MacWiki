@@ -3,46 +3,48 @@ import Foundation
 final class WebViewInspectorPublisher {
     private(set) var lastReportedVisibleSectionId: String?
     private(set) var hasTableOfContents = false
-    var lastTOCPublishedForTitle: String = ""
-    var lastReferencesPublishedForTitle: String = ""
     private var lastPublishedTOCFingerprint: Int?
     private var lastPublishedReferencesFingerprint: Int?
     private(set) var hasPublishedNonEmptyTOCSinceLoad = false
     private(set) var hasPublishedNonEmptyReferencesSinceLoad = false
-    private var isTOCPublishInFlight = false
-    private var isReferencesPublishInFlight = false
+    private var activeTOCPublishID: UUID?
+    private var activeReferencesPublishID: UUID?
+    private var visibleSectionMutationSequence: UInt64 = 0
 
     func resetForContentReload() {
         lastReportedVisibleSectionId = nil
         hasTableOfContents = false
-        lastTOCPublishedForTitle = ""
-        lastReferencesPublishedForTitle = ""
         lastPublishedTOCFingerprint = nil
         lastPublishedReferencesFingerprint = nil
         hasPublishedNonEmptyTOCSinceLoad = false
         hasPublishedNonEmptyReferencesSinceLoad = false
-        isTOCPublishInFlight = false
-        isReferencesPublishInFlight = false
+        activeTOCPublishID = nil
+        activeReferencesPublishID = nil
+        visibleSectionMutationSequence &+= 1
     }
 
-    func beginTableOfContentsPublish() -> Bool {
-        guard !isTOCPublishInFlight else { return false }
-        isTOCPublishInFlight = true
-        return true
+    func beginTableOfContentsPublish() -> UUID? {
+        guard activeTOCPublishID == nil else { return nil }
+        let publicationID = UUID()
+        activeTOCPublishID = publicationID
+        return publicationID
     }
 
-    func endTableOfContentsPublish() {
-        isTOCPublishInFlight = false
+    func endTableOfContentsPublish(_ publicationID: UUID) {
+        guard activeTOCPublishID == publicationID else { return }
+        activeTOCPublishID = nil
     }
 
-    func beginReferencesPublish() -> Bool {
-        guard !isReferencesPublishInFlight else { return false }
-        isReferencesPublishInFlight = true
-        return true
+    func beginReferencesPublish() -> UUID? {
+        guard activeReferencesPublishID == nil else { return nil }
+        let publicationID = UUID()
+        activeReferencesPublishID = publicationID
+        return publicationID
     }
 
-    func endReferencesPublish() {
-        isReferencesPublishInFlight = false
+    func endReferencesPublish(_ publicationID: UUID) {
+        guard activeReferencesPublishID == publicationID else { return }
+        activeReferencesPublishID = nil
     }
 
     func recordTableOfContents(_ items: [ArticleTableOfContentsItem]) -> Bool {
@@ -67,19 +69,32 @@ final class WebViewInspectorPublisher {
     }
 
     func shouldPublishVisibleSection(_ sectionId: String?, force: Bool) -> Bool {
+        shouldPublishVisibleSection(
+            sectionId,
+            force: force,
+            ifUnchangedSince: nil
+        )
+    }
+
+    func beginVisibleSectionQuery() -> UInt64 {
+        visibleSectionMutationSequence
+    }
+
+    func shouldPublishVisibleSection(
+        _ sectionId: String?,
+        force: Bool,
+        ifUnchangedSince querySequence: UInt64?
+    ) -> Bool {
+        if let querySequence,
+           querySequence != visibleSectionMutationSequence {
+            return false
+        }
+        visibleSectionMutationSequence &+= 1
         if force || sectionId != lastReportedVisibleSectionId {
             lastReportedVisibleSectionId = sectionId
             return true
         }
         return false
-    }
-
-    func clearPublishedTableOfContentsFingerprint() {
-        lastPublishedTOCFingerprint = nil
-    }
-
-    func clearPublishedReferencesFingerprint() {
-        lastPublishedReferencesFingerprint = nil
     }
 
     private static func tableOfContentsFingerprint(_ items: [ArticleTableOfContentsItem]) -> Int {

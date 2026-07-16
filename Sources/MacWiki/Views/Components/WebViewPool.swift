@@ -4,10 +4,27 @@ import WebKit
 
 @MainActor
 final class WebViewPool {
+    struct InspectorProjection: Equatable {
+        static let empty = InspectorProjection(
+            tableOfContents: [],
+            references: [],
+            visibleSectionID: nil,
+            hasTableOfContentsResult: false,
+            hasReferencesResult: false
+        )
+
+        var tableOfContents: [ArticleTableOfContentsItem]
+        var references: [ArticleReferenceSection]
+        var visibleSectionID: String?
+        var hasTableOfContentsResult: Bool
+        var hasReferencesResult: Bool
+    }
+
     struct Checkout {
         let webView: WKWebView
         let lastLoadedArticleTitle: String
         let lastLoadedHTMLSignature: UInt64
+        let inspectorProjection: InspectorProjection
     }
 
     static let shared = WebViewPool()
@@ -16,6 +33,7 @@ final class WebViewPool {
         let webView: WKWebView
         var lastLoadedArticleTitle: String
         var lastLoadedHTMLSignature: UInt64
+        var inspectorProjection: InspectorProjection
     }
 
     private var entriesByTabID: [UUID: Entry] = [:]
@@ -31,7 +49,8 @@ final class WebViewPool {
         return Checkout(
             webView: entry.webView,
             lastLoadedArticleTitle: entry.lastLoadedArticleTitle,
-            lastLoadedHTMLSignature: entry.lastLoadedHTMLSignature
+            lastLoadedHTMLSignature: entry.lastLoadedHTMLSignature,
+            inspectorProjection: entry.inspectorProjection
         )
     }
 
@@ -49,7 +68,8 @@ final class WebViewPool {
         _ webView: WKWebView,
         for tabID: UUID,
         lastLoadedArticleTitle: String,
-        lastLoadedHTMLSignature: UInt64
+        lastLoadedHTMLSignature: UInt64,
+        inspectorProjection: InspectorProjection = .empty
     ) {
         guard !lastLoadedArticleTitle.isEmpty else { return }
         if !canStoreWebView(for: tabID) {
@@ -64,7 +84,8 @@ final class WebViewPool {
         entriesByTabID[tabID] = Entry(
             webView: webView,
             lastLoadedArticleTitle: lastLoadedArticleTitle,
-            lastLoadedHTMLSignature: lastLoadedHTMLSignature
+            lastLoadedHTMLSignature: lastLoadedHTMLSignature,
+            inspectorProjection: inspectorProjection
         )
         lruOrder.removeAll { $0 == tabID }
         lruOrder.append(tabID)
@@ -82,6 +103,10 @@ final class WebViewPool {
     }
 
 #if DEBUG
+    static func makeForTesting() -> WebViewPool {
+        WebViewPool()
+    }
+
     func retainedTabIDsForTesting() -> Set<UUID> {
         retainedTabIDsSnapshot
     }

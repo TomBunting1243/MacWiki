@@ -73,8 +73,8 @@ struct WorkspaceArchitectureRegressionTests {
         #expect(bridge.contains("readerController.sizingOptions = []"))
         #expect(!bridge.contains("readerController.rootView ="))
         #expect(!reader.contains("inspectorMode: appState.inspectorMode"))
-        #expect(webView.contains("private func restartInspectorDemandObservation()"))
-        #expect(webView.contains("Observations<InspectorDemand, Never>"))
+        #expect(!webView.contains("inspectorMode"))
+        #expect(!webView.contains("inspectorVisible"))
     }
 
     @Test func mainAndArticleWindowsKeepTheirDistinctInspectorPolicies() throws {

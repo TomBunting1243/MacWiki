@@ -74,35 +74,45 @@ extension WebView.Coordinator {
         }
 
         runAfterReveal { [weak self, weak webView] in
-            guard let self, let webView else { return }
-
-            self.scheduleForCurrentWebView(after: 0.04, webView: webView) { [weak self, weak webView] in
-                guard let self, let webView else { return }
-                if self.isSectionTrackingRequested {
-                    self.publishVisibleSection(from: webView, force: true)
-                }
-            }
+            guard let self, let webView,
+                  let projectionIdentity = self.inspectorProjectionIdentity(for: webView) else { return }
 
             self.scheduleForCurrentWebView(after: 0.06, webView: webView) { [weak self, weak webView] in
-                guard let self, let webView else { return }
-                if self.isSectionTrackingRequested {
-                    self.publishTableOfContents(from: webView)
-                }
-                if self.isReferencesRequested {
-                    self.publishReferences(from: webView)
-                }
+                guard let self, let webView,
+                      self.isCurrentInspectorProjection(projectionIdentity, on: webView) else { return }
+                self.publishTableOfContents(from: webView)
             }
 
             self.scheduleForCurrentWebView(after: 0.24, webView: webView) { [weak self, weak webView] in
-                guard let self, let webView else { return }
-                if self.isSectionTrackingRequested && !self.inspectorPublisher.hasPublishedNonEmptyTOCSinceLoad {
+                guard let self, let webView,
+                      self.isCurrentInspectorProjection(projectionIdentity, on: webView) else { return }
+                self.publishReferences(from: webView)
+            }
+
+            self.scheduleForCurrentWebView(after: 0.36, webView: webView) { [weak self, weak webView] in
+                guard let self, let webView,
+                      self.isCurrentInspectorProjection(projectionIdentity, on: webView) else { return }
+                if !self.inspectorProjection.hasTableOfContentsResult {
                     self.publishTableOfContents(from: webView)
                 }
-                if self.isReferencesRequested && !self.inspectorPublisher.hasPublishedNonEmptyReferencesSinceLoad {
+            }
+
+            self.scheduleForCurrentWebView(after: 0.55, webView: webView) { [weak self, weak webView] in
+                guard let self, let webView,
+                      self.isCurrentInspectorProjection(projectionIdentity, on: webView) else { return }
+                if !self.inspectorProjection.hasReferencesResult {
                     self.publishReferences(from: webView)
                 }
-                if self.isSectionTrackingRequested {
-                    self.publishVisibleSection(from: webView, force: true)
+            }
+
+            self.scheduleForCurrentWebView(after: 0.90, webView: webView) { [weak self, weak webView] in
+                guard let self, let webView,
+                      self.isCurrentInspectorProjection(projectionIdentity, on: webView) else { return }
+                if !self.inspectorProjection.hasTableOfContentsResult {
+                    self.publishTableOfContents(from: webView)
+                }
+                if !self.inspectorProjection.hasReferencesResult {
+                    self.publishReferences(from: webView)
                 }
             }
         }
@@ -122,6 +132,7 @@ extension WebView.Coordinator {
 
         isContentLoadInFlight = true
         expectedNavigationToken = nil
+        beginInspectorProjectionReplacement()
         cancelScriptedScrollRestore(on: webView)
         activeRestoreSessionID = nil
         pendingPostRevealTasks.removeAll(keepingCapacity: false)
@@ -310,7 +321,14 @@ extension WebView.Coordinator {
         hasReportedContentReveal = false
         contentLoadFailed = false
         pendingPostRevealTasks.removeAll(keepingCapacity: false)
+        beginInspectorProjectionReplacement()
+    }
+
+    private func beginInspectorProjectionReplacement() {
+        inspectorProjectionGeneration &+= 1
         inspectorPublisher.resetForContentReload()
+        inspectorProjection = .empty
+        lastAppliedSectionTrackingRequest = nil
     }
 
     func beginContentReload(on webView: WKWebView, htmlContent: String, baseURL: URL?) {
