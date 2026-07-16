@@ -411,6 +411,21 @@ struct NativeWorkspaceLayoutTests {
         #expect(trackingItem.splitView === fixture.controller.splitView)
         #expect(trackingItem.dividerIndex == 2)
 
+        // SwiftUI may publish another toolbar item after the AppKit Inspector
+        // section during an unrelated view update. Re-enforcement must preserve
+        // native item identity instead of remove/reinsert layout churn.
+        toolbar.insertItem(withItemIdentifier: .print, at: toolbar.items.count)
+        for _ in 0..<20 {
+            policy.enforcePolicy()
+        }
+        #expect(toolbar.items.first(where: {
+            $0.itemIdentifier == .toggleInspector
+        }) === toggleItem)
+        #expect(toolbar.items.first(where: {
+            $0.itemIdentifier == .inspectorTrackingSeparator
+        }) === trackingItem)
+        #expect(toolbar.items.last?.itemIdentifier == .print)
+
         #expect(window.tryToPerform(toggleAction, with: nil))
         #expect(fixture.controller.splitViewItems[3].isCollapsed)
         #expect(priorResponder.invocationCount == 0)

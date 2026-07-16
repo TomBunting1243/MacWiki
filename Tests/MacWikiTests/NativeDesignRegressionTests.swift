@@ -188,7 +188,8 @@ struct NativeDesignRegressionTests {
         #expect(articleToolbar.contains("ToolbarSpacer(.flexible, placement: .primaryAction)"))
         #expect(toolbarPolicy.contains("NSToolbarItem.Identifier.inspectorTrackingSeparator"))
         #expect(toolbarPolicy.contains("NSToolbarItem.Identifier.toggleInspector"))
-        #expect(toolbarPolicy.contains("identifiers.suffix(2) != [toggle, separator]"))
+        #expect(toolbarPolicy.contains("if !toolbar.items.contains(where: { $0.itemIdentifier == toggle })"))
+        #expect(!toolbarPolicy.contains("toolbar.removeItem(at:"))
         #expect(toolbarPolicy.contains("toolbar.allowsUserCustomization = false"))
         for action in ["Save Article", "Mark as Read", "Find in Page", "Reader Style", "Page Views", "Open in Browser", "Share"] {
             #expect(toolbar.contains(action))

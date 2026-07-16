@@ -36,10 +36,12 @@ struct ReaderTopChromeLayoutTests {
         #expect(policy.contains("toolbar.autosavesConfiguration = false"))
         #expect(policy.contains("NSToolbarItem.Identifier.inspectorTrackingSeparator"))
         #expect(policy.contains("NSToolbarItem.Identifier.toggleInspector"))
-        #expect(policy.contains("identifiers.suffix(2) != [toggle, separator]"))
+        #expect(policy.contains("if !toolbar.items.contains(where: { $0.itemIdentifier == toggle })"))
+        #expect(policy.contains("if !toolbar.items.contains(where: { $0.itemIdentifier == separator })"))
+        #expect(!policy.contains("toolbar.removeItem(at:"))
         #expect(policy.contains("WorkspaceInspectorResponder"))
         #expect(shell.contains("FixedWindowToolbarPolicy(relaysNestedWorkspaceInspector: true)"))
-        #expect(policy.contains("trackingItem.dividerIndex = inspectorIndex - 1"))
+        #expect(policy.contains("if trackingItem.dividerIndex != dividerIndex"))
         #expect(!toolbar.contains("toggle-reader-inspector"))
         #expect(!toolbar.contains("appState.toggleInspectorVisibility()"))
     }
@@ -90,7 +92,7 @@ struct ReaderTopChromeLayoutTests {
         let policy = try source("Sources/MacWiki/Views/Shared/FixedWindowToolbarPolicy.swift")
         #expect(policy.contains("NSToolbarItem.Identifier.toggleInspector"))
         #expect(policy.contains("NSToolbarItem.Identifier.inspectorTrackingSeparator"))
-        #expect(policy.contains("identifiers.suffix(2) != [toggle, separator]"))
+        #expect(!policy.contains("toolbar.removeItem(at:"))
     }
 
     @Test("menu presentation requests reach native toolbar popovers")

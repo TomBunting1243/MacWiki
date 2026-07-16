@@ -88,9 +88,9 @@ struct WorkspaceArchitectureRegressionTests {
         #expect(!articleWindow.contains("relaysNestedWorkspaceInspector: true"))
         #expect(policy.contains("NSToolbarItem.Identifier.toggleInspector"))
         #expect(policy.contains("NSToolbarItem.Identifier.inspectorTrackingSeparator"))
-        let toggleIndex = try #require(policy.range(of: "toolbar.insertItem(withItemIdentifier: toggle"))
-        let separatorIndex = try #require(policy.range(of: "withItemIdentifier: separator"))
-        #expect(toggleIndex.lowerBound < separatorIndex.lowerBound)
+        #expect(policy.contains("toolbar.insertItem(withItemIdentifier: toggle, at: insertionIndex)"))
+        #expect(policy.contains("toolbar.insertItem(withItemIdentifier: separator, at: insertionIndex)"))
+        #expect(!policy.contains("toolbar.removeItem(at:"))
     }
 
     @Test func navigationVisibilityUsesTwoIndependentStoredBindings() throws {

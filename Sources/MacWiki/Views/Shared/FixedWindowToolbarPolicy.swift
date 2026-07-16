@@ -177,22 +177,17 @@ final class FixedWindowToolbarPolicyView: NSView {
     private func installStandardInspectorSection(in toolbar: NSToolbar) {
         let separator = NSToolbarItem.Identifier.inspectorTrackingSeparator
         let toggle = NSToolbarItem.Identifier.toggleInspector
-        let identifiers = toolbar.items.map(\.itemIdentifier)
-
-        if identifiers.suffix(2) != [toggle, separator] {
-            if let separatorIndex = toolbar.items.firstIndex(where: {
+        if !toolbar.items.contains(where: { $0.itemIdentifier == toggle }) {
+            let insertionIndex = toolbar.items.firstIndex(where: {
                 $0.itemIdentifier == separator
-            }) {
-                toolbar.removeItem(at: separatorIndex)
-            }
-            if let toggleIndex = toolbar.items.firstIndex(where: {
+            }) ?? toolbar.items.count
+            toolbar.insertItem(withItemIdentifier: toggle, at: insertionIndex)
+        }
+        if !toolbar.items.contains(where: { $0.itemIdentifier == separator }) {
+            let insertionIndex = toolbar.items.firstIndex(where: {
                 $0.itemIdentifier == toggle
-            }) {
-                toolbar.removeItem(at: toggleIndex)
-            }
-
-            toolbar.insertItem(withItemIdentifier: toggle, at: toolbar.items.count)
-            toolbar.insertItem(withItemIdentifier: separator, at: toolbar.items.count)
+            }).map { $0 + 1 } ?? toolbar.items.count
+            toolbar.insertItem(withItemIdentifier: separator, at: insertionIndex)
         }
 
         if relaysNestedWorkspaceInspector {
@@ -211,7 +206,9 @@ final class FixedWindowToolbarPolicyView: NSView {
             return
         }
 
-        toggleItem.autovalidates = true
+        if !toggleItem.autovalidates {
+            toggleItem.autovalidates = true
+        }
         installInspectorResponder(for: controller)
 
         guard let inspectorIndex = controller.splitViewItems.firstIndex(where: {
@@ -223,8 +220,13 @@ final class FixedWindowToolbarPolicyView: NSView {
             return
         }
 
-        trackingItem.splitView = controller.splitView
-        trackingItem.dividerIndex = inspectorIndex - 1
+        if trackingItem.splitView !== controller.splitView {
+            trackingItem.splitView = controller.splitView
+        }
+        let dividerIndex = inspectorIndex - 1
+        if trackingItem.dividerIndex != dividerIndex {
+            trackingItem.dividerIndex = dividerIndex
+        }
     }
 
     private func installInspectorResponder(
