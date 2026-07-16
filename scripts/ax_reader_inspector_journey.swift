@@ -154,14 +154,11 @@ private func inspectorPane(in window: AXUIElement) -> AXUIElement? {
 
 private func readerPane(in window: AXUIElement, articleTitle: String) -> AXUIElement? {
     guard let workspace = workspaceSplitGroup(in: window) else { return nil }
-    return directChildren(of: workspace)
-        .filter { hasRole($0, kAXGroupRole as String) }
-        .first { candidate in
-            guard button(in: candidate, label: "New Tab") != nil else { return false }
-            return elements(in: candidate, limit: 1_000).contains { element in
-                hasRole(element, "AXWebArea") && containsLabel(articleTitle, in: element)
-            }
+    return visibleWorkspacePaneGroups(in: workspace).first { candidate in
+        elements(in: candidate, limit: 1_000).contains { element in
+            hasRole(element, "AXWebArea") && containsLabel(articleTitle, in: element)
         }
+    }
 }
 
 private func readerWebArea(in window: AXUIElement, articleTitle: String) -> AXUIElement? {
@@ -174,26 +171,54 @@ private func readerWebArea(in window: AXUIElement, articleTitle: String) -> AXUI
 private func workspaceSplitGroup(in window: AXUIElement) -> AXUIElement? {
     elements(in: window, limit: 2_000).first { candidate in
         guard hasRole(candidate, kAXSplitGroupRole as String) else { return false }
-        let paneGroups = directChildren(of: candidate).filter {
+        let directGroups = directChildren(of: candidate).filter {
             hasRole($0, kAXGroupRole as String)
         }
-        return paneGroups.count == 4 && paneGroups.contains {
+        // macOS 26 exposes each native split-item accessory as a sibling AXGroup
+        // of its pane content. Identify the semantic workspace by the Reader's
+        // native tab accessory rather than assuming one direct group per pane.
+        return directGroups.contains {
             button(in: $0, label: "New Tab") != nil
         }
     }
 }
 
+private func traceWorkspaceCandidates(in window: AXUIElement) {
+    guard traceEnabled else { return }
+    let candidates = elements(in: window, limit: 2_000).filter {
+        hasRole($0, kAXSplitGroupRole as String)
+    }
+    trace("workspace candidate count: \(candidates.count)")
+    for (candidateIndex, candidate) in candidates.enumerated() {
+        let children = directChildren(of: candidate)
+        trace("workspace candidate \(candidateIndex) direct children: \(children.count)")
+        for (childIndex, child) in children.enumerated() {
+            let role = stringAttribute(kAXRoleAttribute as CFString, from: child)
+            let frame = elementFrame(child).map {
+                "\(Int($0.minX)),\(Int($0.minY)) \(Int($0.width))x\(Int($0.height))"
+            } ?? "no-frame"
+            let childLabels = accessibilityLabels(of: child).joined(separator: " / ")
+            trace("  child \(childIndex): \(role) \(frame) [\(childLabels)]")
+        }
+    }
+}
+
 private func visibleWorkspacePaneGroups(in splitGroup: AXUIElement) -> [AXUIElement] {
-    directChildren(of: splitGroup)
+    let visibleGroups = directChildren(of: splitGroup)
         .filter { hasRole($0, kAXGroupRole as String) }
         .filter { elementSize($0).map { $0.width > 1 && $0.height > 1 } == true }
+    let referenceHeight = elementSize(splitGroup)?.height
+        ?? visibleGroups.compactMap(elementSize).map(\.height).max()
+        ?? 0
+    guard referenceHeight > 0 else { return [] }
+    return visibleGroups.filter {
+        elementSize($0).map { $0.height >= referenceHeight * 0.5 } == true
+    }
 }
 
 private func nativeSplitPaneSizes(in window: AXUIElement) -> String {
-    let sizes = elements(in: window, limit: 1_500)
-        .filter { hasRole($0, kAXSplitGroupRole as String) }
-        .flatMap(directChildren)
-        .filter { hasRole($0, kAXGroupRole as String) }
+    guard let workspace = workspaceSplitGroup(in: window) else { return "unavailable" }
+    let sizes = visibleWorkspacePaneGroups(in: workspace)
         .compactMap(elementSize)
         .map { "\(Int($0.width))x\(Int($0.height))" }
     return sizes.isEmpty ? "unavailable" : sizes.joined(separator: ", ")
@@ -381,6 +406,7 @@ do {
     guard wait(timeout: 10, condition: {
         readerWebArea(in: contentWindow, articleTitle: articleTitle) != nil
     }) else {
+        traceWorkspaceCandidates(in: contentWindow)
         throw JourneyError.missing("The seeded article did not become accessible in the main window.")
     }
     traceRuntimeDiagnostics("initial window discovery")

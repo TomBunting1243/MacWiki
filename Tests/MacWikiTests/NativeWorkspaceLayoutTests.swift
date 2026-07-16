@@ -218,6 +218,29 @@ struct NativeWorkspaceLayoutTests {
         #expect(reportedVisibility == nil)
     }
 
+    @Test func firstWindowAttachmentPreservesRequestedFourPaneVisibility() async {
+        let fixture = makeFixture(width: 1_800)
+        fixture.controller.setPaneVisibility(
+            listsVisible: true,
+            directoryVisible: true,
+            inspectorVisible: true,
+            animated: false
+        )
+        let window = NSWindow(contentViewController: fixture.controller)
+        defer {
+            window.close()
+            fixture.tearDown()
+        }
+        window.setContentSize(fixture.size)
+        window.contentView?.layoutSubtreeIfNeeded()
+        fixture.controller.view.layoutSubtreeIfNeeded()
+
+        let didSettle = await waitForNativeCondition(timeout: 3) {
+            fixture.controller.splitViewItems.allSatisfy { !$0.isCollapsed }
+        }
+        #expect(didSettle)
+    }
+
     @Test func paneCommandDuringResizeSupersedesTheGeometrySnapshot() async {
         let fixture = makeFixture(width: 1_500)
         let window = NSWindow(contentViewController: fixture.controller)
@@ -288,16 +311,27 @@ struct NativeWorkspaceLayoutTests {
         #expect(!fixture.controller.splitViewItems[2].isCollapsed)
     }
 
-    @Test func compactWindowPreservesTheLeadingPaneTheUserExplicitlyReveals() {
+    @Test func compactWindowPreservesTheLeadingPaneTheUserExplicitlyReveals() async {
         let fixture = makeFixture(width: MainWindowLayout.minimumWindowWidth)
-        defer { fixture.tearDown() }
-        layout(fixture)
         fixture.controller.setPaneVisibility(
             listsVisible: false,
             directoryVisible: true,
             inspectorVisible: true,
             animated: false
         )
+        let window = NSWindow(contentViewController: fixture.controller)
+        defer {
+            window.close()
+            fixture.tearDown()
+        }
+        window.setContentSize(fixture.size)
+        layout(fixture)
+        _ = await waitForNativeCondition(timeout: 3) {
+            let items = fixture.controller.splitViewItems
+            return items[0].isCollapsed
+                && !items[1].isCollapsed
+                && !items[3].isCollapsed
+        }
 
         var reportedVisibility: WorkspaceNavigationPaneVisibility?
         fixture.controller.onPaneVisibilityChange = { visibility in
@@ -473,8 +507,23 @@ struct NativeWorkspaceLayoutTests {
         // of the three ideal widths, exercising persistence from valid native
         // split geometry instead of depending on exact ideal-width rounding.
         let fixture = makeFixture(width: 1_300)
-        defer { fixture.tearDown() }
+        fixture.controller.setPaneVisibility(
+            listsVisible: true,
+            directoryVisible: true,
+            inspectorVisible: true,
+            animated: false
+        )
+        let window = NSWindow(contentViewController: fixture.controller)
+        defer {
+            window.close()
+            fixture.tearDown()
+        }
+        window.setContentSize(fixture.size)
         layout(fixture)
+        let didSettle = await waitForNativeCondition(timeout: 3) {
+            fixture.controller.splitViewItems.allSatisfy { !$0.isCollapsed }
+        }
+        #expect(didSettle)
         fixture.controller.restoreInitialVisibleWidthsIfFeasible()
         layout(fixture)
 

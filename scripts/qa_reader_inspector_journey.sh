@@ -11,10 +11,13 @@ QA_HOME="${QA_HOME:-/tmp/macwiki-qa/reader-inspector-$(date +%Y%m%d_%H%M%S)-$RAN
 OUTPUT_DIR="${OUTPUT_DIR:-$REPO_ROOT/.qa/reader-inspector}"
 STATE_DIR="$QA_HOME/Library/Application Support/MacWiki"
 STATE_FILE="$STATE_DIR/state.json"
+ARTICLE_CACHE_DIR="$QA_HOME/Library/Caches/MacWiki/ArticleBodyCache"
+ARTICLE_CACHE_FILE="$ARTICLE_CACHE_DIR/ada-lovelace-qa.json"
+ARTICLE_CACHE_INDEX="$ARTICLE_CACHE_DIR/index.json"
 INFO_PLIST="$APP_BUNDLE_PATH/Contents/Info.plist"
 BUILD_INFO_PLIST="$APP_BUNDLE_PATH/Contents/Resources/BuildInfo.plist"
 ARTICLE_TITLE="${ARTICLE_TITLE:-Ada Lovelace}"
-ARTICLE_HTML='<main><h1>Ada Lovelace</h1><p>A deterministic public-domain QA fixture for MacWiki reader and inspector checks.</p><h2 id="legacy">Legacy</h2><p>Ada Lovelace wrote notes on the Analytical Engine.</p></main>'
+ARTICLE_HTML='<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Ada Lovelace</title></head><body><main><h1>Ada Lovelace</h1><p>A deterministic public-domain QA fixture for MacWiki reader and inspector checks.</p><h2 id="legacy">Legacy</h2><p>Ada Lovelace wrote notes on the Analytical Engine.</p></main></body></html>'
 
 # The shared launcher supports background activation for compatible harnesses,
 # but SwiftUI does not publish this window scene to AX until first activation.
@@ -62,10 +65,33 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 qa_prepare_isolated_home
+qa_assert_isolated_path "$ARTICLE_CACHE_DIR" "$QA_HOME"
 qa_assert_no_conflicting_processes
-mkdir -p "$STATE_DIR"
+mkdir -p "$STATE_DIR" "$ARTICLE_CACHE_DIR"
 AX_DRIVER_BIN="$QA_HOME/ax-reader-inspector-journey"
 swiftc "$SCRIPT_DIR/ax_reader_inspector_journey.swift" -o "$AX_DRIVER_BIN"
+
+# Article session persistence intentionally excludes HTML. Seed the app's
+# production disk-cache format inside the disposable QA home, then force the
+# trusted harness offline so this Reader proof cannot silently depend on the
+# network or a developer's normal cache.
+jq -n \
+  --arg title "$ARTICLE_TITLE" \
+  --arg html "$ARTICLE_HTML" \
+  '{title: $title, html: $html, pageId: 307, metadata: [], wordCount: 43}' \
+  >"$ARTICLE_CACHE_FILE"
+ARTICLE_CACHE_BYTES="$(stat -f %z "$ARTICLE_CACHE_FILE")"
+ARTICLE_CACHE_NOW="$(date +%s)"
+jq -n \
+  --arg fileName "$(basename "$ARTICLE_CACHE_FILE")" \
+  --argjson byteCount "$ARTICLE_CACHE_BYTES" \
+  --argjson lastAccessedAt "$ARTICLE_CACHE_NOW" \
+  '{version: 1, entries: {Ada_Lovelace: {fileName: $fileName, byteCount: $byteCount, lastAccessedAt: $lastAccessedAt, isPinned: false}}}' \
+  >"$ARTICLE_CACHE_INDEX"
+jq -e '.title == "Ada Lovelace" and (.html | contains("<title>Ada Lovelace</title>"))' \
+  "$ARTICLE_CACHE_FILE" >/dev/null
+jq -e '.version == 1 and .entries.Ada_Lovelace.byteCount > 0' \
+  "$ARTICLE_CACHE_INDEX" >/dev/null
 
 ARTICLE_ID="$(uuidgen)"
 TAB_ID="$(uuidgen)"
@@ -75,7 +101,6 @@ jq -n \
   --arg historyID "$HISTORY_ID" \
   --arg articleID "$ARTICLE_ID" \
   --arg title "$ARTICLE_TITLE" \
-  --arg html "$ARTICLE_HTML" \
   '{
     openTabs: [{
       id: $tabID,
@@ -87,7 +112,6 @@ jq -n \
           description: null,
           extract: null,
           thumbnailURL: null,
-          htmlContent: $html,
           lastOpened: null,
           isRead: false,
           wordCount: null
@@ -102,6 +126,7 @@ jq -n \
     wikiHopSession: null
   }' >"$STATE_FILE"
 
+export MACWIKI_QA_NETWORK_MODE=offline
 qa_launch_candidate "$APP_LOG"
 if (( MACWIKI_QA_VISUAL_HOLD_SECONDS > 0 )); then
   echo "Visual inspection hold: PID $QA_APP_PID for ${MACWIKI_QA_VISUAL_HOLD_SECONDS}s" >&2
@@ -135,6 +160,7 @@ fi
   printf -- '- Exact candidate PID: `%s`\n' "$READER_PID"
   printf -- '- Isolated QA home: `%s`\n' "$QA_HOME"
   printf -- '- Seeded public article: `%s`\n' "$ARTICLE_TITLE"
+  printf -- '- Reader fixture source: isolated production `ArticleBodyCache`; network: forced offline\n'
   printf -- '- Reader assertions: full-width native toolbar command reachability, no retired custom More control, exactly one Find field, native Find actions, dismissal\n'
   printf -- '- Workspace assertions: four visible AppKit pane regions, Inspector spanning the full Reader pane height, all eight auxiliary visibility states, 20 independent Lists/List Contents cycles, and stable Reader Web-area identity\n'
   printf -- '- Inspector assertions: Info/Notes/References selection and content, 12 rapid mode cycles, and six standard Inspector hide/restore cycles\n'

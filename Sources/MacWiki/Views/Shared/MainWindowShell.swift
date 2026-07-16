@@ -113,6 +113,10 @@ private struct MainWorkspaceShell: View {
                 InspectorHeaderBar(selection: $appState.inspectorMode)
             )
         )
+        // The semantic AppKit Sidebar and Inspector own full-height titlebar
+        // integration. Give the split the whole window surface; AppKit applies
+        // native safe-area insets to pane content and accessory controls.
+        .ignoresSafeArea(.container, edges: .top)
         .toolbar {
             MainWindowReaderToolbar(
                 appState: appState,

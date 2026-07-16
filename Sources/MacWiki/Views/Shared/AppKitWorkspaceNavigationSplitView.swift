@@ -390,7 +390,6 @@ final class WorkspaceSplitItemAccessoryController<Content: View>:
         hostingController = NSHostingController(rootView: WorkspaceHostingRoot(box: box))
         self.height = height
         super.init(nibName: nil, bundle: nil)
-        automaticallyAppliesContentInsets = false
         preferredContentSize = NSSize(width: 0, height: height)
     }
 
@@ -469,6 +468,7 @@ final class AppKitWorkspaceNavigationController: NSSplitViewController {
     private var pendingWindowGeometryReconciliation: Task<Void, Never>?
     private var windowGeometryVisibilitySnapshot: WorkspaceNavigationPaneVisibility?
     private var lastObservedWindowContentWidth: CGFloat?
+    private var hasReconciledInitialWindowGeometry = false
 
     init(
         listsController: NSViewController,
@@ -594,8 +594,10 @@ final class AppKitWorkspaceNavigationController: NSSplitViewController {
 
     override func splitViewDidResizeSubviews(_ notification: Notification) {
         super.splitViewDidResizeSubviews(notification)
-        guard pendingWindowGeometryReconciliation == nil,
-              view.window?.inLiveResize != true else {
+        guard let window = view.window,
+              pendingWindowGeometryReconciliation == nil,
+              !window.inLiveResize,
+              hasReconciledInitialWindowGeometry else {
             return
         }
         reportUserDrivenVisibilityIfNeeded()
@@ -689,6 +691,10 @@ final class AppKitWorkspaceNavigationController: NSSplitViewController {
     private func finishVisibilityUpdate(generation: Int, animated: Bool) {
         guard visibilityTransitionGeneration == generation else { return }
         isApplyingRequestedVisibility = false
+        // Before attachment AppKit may keep collapsible items closed because
+        // the split has no usable width. Preserve the explicit SwiftUI request;
+        // initial window-geometry reconciliation will apply it once sized.
+        guard view.window != nil else { return }
         let visibility = currentVisibility
         if visibility != requestedVisibility {
             requestedVisibility = visibility
@@ -901,8 +907,10 @@ final class AppKitWorkspaceNavigationController: NSSplitViewController {
         guard width.isFinite, width > 0 else { return false }
 
         guard let lastWidth = lastObservedWindowContentWidth else {
-            self.lastObservedWindowContentWidth = width
-            return false
+            lastObservedWindowContentWidth = width
+            windowGeometryVisibilitySnapshot = requestedVisibility ?? currentVisibility
+            scheduleWindowGeometryReconciliation(expectedWindowWidth: width)
+            return true
         }
         let widthChanged = abs(lastWidth - width)
             > WindowGeometry.widthTolerance
@@ -978,6 +986,7 @@ final class AppKitWorkspaceNavigationController: NSSplitViewController {
         }
         splitView.layoutSubtreeIfNeeded()
         isEnforcingReadableLayout = false
+        hasReconciledInitialWindowGeometry = true
 
         requestedVisibility = target
         if target != snapshot, target != lastReportedVisibility {
@@ -998,6 +1007,7 @@ final class AppKitWorkspaceNavigationController: NSSplitViewController {
         windowGeometryVisibilitySnapshot = nil
         if resetObservedWidth {
             lastObservedWindowContentWidth = nil
+            hasReconciledInitialWindowGeometry = false
         }
     }
 
