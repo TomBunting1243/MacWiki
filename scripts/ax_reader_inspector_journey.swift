@@ -153,18 +153,15 @@ private func inspectorPane(in window: AXUIElement) -> AXUIElement? {
 }
 
 private func readerPane(in window: AXUIElement, articleTitle: String) -> AXUIElement? {
-    guard let newTabButton = button(in: window, label: "New Tab") else { return nil }
-    var candidate = parent(of: newTabButton)
-    for _ in 0..<12 {
-        guard let current = candidate else { break }
-        let role = stringAttribute(kAXRoleAttribute as CFString, from: current)
-        if (role == kAXGroupRole as String || role == kAXSplitGroupRole as String),
-           containsLabel(articleTitle, in: current) {
-            return current
+    guard let workspace = workspaceSplitGroup(in: window) else { return nil }
+    return directChildren(of: workspace)
+        .filter { hasRole($0, kAXGroupRole as String) }
+        .first { candidate in
+            guard button(in: candidate, label: "New Tab") != nil else { return false }
+            return elements(in: candidate, limit: 1_000).contains { element in
+                hasRole(element, "AXWebArea") && containsLabel(articleTitle, in: element)
+            }
         }
-        candidate = parent(of: current)
-    }
-    return nil
 }
 
 private func readerWebArea(in window: AXUIElement, articleTitle: String) -> AXUIElement? {
@@ -174,21 +171,15 @@ private func readerWebArea(in window: AXUIElement, articleTitle: String) -> AXUI
     }
 }
 
-private func workspaceSplitGroup(
-    in window: AXUIElement,
-    articleTitle: String
-) -> AXUIElement? {
+private func workspaceSplitGroup(in window: AXUIElement) -> AXUIElement? {
     elements(in: window, limit: 2_000).first { candidate in
-        guard hasRole(candidate, kAXSplitGroupRole as String),
-              containsLabel("Explore", in: candidate),
-              containsLabel("Tab History", in: candidate),
-              containsLabel(articleTitle, in: candidate),
-              inspectorModeGroup(in: candidate) != nil else {
-            return false
-        }
-        return directChildren(of: candidate).filter {
+        guard hasRole(candidate, kAXSplitGroupRole as String) else { return false }
+        let paneGroups = directChildren(of: candidate).filter {
             hasRole($0, kAXGroupRole as String)
-        }.count == 4
+        }
+        return paneGroups.count == 4 && paneGroups.contains {
+            button(in: $0, label: "New Tab") != nil
+        }
     }
 }
 
@@ -388,8 +379,7 @@ do {
     // announced, and querying AXChildren during that update is re-entrant.
     settleAccessibility(for: 1.0)
     guard wait(timeout: 10, condition: {
-        guard let reader = readerPane(in: contentWindow, articleTitle: articleTitle) else { return false }
-        return containsLabel(articleTitle, in: reader)
+        readerWebArea(in: contentWindow, articleTitle: articleTitle) != nil
     }) else {
         throw JourneyError.missing("The seeded article did not become accessible in the main window.")
     }
@@ -469,10 +459,7 @@ do {
     ) else {
         throw JourneyError.missing("The seeded Reader did not expose a stable Web area.")
     }
-    guard let initialWorkspaceSplit = workspaceSplitGroup(
-        in: contentWindow,
-        articleTitle: articleTitle
-    ) else {
+    guard let initialWorkspaceSplit = workspaceSplitGroup(in: contentWindow) else {
         throw JourneyError.missing("The main window did not expose four visible workspace pane groups.")
     }
     let initialPaneFrames = visibleWorkspacePaneGroups(in: initialWorkspaceSplit)
@@ -865,7 +852,8 @@ do {
         guard restoredReader != nil,
               let restoredReaderSize,
               restoredReaderSize.width >= 300,
-              restoredReaderContainsArticle else {
+              restoredReaderContainsArticle,
+              readerWebAreaIdentityIsStable() else {
             let workspacePaneSizes = nativeSplitPaneSizes(in: contentWindow)
             let readerGeometry = restoredReaderSize.map {
                 "\(Int($0.width))x\(Int($0.height))"

@@ -1,7 +1,7 @@
 import SwiftUI
 
 enum ReaderTabLaneMetrics {
-    static let height: CGFloat = 32
+    static let height: CGFloat = ColumnChromeMetrics.secondaryBarHeight
     static let horizontalPadding: CGFloat = 14
     static let verticalPadding: CGFloat = 2
     static let tabMaxWidth: CGFloat = 240

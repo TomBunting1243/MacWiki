@@ -30,6 +30,9 @@ struct WorkspaceArchitectureRegressionTests {
         #expect(bridge.contains("NSSplitViewItem(sidebarWithViewController:"))
         #expect(bridge.contains("NSSplitViewItem(contentListWithViewController:"))
         #expect(bridge.contains("NSSplitViewItem(inspectorWithViewController:"))
+        #expect(bridge.contains("NSSplitViewItemAccessoryViewController"))
+        #expect(bridge.contains("readerItem.addTopAlignedAccessoryViewController("))
+        #expect(bridge.contains("inspectorItem.addTopAlignedAccessoryViewController("))
         #expect(bridge.contains("inspectorItem.allowsFullHeightLayout = true"))
         #expect(bridge.contains("inspectorItem.canCollapseFromWindowResize = false"))
         #expect(shell.contains("inspectorVisible: $appState.inspectorVisible"))
@@ -41,17 +44,21 @@ struct WorkspaceArchitectureRegressionTests {
         #expect(shell.contains(".toolbar {"))
     }
 
-    @Test func readerTabsAndReaderStayInsideOneStableHostedPane() throws {
+    @Test func readerTabsAndInspectorModesUseNativePlaneAccessoriesAroundAStableReader() throws {
         let shell = try source("Sources/MacWiki/Views/Shared/MainWindowShell.swift")
         let bridge = try source("Sources/MacWiki/Views/Shared/AppKitWorkspaceNavigationSplitView.swift")
         let detail = try #require(shell.range(of: "reader: workspaceEnvironment("))
         let inspector = try #require(shell.range(of: "inspector: workspaceEnvironment("))
+        let readerAccessory = try #require(shell.range(of: "readerAccessory: workspaceEnvironment("))
+        let inspectorAccessory = try #require(shell.range(of: "inspectorAccessory: workspaceEnvironment("))
         let detailSource = String(shell[detail.lowerBound..<inspector.lowerBound])
-        let tabs = try #require(detailSource.range(of: "TabBarView("))
-        let reader = try #require(detailSource.range(of: "ReaderColumnView()"))
+        let readerAccessorySource = String(shell[readerAccessory.lowerBound..<inspectorAccessory.lowerBound])
 
-        #expect(tabs.lowerBound < reader.lowerBound)
-        #expect(detailSource.contains("VStack(spacing: 0)"))
+        #expect(detailSource.contains("ReaderColumnView()"))
+        #expect(!detailSource.contains("TabBarView("))
+        #expect(readerAccessorySource.contains("TabBarView("))
+        #expect(shell.contains("InspectorHeaderBar(selection: $appState.inspectorMode)"))
+        #expect(shell.contains("InspectorColumnView(includesHeader: false)"))
         #expect(bridge.contains("readerController = NSHostingController("))
         #expect(bridge.contains("readerController.sizingOptions = []"))
         #expect(!bridge.contains("readerController.rootView ="))

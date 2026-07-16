@@ -2,6 +2,10 @@ import SwiftUI
 
 enum ColumnChromeMetrics {
     static let horizontalPadding: CGFloat = 9
+    /// Reader tabs and Inspector modes share one plane-scoped row beneath the
+    /// unified window toolbar; matching their native control lanes prevents a
+    /// stepped seam at the Reader/Inspector divider.
+    static let secondaryBarHeight: CGFloat = 36
     static let dividerOpacity: CGFloat = 0.065
     static let internalDividerOpacity: CGFloat = 0.035
     static let darkDividerOpacity: CGFloat = 0.038

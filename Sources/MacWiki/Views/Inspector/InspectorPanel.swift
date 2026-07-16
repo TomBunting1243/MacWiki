@@ -17,10 +17,13 @@ struct InspectorPanel: View {
     @State private var showStaleHighlights = true
     @State private var showArchivedHighlights = false
     @State private var selectedReferenceIDs: Set<String> = []
+    let includesHeader: Bool
 
     init(
-        currentArticle: Article?
+        currentArticle: Article?,
+        includesHeader: Bool = true
     ) {
+        self.includesHeader = includesHeader
         let scopedTitle = currentArticle?.title ?? ""
         let scopedURLString = currentArticle?.url.absoluteString ?? ""
         _currentArticleHighlights = Query(
@@ -92,7 +95,9 @@ struct InspectorPanel: View {
         @Bindable var appState = appState
 
         VStack(spacing: 0) {
-            InspectorHeaderBar(selection: $appState.inspectorMode)
+            if includesHeader {
+                InspectorHeaderBar(selection: $appState.inspectorMode)
+            }
 
             inspectorContent
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)

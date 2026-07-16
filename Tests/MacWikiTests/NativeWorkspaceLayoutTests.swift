@@ -57,6 +57,25 @@ struct NativeWorkspaceLayoutTests {
         #expect(items[3].maximumThickness == MainWindowColumnWidth.inspectorRange.upperBound)
     }
 
+    @Test func readerAndInspectorChromeUseNativeTopAlignedSplitItemAccessories() {
+        let readerAccessory = NSSplitViewItemAccessoryViewController()
+        readerAccessory.view = NSView(frame: NSRect(x: 0, y: 0, width: 600, height: 36))
+        let inspectorAccessory = NSSplitViewItemAccessoryViewController()
+        inspectorAccessory.view = NSView(frame: NSRect(x: 0, y: 0, width: 320, height: 36))
+        let fixture = makeFixture(
+            width: 1_500,
+            readerAccessoryController: readerAccessory,
+            inspectorAccessoryController: inspectorAccessory
+        )
+        defer { fixture.tearDown() }
+        layout(fixture)
+
+        #expect(fixture.controller.splitViewItems[0].topAlignedAccessoryViewControllers.isEmpty)
+        #expect(fixture.controller.splitViewItems[1].topAlignedAccessoryViewControllers.isEmpty)
+        #expect(fixture.controller.splitViewItems[2].topAlignedAccessoryViewControllers == [readerAccessory])
+        #expect(fixture.controller.splitViewItems[3].topAlignedAccessoryViewControllers == [inspectorAccessory])
+    }
+
     @Test func appKitControllerSupportsEveryIndependentVisibilityCombination() {
         let fixture = makeFixture(width: 1_500)
         defer { fixture.tearDown() }
@@ -130,7 +149,7 @@ struct NativeWorkspaceLayoutTests {
         #expect(reportedVisibility?.inspectorVisible == false)
     }
 
-    @Test func compactWindowYieldsLeadingNavigationPanesBeforeCrushingReader() {
+    @Test func compactWindowYieldsLeadingNavigationPanesBeforeCrushingReader() async {
         let fixture = makeFixture(width: 1_500)
         let window = NSWindow(contentViewController: fixture.controller)
         defer {
@@ -144,11 +163,59 @@ struct NativeWorkspaceLayoutTests {
         window.contentView?.layoutSubtreeIfNeeded()
         fixture.controller.view.layoutSubtreeIfNeeded()
 
+        let didSettle = await waitForNativeCondition(timeout: 3) {
+            let items = fixture.controller.splitViewItems
+            return items[0].isCollapsed || items[1].isCollapsed
+        }
         let items = fixture.controller.splitViewItems
+        #expect(didSettle)
         #expect(items[0].isCollapsed || items[1].isCollapsed)
         #expect(!items[2].isCollapsed)
         #expect(items[2].viewController.view.bounds.width >= MainWindowLayout.minimumCompactReaderWidth)
         #expect(!items[3].isCollapsed)
+    }
+
+    @Test func transientNarrowFrameCannotRatchetLeadingPanesClosedDuringWideResize() async {
+        let fixture = makeFixture(width: 1_500)
+        let window = NSWindow(contentViewController: fixture.controller)
+        defer {
+            window.close()
+            fixture.tearDown()
+        }
+        window.setContentSize(fixture.size)
+        layout(fixture)
+        fixture.controller.setPaneVisibility(
+            listsVisible: true,
+            directoryVisible: true,
+            inspectorVisible: true,
+            animated: false
+        )
+
+        var reportedVisibility: WorkspaceNavigationPaneVisibility?
+        fixture.controller.onPaneVisibilityChange = { visibility in
+            reportedVisibility = visibility
+        }
+
+        // Model the intermediate layout AX/AppKit can expose while applying a
+        // larger target size: the compact frame must never become user intent.
+        window.setContentSize(NSSize(width: 760, height: 800))
+        window.contentView?.layoutSubtreeIfNeeded()
+        fixture.controller.view.layoutSubtreeIfNeeded()
+        window.setContentSize(NSSize(width: 1_760, height: 900))
+        window.contentView?.layoutSubtreeIfNeeded()
+        fixture.controller.view.layoutSubtreeIfNeeded()
+
+        let didSettle = await waitForNativeCondition(timeout: 3) {
+            let items = fixture.controller.splitViewItems
+            return items.count == 4
+                && !items[0].isCollapsed
+                && !items[1].isCollapsed
+                && !items[2].isCollapsed
+                && !items[3].isCollapsed
+        }
+
+        #expect(didSettle)
+        #expect(reportedVisibility == nil)
     }
 
     @Test func compactWindowPreservesTheLeadingPaneTheUserExplicitlyReveals() {
@@ -403,7 +470,9 @@ struct NativeWorkspaceLayoutTests {
         width: CGFloat,
         initialListsWidth: CGFloat = 220,
         initialDirectoryWidth: CGFloat = 320,
-        initialInspectorWidth: CGFloat = 320
+        initialInspectorWidth: CGFloat = 320,
+        readerAccessoryController: NSSplitViewItemAccessoryViewController? = nil,
+        inspectorAccessoryController: NSSplitViewItemAccessoryViewController? = nil
     ) -> WorkspaceFixture {
         let lists = makePaneController()
         let directory = makePaneController()
@@ -423,6 +492,8 @@ struct NativeWorkspaceLayoutTests {
             directoryController: directory,
             readerController: reader,
             inspectorController: inspector,
+            readerAccessoryController: readerAccessoryController,
+            inspectorAccessoryController: inspectorAccessoryController,
             initialListsWidth: initialListsWidth,
             initialDirectoryWidth: initialDirectoryWidth,
             initialInspectorWidth: initialInspectorWidth,

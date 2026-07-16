@@ -72,6 +72,8 @@ private struct MainWorkspaceShell: View {
             directoryRevision: directoryContentRevision,
             readerRevision: workspaceAppearanceRevision,
             inspectorRevision: workspaceAppearanceRevision,
+            readerAccessoryRevision: workspaceAppearanceRevision,
+            inspectorAccessoryRevision: workspaceAppearanceRevision,
             lists: workspaceEnvironment(
                 ListsColumnView(
                     selectedList: $selectedList,
@@ -95,20 +97,20 @@ private struct MainWorkspaceShell: View {
                 )
             ),
             reader: workspaceEnvironment(
-                VStack(spacing: 0) {
-                    TabBarView(
-                        showsTopDivider: false,
-                        onNewLabelWithArticle: onNewLabelWithArticle
-                    )
-
-                    Divider()
-
-                    ReaderColumnView()
-                        .id("main-reader-column")
-                }
+                ReaderColumnView()
+                    .id("main-reader-column")
             ),
             inspector: workspaceEnvironment(
-                InspectorColumnView()
+                InspectorColumnView(includesHeader: false)
+            ),
+            readerAccessory: workspaceEnvironment(
+                TabBarView(
+                    showsTopDivider: false,
+                    onNewLabelWithArticle: onNewLabelWithArticle
+                )
+            ),
+            inspectorAccessory: workspaceEnvironment(
+                InspectorHeaderBar(selection: $appState.inspectorMode)
             )
         )
         .toolbar {

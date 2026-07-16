@@ -5,7 +5,6 @@ struct InspectorHeaderBar: View {
     @Environment(\.colorScheme) private var colorScheme
 
     private enum Layout {
-        static let height: CGFloat = 50
         static let horizontalPadding: CGFloat = 10
     }
 
@@ -19,7 +18,7 @@ struct InspectorHeaderBar: View {
         .labelsHidden()
         .accessibilityLabel("Inspector mode")
         .padding(.horizontal, Layout.horizontalPadding)
-        .frame(height: Layout.height)
+        .frame(height: ColumnChromeMetrics.secondaryBarHeight)
         .overlay(alignment: .bottom) {
             Rectangle()
                 .fill(Color.primary.opacity(ColumnChromeMetrics.dividerOpacity(for: colorScheme)))

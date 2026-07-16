@@ -32,78 +32,74 @@ struct ArticleWindowReaderToolbar: ToolbarContent {
             .labelStyle(.iconOnly)
         }
 
-        ToolbarItemGroup(placement: .primaryAction) {
-            Button("Save Article", systemImage: "bookmark") {
-                dismissOtherPopovers(keeping: .save)
-                showsSavePopover = true
-            }
-            .labelStyle(.iconOnly)
-            .disabled(article == nil)
-            .popover(isPresented: $showsSavePopover) {
+        ToolbarSpacer(.flexible, placement: .primaryAction)
+
+        ToolbarItem(placement: .primaryAction) {
+            ControlGroup("Reader Actions") {
+                Button("Save Article", systemImage: "bookmark") {
+                    dismissOtherPopovers(keeping: .save)
+                    showsSavePopover = true
+                }
+                .disabled(article == nil)
+                .popover(isPresented: $showsSavePopover) {
+                    if let article {
+                        SaveToListPopover(article: article)
+                    }
+                }
+
+                Button(
+                    article?.isRead == true ? "Mark as Unread" : "Mark as Read",
+                    systemImage: article?.isRead == true ? "checkmark.circle.fill" : "circle"
+                ) {
+                    toggleReadState()
+                }
+                .disabled(article == nil)
+
+                Button("Find in Page", systemImage: "text.magnifyingglass") {
+                    appState.presentFindOnPage()
+                }
+                .disabled(article == nil)
+
+                Button("Reader Style", systemImage: "textformat.size") {
+                    dismissOtherPopovers(keeping: .style)
+                    showsReaderStylePopover = true
+                }
+                .disabled(article == nil)
+                .popover(isPresented: $showsReaderStylePopover) {
+                    ReaderStylePopover()
+                }
+
+                Button("Page Views", systemImage: "chart.xyaxis.line") {
+                    dismissOtherPopovers(keeping: .pageViews)
+                    showsPageViewsPopover = true
+                }
+                .disabled(article == nil)
+                .popover(isPresented: $showsPageViewsPopover) {
+                    if let article {
+                        SidebarPageViewsPopoverContent(
+                            title: article.title,
+                            referenceDate: Date()
+                        )
+                    }
+                }
+
+                Button("Open in Browser", systemImage: "safari") {
+                    if let article {
+                        openURL(article.url)
+                    }
+                }
+                .disabled(article == nil)
+
                 if let article {
-                    SaveToListPopover(article: article)
-                }
-            }
-
-            Button(
-                article?.isRead == true ? "Mark as Unread" : "Mark as Read",
-                systemImage: article?.isRead == true ? "checkmark.circle.fill" : "circle"
-            ) {
-                toggleReadState()
-            }
-            .labelStyle(.iconOnly)
-            .disabled(article == nil)
-
-            Button("Find in Page", systemImage: "text.magnifyingglass") {
-                appState.presentFindOnPage()
-            }
-            .labelStyle(.iconOnly)
-            .disabled(article == nil)
-
-            Button("Reader Style", systemImage: "textformat.size") {
-                dismissOtherPopovers(keeping: .style)
-                showsReaderStylePopover = true
-            }
-            .labelStyle(.iconOnly)
-            .disabled(article == nil)
-            .popover(isPresented: $showsReaderStylePopover) {
-                ReaderStylePopover()
-            }
-
-            Button("Page Views", systemImage: "chart.xyaxis.line") {
-                dismissOtherPopovers(keeping: .pageViews)
-                showsPageViewsPopover = true
-            }
-            .labelStyle(.iconOnly)
-            .disabled(article == nil)
-            .popover(isPresented: $showsPageViewsPopover) {
-                if let article {
-                    SidebarPageViewsPopoverContent(
-                        title: article.title,
-                        referenceDate: Date()
-                    )
-                }
-            }
-
-            Button("Open in Browser", systemImage: "safari") {
-                if let article {
-                    openURL(article.url)
+                    ShareLink(item: article.url) {
+                        SwiftUI.Label("Share", systemImage: "square.and.arrow.up")
+                    }
+                } else {
+                    Button("Share", systemImage: "square.and.arrow.up") {}
+                        .disabled(true)
                 }
             }
             .labelStyle(.iconOnly)
-            .disabled(article == nil)
-
-            if let article {
-                ShareLink(item: article.url) {
-                    SwiftUI.Label("Share", systemImage: "square.and.arrow.up")
-                }
-                .labelStyle(.iconOnly)
-            } else {
-                Button("Share", systemImage: "square.and.arrow.up") {}
-                    .labelStyle(.iconOnly)
-                    .disabled(true)
-            }
-
         }
     }
 
