@@ -46,8 +46,10 @@ struct QAProcessSafetyShellTests {
     }
 
     @Test func timeoutEscalatesPastATermIgnoringCommand() throws {
-        let clock = ContinuousClock()
-        let started = clock.now
+        // The Xcode 27 beta test host can report large sleep-inclusive jumps
+        // through ContinuousClock while this subprocess is being reaped. The
+        // system uptime clock measures the wall budget this regression owns.
+        let started = ProcessInfo.processInfo.systemUptime
         let result = try runBash(
             """
             set -euo pipefail
@@ -61,10 +63,10 @@ struct QAProcessSafetyShellTests {
             """,
             arguments: [repositoryRoot.path()]
         )
-        let elapsed = started.duration(to: clock.now)
+        let elapsed = ProcessInfo.processInfo.systemUptime - started
 
         #expect(result.status == 124)
-        #expect(elapsed < .seconds(6))
+        #expect(elapsed < 6)
     }
 
     @Test func readerAXDriverNeedsNoKeyboardInjection() throws {

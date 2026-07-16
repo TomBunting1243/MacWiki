@@ -431,11 +431,13 @@ do {
     } else {
         throw JourneyError.missing("The native window toolbar omitted its Lists control.")
     }
-    guard element(
-        in: contentWindow,
-        role: kAXStaticTextRole as String,
-        label: "Tab History"
-    ) != nil else {
+    guard wait(timeout: 4, condition: {
+        element(
+            in: contentWindow,
+            role: kAXStaticTextRole as String,
+            label: "Tab History"
+        ) != nil
+    }) else {
         throw JourneyError.missing("The seeded List Contents pane was not initially visible.")
     }
     if modeGroup == nil {

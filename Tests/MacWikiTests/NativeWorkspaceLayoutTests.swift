@@ -95,7 +95,7 @@ struct NativeWorkspaceLayoutTests {
         #expect(!fixture.controller.splitViewItems[2].isCollapsed)
     }
 
-    @Test func userInspectorToggleDuringAnotherPaneAnimationReconcilesNativeState() async throws {
+    @Test func userInspectorToggleDuringAnotherPaneAnimationReconcilesNativeState() async {
         let fixture = makeFixture(width: 1_500)
         let window = NSWindow(contentViewController: fixture.controller)
         defer {
@@ -118,7 +118,10 @@ struct NativeWorkspaceLayoutTests {
         )
         fixture.controller.toggleInspector(nil)
 
-        try await Task.sleep(for: .milliseconds(350))
+        let didReportVisibility = await waitForNativeCondition(timeout: 3) {
+            reportedVisibility != nil
+        }
+        #expect(didReportVisibility)
         layout(fixture)
 
         #expect(fixture.controller.splitViewItems[3].isCollapsed)
@@ -193,6 +196,90 @@ struct NativeWorkspaceLayoutTests {
             directoryVisible: true,
             inspectorVisible: true
         ))
+    }
+
+    @Test func fixedToolbarTargetsNestedWorkspaceInspectorAndTracksItsDivider() throws {
+        let fixture = makeFixture(width: 1_500)
+        let host = NSViewController()
+        host.view = NSView(frame: NSRect(origin: .zero, size: fixture.size))
+        host.addChild(fixture.controller)
+        host.view.addSubview(fixture.controller.view)
+        fixture.controller.view.frame = host.view.bounds
+
+        let window = NSWindow(contentViewController: host)
+        let toolbar = NSToolbar(identifier: "NativeWorkspaceLayoutTests.Toolbar")
+        window.toolbar = toolbar
+        let priorResponder = InspectorActionRecorderResponder()
+        window.nextResponder = priorResponder
+        let policy = FixedWindowToolbarPolicyView(
+            installsInspectorSection: true,
+            relaysNestedWorkspaceInspector: true
+        )
+        host.view.addSubview(policy)
+        defer {
+            window.close()
+            fixture.tearDown()
+        }
+
+        layout(fixture)
+        WorkspaceSplitControllerRegistry.register(fixture.controller, in: window)
+        #expect(WorkspaceSplitControllerRegistry.controller(in: window) === fixture.controller)
+        policy.enforcePolicy()
+
+        let toggleItem = try #require(toolbar.items.first(where: {
+            $0.itemIdentifier == .toggleInspector
+        }))
+        let trackingItem = try #require(toolbar.items.first(where: {
+            $0.itemIdentifier == .inspectorTrackingSeparator
+        }) as? NSTrackingSeparatorToolbarItem)
+        let toggleAction = try #require(toggleItem.action)
+        let responder = try #require(window.nextResponder as? WorkspaceInspectorResponder)
+        #expect(toggleItem.target == nil)
+        #expect(toggleAction == #selector(NSSplitViewController.toggleInspector(_:)))
+        #expect(responder.controller === fixture.controller)
+        #expect(trackingItem.splitView === fixture.controller.splitView)
+        #expect(trackingItem.dividerIndex == 2)
+
+        #expect(window.tryToPerform(toggleAction, with: nil))
+        #expect(fixture.controller.splitViewItems[3].isCollapsed)
+        #expect(priorResponder.invocationCount == 0)
+        #expect(window.tryToPerform(toggleAction, with: nil))
+        #expect(!fixture.controller.splitViewItems[3].isCollapsed)
+        #expect(priorResponder.invocationCount == 0)
+
+        policy.removeFromSuperview()
+        #expect(window.nextResponder === priorResponder)
+        #expect(window.tryToPerform(toggleAction, with: nil))
+        #expect(priorResponder.invocationCount == 1)
+    }
+
+    @Test func fixedToolbarLeavesArticleWindowInspectorResponderUntouched() throws {
+        let host = NSViewController()
+        host.view = NSView(frame: NSRect(x: 0, y: 0, width: 900, height: 700))
+        let window = NSWindow(contentViewController: host)
+        let toolbar = NSToolbar(identifier: "NativeWorkspaceLayoutTests.ArticleToolbar")
+        window.toolbar = toolbar
+        let articleInspectorResponder = InspectorActionRecorderResponder()
+        window.nextResponder = articleInspectorResponder
+        let policy = FixedWindowToolbarPolicyView(installsInspectorSection: true)
+        host.view.addSubview(policy)
+        defer {
+            window.close()
+        }
+
+        policy.enforcePolicy()
+
+        let toggleItem = try #require(toolbar.items.first(where: {
+            $0.itemIdentifier == .toggleInspector
+        }))
+        let toggleAction = try #require(toggleItem.action)
+        #expect(toggleItem.target == nil)
+        #expect(toggleAction == #selector(NSSplitViewController.toggleInspector(_:)))
+        #expect(window.nextResponder === articleInspectorResponder)
+        #expect(!(window.nextResponder is WorkspaceInspectorResponder))
+
+        #expect(window.tryToPerform(toggleAction, with: nil))
+        #expect(articleInspectorResponder.invocationCount == 1)
     }
 
     @Test func readerControllerAndViewIdentitySurviveTwentyPaneToggleCycles() {
@@ -366,6 +453,19 @@ struct NativeWorkspaceLayoutTests {
         fixture.controller.view.layoutSubtreeIfNeeded()
     }
 
+    private func waitForNativeCondition(
+        timeout: TimeInterval,
+        condition: () -> Bool
+    ) async -> Bool {
+        let deadline = ProcessInfo.processInfo.systemUptime + timeout
+        while ProcessInfo.processInfo.systemUptime < deadline {
+            if condition() { return true }
+            await Task.yield()
+            try? await Task.sleep(for: .milliseconds(20))
+        }
+        return condition()
+    }
+
     private func source(_ relativePath: String) throws -> String {
         try String(
             contentsOf: repositoryRoot.appending(path: relativePath),
@@ -406,5 +506,14 @@ private struct WorkspaceFixture {
     func tearDown() {
         controller.view.removeFromSuperview()
         widthDefaults.removePersistentDomain(forName: defaultsSuiteName)
+    }
+}
+
+@MainActor
+private final class InspectorActionRecorderResponder: NSResponder {
+    private(set) var invocationCount = 0
+
+    @objc func toggleInspector(_ sender: Any?) {
+        invocationCount += 1
     }
 }

@@ -457,10 +457,20 @@ final class AppKitWorkspaceNavigationController: NSSplitViewController {
 
     override func viewDidLayout() {
         super.viewDidLayout()
+        if let window = view.window {
+            WorkspaceSplitControllerRegistry.register(self, in: window)
+        }
         if collapseLeadingPanesForReadableLayoutIfNeeded() {
             reportUserDrivenVisibilityIfNeeded()
         }
         scheduleInitialWidthRestore(after: WidthPersistence.restoreDelay)
+    }
+
+    override func viewWillDisappear() {
+        if let window = view.window {
+            WorkspaceSplitControllerRegistry.unregister(self, from: window)
+        }
+        super.viewWillDisappear()
     }
 
     override func splitViewDidResizeSubviews(_ notification: Notification) {

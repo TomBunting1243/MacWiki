@@ -63,10 +63,11 @@ struct WorkspaceArchitectureRegressionTests {
         let policy = try source("Sources/MacWiki/Views/Shared/FixedWindowToolbarPolicy.swift")
 
         #expect(!shell.contains(".inspector(isPresented:"))
-        #expect(shell.contains("FixedWindowToolbarPolicy()"))
+        #expect(shell.contains("FixedWindowToolbarPolicy(relaysNestedWorkspaceInspector: true)"))
         #expect(articleWindow.contains(".inspector(isPresented: $appState.inspectorVisible)"))
         #expect(articleWindow.contains(".inspectorColumnWidth("))
         #expect(articleWindow.contains("FixedWindowToolbarPolicy()"))
+        #expect(!articleWindow.contains("relaysNestedWorkspaceInspector: true"))
         #expect(policy.contains("NSToolbarItem.Identifier.toggleInspector"))
         #expect(policy.contains("NSToolbarItem.Identifier.inspectorTrackingSeparator"))
         let toggleIndex = try #require(policy.range(of: "toolbar.insertItem(withItemIdentifier: toggle"))

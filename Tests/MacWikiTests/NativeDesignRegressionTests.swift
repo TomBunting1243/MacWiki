@@ -186,7 +186,7 @@ struct NativeDesignRegressionTests {
         #expect(!articleToolbar.contains("ToolbarSpacer("))
         #expect(toolbarPolicy.contains("NSToolbarItem.Identifier.inspectorTrackingSeparator"))
         #expect(toolbarPolicy.contains("NSToolbarItem.Identifier.toggleInspector"))
-        #expect(toolbarPolicy.contains("identifiers.suffix(2) == [toggle, separator]"))
+        #expect(toolbarPolicy.contains("identifiers.suffix(2) != [toggle, separator]"))
         #expect(toolbarPolicy.contains("toolbar.allowsUserCustomization = false"))
         for action in ["Save Article", "Mark as Read", "Find in Page", "Reader Style", "Page Views", "Open in Browser", "Share"] {
             #expect(toolbar.contains(action))

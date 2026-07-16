@@ -1,6 +1,75 @@
 import AppKit
 import SwiftUI
 
+@MainActor
+enum WorkspaceSplitControllerRegistry {
+    private final class WeakEntry {
+        weak var window: NSWindow?
+        weak var controller: AppKitWorkspaceNavigationController?
+
+        init(window: NSWindow, controller: AppKitWorkspaceNavigationController) {
+            self.window = window
+            self.controller = controller
+        }
+    }
+
+    private static var entries: [ObjectIdentifier: WeakEntry] = [:]
+
+    static func register(
+        _ controller: AppKitWorkspaceNavigationController,
+        in window: NSWindow
+    ) {
+        entries[ObjectIdentifier(window)] = WeakEntry(window: window, controller: controller)
+    }
+
+    static func controller(in window: NSWindow) -> AppKitWorkspaceNavigationController? {
+        let key = ObjectIdentifier(window)
+        guard let entry = entries[key],
+              entry.window === window,
+              let controller = entry.controller else {
+            entries.removeValue(forKey: key)
+            return nil
+        }
+        return controller
+    }
+
+    static func unregister(
+        _ controller: AppKitWorkspaceNavigationController,
+        from window: NSWindow
+    ) {
+        let key = ObjectIdentifier(window)
+        guard entries[key]?.window === window,
+              entries[key]?.controller === controller else { return }
+        entries.removeValue(forKey: key)
+    }
+}
+
+final class WorkspaceInspectorResponder: NSResponder, NSUserInterfaceValidations {
+    private(set) weak var controller: AppKitWorkspaceNavigationController?
+
+    init(controller: AppKitWorkspaceNavigationController) {
+        self.controller = controller
+        super.init()
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    func update(controller: AppKitWorkspaceNavigationController) {
+        self.controller = controller
+    }
+
+    @objc func toggleInspector(_ sender: Any?) {
+        controller?.toggleInspector(sender)
+    }
+
+    func validateUserInterfaceItem(_ item: any NSValidatedUserInterfaceItem) -> Bool {
+        item.action == #selector(toggleInspector(_:)) && controller != nil
+    }
+}
+
 /// SwiftUI does not expose every macOS window-toolbar primitive. This narrow
 /// platform boundary leaves Reader item creation and placement in SwiftUI,
 /// disables editing for the fixed layout, and can install AppKit's standard
@@ -9,23 +78,36 @@ import SwiftUI
 /// owns the full-height section beyond the divider.
 struct FixedWindowToolbarPolicy: NSViewRepresentable {
     var installsInspectorSection = true
+    var relaysNestedWorkspaceInspector = false
 
     func makeNSView(context: Context) -> FixedWindowToolbarPolicyView {
-        FixedWindowToolbarPolicyView(installsInspectorSection: installsInspectorSection)
+        FixedWindowToolbarPolicyView(
+            installsInspectorSection: installsInspectorSection,
+            relaysNestedWorkspaceInspector: relaysNestedWorkspaceInspector
+        )
     }
 
     func updateNSView(_ nsView: FixedWindowToolbarPolicyView, context: Context) {
         nsView.installsInspectorSection = installsInspectorSection
+        nsView.relaysNestedWorkspaceInspector = relaysNestedWorkspaceInspector
         nsView.enforcePolicy()
     }
 }
 
 final class FixedWindowToolbarPolicyView: NSView {
     var installsInspectorSection: Bool
+    var relaysNestedWorkspaceInspector: Bool
     private var isEnforcingPolicy = false
+    private weak var workspaceController: AppKitWorkspaceNavigationController?
+    private weak var responderWindow: NSWindow?
+    private var inspectorResponder: WorkspaceInspectorResponder?
 
-    init(installsInspectorSection: Bool) {
+    init(
+        installsInspectorSection: Bool,
+        relaysNestedWorkspaceInspector: Bool = false
+    ) {
         self.installsInspectorSection = installsInspectorSection
+        self.relaysNestedWorkspaceInspector = relaysNestedWorkspaceInspector
         super.init(frame: .zero)
     }
 
@@ -55,16 +137,24 @@ final class FixedWindowToolbarPolicyView: NSView {
         enforcePolicy()
     }
 
+    override func viewWillMove(toWindow newWindow: NSWindow?) {
+        if newWindow !== window {
+            detachInspectorResponder()
+        }
+        super.viewWillMove(toWindow: newWindow)
+    }
+
     override func layout() {
         super.layout()
         enforcePolicy()
     }
 
-    deinit {
+    isolated deinit {
+        detachInspectorResponder()
         NotificationCenter.default.removeObserver(self)
     }
 
-    fileprivate func enforcePolicy() {
+    func enforcePolicy() {
         guard !isEnforcingPolicy, let toolbar = window?.toolbar else { return }
         isEnforcingPolicy = true
         defer { isEnforcingPolicy = false }
@@ -89,23 +179,161 @@ final class FixedWindowToolbarPolicyView: NSView {
         let toggle = NSToolbarItem.Identifier.toggleInspector
         let identifiers = toolbar.items.map(\.itemIdentifier)
 
-        if identifiers.suffix(2) == [toggle, separator] {
+        if identifiers.suffix(2) != [toggle, separator] {
+            if let separatorIndex = toolbar.items.firstIndex(where: {
+                $0.itemIdentifier == separator
+            }) {
+                toolbar.removeItem(at: separatorIndex)
+            }
+            if let toggleIndex = toolbar.items.firstIndex(where: {
+                $0.itemIdentifier == toggle
+            }) {
+                toolbar.removeItem(at: toggleIndex)
+            }
+
+            toolbar.insertItem(withItemIdentifier: toggle, at: toolbar.items.count)
+            toolbar.insertItem(withItemIdentifier: separator, at: toolbar.items.count)
+        }
+
+        if relaysNestedWorkspaceInspector {
+            configureWorkspaceInspectorItems(in: toolbar)
+        } else {
+            workspaceController = nil
+            detachInspectorResponder()
+        }
+    }
+
+    private func configureWorkspaceInspectorItems(in toolbar: NSToolbar) {
+        guard let controller = workspaceControllerInWindow() else { return }
+        guard let toggleItem = toolbar.items.first(where: {
+            $0.itemIdentifier == .toggleInspector
+        }) else {
             return
         }
 
-        if let separatorIndex = toolbar.items.firstIndex(where: {
-            $0.itemIdentifier == separator
-        }) {
-            toolbar.removeItem(at: separatorIndex)
-        }
-        if let toggleIndex = toolbar.items.firstIndex(where: {
-            $0.itemIdentifier == toggle
-        }) {
-            toolbar.removeItem(at: toggleIndex)
+        toggleItem.autovalidates = true
+        installInspectorResponder(for: controller)
+
+        guard let inspectorIndex = controller.splitViewItems.firstIndex(where: {
+            $0.behavior == .inspector
+        }), inspectorIndex > 0,
+        let trackingItem = toolbar.items.first(where: {
+            $0.itemIdentifier == .inspectorTrackingSeparator
+        }) as? NSTrackingSeparatorToolbarItem else {
+            return
         }
 
-        toolbar.insertItem(withItemIdentifier: toggle, at: toolbar.items.count)
-        toolbar.insertItem(withItemIdentifier: separator, at: toolbar.items.count)
+        trackingItem.splitView = controller.splitView
+        trackingItem.dividerIndex = inspectorIndex - 1
+    }
+
+    private func installInspectorResponder(
+        for controller: AppKitWorkspaceNavigationController
+    ) {
+        guard let window else { return }
+
+        if let inspectorResponder, responderWindow === window {
+            inspectorResponder.update(controller: controller)
+            if !Self.responderChain(startingAt: window, contains: inspectorResponder) {
+                inspectorResponder.nextResponder = window.nextResponder
+                window.nextResponder = inspectorResponder
+            }
+            return
+        }
+
+        detachInspectorResponder()
+        let responder = WorkspaceInspectorResponder(controller: controller)
+        responder.nextResponder = window.nextResponder
+        window.nextResponder = responder
+        responderWindow = window
+        inspectorResponder = responder
+    }
+
+    private func detachInspectorResponder() {
+        guard let inspectorResponder else { return }
+        if let responderWindow {
+            var predecessor: NSResponder = responderWindow
+            var visited = Set<ObjectIdentifier>()
+            while let next = predecessor.nextResponder {
+                let identifier = ObjectIdentifier(next)
+                guard visited.insert(identifier).inserted else { break }
+                if next === inspectorResponder {
+                    predecessor.nextResponder = inspectorResponder.nextResponder
+                    break
+                }
+                predecessor = next
+            }
+        }
+        inspectorResponder.nextResponder = nil
+        self.inspectorResponder = nil
+        responderWindow = nil
+    }
+
+    private static func responderChain(
+        startingAt responder: NSResponder,
+        contains target: NSResponder
+    ) -> Bool {
+        var current: NSResponder? = responder
+        var visited = Set<ObjectIdentifier>()
+        while let responder = current {
+            let identifier = ObjectIdentifier(responder)
+            guard visited.insert(identifier).inserted else { return false }
+            if responder === target { return true }
+            current = responder.nextResponder
+        }
+        return false
+    }
+
+    private func workspaceControllerInWindow() -> AppKitWorkspaceNavigationController? {
+        if let workspaceController,
+           workspaceController.view.window === window {
+            return workspaceController
+        }
+        guard let window else { return nil }
+
+        if let controller = WorkspaceSplitControllerRegistry.controller(in: window) {
+            workspaceController = controller
+            return controller
+        }
+
+        if let contentController = window.contentViewController,
+           let controller = Self.workspaceController(in: contentController) {
+            workspaceController = controller
+            return controller
+        }
+        if let contentView = window.contentView,
+           let controller = Self.workspaceController(in: contentView) {
+            workspaceController = controller
+            return controller
+        }
+        return nil
+    }
+
+    private static func workspaceController(
+        in root: NSViewController
+    ) -> AppKitWorkspaceNavigationController? {
+        if let controller = root as? AppKitWorkspaceNavigationController {
+            return controller
+        }
+        for child in root.children {
+            if let controller = workspaceController(in: child) {
+                return controller
+            }
+        }
+        return nil
+    }
+
+    private static func workspaceController(
+        in root: NSView
+    ) -> AppKitWorkspaceNavigationController? {
+        var pending = [root]
+        while let view = pending.popLast() {
+            if let controller = view.nextResponder as? AppKitWorkspaceNavigationController {
+                return controller
+            }
+            pending.append(contentsOf: view.subviews.reversed())
+        }
+        return nil
     }
 
     @objc private func windowDidUpdate(_ notification: Notification) {
