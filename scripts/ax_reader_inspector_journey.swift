@@ -429,8 +429,11 @@ do {
         return result
     }
 
-    func inspectorToolbarButton() throws -> AXUIElement {
-        try toolbarButton("Inspector")
+    func inspectorToggleButton(_ label: String) throws -> AXUIElement {
+        guard let result = button(in: contentWindow, label: label) else {
+            throw JourneyError.missing("The Reader accessory omitted \(label).")
+        }
+        return result
     }
 
     var modeGroup = inspectorModeGroup(in: contentWindow)
@@ -460,14 +463,14 @@ do {
     }
     if modeGroup == nil {
         guard wait(condition: {
-            guard let inspector = try? inspectorToolbarButton() else { return false }
+            guard let inspector = try? inspectorToggleButton("Show Inspector") else { return false }
             return isEnabled(inspector)
-        }), let inspector = try? inspectorToolbarButton() else {
+        }), let inspector = try? inspectorToggleButton("Show Inspector") else {
             throw JourneyError.missing(
                 "Inspector never became enabled at the wide test size \(String(describing: windowSize(contentWindow)))."
             )
         }
-        try press(inspector, label: "Inspector")
+        try press(inspector, label: "Show Inspector")
         settleAccessibility(for: 0.45)
     }
     guard wait(condition: {
@@ -523,12 +526,13 @@ do {
         let inspectorVisible = inspectorModeGroup(in: contentWindow) != nil
         let expectedListsControl = expected.lists ? "Hide Lists" : "Show Lists"
         let expectedDirectoryControl = expected.directory ? "Hide List Contents" : "Show List Contents"
+        let expectedInspectorControl = expected.inspector ? "Hide Inspector" : "Show Inspector"
         return listsVisible == expected.lists
             && directoryVisible == expected.directory
             && inspectorVisible == expected.inspector
             && button(in: toolbar, label: expectedListsControl) != nil
             && button(in: toolbar, label: expectedDirectoryControl) != nil
-            && button(in: toolbar, label: "Inspector") != nil
+            && button(in: contentWindow, label: expectedInspectorControl) != nil
             && readerWebAreaIdentityIsStable()
     }
 
@@ -561,7 +565,8 @@ do {
             }
         }
         if currentPaneState.inspector != target.inspector {
-            try press(try inspectorToolbarButton(), label: "Inspector")
+            let label = currentPaneState.inspector ? "Hide Inspector" : "Show Inspector"
+            try press(try inspectorToggleButton(label), label: label)
             currentPaneState = PaneVisibilityState(
                 lists: currentPaneState.lists,
                 directory: currentPaneState.directory,
@@ -583,7 +588,7 @@ do {
     let expectedReaderControls = [
         "Back", "Forward", "Search Wikipedia", "Save Article",
         "Mark as Read", "Find in Page", "Reader Style",
-        "Page Views", "Open in Browser", "Share", "Inspector"
+        "Page Views", "Open in Browser", "Share"
     ]
     let contractToolbar = try refreshNativeToolbar()
     let missingToolbarControls = expectedReaderControls.filter {
@@ -609,7 +614,8 @@ do {
         throw JourneyError.missing("The retired custom More Reader Actions control is still exposed.")
     }
 
-    let reportedReaderControls = [listsControlReport, listContentsControlReport] + expectedReaderControls
+    let reportedReaderControls = [listsControlReport, listContentsControlReport]
+        + expectedReaderControls + ["Hide Inspector", "Show Inspector"]
     trace("native window toolbar contract verified")
     traceRuntimeDiagnostics("native window toolbar contract")
 
@@ -721,20 +727,20 @@ do {
     // Exercise the standard Inspector responder-chain action against the fourth
     // semantic AppKit split item, refreshing both toolbar and pane AX state.
     for cycle in 1...6 {
-        let hideInspector = try inspectorToolbarButton()
-        try press(hideInspector, label: "Inspector")
+        let hideInspector = try inspectorToggleButton("Hide Inspector")
+        try press(hideInspector, label: "Hide Inspector")
         guard wait(timeout: 4, condition: {
             inspectorModeGroup(in: contentWindow) == nil
-                && (try? inspectorToolbarButton()) != nil
+                && (try? inspectorToggleButton("Show Inspector")) != nil
         }) else {
             throw JourneyError.missing("Inspector visibility cycle \(cycle) did not hide the native inspector.")
         }
 
-        let showInspector = try inspectorToolbarButton()
-        try press(showInspector, label: "Inspector")
+        let showInspector = try inspectorToggleButton("Show Inspector")
+        try press(showInspector, label: "Show Inspector")
         guard wait(timeout: 4, condition: {
             inspectorModeGroup(in: contentWindow) != nil
-                && (try? inspectorToolbarButton()) != nil
+                && (try? inspectorToggleButton("Hide Inspector")) != nil
                 && readerWebAreaIdentityIsStable()
         }) else {
             throw JourneyError.missing("Inspector visibility cycle \(cycle) did not restore the native inspector.")

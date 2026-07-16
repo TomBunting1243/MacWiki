@@ -460,7 +460,6 @@ final class AppKitWorkspaceNavigationController: NSSplitViewController {
     private let readerItem: NSSplitViewItem
     private let inspectorItem: NSSplitViewItem
     private let readerAccessoryController: NSSplitViewItemAccessoryViewController?
-    private let inspectorAccessoryController: NSSplitViewItemAccessoryViewController?
     private let initialListsWidth: CGFloat
     private let initialDirectoryWidth: CGFloat
     private let initialInspectorWidth: CGFloat
@@ -486,7 +485,6 @@ final class AppKitWorkspaceNavigationController: NSSplitViewController {
         readerController: NSViewController,
         inspectorController: NSViewController,
         readerAccessoryController: NSSplitViewItemAccessoryViewController? = nil,
-        inspectorAccessoryController: NSSplitViewItemAccessoryViewController? = nil,
         initialListsWidth: CGFloat,
         initialDirectoryWidth: CGFloat,
         initialInspectorWidth: CGFloat,
@@ -497,7 +495,6 @@ final class AppKitWorkspaceNavigationController: NSSplitViewController {
         readerItem = NSSplitViewItem(viewController: readerController)
         inspectorItem = NSSplitViewItem(inspectorWithViewController: inspectorController)
         self.readerAccessoryController = readerAccessoryController
-        self.inspectorAccessoryController = inspectorAccessoryController
         self.initialListsWidth = Self.clamped(
             initialListsWidth,
             to: MainWindowColumnWidth.sidebarRange,
@@ -577,16 +574,10 @@ final class AppKitWorkspaceNavigationController: NSSplitViewController {
         if let readerAccessoryController {
             readerItem.addTopAlignedAccessoryViewController(readerAccessoryController)
         }
-        if let inspectorAccessoryController {
-            inspectorItem.addTopAlignedAccessoryViewController(inspectorAccessoryController)
-        }
     }
 
     override func viewDidLayout() {
         super.viewDidLayout()
-        if let window = view.window {
-            WorkspaceSplitControllerRegistry.register(self, in: window)
-        }
         guard !observeWindowGeometryTransitionIfNeeded() else { return }
         if collapseLeadingPanesForReadableLayoutIfNeeded() {
             reportUserDrivenVisibilityIfNeeded()
@@ -595,9 +586,6 @@ final class AppKitWorkspaceNavigationController: NSSplitViewController {
     }
 
     override func viewWillDisappear() {
-        if let window = view.window {
-            WorkspaceSplitControllerRegistry.unregister(self, from: window)
-        }
         cancelWindowGeometryTransition(resetObservedWidth: true)
         super.viewWillDisappear()
     }

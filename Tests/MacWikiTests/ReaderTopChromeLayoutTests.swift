@@ -12,6 +12,7 @@ struct ReaderTopChromeLayoutTests {
         let toolbar = try source("Sources/MacWiki/Views/Shared/MainWindowReaderToolbar.swift")
         let shell = try source("Sources/MacWiki/Views/Shared/MainWindowShell.swift")
         let policy = try source("Sources/MacWiki/Views/Shared/FixedWindowToolbarPolicy.swift")
+        let tabAccessories = try source("Sources/MacWiki/Views/Components/ReaderTabAccessoryCluster.swift")
 
         #expect(toolbar.contains("struct MainWindowReaderToolbar: ToolbarContent"))
         #expect(!toolbar.contains("CustomizableToolbarContent"))
@@ -35,14 +36,14 @@ struct ReaderTopChromeLayoutTests {
         #expect(!toolbar.contains(".frame(width:"))
         #expect(policy.contains("toolbar.allowsUserCustomization = false"))
         #expect(policy.contains("toolbar.autosavesConfiguration = false"))
-        #expect(policy.contains("NSToolbarItem.Identifier.inspectorTrackingSeparator"))
-        #expect(policy.contains("NSToolbarItem.Identifier.toggleInspector"))
-        #expect(policy.contains("if !toolbar.items.contains(where: { $0.itemIdentifier == toggle })"))
-        #expect(policy.contains("if !toolbar.items.contains(where: { $0.itemIdentifier == separator })"))
+        #expect(!policy.contains("toolbar.items"))
+        #expect(!policy.contains("insertItem"))
         #expect(!policy.contains("toolbar.removeItem(at:"))
-        #expect(policy.contains("WorkspaceInspectorResponder"))
-        #expect(shell.contains("FixedWindowToolbarPolicy(relaysNestedWorkspaceInspector: true)"))
-        #expect(policy.contains("if trackingItem.dividerIndex != dividerIndex"))
+        #expect(!policy.contains("NSWindow.didUpdateNotification"))
+        #expect(!policy.contains("override func layout"))
+        #expect(shell.contains("FixedWindowToolbarPolicy()"))
+        #expect(tabAccessories.contains("appState.toggleInspectorVisibility()"))
+        #expect(tabAccessories.contains("toggle-reader-inspector"))
         #expect(!toolbar.contains("toggle-reader-inspector"))
         #expect(!toolbar.contains("appState.toggleInspectorVisibility()"))
     }
@@ -74,6 +75,7 @@ struct ReaderTopChromeLayoutTests {
     @Test("every main reader command remains natively reachable")
     func mainReaderToolbarPreservesEveryCommandPath() throws {
         let toolbar = try source("Sources/MacWiki/Views/Shared/MainWindowReaderToolbar.swift")
+        let tabAccessories = try source("Sources/MacWiki/Views/Components/ReaderTabAccessoryCluster.swift")
 
         for action in [
             "Hide Lists", "Show Lists", "Hide List Contents", "Show List Contents", "Back", "Forward",
@@ -90,10 +92,8 @@ struct ReaderTopChromeLayoutTests {
         #expect(toolbar.contains("SidebarPageViewsPopoverContent("))
         #expect(toolbar.contains("ReadStateSync.applyReadState("))
         #expect(toolbar.contains("ShareLink(item: article.url)"))
-        let policy = try source("Sources/MacWiki/Views/Shared/FixedWindowToolbarPolicy.swift")
-        #expect(policy.contains("NSToolbarItem.Identifier.toggleInspector"))
-        #expect(policy.contains("NSToolbarItem.Identifier.inspectorTrackingSeparator"))
-        #expect(!policy.contains("toolbar.removeItem(at:"))
+        #expect(tabAccessories.contains("Hide Inspector"))
+        #expect(tabAccessories.contains("Show Inspector"))
     }
 
     @Test("menu presentation requests reach native toolbar popovers")

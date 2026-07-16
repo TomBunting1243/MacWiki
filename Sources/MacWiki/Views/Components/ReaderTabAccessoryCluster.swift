@@ -59,7 +59,17 @@ struct ReaderTabAccessoryCluster: View {
             .labelStyle(.iconOnly)
             .help("New Tab (⌘T)")
             .accessibilityHint("Creates a new tab")
+
+            Button(
+                appState.inspectorVisible ? "Hide Inspector" : "Show Inspector",
+                systemImage: "sidebar.right"
+            ) {
+                appState.toggleInspectorVisibility()
+            }
+            .labelStyle(.iconOnly)
+            .help(appState.inspectorVisible ? "Hide Inspector" : "Show Inspector")
+            .accessibilityIdentifier("toggle-reader-inspector")
         }
-        .controlSize(.small)
+        .controlSize(.regular)
     }
 }

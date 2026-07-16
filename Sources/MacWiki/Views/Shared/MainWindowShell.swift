@@ -123,7 +123,7 @@ private struct MainWorkspaceShell: View {
             )
         }
         .background {
-            FixedWindowToolbarPolicy(relaysNestedWorkspaceInspector: true)
+            FixedWindowToolbarPolicy()
                 .frame(width: 0, height: 0)
                 .accessibilityHidden(true)
         }

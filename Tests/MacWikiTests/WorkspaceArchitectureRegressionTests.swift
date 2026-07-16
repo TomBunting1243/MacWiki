@@ -32,7 +32,7 @@ struct WorkspaceArchitectureRegressionTests {
         #expect(bridge.contains("NSSplitViewItem(inspectorWithViewController:"))
         #expect(bridge.contains("NSSplitViewItemAccessoryViewController"))
         #expect(bridge.contains("readerItem.addTopAlignedAccessoryViewController("))
-        #expect(bridge.contains("inspectorItem.addTopAlignedAccessoryViewController("))
+        #expect(!bridge.contains("inspectorItem.addTopAlignedAccessoryViewController("))
         #expect(bridge.contains("listsItem.allowsFullHeightLayout = true"))
         #expect(bridge.contains("inspectorItem.allowsFullHeightLayout = true"))
         #expect(!bridge.contains("automaticallyAppliesContentInsets = false"))
@@ -78,16 +78,14 @@ struct WorkspaceArchitectureRegressionTests {
         let policy = try source("Sources/MacWiki/Views/Shared/FixedWindowToolbarPolicy.swift")
 
         #expect(!shell.contains(".inspector(isPresented:"))
-        #expect(shell.contains("FixedWindowToolbarPolicy(relaysNestedWorkspaceInspector: true)"))
+        #expect(shell.contains("FixedWindowToolbarPolicy()"))
         #expect(articleWindow.contains(".inspector(isPresented: $appState.inspectorVisible)"))
         #expect(articleWindow.contains(".inspectorColumnWidth("))
         #expect(articleWindow.contains("FixedWindowToolbarPolicy()"))
-        #expect(!articleWindow.contains("relaysNestedWorkspaceInspector: true"))
-        #expect(policy.contains("NSToolbarItem.Identifier.toggleInspector"))
-        #expect(policy.contains("NSToolbarItem.Identifier.inspectorTrackingSeparator"))
-        #expect(policy.contains("toolbar.insertItem(withItemIdentifier: toggle, at: insertionIndex)"))
-        #expect(policy.contains("toolbar.insertItem(withItemIdentifier: separator, at: insertionIndex)"))
-        #expect(!policy.contains("toolbar.removeItem(at:"))
+        #expect(!policy.contains("insertItem"))
+        #expect(!policy.contains("removeItem"))
+        #expect(!policy.contains("inspectorTrackingSeparator"))
+        #expect(!policy.contains("WorkspaceInspectorResponder"))
     }
 
     @Test func navigationVisibilityUsesTwoIndependentStoredBindings() throws {

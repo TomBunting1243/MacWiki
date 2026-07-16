@@ -57,15 +57,12 @@ struct NativeWorkspaceLayoutTests {
         #expect(items[3].maximumThickness == MainWindowColumnWidth.inspectorRange.upperBound)
     }
 
-    @Test func readerAndInspectorChromeUseNativeTopAlignedSplitItemAccessories() {
+    @Test func onlyReaderTabsUseANativeTopAlignedSplitItemAccessory() {
         let readerAccessory = NSSplitViewItemAccessoryViewController()
         readerAccessory.view = NSView(frame: NSRect(x: 0, y: 0, width: 600, height: 36))
-        let inspectorAccessory = NSSplitViewItemAccessoryViewController()
-        inspectorAccessory.view = NSView(frame: NSRect(x: 0, y: 0, width: 320, height: 36))
         let fixture = makeFixture(
             width: 1_500,
-            readerAccessoryController: readerAccessory,
-            inspectorAccessoryController: inspectorAccessory
+            readerAccessoryController: readerAccessory
         )
         defer { fixture.tearDown() }
         layout(fixture)
@@ -73,7 +70,7 @@ struct NativeWorkspaceLayoutTests {
         #expect(fixture.controller.splitViewItems[0].topAlignedAccessoryViewControllers.isEmpty)
         #expect(fixture.controller.splitViewItems[1].topAlignedAccessoryViewControllers.isEmpty)
         #expect(fixture.controller.splitViewItems[2].topAlignedAccessoryViewControllers == [readerAccessory])
-        #expect(fixture.controller.splitViewItems[3].topAlignedAccessoryViewControllers == [inspectorAccessory])
+        #expect(fixture.controller.splitViewItems[3].topAlignedAccessoryViewControllers.isEmpty)
     }
 
     @Test func appKitControllerSupportsEveryIndependentVisibilityCombination() {
@@ -369,103 +366,30 @@ struct NativeWorkspaceLayoutTests {
         ))
     }
 
-    @Test func fixedToolbarTargetsNestedWorkspaceInspectorAndTracksItsDivider() throws {
-        let fixture = makeFixture(width: 1_500)
-        let host = NSViewController()
-        host.view = NSView(frame: NSRect(origin: .zero, size: fixture.size))
-        host.addChild(fixture.controller)
-        host.view.addSubview(fixture.controller.view)
-        fixture.controller.view.frame = host.view.bounds
-
-        let window = NSWindow(contentViewController: host)
-        let toolbar = NSToolbar(identifier: "NativeWorkspaceLayoutTests.Toolbar")
-        window.toolbar = toolbar
-        let priorResponder = InspectorActionRecorderResponder()
-        window.nextResponder = priorResponder
-        let policy = FixedWindowToolbarPolicyView(
-            installsInspectorSection: true,
-            relaysNestedWorkspaceInspector: true
-        )
-        host.view.addSubview(policy)
-        defer {
-            window.close()
-            fixture.tearDown()
-        }
-
-        layout(fixture)
-        WorkspaceSplitControllerRegistry.register(fixture.controller, in: window)
-        #expect(WorkspaceSplitControllerRegistry.controller(in: window) === fixture.controller)
-        policy.enforcePolicy()
-
-        let toggleItem = try #require(toolbar.items.first(where: {
-            $0.itemIdentifier == .toggleInspector
-        }))
-        let trackingItem = try #require(toolbar.items.first(where: {
-            $0.itemIdentifier == .inspectorTrackingSeparator
-        }) as? NSTrackingSeparatorToolbarItem)
-        let toggleAction = try #require(toggleItem.action)
-        let responder = try #require(window.nextResponder as? WorkspaceInspectorResponder)
-        #expect(toggleItem.target == nil)
-        #expect(toggleAction == #selector(NSSplitViewController.toggleInspector(_:)))
-        #expect(responder.controller === fixture.controller)
-        #expect(trackingItem.splitView === fixture.controller.splitView)
-        #expect(trackingItem.dividerIndex == 2)
-
-        // SwiftUI may publish another toolbar item after the AppKit Inspector
-        // section during an unrelated view update. Re-enforcement must preserve
-        // native item identity instead of remove/reinsert layout churn.
-        toolbar.insertItem(withItemIdentifier: .print, at: toolbar.items.count)
-        for _ in 0..<20 {
-            policy.enforcePolicy()
-        }
-        #expect(toolbar.items.first(where: {
-            $0.itemIdentifier == .toggleInspector
-        }) === toggleItem)
-        #expect(toolbar.items.first(where: {
-            $0.itemIdentifier == .inspectorTrackingSeparator
-        }) === trackingItem)
-        #expect(toolbar.items.last?.itemIdentifier == .print)
-
-        #expect(window.tryToPerform(toggleAction, with: nil))
-        #expect(fixture.controller.splitViewItems[3].isCollapsed)
-        #expect(priorResponder.invocationCount == 0)
-        #expect(window.tryToPerform(toggleAction, with: nil))
-        #expect(!fixture.controller.splitViewItems[3].isCollapsed)
-        #expect(priorResponder.invocationCount == 0)
-
-        policy.removeFromSuperview()
-        #expect(window.nextResponder === priorResponder)
-        #expect(window.tryToPerform(toggleAction, with: nil))
-        #expect(priorResponder.invocationCount == 1)
-    }
-
-    @Test func fixedToolbarLeavesArticleWindowInspectorResponderUntouched() throws {
+    @Test func fixedToolbarPolicyNeverMutatesToolbarItems() throws {
         let host = NSViewController()
         host.view = NSView(frame: NSRect(x: 0, y: 0, width: 900, height: 700))
         let window = NSWindow(contentViewController: host)
-        let toolbar = NSToolbar(identifier: "NativeWorkspaceLayoutTests.ArticleToolbar")
+        let toolbar = NSToolbar(identifier: "NativeWorkspaceLayoutTests.Toolbar")
         window.toolbar = toolbar
-        let articleInspectorResponder = InspectorActionRecorderResponder()
-        window.nextResponder = articleInspectorResponder
-        let policy = FixedWindowToolbarPolicyView(installsInspectorSection: true)
+        toolbar.insertItem(withItemIdentifier: .print, at: 0)
+        let originalItem = try #require(toolbar.items.first)
+        let policy = FixedWindowToolbarPolicyView()
         host.view.addSubview(policy)
         defer {
             window.close()
         }
 
         policy.enforcePolicy()
-
-        let toggleItem = try #require(toolbar.items.first(where: {
-            $0.itemIdentifier == .toggleInspector
-        }))
-        let toggleAction = try #require(toggleItem.action)
-        #expect(toggleItem.target == nil)
-        #expect(toggleAction == #selector(NSSplitViewController.toggleInspector(_:)))
-        #expect(window.nextResponder === articleInspectorResponder)
-        #expect(!(window.nextResponder is WorkspaceInspectorResponder))
-
-        #expect(window.tryToPerform(toggleAction, with: nil))
-        #expect(articleInspectorResponder.invocationCount == 1)
+        for _ in 0..<20 {
+            policy.enforcePolicy()
+        }
+        #expect(toolbar.items.count == 1)
+        #expect(toolbar.items.first === originalItem)
+        #expect(toolbar.items.first?.itemIdentifier == .print)
+        #expect(!toolbar.allowsUserCustomization)
+        #expect(!toolbar.autosavesConfiguration)
+        #expect(!toolbar.allowsDisplayModeCustomization)
     }
 
     @Test func readerControllerAndViewIdentitySurviveTwentyPaneToggleCycles() {
@@ -605,8 +529,7 @@ struct NativeWorkspaceLayoutTests {
         initialListsWidth: CGFloat = 220,
         initialDirectoryWidth: CGFloat = 320,
         initialInspectorWidth: CGFloat = 320,
-        readerAccessoryController: NSSplitViewItemAccessoryViewController? = nil,
-        inspectorAccessoryController: NSSplitViewItemAccessoryViewController? = nil
+        readerAccessoryController: NSSplitViewItemAccessoryViewController? = nil
     ) -> WorkspaceFixture {
         let lists = makePaneController()
         let directory = makePaneController()
@@ -627,7 +550,6 @@ struct NativeWorkspaceLayoutTests {
             readerController: reader,
             inspectorController: inspector,
             readerAccessoryController: readerAccessoryController,
-            inspectorAccessoryController: inspectorAccessoryController,
             initialListsWidth: initialListsWidth,
             initialDirectoryWidth: initialDirectoryWidth,
             initialInspectorWidth: initialInspectorWidth,
@@ -711,14 +633,5 @@ private struct WorkspaceFixture {
     func tearDown() {
         controller.view.removeFromSuperview()
         widthDefaults.removePersistentDomain(forName: defaultsSuiteName)
-    }
-}
-
-@MainActor
-private final class InspectorActionRecorderResponder: NSResponder {
-    private(set) var invocationCount = 0
-
-    @objc func toggleInspector(_ sender: Any?) {
-        invocationCount += 1
     }
 }
