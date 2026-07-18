@@ -135,11 +135,13 @@ struct DiscoverFeatureCard: View {
                 onOpen(result, SystemBridge.isCommandPressed)
             } label: {
                 VStack(alignment: .leading, spacing: 0) {
-                    featureImage
-                        .frame(maxWidth: .infinity)
-                        .frame(height: heroImageHeight)
-                        .clipped()
-                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    if result.thumbnailURL != nil {
+                        featureImage
+                            .frame(maxWidth: .infinity)
+                            .frame(height: heroImageHeight)
+                            .clipped()
+                            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    }
 
                     VStack(alignment: .leading, spacing: 8) {
                         Text(DiscoverEditionCopy.leadKicker)
@@ -189,7 +191,7 @@ struct DiscoverFeatureCard: View {
                 .padding(.horizontal, 16)
                 .padding(.bottom, 16)
         }
-        .frame(minHeight: heroImageHeight + 72)
+        .frame(minHeight: result.thumbnailURL == nil ? 0 : heroImageHeight + 72)
         .discoverSurfaceChrome(
             isEnabled: showsSurface,
             cornerRadius: 14,
@@ -263,12 +265,6 @@ struct DiscoverFeatureCard: View {
                         .foregroundStyle(.white.opacity(0.55))
                 }
             }
-        } else {
-            LinearGradient(
-                colors: [Color.accentColor.opacity(0.25), Color.blue.opacity(0.2)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
         }
     }
 }

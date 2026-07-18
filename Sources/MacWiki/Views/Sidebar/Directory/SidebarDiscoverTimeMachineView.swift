@@ -59,6 +59,8 @@ struct SidebarDiscoverTimeMachineView: View {
                         )
                         .labelsHidden()
                         .datePickerStyle(.field)
+                        .frame(minWidth: 108)
+                        .layoutPriority(1)
                         .accessibilityLabel("Edition Date")
 
                         Button("Next Day", systemImage: "chevron.right") {

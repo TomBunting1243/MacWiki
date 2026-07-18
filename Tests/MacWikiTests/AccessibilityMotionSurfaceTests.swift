@@ -35,20 +35,26 @@ struct AccessibilityMotionSurfaceTests {
     }
 
     @Test func timeMachineIconControlsExposeSemanticAccessibilityMetadata() throws {
-        let source = try source("Sources/MacWiki/Views/Home/Discover/DiscoverTimeMachineControlsView.swift")
+        let timeMachineSource = try source("Sources/MacWiki/Views/Home/Discover/DiscoverTimeMachineControlsView.swift")
 
-        #expect(source.contains(".accessibilityLabel(\"Refresh Discover\")"))
-        #expect(source.contains(".accessibilityValue(discoverFeedStore.isLoading ? \"Refreshing\" : \"Ready\")"))
-        #expect(source.contains(".help(discoverFeedStore.isLoading ? \"Refreshing Discover…\" : \"Refresh Discover\")"))
+        #expect(timeMachineSource.contains(".accessibilityLabel(\"Refresh Discover\")"))
+        #expect(timeMachineSource.contains(".accessibilityValue(discoverFeedStore.isLoading ? \"Refreshing\" : \"Ready\")"))
+        #expect(timeMachineSource.contains(".help(discoverFeedStore.isLoading ? \"Refreshing Discover…\" : \"Refresh Discover\")"))
 
-        #expect(source.contains("Menu(\"Jump\", systemImage: \"calendar.badge.clock\")"))
-        #expect(source.contains(".help(\"Jump to another edition\")"))
+        #expect(timeMachineSource.contains("Menu(\"Jump\", systemImage: \"calendar.badge.clock\")"))
+        #expect(timeMachineSource.contains(".help(\"Jump to another edition\")"))
 
-        #expect(source.contains("Button(\"Previous Day\", systemImage: \"chevron.left\")"))
-        #expect(source.contains("Button(\"Next Day\", systemImage: \"chevron.right\")"))
-        #expect(source.contains("DatePicker("))
-        #expect(source.contains(".datePickerStyle(.field)"))
-        #expect(source.contains(".accessibilityLabel(\"Edition Date\")"))
+        #expect(timeMachineSource.contains("Button(\"Previous Day\", systemImage: \"chevron.left\")"))
+        #expect(timeMachineSource.contains("Button(\"Next Day\", systemImage: \"chevron.right\")"))
+        #expect(timeMachineSource.contains("DatePicker("))
+        #expect(timeMachineSource.contains(".datePickerStyle(.field)"))
+        #expect(timeMachineSource.contains(".frame(minWidth: 120)"))
+        #expect(timeMachineSource.contains(".accessibilityLabel(\"Edition Date\")"))
+
+        let sidebarSource = try source(
+            "Sources/MacWiki/Views/Sidebar/Directory/SidebarDiscoverTimeMachineView.swift"
+        )
+        #expect(sidebarSource.contains(".frame(minWidth: 108)"))
     }
 
     private func source(_ relativePath: String) throws -> String {

@@ -102,6 +102,8 @@ struct DiscoverTimeMachineControlsView: View {
             )
             .labelsHidden()
             .datePickerStyle(.field)
+            .frame(minWidth: 120)
+            .layoutPriority(1)
             .accessibilityLabel("Edition Date")
 
             Button("Next Day", systemImage: "chevron.right") {

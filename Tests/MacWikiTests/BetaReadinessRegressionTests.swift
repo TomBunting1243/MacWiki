@@ -546,13 +546,21 @@ struct BetaReadinessRegressionTests {
                 .appendingPathComponent("Home")
                 .appendingPathComponent("DiscoverNewTabPageView.swift"),
             discoverRoot.appendingPathComponent("DiscoverFeedSections.swift"),
-            discoverRoot.appendingPathComponent("DiscoverMediaSupport.swift")
+            discoverRoot.appendingPathComponent("DiscoverMediaSupport.swift"),
+            discoverRoot.appendingPathComponent("DiscoverFeatureComponents.swift")
         ]
 
         for file in discoverFiles {
             let source = try String(contentsOf: file, encoding: .utf8)
             #expect(!source.contains("Text(\"PLACEHOLDER\")"))
         }
+
+        let featureSource = try String(
+            contentsOf: discoverRoot.appendingPathComponent("DiscoverFeatureComponents.swift"),
+            encoding: .utf8
+        )
+        #expect(featureSource.contains("if result.thumbnailURL != nil"))
+        #expect(featureSource.contains("result.thumbnailURL == nil ? 0 : heroImageHeight + 72"))
 
         let newTabSource = try String(
             contentsOf: root
