@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import WebKit
 
 @Suite
 struct ReaderScrollBehaviorRegressionTests {
@@ -80,9 +81,55 @@ struct ReaderScrollBehaviorRegressionTests {
             endingBefore: "// Invalidate cache on layout events"
         )
 
-        #expect(visibleSection.contains("var activeId = null"))
+        #expect(visibleSection.contains("var activeIndex = activeHeadingIndex(scrollTop)"))
+        #expect(visibleSection.contains("return activeIndex >= 0 ? _cachedHeadings[activeIndex].id : null"))
         #expect(!visibleSection.contains("_cachedHeadings[0].id"))
         #expect(!visibleSection.contains("upper 60%"))
+    }
+
+    @MainActor
+    @Test func visibleSectionSelfCorrectsAfterLateDocumentLayoutShift() async throws {
+        let script = try webViewScript()
+        let headingTracker = sourceSection(
+            script,
+            startingAt: "(function () {\n    var _cachedHeadings = null; // [{id, element, offsetTop}]",
+            endingBefore: "// Highlight Rendering Support"
+        )
+        let webView = WKWebView(frame: CGRect(x: 0, y: 0, width: 640, height: 700))
+        webView.loadHTMLString(
+            """
+            <!doctype html><html><body style="margin:0">
+              <div id="late" style="height:0"></div>
+              <h2 id="biography">Biography</h2><div style="height:900px"></div>
+              <h2 id="death">Death</h2><div style="height:900px"></div>
+              <h2 id="work">Work</h2><div style="height:900px"></div>
+              <h2 id="legacy">Legacy</h2><div style="height:900px"></div>
+            </body></html>
+            """,
+            baseURL: nil
+        )
+
+        for _ in 0..<200 {
+            let fixtureLoaded = try? await webView.evaluateJavaScript(
+                "document.readyState === 'complete' && document.querySelector('#legacy') !== null"
+            )
+            if fixtureLoaded as? Bool == true {
+                break
+            }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+
+        _ = try await webView.evaluateJavaScript(headingTracker)
+        _ = try await webView.evaluateJavaScript("window.currentVisibleSectionId()")
+        _ = try await webView.evaluateJavaScript("document.querySelector('#late').style.height = '2400px'")
+        _ = try await webView.evaluateJavaScript(
+            "window.scrollTo(0, document.querySelector('#legacy').offsetTop - 80)"
+        )
+        let visible = try await webView.evaluateJavaScript("window.currentVisibleSectionId()") as? String
+
+        #expect(visible == "legacy")
+        #expect(headingTracker.contains("candidate.element.getBoundingClientRect().top"))
+        #expect(headingTracker.contains("new ResizeObserver"))
     }
 
     @Test func tocRowOnlyEnqueuesAndNativeBridgeAwaitsSuccessfulSettlement() throws {

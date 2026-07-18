@@ -2386,13 +2386,18 @@ window._macwikiTagReferenceSections();
 // Cached heading positions for fast visible-section lookup during scroll.
 // Rebuilt on demand when invalidated (resize, TOC extract, first scroll).
 (function () {
-    var _cachedHeadings = null; // [{id, offsetTop}]
+    var _cachedHeadings = null; // [{id, element, offsetTop}]
     var _invalidationScheduled = false;
+    var _headingLayoutObserver = null;
 
     function rebuildHeadingCache() {
         var headings = Array.prototype.slice.call(document.querySelectorAll('h2[id], h3[id], h4[id]'));
         _cachedHeadings = headings.map(function (h) {
-            return { id: h.id, offsetTop: h.getBoundingClientRect().top + window.scrollY };
+            return {
+                id: h.id,
+                element: h,
+                offsetTop: h.getBoundingClientRect().top + window.scrollY
+            };
         });
     }
 
@@ -2422,6 +2427,21 @@ window._macwikiTagReferenceSections();
         invalidateHeadingCache();
     };
 
+    function activeHeadingIndex(scrollTop) {
+        var lo = 0, hi = _cachedHeadings.length - 1;
+        var activeIndex = -1;
+        while (lo <= hi) {
+            var mid = (lo + hi) >>> 1;
+            if (_cachedHeadings[mid].offsetTop <= scrollTop) {
+                activeIndex = mid;
+                lo = mid + 1;
+            } else {
+                hi = mid - 1;
+            }
+        }
+        return activeIndex;
+    }
+
     window.currentVisibleSectionId = function () {
         if (!_cachedHeadings) {
             rebuildHeadingCache();
@@ -2429,20 +2449,23 @@ window._macwikiTagReferenceSections();
         if (!_cachedHeadings || !_cachedHeadings.length) return null;
 
         var scrollTop = window.scrollY + 110; // threshold from top
-        // Binary search: find last heading with offsetTop <= scrollTop
-        var lo = 0, hi = _cachedHeadings.length - 1;
-        var activeId = null;
-        while (lo <= hi) {
-            var mid = (lo + hi) >>> 1;
-            if (_cachedHeadings[mid].offsetTop <= scrollTop) {
-                activeId = _cachedHeadings[mid].id;
-                lo = mid + 1;
-            } else {
-                hi = mid - 1;
+        var activeIndex = activeHeadingIndex(scrollTop);
+
+        // Wikipedia images, tables, and fonts can finish laying out after the
+        // initial cache was built. Validate only the current candidate so the
+        // normal path stays O(log n) with one live geometry read. A shifted
+        // candidate means the whole cache is stale; rebuild once before
+        // publishing a section rather than leaving Contents stuck on an old row.
+        if (activeIndex >= 0) {
+            var candidate = _cachedHeadings[activeIndex];
+            var liveOffsetTop = candidate.element.getBoundingClientRect().top + window.scrollY;
+            if (Math.abs(liveOffsetTop - candidate.offsetTop) > 2) {
+                rebuildHeadingCache();
+                activeIndex = activeHeadingIndex(scrollTop);
             }
         }
 
-        return activeId || null;
+        return activeIndex >= 0 ? _cachedHeadings[activeIndex].id : null;
     };
 
     // Invalidate cache on layout events that shift heading offsets.
@@ -2457,6 +2480,19 @@ window._macwikiTagReferenceSections();
         if (!target || target.tagName !== 'IMG') return;
         scheduleHeadingInvalidation(18);
     });
+
+    if (window.ResizeObserver && document.body) {
+        _headingLayoutObserver = new ResizeObserver(function () {
+            scheduleHeadingInvalidation(18);
+        });
+        _headingLayoutObserver.observe(document.body);
+        window.addEventListener('pagehide', function () {
+            if (_headingLayoutObserver) {
+                _headingLayoutObserver.disconnect();
+                _headingLayoutObserver = null;
+            }
+        }, { once: true });
+    }
 })();
 
 // Highlight Rendering Support using CSS Custom Highlight API
