@@ -3,6 +3,15 @@ import Testing
 
 @Suite
 struct ReaderScrollBehaviorRegressionTests {
+    @Test func readerReadStateDerivesFromTheActiveArticleProjection() throws {
+        let reader = try source("Sources/MacWiki/Views/Reader/ReaderView.swift")
+
+        #expect(reader.contains("private var isArticleUnreadState: Bool"))
+        #expect(reader.contains("!article.isRead"))
+        #expect(!reader.contains("@State private var isArticleUnreadState"))
+        #expect(!reader.contains(".onChange(of: appState.currentArticle?.isRead)"))
+    }
+
     @Test func resizeInvalidatesMetricsWithoutForcingReaderPosition() throws {
         let script = try webViewScript()
         let resizeBehavior = sourceSection(

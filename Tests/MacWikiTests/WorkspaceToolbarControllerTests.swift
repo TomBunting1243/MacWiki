@@ -28,7 +28,7 @@ struct WorkspaceToolbarControllerTests {
         #expect(separators.allSatisfy { $0.splitView === fixture.splitController.splitView })
 
         let rightBoundary = try #require(
-            toolbar.items.firstIndex { $0.itemIdentifier == .workspaceReaderInspectorBoundary }
+            toolbar.items.firstIndex { $0.itemIdentifier == .inspectorTrackingSeparator }
         )
         let inspectorModesIndex = try #require(
             toolbar.items.firstIndex { $0.itemIdentifier == .workspaceInspectorModes }
@@ -50,13 +50,21 @@ struct WorkspaceToolbarControllerTests {
             #expect(inspectorModes.role == .tabs)
         }
 
-        for item in toolbar.items where WorkspaceToolbarLayout.readerItemIdentifiers.contains(item.itemIdentifier) {
+        for item in toolbar.items where WorkspaceToolbarLayout.readerItemIdentifiers.contains(item.itemIdentifier)
+                && item.itemIdentifier != .toggleInspector {
             #expect(item.view == nil)
             #expect(item.isBordered)
             #expect(item.style == .plain)
             #expect(item.image != nil)
             #expect(item.toolTip?.isEmpty == false)
         }
+        let inspectorToggle = try #require(
+            toolbar.items.first { $0.itemIdentifier == .toggleInspector }
+        )
+        let inspectorToggleButton = try #require(inspectorToggle.view as? NSButton)
+        #expect(inspectorToggle.image != nil)
+        #expect(inspectorToggleButton.target === fixture.splitController)
+        #expect(inspectorToggleButton.action == #selector(NSSplitViewController.toggleInspector(_:)))
     }
 
     @Test("Inspector mode switches preserve toolbar identity and item geometry graph")
@@ -75,7 +83,7 @@ struct WorkspaceToolbarControllerTests {
         let readImage = try #require(readItem.image)
         let readPresentation = (readItem.label, readItem.toolTip, readItem.isEnabled)
         let inspectorBoundary = try #require(
-            toolbar.items.first { $0.itemIdentifier == .workspaceReaderInspectorBoundary }
+            toolbar.items.first { $0.itemIdentifier == .inspectorTrackingSeparator }
         )
         let inspectorModes = try #require(
             toolbar.items.first { $0.itemIdentifier == .workspaceInspectorModes }
@@ -117,14 +125,15 @@ struct WorkspaceToolbarControllerTests {
         fixture.toolbarController.setInspectorPlaneVisible(false)
         #expect(!inspectorModes.isEnabled)
         #expect(inspectorModes.isHidden)
-        #expect(inspectorBoundary.isHidden)
+        #expect(!toolbar.items.contains { $0 === inspectorBoundary })
+        #expect(!toolbar.items.contains { $0.itemIdentifier == .inspectorTrackingSeparator })
         #expect(ObjectIdentifier(inspectorModes) == inspectorModesIdentity)
 
         fixture.appState.inspectorMode = .info
         fixture.toolbarController.update(configuration: fixture.makeConfiguration())
         #expect(!inspectorModes.isEnabled)
         #expect(inspectorModes.isHidden)
-        #expect(inspectorBoundary.isHidden)
+        #expect(!toolbar.items.contains { $0.itemIdentifier == .inspectorTrackingSeparator })
         #expect(inspectorModes.selectedIndex == 0)
         #expect(ObjectIdentifier(inspectorModes) == inspectorModesIdentity)
 
@@ -132,11 +141,16 @@ struct WorkspaceToolbarControllerTests {
         fixture.toolbarController.update(configuration: fixture.makeConfiguration())
         #expect(!inspectorModes.isEnabled)
         #expect(inspectorModes.isHidden)
-        #expect(inspectorBoundary.isHidden)
+        #expect(!toolbar.items.contains { $0.itemIdentifier == .inspectorTrackingSeparator })
         fixture.toolbarController.setInspectorPlaneVisible(true)
         #expect(inspectorModes.isEnabled)
         #expect(!inspectorModes.isHidden)
-        #expect(!inspectorBoundary.isHidden)
+        let restoredBoundary = try #require(
+            toolbar.items.first { $0.itemIdentifier == .inspectorTrackingSeparator }
+                as? NSTrackingSeparatorToolbarItem
+        )
+        #expect(restoredBoundary.dividerIndex == 2)
+        #expect(restoredBoundary.splitView === fixture.splitController.splitView)
         #expect(ObjectIdentifier(inspectorModes) == inspectorModesIdentity)
     }
 
@@ -190,19 +204,19 @@ struct WorkspaceToolbarControllerTests {
         fixture.toolbarController.install(on: fixture.window)
         let toolbar = try #require(fixture.window.toolbar)
         let toggle = try #require(
-            toolbar.items.first { $0.itemIdentifier == .workspaceInspectorToggle }
+            toolbar.items.first { $0.itemIdentifier == .toggleInspector }
         )
         let modes = try #require(
             toolbar.items.first { $0.itemIdentifier == .workspaceInspectorModes }
         )
         let boundary = try #require(
-            toolbar.items.first { $0.itemIdentifier == .workspaceReaderInspectorBoundary }
+            toolbar.items.first { $0.itemIdentifier == .inspectorTrackingSeparator }
         )
 
-        #expect(NSApp.sendAction(try #require(toggle.action), to: toggle.target, from: toggle))
+        let toggleButton = try #require(toggle.view as? NSButton)
+        #expect(NSApp.sendAction(try #require(toggleButton.action), to: toggleButton.target, from: toggleButton))
         #expect(modes.isHidden)
-        #expect(boundary.isHidden)
-        #expect(toggle.toolTip == "Show Inspector")
+        #expect(!toolbar.items.contains { $0 === boundary })
     }
 
     @Test("Divider collapse keeps Inspector toolbar chrome attached to the pane")
@@ -218,17 +232,17 @@ struct WorkspaceToolbarControllerTests {
             toolbar.items.first { $0.itemIdentifier == .workspaceInspectorModes }
         )
         let boundary = try #require(
-            toolbar.items.first { $0.itemIdentifier == .workspaceReaderInspectorBoundary }
+            toolbar.items.first { $0.itemIdentifier == .inspectorTrackingSeparator }
         )
         let inspectorItem = fixture.splitController.splitViewItems[3]
 
         inspectorItem.isCollapsed = true
         #expect(modes.isHidden)
-        #expect(boundary.isHidden)
+        #expect(!toolbar.items.contains { $0 === boundary })
 
         inspectorItem.isCollapsed = false
         #expect(!modes.isHidden)
-        #expect(!boundary.isHidden)
+        #expect(toolbar.items.contains { $0.itemIdentifier == .inspectorTrackingSeparator })
     }
 
     @Test("sharing and validation follow the live article and navigation lock")
@@ -250,7 +264,7 @@ struct WorkspaceToolbarControllerTests {
         fixture.appState.startWikiHop(mode: .chill, start: article, target: target)
         fixture.toolbarController.update(configuration: fixture.makeConfiguration())
         for item in toolbar.items where WorkspaceToolbarLayout.readerItemIdentifiers.contains(item.itemIdentifier) {
-            if item.itemIdentifier == .workspaceInspectorToggle {
+            if item.itemIdentifier == .toggleInspector {
                 #expect(item.isEnabled)
             } else {
                 #expect(!item.isEnabled)

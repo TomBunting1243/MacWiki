@@ -97,7 +97,13 @@ final class WorkspaceToolbarController: NSObject, NSToolbarDelegate,
     }
 
     func setInspectorPlaneVisible(_ isVisible: Bool) {
-        inspectorModesController.setPlaneVisible(isVisible, in: installedToolbar)
+        guard let toolbar = installedToolbar else {
+            inspectorModesController.setPlaneVisible(isVisible, in: nil)
+            return
+        }
+        inspectorModesController.setPlaneVisible(isVisible, in: toolbar)
+        toolbar.validateVisibleItems()
+        configureSystemInspectorToggle(in: toolbar)
     }
 
     func invalidate() {
@@ -167,12 +173,6 @@ final class WorkspaceToolbarController: NSObject, NSToolbarDelegate,
                 identifier: itemIdentifier,
                 splitView: splitController.splitView,
                 dividerIndex: 1
-            )
-        case .workspaceReaderInspectorBoundary:
-            return WorkspaceToolbarItemFactory.trackingSeparator(
-                identifier: itemIdentifier,
-                splitView: splitController.splitView,
-                dividerIndex: 2
             )
         case .workspaceInspectorModes:
             return inspectorModesController.makeItem(identifier: itemIdentifier)
@@ -283,16 +283,6 @@ final class WorkspaceToolbarController: NSObject, NSToolbarDelegate,
             item.style = .plain
             item.delegate = self
             return item
-        case .workspaceInspectorToggle:
-            let item = WorkspaceToolbarItemFactory.button(
-                identifier: itemIdentifier,
-                label: "Inspector",
-                symbol: "sidebar.right",
-                target: self,
-                action: #selector(toggleInspector(_:))
-            )
-            item.visibilityPriority = .high
-            return item
         default:
             return nil
         }
@@ -313,8 +303,6 @@ final class WorkspaceToolbarController: NSObject, NSToolbarDelegate,
                 .workspaceReaderStyle, .workspacePageViews,
                 .workspaceOpenBrowser, .workspaceShare:
             return hasArticle && !snapshot.navigationLocked
-        case .workspaceInspectorToggle:
-            return true
         case .workspaceInspectorModes:
             return inspectorModesController.isPlaneVisible
         default:
@@ -360,13 +348,16 @@ final class WorkspaceToolbarController: NSObject, NSToolbarDelegate,
     @objc private func toggleReadState(_ sender: Any?) {
         let appState = configuration.appState
         guard let article = appState.currentArticle else { return }
-        _ = ReadStateSync.applyReadState(
-            !article.isRead,
+        let isRead = !article.isRead
+        guard ReadStateSync.applyReadState(
+            isRead,
             for: article,
             in: configuration.modelContext,
             appState: appState
-        )
-        refreshFromLiveState()
+        ) else {
+            return
+        }
+        updateReadStatePresentation(isRead: isRead)
     }
 
     @objc private func findInPage(_ sender: Any?) {
@@ -386,10 +377,6 @@ final class WorkspaceToolbarController: NSObject, NSToolbarDelegate,
         configuration.openURL(url)
     }
 
-    @objc private func toggleInspector(_ sender: Any?) {
-        splitController?.toggleInspector(sender)
-    }
-
     private func refreshFromLiveState() {
         update(
             configuration: WorkspaceToolbarConfiguration(
@@ -397,6 +384,28 @@ final class WorkspaceToolbarController: NSObject, NSToolbarDelegate,
                 modelContext: configuration.modelContext,
                 openURL: configuration.openURL
             )
+        )
+    }
+
+    private func updateReadStatePresentation(isRead: Bool) {
+        guard let item = installedToolbar?.items.first(where: {
+            $0.itemIdentifier == .workspaceReadState
+        }) else {
+            return
+        }
+        updateReadStatePresentation(of: item, isRead: isRead)
+    }
+
+    private func updateReadStatePresentation(
+        of item: NSToolbarItem,
+        isRead: Bool
+    ) {
+        let label = isRead ? "Mark as Unread" : "Mark as Read"
+        item.label = label
+        item.toolTip = label
+        item.image = NSImage(
+            systemSymbolName: isRead ? "checkmark.circle.fill" : "circle",
+            accessibilityDescription: label
         )
     }
 
@@ -423,17 +432,10 @@ final class WorkspaceToolbarController: NSObject, NSToolbarDelegate,
                     ? "Hide List Contents"
                     : "Show List Contents"
             case .workspaceReadState:
-                let label = snapshot.articleIsRead ? "Mark as Unread" : "Mark as Read"
-                item.label = label
-                item.toolTip = label
-                item.image = NSImage(
-                    systemSymbolName: snapshot.articleIsRead ? "checkmark.circle.fill" : "circle",
-                    accessibilityDescription: label
+                updateReadStatePresentation(
+                    of: item,
+                    isRead: snapshot.articleIsRead
                 )
-            case .workspaceInspectorToggle:
-                item.toolTip = snapshot.inspectorVisible
-                    ? "Hide Inspector"
-                    : "Show Inspector"
             case .workspaceInspectorModes:
                 inspectorModesController.updateSelection(
                     of: item,
@@ -443,6 +445,21 @@ final class WorkspaceToolbarController: NSObject, NSToolbarDelegate,
                 break
             }
         }
+        configureSystemInspectorToggle(in: toolbar)
+    }
+
+    private func configureSystemInspectorToggle(in toolbar: NSToolbar) {
+        guard let splitController,
+              let item = toolbar.items.first(where: {
+                  $0.itemIdentifier == .toggleInspector
+              }), let control = item.view as? NSControl else {
+            return
+        }
+        control.target = splitController
+        control.action = #selector(NSSplitViewController.toggleInspector(_:))
+        control.isEnabled = true
+        item.isEnabled = true
+        item.visibilityPriority = .high
     }
 
     private func consumePresentationRequests() {

@@ -100,7 +100,15 @@ do {
     let toolbarLabel = CommandLine.arguments[2]
     let expectedContent = CommandLine.arguments[3]
     let application = AXUIElementCreateApplication(pid)
-    let baselineWindowCount = windowCount(in: application)
+    let windowDeadline = Date().addingTimeInterval(10)
+    var baselineWindowCount = windowCount(in: application)
+    while baselineWindowCount == 0, Date() < windowDeadline {
+        guard processIsAlive(pid) else {
+            throw VerificationError.missing("PID \(pid) terminated before presenting a window.")
+        }
+        RunLoop.main.run(until: Date().addingTimeInterval(0.08))
+        baselineWindowCount = windowCount(in: application)
+    }
     guard baselineWindowCount > 0 else {
         throw VerificationError.missing("PID \(pid) has no accessible window.")
     }

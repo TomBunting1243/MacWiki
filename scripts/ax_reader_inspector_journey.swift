@@ -818,7 +818,10 @@ do {
                       - baselineInspectorToggleTrailingInset
               ) <= 2 else {
             throw JourneyError.missing(
-                "The \(label) control left a toolbar gap or escaped the live Reader plane."
+                "The \(label) control left a toolbar gap or escaped the live Reader plane: "
+                    + "Reader=\(String(describing: readerPane(in: contentWindow, articleTitle: articleTitle).flatMap(elementFrame))), "
+                    + "control=\(String(describing: toolbarControl(in: toolbarElements, label: label).flatMap(elementFrame))), "
+                    + "expected trailing inset=\(baselineInspectorToggleTrailingInset)."
             )
         }
     }
@@ -1017,14 +1020,29 @@ do {
                   let workspace = workspaceSplitGroup(in: contentWindow) else { return false }
             return inspectorModeGroup(in: toolbar).map {
                 isEnabled($0)
-                    && CFEqual($0, toolbarModeGroup)
                     && elementFrame($0).map { frameMatches($0, modeGroupFrame) } == true
             } == true
                 && visibleWorkspacePaneGroups(in: workspace).count == 4
                 && (try? inspectorToggleButton("Hide Inspector")) != nil
                 && readerWebAreaIdentityIsStable()
         }) else {
-            throw JourneyError.missing("Inspector visibility cycle \(cycle) did not restore the native inspector.")
+            let currentToolbar = try? refreshNativeToolbar()
+            let currentModeGroup = currentToolbar.flatMap(inspectorModeGroup)
+            let currentWorkspace = workspaceSplitGroup(in: contentWindow)
+            let hasHideInspector = (try? inspectorToggleButton("Hide Inspector")) != nil
+            let hasShowInspector = (try? inspectorToggleButton("Show Inspector")) != nil
+            throw JourneyError.missing(
+                "Inspector visibility cycle \(cycle) did not restore the native inspector: "
+                    + "mode group present=\(currentModeGroup != nil), "
+                    + "same group=\(currentModeGroup.map { CFEqual($0, toolbarModeGroup) } ?? false), "
+                    + "enabled=\(currentModeGroup.map(isEnabled) ?? false), "
+                    + "frame=\(String(describing: currentModeGroup.flatMap(elementFrame))), "
+                    + "expected frame=\(modeGroupFrame), "
+                    + "pane count=\(currentWorkspace.map { visibleWorkspacePaneGroups(in: $0).count } ?? -1), "
+                    + "Hide Inspector present=\(hasHideInspector), "
+                    + "Show Inspector present=\(hasShowInspector), "
+                    + "Reader identity stable=\(readerWebAreaIdentityIsStable())."
+            )
         }
         try verifyInspectorToggleAlignment("Hide Inspector")
         settleAccessibility(for: 0.15)
@@ -1045,7 +1063,7 @@ do {
               let group = inspectorModeGroup(in: toolbar),
               let workspace = workspaceSplitGroup(in: contentWindow) else { return false }
         return isEnabled(group)
-            && CFEqual(group, toolbarModeGroup)
+            && elementFrame(group).map { frameMatches($0, modeGroupFrame) } == true
             && visibleWorkspacePaneGroups(in: workspace).count == 4
             && (try? inspectorToggleButton("Hide Inspector")) != nil
             && readerWebAreaIdentityIsStable()

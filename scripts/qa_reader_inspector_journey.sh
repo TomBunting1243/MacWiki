@@ -137,6 +137,20 @@ if (( MACWIKI_QA_VISUAL_HOLD_SECONDS > 0 )); then
   echo "Visual inspection hold: PID $QA_APP_PID for ${MACWIKI_QA_VISUAL_HOLD_SECONDS}s" >&2
   sleep "$MACWIKI_QA_VISUAL_HOLD_SECONDS"
 fi
+if ! qa_run_command_with_timeout 20 "$POPOVER_DRIVER_BIN" \
+  "$QA_APP_PID" "Page Views" "Views" >"$POPOVER_RESULT"; then
+  echo "Page Views toolbar popover did not present visible content." >&2
+  exit 1
+fi
+if ! jq -e '
+  .toolbarLabel == "Page Views"
+  and .expectedContent == "Views"
+  and (.observedContent | index("Views") != null)
+' "$POPOVER_RESULT" >/dev/null; then
+  echo "Page Views popover evidence omitted its visible content." >&2
+  exit 1
+fi
+kill -0 "$QA_APP_PID"
 if ! MACWIKI_QA_APP_LOG="$APP_LOG" qa_run_command_with_timeout 180 "$AX_DRIVER_BIN" \
   "$QA_APP_PID" "$ARTICLE_TITLE" >"$AX_RESULT"; then
   echo "Reader/inspector AX journey failed." >&2
@@ -151,19 +165,6 @@ if ! jq -e '
   and (.readStateControlCycle | contains("Mark as Unread"))
 ' "$AX_RESULT" >/dev/null; then
   echo "Reader/inspector AX evidence omitted native toolbar geometry or stability proof." >&2
-  exit 1
-fi
-if ! qa_run_command_with_timeout 20 "$POPOVER_DRIVER_BIN" \
-  "$QA_APP_PID" "Page Views" "Views" >"$POPOVER_RESULT"; then
-  echo "Page Views toolbar popover did not present visible content." >&2
-  exit 1
-fi
-if ! jq -e '
-  .toolbarLabel == "Page Views"
-  and .expectedContent == "Views"
-  and (.observedContent | index("Views") != null)
-' "$POPOVER_RESULT" >/dev/null; then
-  echo "Page Views popover evidence omitted its visible content." >&2
   exit 1
 fi
 kill -0 "$QA_APP_PID"

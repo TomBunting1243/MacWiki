@@ -60,9 +60,17 @@ final class WorkspaceInspectorToolbarItemController: NSObject {
 
     func setPlaneVisible(_ isVisible: Bool, in toolbar: NSToolbar?) {
         isPlaneVisible = isVisible
-        toolbar?.items.filter {
-            [.workspaceReaderInspectorBoundary, .workspaceInspectorModes]
-                .contains($0.itemIdentifier)
+        guard let toolbar else { return }
+
+        if !isVisible,
+           let boundaryIndex = toolbar.items.firstIndex(where: {
+               $0.itemIdentifier == .inspectorTrackingSeparator
+           }) {
+            toolbar.removeItem(at: boundaryIndex)
+        }
+
+        toolbar.items.filter {
+            $0.itemIdentifier == .workspaceInspectorModes
         }.forEach { item in
             let shouldHide = !isVisible
             if item.isHidden != shouldHide {
@@ -74,11 +82,17 @@ final class WorkspaceInspectorToolbarItemController: NSObject {
                 }
             }
         }
-        let inspectorToolTip = isVisible ? "Hide Inspector" : "Show Inspector"
-        if let inspectorToggle = toolbar?.items.first(where: {
-            $0.itemIdentifier == .workspaceInspectorToggle
-        }), inspectorToggle.toolTip != inspectorToolTip {
-            inspectorToggle.toolTip = inspectorToolTip
+
+        if isVisible,
+           !toolbar.items.contains(where: {
+               $0.itemIdentifier == .inspectorTrackingSeparator
+           }), let modeIndex = toolbar.items.firstIndex(where: {
+               $0.itemIdentifier == .workspaceInspectorModes
+           }) {
+            toolbar.insertItem(
+                withItemIdentifier: .inspectorTrackingSeparator,
+                at: modeIndex
+            )
         }
     }
 

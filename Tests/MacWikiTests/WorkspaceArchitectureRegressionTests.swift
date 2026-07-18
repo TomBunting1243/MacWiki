@@ -23,6 +23,7 @@ struct WorkspaceArchitectureRegressionTests {
         let shell = try source("Sources/MacWiki/Views/Shared/MainWindowShell.swift")
         let bridge = try source("Sources/MacWiki/Views/Shared/AppKitWorkspaceNavigationSplitView.swift")
         let toolbar = try source("Sources/MacWiki/Views/Shared/WorkspaceToolbarController.swift")
+        let toolbarLayout = try source("Sources/MacWiki/Views/Shared/WorkspaceToolbarLayout.swift")
         let toolbarItemFactory = try source(
             "Sources/MacWiki/Views/Shared/WorkspaceToolbarItemFactory.swift"
         )
@@ -59,7 +60,8 @@ struct WorkspaceArchitectureRegressionTests {
         #expect(toolbarItemFactory.contains("NSTrackingSeparatorToolbarItem("))
         #expect(toolbar.contains("dividerIndex: 0"))
         #expect(toolbar.contains("dividerIndex: 1"))
-        #expect(toolbar.contains("dividerIndex: 2"))
+        #expect(!toolbar.contains("dividerIndex: 2"))
+        #expect(toolbarLayout.contains(".inspectorTrackingSeparator"))
         #expect(!toolbar.contains("NSHostingView"))
     }
 

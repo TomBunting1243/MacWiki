@@ -52,7 +52,12 @@ struct ReaderTopChromeLayoutTests {
         #expect(inspectorToolbarItem.contains("item.role = .tabs"))
         #expect(!tabAccessories.contains("appState.toggleInspectorVisibility()"))
         #expect(!tabAccessories.contains("toggle-reader-inspector"))
-        #expect(toolbar.contains("splitController?.toggleInspector(sender)"))
+        #expect(WorkspaceToolbarLayout.defaultItemIdentifiers.contains(.toggleInspector))
+        #expect(WorkspaceToolbarLayout.defaultItemIdentifiers.contains(.inspectorTrackingSeparator))
+        #expect(toolbar.contains("control.target = splitController"))
+        #expect(toolbar.contains("#selector(NSSplitViewController.toggleInspector(_:))"))
+        #expect(inspectorToolbarItem.contains("toolbar.removeItem(at: boundaryIndex)"))
+        #expect(inspectorToolbarItem.contains("withItemIdentifier: .inspectorTrackingSeparator"))
         #expect(!FileManager.default.fileExists(
             atPath: repositoryRoot
                 .appending(path: "Sources/MacWiki/Views/Shared/MainWindowReaderToolbar.swift")
@@ -74,10 +79,10 @@ struct ReaderTopChromeLayoutTests {
         let flexibleSpaceIndex = try #require(identifiers.firstIndex(of: .flexibleSpace))
         let saveIndex = try #require(identifiers.firstIndex(of: .workspaceSave))
         let inspectorToggleIndex = try #require(
-            identifiers.firstIndex(of: .workspaceInspectorToggle)
+            identifiers.firstIndex(of: .toggleInspector)
         )
         let inspectorBoundaryIndex = try #require(
-            identifiers.firstIndex(of: .workspaceReaderInspectorBoundary)
+            identifiers.firstIndex(of: .inspectorTrackingSeparator)
         )
         let inspectorModesIndex = try #require(
             identifiers.firstIndex(of: .workspaceInspectorModes)
@@ -105,7 +110,8 @@ struct ReaderTopChromeLayoutTests {
         #expect(toolbarItemFactory.components(separatedBy: "NSTrackingSeparatorToolbarItem(").count - 1 == 1)
         #expect(toolbar.contains("dividerIndex: 0"))
         #expect(toolbar.contains("dividerIndex: 1"))
-        #expect(toolbar.contains("dividerIndex: 2"))
+        #expect(!toolbar.contains("dividerIndex: 2"))
+        #expect(identifiers.contains(.inspectorTrackingSeparator))
         #expect(toolbar.contains("item.visibilityPriority = .high"))
 
         // Standalone article windows intentionally retain SwiftUI toolbar placement.
@@ -146,17 +152,29 @@ struct ReaderTopChromeLayoutTests {
         #expect(toolbar.contains("configuration.appState.goForward()"))
         #expect(toolbar.contains("configuration.appState.startSearch(context: .navigation)"))
         #expect(toolbar.contains("configuration.appState.presentFindOnPage()"))
-        #expect(toolbar.contains("splitController?.toggleInspector(sender)"))
+        #expect(WorkspaceToolbarLayout.defaultItemIdentifiers.contains(.toggleInspector))
+        #expect(toolbar.contains("configureSystemInspectorToggle(in: toolbar)"))
         #expect(popoverPresenter.contains("SaveToListPopover(article: article)"))
         #expect(popoverPresenter.contains("ReaderStylePopover()"))
         #expect(popoverPresenter.contains("SidebarPageViewsPopoverContent("))
         #expect(toolbar.contains("ReadStateSync.applyReadState("))
+        let readActionStart = try #require(
+            toolbar.range(of: "@objc private func toggleReadState")
+        )
+        let readActionEnd = try #require(
+            toolbar.range(
+                of: "@objc private func findInPage",
+                range: readActionStart.upperBound..<toolbar.endIndex
+            )
+        )
+        let readAction = toolbar[readActionStart.lowerBound..<readActionEnd.lowerBound]
+        #expect(readAction.contains("updateReadStatePresentation(isRead: isRead)"))
+        #expect(!readAction.contains("refreshFromLiveState()"))
         #expect(toolbar.contains("NSSharingServicePickerToolbarItem"))
         #expect(toolbar.contains("configuration.openURL(url)"))
         #expect(toolbar.contains("func validateToolbarItem(_ item: NSToolbarItem) -> Bool"))
         #expect(toolbar.contains("toolbar.validateVisibleItems()"))
-        #expect(toolbar.contains("? \"Hide Inspector\""))
-        #expect(toolbar.contains(": \"Show Inspector\""))
+        #expect(!toolbar.contains("@objc private func toggleInspector"))
         #expect(!tabAccessories.contains("Hide Inspector"))
         #expect(!tabAccessories.contains("Show Inspector"))
     }

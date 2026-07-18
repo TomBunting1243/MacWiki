@@ -731,7 +731,7 @@ struct BetaReadinessRegressionTests {
         #expect(
             workspaceToolbarSource.components(
                 separatedBy: "return WorkspaceToolbarItemFactory.trackingSeparator("
-            ).count - 1 == 3
+            ).count - 1 == 2
         )
         #expect(!workspaceToolbarSource.contains("NSHostingView"))
 
@@ -749,15 +749,10 @@ struct BetaReadinessRegressionTests {
         )
         let directoryBoundaryCase = try toolbarSwitchCase(
             ".workspaceDirectoryReaderBoundary",
-            endingAt: ".workspaceReaderInspectorBoundary"
-        )
-        let inspectorBoundaryCase = try toolbarSwitchCase(
-            ".workspaceReaderInspectorBoundary",
             endingAt: ".workspaceLists"
         )
         #expect(listsBoundaryCase.contains("dividerIndex: 0"))
         #expect(directoryBoundaryCase.contains("dividerIndex: 1"))
-        #expect(inspectorBoundaryCase.contains("dividerIndex: 2"))
 
         let defaultItemsStart = try #require(
             workspaceToolbarLayoutSource.range(of: "static let defaultItemIdentifiers")
@@ -771,19 +766,19 @@ struct BetaReadinessRegressionTests {
         let defaultItemsSource = String(
             workspaceToolbarLayoutSource[defaultItemsStart.lowerBound..<readerItemsStart.lowerBound]
         )
-        let inspectorToggle = try #require(defaultItemsSource.range(of: ".workspaceInspectorToggle"))
-        let inspectorBoundary = try #require(defaultItemsSource.range(of: ".workspaceReaderInspectorBoundary"))
+        let inspectorToggle = try #require(defaultItemsSource.range(of: ".toggleInspector"))
+        let inspectorBoundary = try #require(defaultItemsSource.range(of: ".inspectorTrackingSeparator"))
         let inspectorModes = try #require(defaultItemsSource.range(of: ".workspaceInspectorModes"))
         #expect(inspectorToggle.lowerBound < inspectorBoundary.lowerBound)
         #expect(inspectorBoundary.lowerBound < inspectorModes.lowerBound)
         #expect(defaultItemsSource.contains(
-            ".workspaceInspectorToggle,\n        .workspaceReaderInspectorBoundary,\n        .workspaceInspectorModes\n    ]"
+            ".toggleInspector,\n        .inspectorTrackingSeparator,\n        .workspaceInspectorModes\n    ]"
         ))
         for readerItem in [
             ".workspaceBack", ".workspaceForward", ".workspaceSearch", ".workspaceSave",
             ".workspaceReadState", ".workspaceFind", ".workspaceReaderStyle",
             ".workspacePageViews", ".workspaceOpenBrowser", ".workspaceShare",
-            ".workspaceInspectorToggle"
+            ".toggleInspector"
         ] {
             let item = try #require(defaultItemsSource.range(of: readerItem))
             #expect(item.lowerBound < inspectorBoundary.lowerBound)
@@ -809,8 +804,13 @@ struct BetaReadinessRegressionTests {
         #expect(toolbarPolicySource.contains("toolbar.allowsUserCustomization = false"))
         #expect(!tabAccessorySource.contains("appState.toggleInspectorVisibility()"))
         #expect(!tabAccessorySource.contains("toggle-reader-inspector"))
-        #expect(workspaceToolbarSource.contains("splitController?.toggleInspector(sender)"))
-        #expect(workspaceToolbarSource.contains("action: #selector(toggleInspector(_:))"))
+        #expect(workspaceToolbarLayoutSource.contains(".toggleInspector"))
+        #expect(workspaceToolbarLayoutSource.contains(".inspectorTrackingSeparator"))
+        #expect(workspaceToolbarSource.contains("control.target = splitController"))
+        #expect(workspaceToolbarSource.contains("#selector(NSSplitViewController.toggleInspector(_:))"))
+        #expect(inspectorToolbarItemSource.contains("toolbar.removeItem(at: boundaryIndex)"))
+        #expect(inspectorToolbarItemSource.contains("withItemIdentifier: .inspectorTrackingSeparator"))
+        #expect(!workspaceToolbarSource.contains("@objc private func toggleInspector"))
         #expect(workspaceToolbarSource.contains("configuration.appState.goBack()"))
         #expect(workspaceToolbarSource.contains("configuration.appState.goForward()"))
         #expect(workspaceToolbarSource.contains("configuration.appState.startSearch(context: .navigation)"))

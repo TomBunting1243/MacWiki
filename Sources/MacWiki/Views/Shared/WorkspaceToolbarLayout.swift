@@ -15,8 +15,6 @@ extension NSToolbarItem.Identifier {
     static let workspacePageViews = Self("com.macwiki.workspace.toolbar.page-views")
     static let workspaceOpenBrowser = Self("com.macwiki.workspace.toolbar.open-browser")
     static let workspaceShare = Self("com.macwiki.workspace.toolbar.share")
-    static let workspaceInspectorToggle = Self("com.macwiki.workspace.toolbar.inspector-toggle")
-    static let workspaceReaderInspectorBoundary = Self("com.macwiki.workspace.toolbar.boundary.reader-inspector")
     static let workspaceInspectorModes = Self("com.macwiki.workspace.toolbar.inspector-modes")
 }
 
@@ -41,8 +39,8 @@ enum WorkspaceToolbarLayout {
         .workspacePageViews,
         .workspaceOpenBrowser,
         .workspaceShare,
-        .workspaceInspectorToggle,
-        .workspaceReaderInspectorBoundary,
+        .toggleInspector,
+        .inspectorTrackingSeparator,
         .workspaceInspectorModes
     ]
 
@@ -57,6 +55,6 @@ enum WorkspaceToolbarLayout {
         .workspacePageViews,
         .workspaceOpenBrowser,
         .workspaceShare,
-        .workspaceInspectorToggle
+        .toggleInspector
     ]
 }

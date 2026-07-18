@@ -303,7 +303,6 @@ struct ArticleView: View {
     @State private var errorMessage: String?
     @State private var preferImmediateWebReveal = false
     @State private var showMarkAsReadPrompt = false
-    @State private var isArticleUnreadState = true
     @State private var progressCoordinator = ReaderProgressCoordinator()
     @State private var articleLoader = ReaderArticleLoader()
     @State private var promptPolicy = ReaderPromptPolicy()
@@ -326,6 +325,10 @@ struct ArticleView: View {
 
     private var reduceMotion: Bool {
         accessibilityPersonalization.reduceMotion
+    }
+
+    private var isArticleUnreadState: Bool {
+        !article.isRead
     }
 
     private var increasedContrast: Bool {
@@ -558,11 +561,6 @@ struct ArticleView: View {
             Task {
                 await refreshArticleForHighlightReconciliation(request: request)
             }
-        }
-        .onChange(of: appState.currentArticle?.isRead) { _, newValue in
-            guard appState.currentArticle?.title == article.title,
-                  let newValue else { return }
-            isArticleUnreadState = !newValue
         }
         .onChange(of: scrollPosition) { oldValue, newValue in
             promptPolicy.noteScrollChange(oldValue: oldValue, newValue: newValue)
@@ -901,13 +899,11 @@ struct ArticleView: View {
     }
 
     private func markAllAsRead() {
-        if progressCoordinator.markAsCompleted(
+        _ = progressCoordinator.markAsCompleted(
             for: article,
             in: modelContext,
             appState: appState
-        ) {
-            isArticleUnreadState = false
-        }
+        )
     }
 
     private func updateReadingProgress(_ progress: Double) {
@@ -965,7 +961,6 @@ struct ArticleView: View {
     private func syncReadStateFromStore() {
         let resolved = ReadStateSync.resolveReadState(for: article, in: modelContext)
         appState.updateReadState(forTitle: article.title, isRead: resolved)
-        isArticleUnreadState = !resolved
 
         let now = Date().timeIntervalSinceReferenceDate
         if let existing = ReadStateSync.fetchArticleState(forURLString: article.url.absoluteString, in: modelContext) {

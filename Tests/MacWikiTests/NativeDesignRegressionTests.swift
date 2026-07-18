@@ -190,9 +190,12 @@ struct NativeDesignRegressionTests {
         #expect(toolbarItemFactory.contains("NSToolbarItem(itemIdentifier: identifier)"))
         #expect(toolbar.contains("NSSharingServicePickerToolbarItem(itemIdentifier: itemIdentifier)"))
         #expect(toolbarItemFactory.contains("NSTrackingSeparatorToolbarItem("))
-        for dividerIndex in 0...2 {
+        for dividerIndex in 0...1 {
             #expect(toolbar.contains("dividerIndex: \(dividerIndex)"))
         }
+        #expect(!toolbar.contains("dividerIndex: 2"))
+        #expect(toolbarLayout.contains(".toggleInspector"))
+        #expect(toolbarLayout.contains(".inspectorTrackingSeparator"))
         #expect(toolbarItemFactory.contains("item.isBordered = true"))
         #expect(toolbarItemFactory.contains("item.style = .plain"))
         #expect(toolbar.contains("toolbar.allowsUserCustomization = false"))
@@ -243,7 +246,7 @@ struct NativeDesignRegressionTests {
         #expect(toolbar.contains("symbol: \"sidebar.left\""))
         #expect(!toolbar.contains("sidebar.leading"))
         #expect(toolbar.contains("configuration.appState.toggleDirectoryColumnVisibility()"))
-        #expect(toolbar.contains("splitController?.toggleInspector(sender)"))
+        #expect(!toolbar.contains("@objc private func toggleInspector"))
         #expect(articleToolbar.contains("ToolbarContent"))
         #expect(!articleToolbar.contains("CustomizableToolbarContent"))
         #expect(articleToolbar.contains("ToolbarItem(placement: .navigation)"))
