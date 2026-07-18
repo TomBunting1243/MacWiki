@@ -83,74 +83,6 @@ struct MacWikiCommands: Commands {
             }
         }
 
-        CommandGroup(after: .newItem) {
-            if supports(.libraryOrganization) {
-                Button("New Reading List") {
-                    appState.requestNewReadingList()
-                }
-                .keyboardShortcut("n", modifiers: [.command, .option, .shift])
-
-                Button("New Folder") {
-                    appState.requestNewFolder()
-                }
-                .keyboardShortcut("n", modifiers: [.command, .shift])
-
-                Divider()
-            }
-
-            if supports(.tabs) {
-                Button("New Tab") {
-                    appState.createNewTab()
-                }
-                .keyboardShortcut("t", modifiers: .command)
-                .disabled(appState.isWikiHopNavigationLocked)
-
-                Button("Close Tab") {
-                    appState.closeActiveTab()
-                }
-                .keyboardShortcut("w", modifiers: .command)
-                .disabled(
-                    appState.activeTabId == nil
-                        || appState.isWikiHopNavigationLocked
-                )
-
-                Button("Reopen Closed Tab") {
-                    appState.reopenLastClosedTab()
-                }
-                .keyboardShortcut("t", modifiers: [.command, .shift])
-                .disabled(
-                    appState.recentlyClosedTabs.isEmpty
-                        || appState.isWikiHopNavigationLocked
-                )
-
-                Divider()
-            }
-
-            if supports(.reader) {
-                Button("Save Article...") {
-                    appState.presentOptionClickSavePromptForCurrentArticle()
-                }
-                .keyboardShortcut("s", modifiers: .command)
-                .disabled(
-                    appState.currentArticle == nil
-                        || appState.isWikiHopNavigationLocked
-                )
-            }
-        }
-
-        CommandGroup(after: .pasteboard) {
-            if supports(.reader) {
-                Button("Add to List...") {
-                    appState.showAddToList = true
-                }
-                .keyboardShortcut("l", modifiers: .command)
-                .disabled(
-                    appState.currentArticle == nil
-                        || appState.isWikiHopNavigationLocked
-                )
-            }
-        }
-
         CommandGroup(after: .toolbar) {
             if supports(.workspaceNavigation) {
                 Button(appState.listsSidebarVisible ? "Hide Lists" : "Show Lists") {
@@ -198,6 +130,20 @@ struct MacWikiCommands: Commands {
             .disabled(!readerActionIsAvailable)
         }
 
+        CommandMenu("Library") {
+            Button("New Reading List") {
+                appState.requestNewReadingList()
+            }
+            .keyboardShortcut("n", modifiers: [.command, .option, .shift])
+            .disabled(!supports(.libraryOrganization))
+
+            Button("New Folder") {
+                appState.requestNewFolder()
+            }
+            .keyboardShortcut("n", modifiers: [.command, .shift])
+            .disabled(!supports(.libraryOrganization))
+        }
+
         CommandMenu("Article") {
             Button("Back") {
                 appState.goBack()
@@ -218,6 +164,20 @@ struct MacWikiCommands: Commands {
                     || !appState.canGoForward
                     || appState.isWikiHopNavigationLocked
             )
+
+            Divider()
+
+            Button("Save Article…") {
+                appState.presentOptionClickSavePromptForCurrentArticle()
+            }
+            .keyboardShortcut("s", modifiers: .command)
+            .disabled(!readerActionIsAvailable)
+
+            Button("Add to List…") {
+                appState.showAddToList = true
+            }
+            .keyboardShortcut("l", modifiers: .command)
+            .disabled(!readerActionIsAvailable)
 
             Divider()
 
@@ -274,6 +234,37 @@ struct MacWikiCommands: Commands {
         }
 
         CommandMenu("Tabs") {
+            Button("New Tab") {
+                appState.createNewTab()
+            }
+            .keyboardShortcut("t", modifiers: .command)
+            .disabled(
+                !supports(.tabs)
+                    || appState.isWikiHopNavigationLocked
+            )
+
+            Button("Close Tab") {
+                appState.closeActiveTab()
+            }
+            .keyboardShortcut("w", modifiers: .command)
+            .disabled(
+                !supports(.tabs)
+                    || appState.activeTabId == nil
+                    || appState.isWikiHopNavigationLocked
+            )
+
+            Button("Reopen Closed Tab") {
+                appState.reopenLastClosedTab()
+            }
+            .keyboardShortcut("t", modifiers: [.command, .shift])
+            .disabled(
+                !supports(.tabs)
+                    || appState.recentlyClosedTabs.isEmpty
+                    || appState.isWikiHopNavigationLocked
+            )
+
+            Divider()
+
             Button("Next Tab") {
                 appState.nextTab()
             }
