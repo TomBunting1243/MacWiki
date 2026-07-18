@@ -37,6 +37,8 @@ struct ReaderTableOfContentsPlacementTests {
         #expect(overlay.contains("personalization.colorSchemeContrast"))
         #expect(overlay.contains(".accessibilityLabel(\"Show article contents\")"))
         #expect(overlay.contains(".accessibilityLabel(\"Article contents\")"))
+        #expect(overlay.contains(".task(id: activeSectionID)"))
+        #expect(overlay.contains("proxy.scrollTo(activeSectionID, anchor: .center)"))
         #expect(!overlay.contains("DragGesture"))
     }
 

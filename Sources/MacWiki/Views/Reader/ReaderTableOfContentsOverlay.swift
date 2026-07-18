@@ -112,10 +112,14 @@ struct ReaderTableOfContentsOverlay: View {
                     .padding(.horizontal, 10)
                     .padding(.vertical, 10)
                 }
-                .onChange(of: activeSectionID) { _, newID in
-                    guard let newID else { return }
+                .task(id: activeSectionID) {
+                    guard let activeSectionID else { return }
+                    // This task also runs when the overlay first appears, so a
+                    // long outline reveals the current row instead of always
+                    // reopening at Biography.
+                    await Task.yield()
                     withAnimation(personalization.reduceMotion ? nil : .easeOut(duration: 0.18)) {
-                        proxy.scrollTo(newID, anchor: .center)
+                        proxy.scrollTo(activeSectionID, anchor: .center)
                     }
                 }
             }
