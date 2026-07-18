@@ -58,8 +58,12 @@ struct DiscoverResponsiveLayoutProfileTests {
         let expanded = try #require(DiscoverResponsiveLayoutProfile(width: 1_540))
 
         #expect(!compact.prefersEditorialSpread)
+        #expect(compact.todayMostReadColumnCount(hasNewsBriefing: false, itemCount: 14) == 1)
         #expect(wide.prefersEditorialSpread)
         #expect(wide.editorialColumnSpacing == 16)
+        #expect(wide.todayMostReadColumnCount(hasNewsBriefing: true, itemCount: 14) == 1)
+        #expect(wide.todayMostReadColumnCount(hasNewsBriefing: false, itemCount: 7) == 1)
+        #expect(wide.todayMostReadColumnCount(hasNewsBriefing: false, itemCount: 8) == 2)
         #expect(expanded.prefersEditorialSpread)
         #expect(expanded.editorialColumnSpacing == 20)
     }
@@ -70,6 +74,10 @@ struct DiscoverResponsiveLayoutProfileTests {
         )
 
         #expect(stages.contains("Grid(horizontalSpacing: responsiveLayout.editorialColumnSpacing"))
+        #expect(stages.contains("let columnCount = responsiveLayout.todayMostReadColumnCount"))
+        #expect(stages.contains("hasNewsBriefing: !feed.newsStories.isEmpty"))
+        #expect(stages.contains("todayMostReadRows(columnCount: columnCount)"))
+        #expect(stages.contains("let splitIndex = (todayMostReadItems.count + 1) / 2"))
         #expect(stages.contains("style: responsiveLayout.prefersEditorialSpread ? .rail : .standard"))
         #expect(stages.contains("prefersHorizontalLayout: responsiveLayout.prefersEditorialSpread"))
     }

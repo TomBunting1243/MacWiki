@@ -149,6 +149,11 @@ extension DiscoverFeedSections {
 
     @ViewBuilder
     var todayMostReadSection: some View {
+        let columnCount = responsiveLayout.todayMostReadColumnCount(
+            hasNewsBriefing: !feed.newsStories.isEmpty,
+            itemCount: todayMostReadItems.count
+        )
+
         DiscoverExpandableCollectionCard(
             title: "Today’s Most Read",
             subtitle: todayMostReadSubtitle,
@@ -167,33 +172,65 @@ extension DiscoverFeedSections {
                         : "Today's Most Read is unavailable right now."
                 )
             } else {
-                ForEach(Array(todayMostReadItems.enumerated()), id: \.element.id) { index, result in
-                    let rowKey = pageViewsRowKey(section: "today-most-read", result: result, index: index)
-                    let trendPulse = todayMostReadPulse(for: result)
-                    DiscoverPlaylistArticleRow(
-                        result: result,
-                        rank: index + 1,
-                        primaryStat: todayMostReadPrimaryStat(for: result),
-                        secondaryStat: todayMostReadSecondaryStat(for: result),
-                        statTint: todayMostReadStatTint(for: result),
-                        isKeyboardFocused: false,
-                        onFocus: nil,
-                        onOpen: onOpen
-                    )
-                    .contextMenu {
-                        discoverContextMenu(for: result) {
-                            presentPageViewsPopover(
-                                for: result,
-                                rowKey: rowKey,
-                                initialPulse: trendPulse
-                            )
-                        }
-                    }
-                    .popover(isPresented: pageViewsPopoverBinding(for: rowKey), arrowEdge: .trailing) {
-                        pageViewsPopover(for: rowKey)
-                    }
-                }
+                todayMostReadRows(columnCount: columnCount)
             }
+        }
+    }
+
+    @ViewBuilder
+    private func todayMostReadRows(columnCount: Int) -> some View {
+        if columnCount == 2 {
+            let splitIndex = (todayMostReadItems.count + 1) / 2
+
+            HStack(alignment: .top, spacing: 8) {
+                todayMostReadColumn(todayMostReadItems[..<splitIndex], rankOffset: 0)
+                todayMostReadColumn(todayMostReadItems[splitIndex...], rankOffset: splitIndex)
+            }
+        } else {
+            todayMostReadColumn(todayMostReadItems[...], rankOffset: 0)
+        }
+    }
+
+    private func todayMostReadColumn(
+        _ items: ArraySlice<WikipediaService.SearchResult>,
+        rankOffset: Int
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            ForEach(Array(items.enumerated()), id: \.element.id) { offset, result in
+                todayMostReadRow(result, index: rankOffset + offset)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+    }
+
+    private func todayMostReadRow(
+        _ result: WikipediaService.SearchResult,
+        index: Int
+    ) -> some View {
+        let rowKey = pageViewsRowKey(section: "today-most-read", result: result, index: index)
+        let trendPulse = todayMostReadPulse(for: result)
+
+        return DiscoverPlaylistArticleRow(
+            result: result,
+            rank: index + 1,
+            primaryStat: todayMostReadPrimaryStat(for: result),
+            secondaryStat: todayMostReadSecondaryStat(for: result),
+            statTint: todayMostReadStatTint(for: result),
+            isKeyboardFocused: false,
+            onFocus: nil,
+            onOpen: onOpen
+        )
+        .contextMenu {
+            discoverContextMenu(for: result) {
+                presentPageViewsPopover(
+                    for: result,
+                    rowKey: rowKey,
+                    initialPulse: trendPulse
+                )
+            }
+        }
+        .popover(isPresented: pageViewsPopoverBinding(for: rowKey), arrowEdge: .trailing) {
+            pageViewsPopover(for: rowKey)
         }
     }
 

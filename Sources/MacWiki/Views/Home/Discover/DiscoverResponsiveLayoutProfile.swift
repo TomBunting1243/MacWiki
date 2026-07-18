@@ -111,6 +111,10 @@ struct DiscoverResponsiveLayoutProfile: Equatable, Sendable {
         isAtLeast(.from1240)
     }
 
+    func todayMostReadColumnCount(hasNewsBriefing: Bool, itemCount: Int) -> Int {
+        prefersEditorialSpread && !hasNewsBriefing && itemCount >= 8 ? 2 : 1
+    }
+
     var editorialColumnSpacing: CGFloat {
         isAtLeast(.from1540) ? 20 : 16
     }
