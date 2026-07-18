@@ -20,6 +20,8 @@ struct OptionClickSaveSheet: View {
     @State private var selectedLabelID: UUID?
     @State private var newListName = ""
     @State private var isCreatingNewList = false
+    @State private var isCreatingNewLabel = false
+    @State private var isCreatingNewTag = false
     @State private var isSaving = false
     @FocusState private var isNewListFocused: Bool
 
@@ -34,7 +36,15 @@ struct OptionClickSaveSheet: View {
 
     private var selectedTag: Tag? {
         guard let selectedTagID else { return nil }
-        return allTags.first(where: { $0.id == selectedTagID })
+        if let presentedTag = allTags.first(where: { $0.id == selectedTagID }) {
+            return presentedTag
+        }
+
+        let id = selectedTagID
+        let descriptor = FetchDescriptor<Tag>(
+            predicate: #Predicate { $0.id == id }
+        )
+        return try? modelContext.fetch(descriptor).first
     }
 
     private var canSave: Bool {
@@ -42,15 +52,6 @@ struct OptionClickSaveSheet: View {
             return !trimmedNewListName.isEmpty && !isSaving
         }
         return selectedList != nil && !isSaving
-    }
-
-    private var destinationSummaryText: String {
-        let listText = isCreatingNewList
-            ? (trimmedNewListName.isEmpty ? "new list" : "\"\(trimmedNewListName)\"")
-            : "\"\(selectedList?.name ?? "list")\""
-        let tagText = selectedTag?.name ?? "none"
-        let labelText = allLabels.first(where: { $0.id == selectedLabelID })?.name ?? "none"
-        return "Saving to \(listText) • Tag: \(tagText) • Label: \(labelText)"
     }
 
     var body: some View {
@@ -100,28 +101,36 @@ struct OptionClickSaveSheet: View {
                         }
                     }
 
-                    Picker("Label", selection: $selectedLabelID) {
-                        Text("None").tag(UUID?.none)
-                        ForEach(allLabels) { label in
-                            SwiftUI.Label(label.name, systemImage: "tag")
-                                .tag(Optional(label.id))
+                    HStack(spacing: 10) {
+                        Picker("Label", selection: $selectedLabelID) {
+                            Text("None").tag(UUID?.none)
+                            ForEach(allLabels) { label in
+                                SwiftUI.Label(label.name, systemImage: "tag")
+                                    .tag(Optional(label.id))
+                            }
                         }
+                        .frame(maxWidth: .infinity)
+
+                        Button("New Label…", systemImage: "plus") {
+                            isCreatingNewLabel = true
+                        }
+                        .help("Create a label and select it for this link")
                     }
 
-                    Picker("Tag", selection: $selectedTagID) {
-                        Text("None").tag(UUID?.none)
-                        ForEach(allTags) { tag in
-                            SwiftUI.Label(tag.name, systemImage: "number")
-                                .tag(Optional(tag.id))
+                    HStack(spacing: 10) {
+                        Picker("Tag", selection: $selectedTagID) {
+                            Text("None").tag(UUID?.none)
+                            ForEach(allTags) { tag in
+                                SwiftUI.Label(tag.name, systemImage: "number")
+                                    .tag(Optional(tag.id))
+                            }
                         }
-                    }
-                }
+                        .frame(maxWidth: .infinity)
 
-                Section("Summary") {
-                    LabeledContent("Destination") {
-                        Text(destinationSummaryText)
-                            .foregroundStyle(.secondary)
-                            .multilineTextAlignment(.trailing)
+                        Button("New Tag…", systemImage: "plus") {
+                            isCreatingNewTag = true
+                        }
+                        .help("Create a tag and select it for this link")
                     }
                 }
             }
@@ -140,7 +149,7 @@ struct OptionClickSaveSheet: View {
                 }
             }
         }
-        .frame(minWidth: 540, minHeight: 420)
+        .frame(minWidth: 540, minHeight: 360)
         .onAppear {
             selectedTagID = nil
             selectedLabelID = nil
@@ -153,6 +162,24 @@ struct OptionClickSaveSheet: View {
         .onChange(of: isCreatingNewList) { _, isCreating in
             guard isCreating else { return }
             isNewListFocused = true
+        }
+        .sheet(isPresented: $isCreatingNewLabel) {
+            LabelDetailSheet(
+                isPresented: $isCreatingNewLabel,
+                labelToEdit: nil,
+                onSave: { label in
+                    selectedLabelID = label.id
+                }
+            )
+        }
+        .sheet(isPresented: $isCreatingNewTag) {
+            TagDetailSheet(
+                isPresented: $isCreatingNewTag,
+                tagToEdit: nil,
+                onSave: { tag in
+                    selectedTagID = tag.id
+                }
+            )
         }
     }
 
@@ -238,7 +265,10 @@ struct OptionClickSaveSheet: View {
         targetList.updatedAt = Date()
         defaultListID = targetList.id.uuidString
 
-        modelContext.saveReportingFailure(operation: #function)
+        guard modelContext.saveReportingFailure(operation: #function) else {
+            isSaving = false
+            return
+        }
 
         if createdNewArticle {
             SavedArticleSummaryBackfill.enqueueIfNeeded(savedArticle, modelContext: modelContext)
