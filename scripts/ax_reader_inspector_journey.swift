@@ -65,6 +65,10 @@ private struct PaneVisibilityState: Equatable {
     var summary: String {
         "Lists=\(lists), List Contents=\(directory), Inspector=\(inspector)"
     }
+
+    var expectedVisiblePaneCount: Int {
+        1 + [lists, directory, inspector].filter { $0 }.count
+    }
 }
 
 private func attributeValue(_ name: CFString, from element: AXUIElement) -> CFTypeRef? {
@@ -130,7 +134,10 @@ private func nativeWindowToolbar(in window: AXUIElement) -> AXUIElement? {
 
 private func inspectorModeGroup(in window: AXUIElement) -> AXUIElement? {
     elements(in: window, limit: 1_500).first { candidate in
-        guard hasRole(candidate, kAXRadioGroupRole as String) else { return false }
+        let role = stringAttribute(kAXRoleAttribute as CFString, from: candidate)
+        guard [kAXRadioGroupRole as String, "AXTabGroup", "AXSegmentedControl"].contains(role) else {
+            return false
+        }
         let candidateLabels = Set(elements(in: candidate, limit: 30).flatMap(accessibilityLabels))
         return candidateLabels.isSuperset(of: ["Info", "Notes", "References"])
     }
@@ -251,6 +258,7 @@ private func element(
         return [
             stringAttribute(kAXTitleAttribute as CFString, from: element),
             stringAttribute(kAXDescriptionAttribute as CFString, from: element),
+            stringAttribute(kAXHelpAttribute as CFString, from: element),
             stringAttribute(kAXPlaceholderValueAttribute as CFString, from: element)
         ].contains { matchesAXLabel($0, expected: label) }
     }
@@ -260,7 +268,8 @@ private func labeledElement(in root: AXUIElement, label: String) -> AXUIElement?
     elements(in: root).first { element in
         [
             stringAttribute(kAXTitleAttribute as CFString, from: element),
-            stringAttribute(kAXDescriptionAttribute as CFString, from: element)
+            stringAttribute(kAXDescriptionAttribute as CFString, from: element),
+            stringAttribute(kAXHelpAttribute as CFString, from: element)
         ].contains { matchesAXLabel($0, expected: label) }
     }
 }
@@ -275,6 +284,7 @@ private func matchingElements(
         return [
             stringAttribute(kAXTitleAttribute as CFString, from: element),
             stringAttribute(kAXDescriptionAttribute as CFString, from: element),
+            stringAttribute(kAXHelpAttribute as CFString, from: element),
             stringAttribute(kAXPlaceholderValueAttribute as CFString, from: element)
         ].contains { matchesAXLabel($0, expected: label) }
     }
@@ -285,8 +295,20 @@ private func button(in application: AXUIElement, label: String) -> AXUIElement? 
 }
 
 private func toolbarControl(in toolbar: AXUIElement, label: String) -> AXUIElement? {
+    toolbarControl(in: elements(in: toolbar, limit: 300), label: label)
+}
+
+private func toolbarControl(in candidates: [AXUIElement], label: String) -> AXUIElement? {
     for role in [kAXButtonRole as String, kAXMenuButtonRole as String] {
-        if let result = element(in: toolbar, role: role, label: label) {
+        if let result = candidates.first(where: { candidate in
+            guard hasRole(candidate, role) else { return false }
+            return [
+                stringAttribute(kAXTitleAttribute as CFString, from: candidate),
+                stringAttribute(kAXDescriptionAttribute as CFString, from: candidate),
+                stringAttribute(kAXHelpAttribute as CFString, from: candidate),
+                stringAttribute(kAXPlaceholderValueAttribute as CFString, from: candidate)
+            ].contains { matchesAXLabel($0, expected: label) }
+        }) {
             return result
         }
     }
@@ -294,11 +316,19 @@ private func toolbarControl(in toolbar: AXUIElement, label: String) -> AXUIEleme
 }
 
 private func isSelected(_ element: AXUIElement) -> Bool {
-    ["1", "Selected"].contains(stringAttribute(kAXValueAttribute as CFString, from: element))
+    let selected = stringAttribute(kAXSelectedAttribute as CFString, from: element)
+    if ["1", "true", "selected"].contains(selected.lowercased()) {
+        return true
+    }
+    return ["1", "true", "selected"].contains(
+        stringAttribute(kAXValueAttribute as CFString, from: element).lowercased()
+    )
 }
 
 private func isEnabled(_ element: AXUIElement) -> Bool {
-    stringAttribute(kAXEnabledAttribute as CFString, from: element) != "0"
+    ["1", "true"].contains(
+        stringAttribute(kAXEnabledAttribute as CFString, from: element).lowercased()
+    )
 }
 
 private func supportsAction(_ action: CFString, on element: AXUIElement) -> Bool {
@@ -450,9 +480,9 @@ do {
         return result
     }
 
-    var modeGroup = inspectorModeGroup(in: contentWindow)
     let listContentsControlReport: String
     let initialToolbar = try refreshNativeToolbar()
+    var modeGroup = inspectorModeGroup(in: initialToolbar)
     if toolbarControl(in: initialToolbar, label: "Hide List Contents") != nil {
         listContentsControlReport = "Hide List Contents"
     } else if toolbarControl(in: initialToolbar, label: "Show List Contents") != nil {
@@ -475,7 +505,7 @@ do {
         trace("toolbar labels: \(labels(in: initialToolbar).joined(separator: " | "))")
         throw JourneyError.missing("The seeded List Contents pane was not initially visible.")
     }
-    if modeGroup == nil {
+    if modeGroup.map(isEnabled) != true {
         guard wait(condition: {
             guard let inspector = try? inspectorToggleButton("Show Inspector") else { return false }
             return isEnabled(inspector)
@@ -488,8 +518,9 @@ do {
         settleAccessibility(for: 0.45)
     }
     guard wait(condition: {
-        modeGroup = inspectorModeGroup(in: contentWindow)
-        return modeGroup != nil
+        guard let toolbar = try? refreshNativeToolbar() else { return false }
+        modeGroup = inspectorModeGroup(in: toolbar)
+        return modeGroup.map(isEnabled) == true
     }) else {
         throw JourneyError.missing("The native inspector did not become accessible.")
     }
@@ -534,16 +565,19 @@ do {
     }
 
     func paneStateMatches(_ expected: PaneVisibilityState) -> Bool {
-        guard let toolbar = try? refreshNativeToolbar() else { return false }
+        guard let toolbar = try? refreshNativeToolbar(),
+              let workspace = workspaceSplitGroup(in: contentWindow) else { return false }
         let listsVisible = containsLabel("Explore", in: contentWindow)
         let directoryVisible = containsLabel("Tab History", in: contentWindow)
-        let inspectorVisible = inspectorModeGroup(in: contentWindow) != nil
+        let inspectorVisible = inspectorModeGroup(in: toolbar).map(isEnabled) == true
+        let visiblePaneCount = visibleWorkspacePaneGroups(in: workspace).count
         let expectedListsControl = expected.lists ? "Hide Lists" : "Show Lists"
         let expectedDirectoryControl = expected.directory ? "Hide List Contents" : "Show List Contents"
         let expectedInspectorControl = expected.inspector ? "Hide Inspector" : "Show Inspector"
         return listsVisible == expected.lists
             && directoryVisible == expected.directory
             && inspectorVisible == expected.inspector
+            && visiblePaneCount == expected.expectedVisiblePaneCount
             && toolbarControl(in: toolbar, label: expectedListsControl) != nil
             && toolbarControl(in: toolbar, label: expectedDirectoryControl) != nil
             && toolbarControl(in: toolbar, label: expectedInspectorControl) != nil
@@ -623,6 +657,7 @@ do {
             "Native window toolbar omitted accessible controls: \(missingToolbarControls.joined(separator: ", "))"
         )
     }
+    traceRuntimeDiagnostics("toolbar presence and enabled-state checks")
 
     for label in [
         "Search Wikipedia", "Save Article", "Mark as Read", "Find in Page",
@@ -658,6 +693,7 @@ do {
             "Mark as Read did not become Mark as Unread in place on the native toolbar."
         )
     }
+    traceRuntimeDiagnostics("Mark as Read")
     try press(unreadControl, label: "Mark as Unread")
     guard wait(timeout: 4, condition: {
         guard let toolbar = try? refreshNativeToolbar() else { return false }
@@ -675,6 +711,7 @@ do {
             "Mark as Unread did not restore Mark as Read in place on the native toolbar."
         )
     }
+    traceRuntimeDiagnostics("Mark as Unread")
     let readStateControlCycle =
         "Mark as Read changed to Mark as Unread and restored in place without replacing the toolbar"
 
@@ -686,11 +723,33 @@ do {
         + expectedReaderControls + ["Hide Inspector", "Show Inspector"]
 
     let readerPlaneLabels = expectedReaderControls + ["Hide Inspector"]
-    func toolbarFrames(for labels: [String]) throws -> [String: CGRect] {
-        let toolbar = try refreshNativeToolbar()
+    let inspectorModeLabels = Set(["Info", "Notes", "References"])
+    func inspectorModeButtons(in group: AXUIElement) -> [AXUIElement] {
+        elements(in: group, limit: 20).filter { candidate in
+            [kAXRadioButtonRole as String, "AXTab", kAXButtonRole as String].contains(
+                stringAttribute(kAXRoleAttribute as CFString, from: candidate)
+            )
+                && !inspectorModeLabels.isDisjoint(
+                    with: accessibilityLabels(of: candidate)
+                )
+                && supportsAction(kAXPressAction as CFString, on: candidate)
+        }
+    }
+
+    func frameMatches(_ candidate: CGRect, _ baseline: CGRect, tolerance: CGFloat = 1) -> Bool {
+        abs(candidate.minX - baseline.minX) <= tolerance
+            && abs(candidate.minY - baseline.minY) <= tolerance
+            && abs(candidate.width - baseline.width) <= tolerance
+            && abs(candidate.height - baseline.height) <= tolerance
+    }
+
+    func toolbarFrames(
+        for labels: [String],
+        in toolbarElements: [AXUIElement]
+    ) throws -> [String: CGRect] {
         var frames: [String: CGRect] = [:]
         for label in labels {
-            guard let control = toolbarControl(in: toolbar, label: label),
+            guard let control = toolbarControl(in: toolbarElements, label: label),
                   let frame = elementFrame(control),
                   frame.width > 1,
                   frame.height > 1 else {
@@ -704,8 +763,12 @@ do {
     }
 
     let baselineToolbar = try refreshNativeToolbar()
-    let baselineToolbarElementCount = elements(in: baselineToolbar, limit: 300).count
-    let baselineToolbarFrames = try toolbarFrames(for: readerPlaneLabels)
+    let baselineToolbarElements = elements(in: baselineToolbar, limit: 300)
+    let baselineToolbarElementCount = baselineToolbarElements.count
+    let baselineToolbarFrames = try toolbarFrames(
+        for: readerPlaneLabels,
+        in: baselineToolbarElements
+    )
     for (label, frame) in baselineToolbarFrames {
         guard frame.minX >= readerFrame.minX - paneAlignmentTolerance,
               frame.maxX <= readerFrame.maxX + paneAlignmentTolerance,
@@ -728,17 +791,37 @@ do {
 
     guard let initialModeGroup = inspectorModeGroup(in: contentWindow),
           let modeGroupFrame = elementFrame(initialModeGroup),
-          let newTabButton = button(in: contentWindow, label: "New Tab"),
-          let newTabFrame = elementFrame(newTabButton),
+          let toolbarModeGroup = inspectorModeGroup(in: baselineToolbar),
+          CFEqual(initialModeGroup, toolbarModeGroup),
           modeGroupFrame.minX >= inspectorFrame.minX - paneAlignmentTolerance,
           modeGroupFrame.maxX <= inspectorFrame.maxX + paneAlignmentTolerance,
-          abs(modeGroupFrame.midY - newTabFrame.midY) <= 4 else {
+          abs(modeGroupFrame.midY - inspectorToggleFrame.midY) <= 4 else {
         throw JourneyError.missing(
-            "The Inspector mode selector was not aligned in the Inspector's native top accessory."
+            "The Inspector mode selector was not aligned in the Inspector's native toolbar plane."
         )
     }
     let inspectorAccessoryAlignment =
-        "Inspector mode selector stayed within the Inspector plane and aligned with the Reader tab accessory"
+        "Inspector mode selector stayed within the Inspector plane and aligned with the native window toolbar"
+    let baselineInspectorToggleTrailingInset = readerFrame.maxX - inspectorToggleFrame.maxX
+
+    func verifyInspectorToggleAlignment(_ label: String) throws {
+        let toolbar = try refreshNativeToolbar()
+        let toolbarElements = elements(in: toolbar, limit: 300)
+        guard let currentReader = readerPane(in: contentWindow, articleTitle: articleTitle),
+              let currentReaderFrame = elementFrame(currentReader),
+              let toggle = toolbarControl(in: toolbarElements, label: label),
+              let toggleFrame = elementFrame(toggle),
+              toggleFrame.minX >= currentReaderFrame.minX - paneAlignmentTolerance,
+              toggleFrame.maxX <= currentReaderFrame.maxX + paneAlignmentTolerance,
+              abs(
+                  (currentReaderFrame.maxX - toggleFrame.maxX)
+                      - baselineInspectorToggleTrailingInset
+              ) <= 2 else {
+            throw JourneyError.missing(
+                "The \(label) control left a toolbar gap or escaped the live Reader plane."
+            )
+        }
+    }
 
     func framesMatchBaseline(_ current: [String: CGRect], tolerance: CGFloat = 1) -> Bool {
         guard current.count == baselineToolbarFrames.count else { return false }
@@ -755,12 +838,12 @@ do {
     traceRuntimeDiagnostics("native window toolbar contract")
 
     func inspectorButton(_ label: String) throws -> AXUIElement {
-        guard let group = inspectorModeGroup(in: contentWindow) else {
+        let toolbar = try refreshNativeToolbar()
+        guard let group = inspectorModeGroup(in: toolbar) else {
             throw JourneyError.missing("Inspector mode container was not accessible.")
         }
-        guard let result = elements(in: group, limit: 20).first(where: { candidate in
-            hasRole(candidate, kAXRadioButtonRole as String)
-                && accessibilityLabels(of: candidate).contains {
+        guard let result = inspectorModeButtons(in: group).first(where: { candidate in
+            accessibilityLabels(of: candidate).contains {
                     matchesAXLabel($0, expected: label)
                 }
         }) else {
@@ -778,23 +861,45 @@ do {
 
         while true {
             let toolbar = try refreshNativeToolbar()
+            let toolbarElements = elements(in: toolbar, limit: 300)
             guard CFEqual(toolbar, baselineToolbar),
-                  elements(in: toolbar, limit: 300).count == baselineToolbarElementCount else {
+                  toolbarElements.count == baselineToolbarElementCount else {
                 throw JourneyError.missing(
                     "Inspector mode switching replaced or structurally mutated the native toolbar."
                 )
             }
-            let frames = try toolbarFrames(for: readerPlaneLabels)
+            let frames = try toolbarFrames(
+                for: readerPlaneLabels,
+                in: toolbarElements
+            )
             guard framesMatchBaseline(frames) else {
                 throw JourneyError.missing(
                     "Reader toolbar controls moved during an Inspector mode transition."
                 )
             }
 
+            guard let currentModeGroup = inspectorModeGroup(in: toolbar),
+                  CFEqual(currentModeGroup, toolbarModeGroup),
+                  let currentModeGroupFrame = elementFrame(currentModeGroup),
+                  frameMatches(currentModeGroupFrame, modeGroupFrame) else {
+                throw JourneyError.missing(
+                    "Inspector mode switching replaced or moved the native tab group."
+                )
+            }
+            let modeButtons = inspectorModeButtons(in: currentModeGroup)
+            let selectedModeButtons = modeButtons.filter(isSelected)
+            guard modeButtons.count == 3, selectedModeButtons.count == 1 else {
+                throw JourneyError.missing(
+                    "Inspector mode switching did not preserve exactly one selected native tab."
+                )
+            }
+
             transitionSampleCount += 1
             toolbarModeSwitchSampleCount += 1
             let now = CFAbsoluteTimeGetCurrent()
-            let selectionSettled = (try? inspectorButton(label)).map(isSelected) == true
+            let selectionSettled = accessibilityLabels(of: selectedModeButtons[0]).contains {
+                matchesAXLabel($0, expected: label)
+            }
             if selectionSettled, now >= minimumEnd, transitionSampleCount >= 5 {
                 return
             }
@@ -812,6 +917,7 @@ do {
         let control = try inspectorButton(label)
         try press(control, label: label)
         try verifyToolbarStabilityDuringInspectorTransition(untilSelected: label)
+        traceRuntimeDiagnostics("selected \(label)")
         trace("\(label) selected in \(String(format: "%.3f", CFAbsoluteTimeGetCurrent() - startedAt))s")
         settleAccessibility(for: 0.2)
     }
@@ -868,10 +974,9 @@ do {
         throw JourneyError.missing("Info mode did not restore Metadata.")
     }
 
-    // Rapidly switching the native segmented picker previously exposed an
-    // intermittent inspector failure. Refresh the segmented control after each
-    // structural mode change; SwiftUI is allowed to replace the underlying AX
-    // element while preserving the visible native control.
+    // Rapidly switching Inspector modes previously exposed an intermittent
+    // failure. Resolve the stable native toolbar tab group after each content
+    // change so the journey never relies on a stale accessibility element.
     for cycle in 1...12 {
         try selectInspectorMode("Notes")
         trace("stress cycle \(cycle): Notes")
@@ -895,23 +1000,60 @@ do {
         let hideInspector = try inspectorToggleButton("Hide Inspector")
         try press(hideInspector, label: "Hide Inspector")
         guard wait(timeout: 4, condition: {
-            inspectorModeGroup(in: contentWindow) == nil
+            guard let toolbar = try? refreshNativeToolbar(),
+                  let workspace = workspaceSplitGroup(in: contentWindow) else { return false }
+            return inspectorModeGroup(in: toolbar) == nil
+                && visibleWorkspacePaneGroups(in: workspace).count == 3
                 && (try? inspectorToggleButton("Show Inspector")) != nil
         }) else {
             throw JourneyError.missing("Inspector visibility cycle \(cycle) did not hide the native inspector.")
         }
+        try verifyInspectorToggleAlignment("Show Inspector")
 
         let showInspector = try inspectorToggleButton("Show Inspector")
         try press(showInspector, label: "Show Inspector")
         guard wait(timeout: 4, condition: {
-            inspectorModeGroup(in: contentWindow) != nil
+            guard let toolbar = try? refreshNativeToolbar(),
+                  let workspace = workspaceSplitGroup(in: contentWindow) else { return false }
+            return inspectorModeGroup(in: toolbar).map {
+                isEnabled($0)
+                    && CFEqual($0, toolbarModeGroup)
+                    && elementFrame($0).map { frameMatches($0, modeGroupFrame) } == true
+            } == true
+                && visibleWorkspacePaneGroups(in: workspace).count == 4
                 && (try? inspectorToggleButton("Hide Inspector")) != nil
                 && readerWebAreaIdentityIsStable()
         }) else {
             throw JourneyError.missing("Inspector visibility cycle \(cycle) did not restore the native inspector.")
         }
+        try verifyInspectorToggleAlignment("Hide Inspector")
         settleAccessibility(for: 0.15)
     }
+
+    let interruptedHide = try inspectorToggleButton("Hide Inspector")
+    try press(interruptedHide, label: "Hide Inspector")
+    guard wait(timeout: 1, condition: {
+        guard let workspace = workspaceSplitGroup(in: contentWindow) else { return false }
+        return (try? inspectorToggleButton("Show Inspector")) != nil
+            && visibleWorkspacePaneGroups(in: workspace).count == 3
+    }) else {
+        throw JourneyError.missing("Interrupted Inspector cycle never entered its native hidden state.")
+    }
+    try press(try inspectorToggleButton("Show Inspector"), label: "Show Inspector")
+    guard wait(timeout: 4, condition: {
+        guard let toolbar = try? refreshNativeToolbar(),
+              let group = inspectorModeGroup(in: toolbar),
+              let workspace = workspaceSplitGroup(in: contentWindow) else { return false }
+        return isEnabled(group)
+            && CFEqual(group, toolbarModeGroup)
+            && visibleWorkspacePaneGroups(in: workspace).count == 4
+            && (try? inspectorToggleButton("Hide Inspector")) != nil
+            && readerWebAreaIdentityIsStable()
+    }) else {
+        throw JourneyError.missing("Interrupted Inspector cycle did not reconcile to one visible native plane.")
+    }
+    try verifyInspectorToggleAlignment("Hide Inspector")
+    trace("interrupted native inspector transition reconciled")
     trace("native inspector visibility stress cycle verified")
     traceRuntimeDiagnostics("inspector visibility stress cycle")
 
@@ -1015,12 +1157,24 @@ do {
         context: "Narrow Inspector restore"
     )
     guard wait(condition: {
-        inspectorModeGroup(in: contentWindow) != nil
+        guard let toolbar = try? refreshNativeToolbar() else { return false }
+        return inspectorModeGroup(in: toolbar).map(isEnabled) == true
             && (try? toolbarButton("Hide List Contents")) != nil
             && (try? toolbarButton("Show Lists")) != nil
             && containsLabel("Tab History", in: contentWindow)
     }) else {
         throw JourneyError.missing("The narrow window did not restore List Contents and Inspector with Lists hidden.")
+    }
+    guard let narrowInspector = inspectorPane(in: contentWindow),
+          let narrowInspectorFrame = elementFrame(narrowInspector),
+          let narrowToolbar = try? refreshNativeToolbar(),
+          let narrowModeGroup = inspectorModeGroup(in: narrowToolbar),
+          let narrowModeGroupFrame = elementFrame(narrowModeGroup),
+          narrowModeGroupFrame.minX >= narrowInspectorFrame.minX - paneAlignmentTolerance,
+          narrowModeGroupFrame.maxX <= narrowInspectorFrame.maxX + paneAlignmentTolerance else {
+        throw JourneyError.missing(
+            "The native Inspector tab group overflowed its pane at the supported narrow width."
+        )
     }
     for _ in 0..<8 {
         guard let restoredWindowSize = windowSize(contentWindow),
@@ -1062,12 +1216,13 @@ do {
         findBar: findBar,
         workspaceStructure: workspaceStructure,
         toolbarPlaneContainment: toolbarPlaneContainment,
-        toolbarModeSwitchStability: toolbarModeSwitchStability,
+        toolbarModeSwitchStability: toolbarModeSwitchStability
+            + "; tab-group identity/frame and exactly-one-selected semantics stayed stable",
         toolbarModeSwitchSampleCount: toolbarModeSwitchSampleCount,
         inspectorAccessoryAlignment: inspectorAccessoryAlignment,
         auxiliaryPaneMatrix: "all eight visibility states plus 20 independent Lists/List Contents hide-restore cycles; Reader Web area identity preserved",
-        inspectorToggleCycle: "native inspector hidden and restored through six rapid cycles",
-        narrowPaneRestoreCycle: "900-point window preserved with Lists hidden while List Contents and Inspector restored around a usable Reader"
+        inspectorToggleCycle: "native inspector hidden/restored through six rapid cycles plus one interrupted transition without ghost toolbar geometry",
+        narrowPaneRestoreCycle: "900-point window preserved with Lists hidden while List Contents and Inspector restored around a usable Reader; native tabs remained within the Inspector"
     )
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.prettyPrinted, .sortedKeys]

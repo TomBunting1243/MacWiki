@@ -57,15 +57,12 @@ struct NativeWorkspaceLayoutTests {
         #expect(items[3].maximumThickness == MainWindowColumnWidth.inspectorRange.upperBound)
     }
 
-    @Test func readerTabsAndInspectorHeaderUseNativeTopAlignedSplitItemAccessories() {
+    @Test func onlyReaderTabsUseANativeTopAlignedSplitItemAccessory() {
         let readerAccessory = NSSplitViewItemAccessoryViewController()
         readerAccessory.view = NSView(frame: NSRect(x: 0, y: 0, width: 600, height: 36))
-        let inspectorAccessory = NSSplitViewItemAccessoryViewController()
-        inspectorAccessory.view = NSView(frame: NSRect(x: 0, y: 0, width: 320, height: 36))
         let fixture = makeFixture(
             width: 1_500,
-            readerAccessoryController: readerAccessory,
-            inspectorAccessoryController: inspectorAccessory
+            readerAccessoryController: readerAccessory
         )
         defer { fixture.tearDown() }
         layout(fixture)
@@ -73,7 +70,7 @@ struct NativeWorkspaceLayoutTests {
         #expect(fixture.controller.splitViewItems[0].topAlignedAccessoryViewControllers.isEmpty)
         #expect(fixture.controller.splitViewItems[1].topAlignedAccessoryViewControllers.isEmpty)
         #expect(fixture.controller.splitViewItems[2].topAlignedAccessoryViewControllers == [readerAccessory])
-        #expect(fixture.controller.splitViewItems[3].topAlignedAccessoryViewControllers == [inspectorAccessory])
+        #expect(fixture.controller.splitViewItems[3].topAlignedAccessoryViewControllers.isEmpty)
     }
 
     @Test func appKitControllerSupportsEveryIndependentVisibilityCombination() {
@@ -101,17 +98,42 @@ struct NativeWorkspaceLayoutTests {
         let fixture = makeFixture(width: 1_500)
         defer { fixture.tearDown() }
         layout(fixture)
+        var toolbarVisibility: [Bool] = []
+        fixture.controller.onInspectorToolbarVisibilityChange = {
+            toolbarVisibility.append($0)
+        }
 
         #expect(!fixture.controller.splitViewItems[3].isCollapsed)
 
         fixture.controller.toggleInspector(nil)
         layout(fixture)
         #expect(fixture.controller.splitViewItems[3].isCollapsed)
+        #expect(toolbarVisibility.last == false)
 
         fixture.controller.toggleInspector(nil)
         layout(fixture)
         #expect(!fixture.controller.splitViewItems[3].isCollapsed)
         #expect(!fixture.controller.splitViewItems[2].isCollapsed)
+        #expect(toolbarVisibility.last == true)
+    }
+
+    @Test func inspectorToolbarPlaneTracksDividerDrivenCollapseState() {
+        let fixture = makeFixture(width: 1_500)
+        defer { fixture.tearDown() }
+        layout(fixture)
+        var toolbarVisibility: [Bool] = []
+        fixture.controller.onInspectorToolbarVisibilityChange = {
+            toolbarVisibility.append($0)
+        }
+
+        let inspectorItem = fixture.controller.splitViewItems[3]
+        inspectorItem.isCollapsed = true
+        layout(fixture)
+        #expect(toolbarVisibility.last == false)
+
+        inspectorItem.isCollapsed = false
+        layout(fixture)
+        #expect(toolbarVisibility.last == true)
     }
 
     @Test func userInspectorToggleDuringAnotherPaneAnimationReconcilesNativeState() async {
@@ -544,7 +566,7 @@ struct NativeWorkspaceLayoutTests {
         #expect(MainWindowColumnWidth.clampedStorageValue(.nan, range: MainWindowColumnWidth.sidebarRange) == nil)
         #expect(MainWindowColumnWidth.clampedStorageValue(120, range: MainWindowColumnWidth.sidebarRange) == 176)
         #expect(MainWindowColumnWidth.clampedStorageValue(480, range: MainWindowColumnWidth.directoryRange) == 420)
-        #expect(MainWindowColumnWidth.clampedStorageValue(260, range: MainWindowColumnWidth.inspectorRange) == 270)
+        #expect(MainWindowColumnWidth.clampedStorageValue(260, range: MainWindowColumnWidth.inspectorRange) == 320)
     }
 
     private func makeFixture(
@@ -552,8 +574,7 @@ struct NativeWorkspaceLayoutTests {
         initialListsWidth: CGFloat = 220,
         initialDirectoryWidth: CGFloat = 320,
         initialInspectorWidth: CGFloat = 320,
-        readerAccessoryController: NSSplitViewItemAccessoryViewController? = nil,
-        inspectorAccessoryController: NSSplitViewItemAccessoryViewController? = nil
+        readerAccessoryController: NSSplitViewItemAccessoryViewController? = nil
     ) -> WorkspaceFixture {
         let lists = makePaneController()
         let directory = makePaneController()
@@ -574,7 +595,6 @@ struct NativeWorkspaceLayoutTests {
             readerController: reader,
             inspectorController: inspector,
             readerAccessoryController: readerAccessoryController,
-            inspectorAccessoryController: inspectorAccessoryController,
             initialListsWidth: initialListsWidth,
             initialDirectoryWidth: initialDirectoryWidth,
             initialInspectorWidth: initialInspectorWidth,

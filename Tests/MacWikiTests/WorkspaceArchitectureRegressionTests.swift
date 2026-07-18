@@ -23,6 +23,9 @@ struct WorkspaceArchitectureRegressionTests {
         let shell = try source("Sources/MacWiki/Views/Shared/MainWindowShell.swift")
         let bridge = try source("Sources/MacWiki/Views/Shared/AppKitWorkspaceNavigationSplitView.swift")
         let toolbar = try source("Sources/MacWiki/Views/Shared/WorkspaceToolbarController.swift")
+        let toolbarItemFactory = try source(
+            "Sources/MacWiki/Views/Shared/WorkspaceToolbarItemFactory.swift"
+        )
 
         #expect(shell.contains("AppKitWorkspaceNavigationSplitView("))
         #expect(!shell.contains("NavigationSplitView(columnVisibility:"))
@@ -33,7 +36,7 @@ struct WorkspaceArchitectureRegressionTests {
         #expect(bridge.contains("NSSplitViewItem(inspectorWithViewController:"))
         #expect(bridge.contains("NSSplitViewItemAccessoryViewController"))
         #expect(bridge.contains("readerItem.addTopAlignedAccessoryViewController("))
-        #expect(bridge.contains("inspectorItem.addTopAlignedAccessoryViewController("))
+        #expect(!bridge.contains("inspectorItem.addTopAlignedAccessoryViewController("))
         #expect(bridge.contains("listsItem.allowsFullHeightLayout = true"))
         #expect(bridge.contains("inspectorItem.allowsFullHeightLayout = true"))
         #expect(!bridge.contains("automaticallyAppliesContentInsets = false"))
@@ -53,26 +56,28 @@ struct WorkspaceArchitectureRegressionTests {
         #expect(bridge.contains("toolbarController = WorkspaceToolbarController("))
         #expect(bridge.contains("toolbarController?.update(configuration: configuration)"))
         #expect(toolbar.contains("let toolbar = NSToolbar(identifier: WorkspaceToolbarLayout.toolbarIdentifier)"))
-        #expect(toolbar.contains("NSTrackingSeparatorToolbarItem("))
+        #expect(toolbarItemFactory.contains("NSTrackingSeparatorToolbarItem("))
         #expect(toolbar.contains("dividerIndex: 0"))
         #expect(toolbar.contains("dividerIndex: 1"))
         #expect(toolbar.contains("dividerIndex: 2"))
         #expect(!toolbar.contains("NSHostingView"))
     }
 
-    @Test func readerTabsAndInspectorModesUseTheirOwnNativePlaneAccessories() throws {
+    @Test func readerTabsUseTheirPlaneAccessoryAndInspectorModesUseNativeWindowToolbar() throws {
         let shell = try source("Sources/MacWiki/Views/Shared/MainWindowShell.swift")
         let bridge = try source("Sources/MacWiki/Views/Shared/AppKitWorkspaceNavigationSplitView.swift")
+        let toolbar = try source("Sources/MacWiki/Views/Shared/WorkspaceToolbarController.swift")
+        let inspectorToolbarItem = try source(
+            "Sources/MacWiki/Views/Shared/WorkspaceInspectorToolbarItemController.swift"
+        )
         let inspectorPanel = try source("Sources/MacWiki/Views/Inspector/InspectorPanel.swift")
         let reader = try source("Sources/MacWiki/Views/Reader/ReaderView.swift")
         let webView = try source("Sources/MacWiki/Views/Components/WebView.swift")
         let detail = try #require(shell.range(of: "reader: workspaceEnvironment("))
         let inspector = try #require(shell.range(of: "inspector: workspaceEnvironment("))
         let readerAccessory = try #require(shell.range(of: "readerAccessory: workspaceEnvironment("))
-        let inspectorAccessory = try #require(shell.range(of: "inspectorAccessory: workspaceEnvironment("))
         let detailSource = String(shell[detail.lowerBound..<inspector.lowerBound])
-        let readerAccessorySource = String(shell[readerAccessory.lowerBound..<inspectorAccessory.lowerBound])
-        let inspectorAccessorySource = String(shell[inspectorAccessory.lowerBound...])
+        let readerAccessorySource = String(shell[readerAccessory.lowerBound...])
 
         #expect(detailSource.contains("ReaderColumnView()"))
         #expect(!detailSource.contains("TabBarView("))
@@ -80,9 +85,12 @@ struct WorkspaceArchitectureRegressionTests {
         #expect(!readerAccessorySource.contains("InspectorHeaderBar("))
         #expect(shell.contains("InspectorColumnView(includesHeader: false)"))
         #expect(!shell.contains("InspectorModeAccessoryHost"))
-        #expect(inspectorAccessorySource.contains("InspectorHeaderBar(selection: $appState.inspectorMode)"))
-        #expect(bridge.contains("inspectorAccessoryController = WorkspaceSplitItemAccessoryController("))
-        #expect(bridge.contains("inspectorItem.addTopAlignedAccessoryViewController(inspectorAccessoryController)"))
+        #expect(!shell.contains("inspectorAccessory:"))
+        #expect(!bridge.contains("inspectorAccessoryController"))
+        #expect(toolbar.contains("inspectorModesController.makeItem(identifier:"))
+        #expect(inspectorToolbarItem.contains("NSToolbarItemGroup("))
+        #expect(inspectorToolbarItem.contains("item.role = .tabs"))
+        #expect(inspectorToolbarItem.contains("action: #selector(selectInspectorMode(_:))"))
         // Standalone article windows still use the Inspector panel's embedded header.
         #expect(inspectorPanel.contains("InspectorHeaderBar(selection: $appState.inspectorMode)"))
         #expect(inspectorPanel.contains("if includesHeader"))

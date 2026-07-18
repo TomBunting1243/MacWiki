@@ -77,12 +77,11 @@ struct BetaReadinessRegressionTests {
         #expect(progressSource.contains("PieSlice(progress: fillProgress)"))
         #expect(!progressSource.contains("if fillProgress"))
         #expect(progressSource.contains("@Animatable\nprivate struct PieSlice: Shape"))
-        #expect(progressSource.contains("@Environment(\\.macWikiAccessibilityPersonalization.reduceMotion)"))
-        #expect(progressSource.contains(".animation(reduceMotion ? nil :"))
+        #expect(!progressSource.contains("@Environment(\\.macWikiAccessibilityPersonalization.reduceMotion)"))
         let fillIndex = try #require(progressSource.range(of: "PieSlice(progress: fillProgress)"))
         let trackIndex = try #require(progressSource.range(of: ".strokeBorder(trackColor"))
         #expect(fillIndex.lowerBound < trackIndex.lowerBound)
-        #expect(progressSource.components(separatedBy: ".animation(").count == 2)
+        #expect(!progressSource.contains(".animation("))
 
         let modelSource = try source("Sources/MacWiki/Views/Sidebar/Search/SidebarSearchSurfaceModel.swift")
         #expect(modelSource.contains("private struct DerivedState"))
@@ -125,13 +124,13 @@ struct BetaReadinessRegressionTests {
         #expect(MainWindowColumnWidth.clampedStorageValue(.nan, range: MainWindowColumnWidth.sidebarRange) == nil)
         #expect(MainWindowColumnWidth.clampedStorageValue(120, range: MainWindowColumnWidth.sidebarRange) == 176)
         #expect(MainWindowColumnWidth.clampedStorageValue(480, range: MainWindowColumnWidth.directoryRange) == 420)
-        #expect(MainWindowColumnWidth.clampedStorageValue(260, range: MainWindowColumnWidth.inspectorRange) == 270)
+        #expect(MainWindowColumnWidth.clampedStorageValue(260, range: MainWindowColumnWidth.inspectorRange) == 320)
         #expect(MainWindowColumnWidth.clampedStorageValue(320, range: MainWindowColumnWidth.inspectorRange) == 320)
         #expect(MainWindowLayout.minimumContentWidth(
             listsSidebarVisible: true,
             directoryVisible: true,
             inspectorVisible: true
-        ) == 1_229)
+        ) == 1_279)
         #expect(MainWindowLayout.minimumContentWidth(
             listsSidebarVisible: false,
             directoryVisible: false,
@@ -641,6 +640,12 @@ struct BetaReadinessRegressionTests {
         let shellSource = try source("Sources/MacWiki/Views/Shared/MainWindowShell.swift")
         let navigationSplitSource = try source("Sources/MacWiki/Views/Shared/AppKitWorkspaceNavigationSplitView.swift")
         let workspaceToolbarSource = try source("Sources/MacWiki/Views/Shared/WorkspaceToolbarController.swift")
+        let workspaceToolbarItemFactorySource = try source(
+            "Sources/MacWiki/Views/Shared/WorkspaceToolbarItemFactory.swift"
+        )
+        let inspectorToolbarItemSource = try source(
+            "Sources/MacWiki/Views/Shared/WorkspaceInspectorToolbarItemController.swift"
+        )
         let workspaceToolbarLayoutSource = try source(
             "Sources/MacWiki/Views/Shared/WorkspaceToolbarLayout.swift"
         )
@@ -684,7 +689,7 @@ struct BetaReadinessRegressionTests {
         #expect(navigationSplitSource.contains("NSSplitViewItemAccessoryViewController"))
         #expect(navigationSplitSource.contains("addTopAlignedAccessoryViewController"))
         #expect(navigationSplitSource.contains("readerItem.addTopAlignedAccessoryViewController("))
-        #expect(navigationSplitSource.contains("inspectorItem.addTopAlignedAccessoryViewController("))
+        #expect(!navigationSplitSource.contains("inspectorItem.addTopAlignedAccessoryViewController("))
         #expect(navigationSplitSource.contains("inspectorItem.allowsFullHeightLayout = true"))
         #expect(navigationSplitSource.contains("final class WorkspaceInspectorHostingController"))
         #expect(navigationSplitSource.contains("surface.material = .sidebar"))
@@ -703,8 +708,7 @@ struct BetaReadinessRegressionTests {
         #expect(shellSource.contains(".id(\"main-reader-column\")"))
         #expect(shellSource.contains("InspectorColumnView(includesHeader: false)"))
         #expect(shellSource.contains("readerAccessory: workspaceEnvironment("))
-        #expect(shellSource.contains("inspectorAccessory: workspaceEnvironment("))
-        #expect(shellSource.contains("InspectorHeaderBar(selection: $appState.inspectorMode)"))
+        #expect(!shellSource.contains("inspectorAccessory:"))
         #expect(!shellSource.contains("InspectorModeAccessoryHost"))
         #expect(inspectorColumnSource.contains("InspectorPanel("))
         #expect(!inspectorColumnSource.contains("ignoresSafeArea"))
@@ -718,10 +722,17 @@ struct BetaReadinessRegressionTests {
         #expect(workspaceToolbarSource.contains("NSToolbarItemValidation"))
         #expect(workspaceToolbarSource.contains("let toolbar = NSToolbar(identifier: WorkspaceToolbarLayout.toolbarIdentifier)"))
         #expect(workspaceToolbarSource.contains("guard window.toolbar == nil else"))
-        #expect(workspaceToolbarSource.contains("NSToolbarItem(itemIdentifier: identifier)"))
+        #expect(workspaceToolbarItemFactorySource.contains("NSToolbarItem(itemIdentifier: identifier)"))
         #expect(workspaceToolbarSource.contains("NSSharingServicePickerToolbarItem(itemIdentifier: itemIdentifier)"))
-        #expect(workspaceToolbarSource.contains("NSTrackingSeparatorToolbarItem("))
-        #expect(workspaceToolbarSource.components(separatedBy: "return trackingSeparator(").count - 1 == 3)
+        #expect(workspaceToolbarItemFactorySource.contains("NSTrackingSeparatorToolbarItem("))
+        #expect(workspaceToolbarSource.contains("inspectorModesController.makeItem(identifier:"))
+        #expect(inspectorToolbarItemSource.contains("NSToolbarItemGroup("))
+        #expect(inspectorToolbarItemSource.contains("item.role = .tabs"))
+        #expect(
+            workspaceToolbarSource.components(
+                separatedBy: "return WorkspaceToolbarItemFactory.trackingSeparator("
+            ).count - 1 == 3
+        )
         #expect(!workspaceToolbarSource.contains("NSHostingView"))
 
         func toolbarSwitchCase(_ identifier: String, endingAt nextIdentifier: String) throws -> String {
@@ -762,9 +773,11 @@ struct BetaReadinessRegressionTests {
         )
         let inspectorToggle = try #require(defaultItemsSource.range(of: ".workspaceInspectorToggle"))
         let inspectorBoundary = try #require(defaultItemsSource.range(of: ".workspaceReaderInspectorBoundary"))
+        let inspectorModes = try #require(defaultItemsSource.range(of: ".workspaceInspectorModes"))
         #expect(inspectorToggle.lowerBound < inspectorBoundary.lowerBound)
+        #expect(inspectorBoundary.lowerBound < inspectorModes.lowerBound)
         #expect(defaultItemsSource.contains(
-            ".workspaceInspectorToggle,\n        .workspaceReaderInspectorBoundary\n    ]"
+            ".workspaceInspectorToggle,\n        .workspaceReaderInspectorBoundary,\n        .workspaceInspectorModes\n    ]"
         ))
         for readerItem in [
             ".workspaceBack", ".workspaceForward", ".workspaceSearch", ".workspaceSave",
@@ -796,7 +809,7 @@ struct BetaReadinessRegressionTests {
         #expect(toolbarPolicySource.contains("toolbar.allowsUserCustomization = false"))
         #expect(!tabAccessorySource.contains("appState.toggleInspectorVisibility()"))
         #expect(!tabAccessorySource.contains("toggle-reader-inspector"))
-        #expect(workspaceToolbarSource.contains("configuration.appState.toggleInspectorVisibility()"))
+        #expect(workspaceToolbarSource.contains("splitController?.toggleInspector(sender)"))
         #expect(workspaceToolbarSource.contains("action: #selector(toggleInspector(_:))"))
         #expect(workspaceToolbarSource.contains("configuration.appState.goBack()"))
         #expect(workspaceToolbarSource.contains("configuration.appState.goForward()"))
@@ -941,6 +954,7 @@ struct BetaReadinessRegressionTests {
         let surfaceChromeSource = try source("Sources/MacWiki/Views/Shared/ReaderInspectorSurfaceChrome.swift")
 
         #expect(inspectorHeaderSource.contains("Picker(\"Inspector mode\", selection: $selection)"))
+        #expect(inspectorHeaderSource.contains(".pickerStyle(.tabs)"))
         #expect(inspectorHeaderSource.contains(".pickerStyle(.segmented)"))
         #expect(!inspectorSource.contains("private struct InspectorModeControl"))
         #expect(inspectorSource.contains("transaction.animation = nil"))
@@ -1660,9 +1674,12 @@ struct BetaReadinessRegressionTests {
         #expect(driver.contains("Open in Browser"))
         #expect(driver.contains("matchingElements("))
         #expect(driver.contains(".count == 1"))
-        #expect(driver.contains("native inspector hidden and restored through six rapid cycles"))
+        #expect(driver.contains("native inspector hidden/restored through six rapid cycles plus one interrupted transition"))
         #expect(driver.contains("all eight visibility states plus 20 independent Lists/List Contents hide-restore cycles"))
-        #expect(driver.contains("900-point window preserved with Lists hidden while List Contents and Inspector restored around a usable Reader"))
+        #expect(driver.contains("900-point window preserved with Lists hidden while List Contents and Inspector restored around a usable Reader; native tabs remained within the Inspector"))
+        #expect(driver.contains("CFEqual(currentModeGroup, toolbarModeGroup)"))
+        #expect(driver.contains("selectedModeButtons.count == 1"))
+        #expect(driver.contains("The native Inspector tab group overflowed its pane"))
         #expect(driver.contains("Restoring panes resized the whole window"))
         #expect(driver.contains("for _ in 0..<8"))
         #expect(driver.contains("for cycle in 1...20"))
@@ -1683,13 +1700,14 @@ struct BetaReadinessRegressionTests {
         #expect(driver.contains("macOS 26 exposes each native split-item accessory as a sibling AXGroup"))
         #expect(driver.contains("$0.height >= referenceHeight * 0.5"))
         #expect(harness.contains("every Reader control stays between dividers 1 and 2"))
-        #expect(harness.contains("live toolbar identity/frame sampling"))
+        #expect(harness.contains("live toolbar sampling during 12 rapid mode cycles"))
         #expect(driver.contains("frame.maxX <= inspectorFrame.minX + paneAlignmentTolerance"))
         #expect(driver.contains("toolbarModeSwitchSampleCount"))
         #expect(driver.contains("verifyToolbarStabilityDuringInspectorTransition(untilSelected:"))
         #expect(driver.contains("transitionSampleCount >= 5"))
         #expect(harness.contains(".toolbarModeSwitchSampleCount >= 195"))
         #expect(driver.contains("kAXMenuButtonRole"))
+        #expect(driver.contains("stringAttribute(kAXHelpAttribute as CFString, from: element)"))
         #expect(driver.contains("supportsAction(kAXPressAction"))
         #expect(driver.contains("let readStateControlCycle: String"))
         #expect(driver.contains("try press(initialReadControl, label: \"Mark as Read\")"))
@@ -1912,9 +1930,8 @@ struct BetaReadinessRegressionTests {
         #expect(splitSource.contains("NSSplitViewItem(inspectorWithViewController:"))
         #expect(splitSource.contains("NSSplitViewItemAccessoryViewController"))
         #expect(splitSource.contains("readerItem.addTopAlignedAccessoryViewController("))
-        #expect(splitSource.contains("inspectorItem.addTopAlignedAccessoryViewController("))
-        #expect(shellSource.contains("inspectorAccessory: workspaceEnvironment("))
-        #expect(shellSource.contains("InspectorHeaderBar(selection: $appState.inspectorMode)"))
+        #expect(!splitSource.contains("inspectorItem.addTopAlignedAccessoryViewController("))
+        #expect(!shellSource.contains("inspectorAccessory:"))
         #expect(splitSource.contains("readerController.sizingOptions = []"))
         #expect(!splitSource.contains("readerController.rootView ="))
         #expect(shellSource.contains("InspectorColumnView(includesHeader: false)"))

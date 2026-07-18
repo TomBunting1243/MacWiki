@@ -427,7 +427,7 @@ public enum SettingsCatalog {
                     storageKey: "mainWindow.inspectorWidth",
                     defaultValue: "320",
                     control: "Layout memory",
-                    values: ["270...460 pt"],
+                    values: ["320...460 pt"],
                     codeReference: "AppStorageKey.MainWindow.inspectorWidth",
                     appearsInSettings: false
                 ),
@@ -438,7 +438,7 @@ public enum SettingsCatalog {
                     storageKey: "articleWindow.inspectorWidth",
                     defaultValue: "320",
                     control: "Layout memory",
-                    values: ["270...460 pt"],
+                    values: ["320...460 pt"],
                     codeReference: "AppStorageKey.ArticleWindow.inspectorWidth",
                     appearsInSettings: false
                 )

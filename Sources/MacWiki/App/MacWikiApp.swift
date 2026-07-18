@@ -161,8 +161,8 @@ struct MacWikiApp: App {
 
         sanitizePersistedSplitWidth(defaults, key: AppStorageKey.MainWindow.sidebarWidth, minimum: 176, maximum: 260)
         sanitizePersistedSplitWidth(defaults, key: AppStorageKey.MainWindow.directoryWidth, minimum: 260, maximum: 420)
-        sanitizePersistedSplitWidth(defaults, key: AppStorageKey.MainWindow.inspectorWidth, minimum: 270, maximum: 460)
-        sanitizePersistedSplitWidth(defaults, key: AppStorageKey.ArticleWindow.inspectorWidth, minimum: 270, maximum: 460)
+        sanitizePersistedSplitWidth(defaults, key: AppStorageKey.MainWindow.inspectorWidth, minimum: 320, maximum: 460)
+        sanitizePersistedSplitWidth(defaults, key: AppStorageKey.ArticleWindow.inspectorWidth, minimum: 320, maximum: 460)
     }
 
     private static func sanitizePersistedSplitWidth(

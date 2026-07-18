@@ -159,6 +159,12 @@ struct NativeDesignRegressionTests {
         let app = try source("Sources/MacWiki/App/MacWikiApp.swift")
         let shell = try source("Sources/MacWiki/Views/Shared/MainWindowShell.swift")
         let toolbar = try source("Sources/MacWiki/Views/Shared/WorkspaceToolbarController.swift")
+        let toolbarItemFactory = try source(
+            "Sources/MacWiki/Views/Shared/WorkspaceToolbarItemFactory.swift"
+        )
+        let inspectorToolbarItem = try source(
+            "Sources/MacWiki/Views/Shared/WorkspaceInspectorToolbarItemController.swift"
+        )
         let toolbarConfiguration = try source(
             "Sources/MacWiki/Views/Shared/WorkspaceToolbarConfiguration.swift"
         )
@@ -181,14 +187,14 @@ struct NativeDesignRegressionTests {
         #expect(toolbar.contains("NSToolbarDelegate"))
         #expect(toolbar.contains("NSToolbarItemValidation"))
         #expect(toolbar.contains("NSSharingServicePickerToolbarItemDelegate"))
-        #expect(toolbar.contains("NSToolbarItem(itemIdentifier: identifier)"))
+        #expect(toolbarItemFactory.contains("NSToolbarItem(itemIdentifier: identifier)"))
         #expect(toolbar.contains("NSSharingServicePickerToolbarItem(itemIdentifier: itemIdentifier)"))
-        #expect(toolbar.contains("NSTrackingSeparatorToolbarItem("))
+        #expect(toolbarItemFactory.contains("NSTrackingSeparatorToolbarItem("))
         for dividerIndex in 0...2 {
             #expect(toolbar.contains("dividerIndex: \(dividerIndex)"))
         }
-        #expect(toolbar.contains("item.isBordered = true"))
-        #expect(toolbar.contains("item.style = .plain"))
+        #expect(toolbarItemFactory.contains("item.isBordered = true"))
+        #expect(toolbarItemFactory.contains("item.style = .plain"))
         #expect(toolbar.contains("toolbar.allowsUserCustomization = false"))
         #expect(toolbar.contains("toolbar.allowsDisplayModeCustomization = false"))
         #expect(toolbar.contains("toolbar.autosavesConfiguration = false"))
@@ -206,16 +212,20 @@ struct NativeDesignRegressionTests {
         #expect(!toolbar.contains(".glassEffect("))
         #expect(!toolbar.contains(".view ="))
 
-        // Reader tabs and the Inspector selector are split-item accessories;
-        // they are not competing SwiftUI toolbar lanes.
+        // Reader tabs retain their split-item accessory while Inspector modes
+        // use a stable native item group in the Inspector toolbar plane.
         #expect(shell.contains("toolbarConfiguration: WorkspaceToolbarConfiguration("))
         #expect(shell.contains("readerAccessory: workspaceEnvironment("))
-        #expect(shell.contains("inspectorAccessory: workspaceEnvironment("))
-        #expect(shell.contains("InspectorHeaderBar(selection: $appState.inspectorMode)"))
+        #expect(!shell.contains("inspectorAccessory:"))
+        #expect(toolbar.contains("inspectorModesController.makeItem(identifier:"))
+        #expect(inspectorToolbarItem.contains("NSToolbarItemGroup("))
+        #expect(inspectorToolbarItem.contains("item.role = .tabs"))
         #expect(shell.contains("InspectorColumnView(includesHeader: false)"))
         #expect(!shell.contains(".toolbar {"))
         #expect(!shell.contains("FixedWindowToolbarPolicy()"))
-        #expect(!toolbarConfiguration.contains("inspectorMode"))
+        #expect(toolbarConfiguration.contains("inspectorMode = appState.inspectorMode"))
+        #expect(toolbar.contains("guard previousSnapshot != configuration.snapshot else"))
+        #expect(toolbar.contains("inspectorModesController.updateSelection(to:"))
 
         // Only the SwiftUI-owned Article window retains SwiftUI toolbar style
         // and policy. The main window leaves toolbar ownership entirely AppKit.
@@ -233,7 +243,7 @@ struct NativeDesignRegressionTests {
         #expect(toolbar.contains("symbol: \"sidebar.left\""))
         #expect(!toolbar.contains("sidebar.leading"))
         #expect(toolbar.contains("configuration.appState.toggleDirectoryColumnVisibility()"))
-        #expect(toolbar.contains("configuration.appState.toggleInspectorVisibility()"))
+        #expect(toolbar.contains("splitController?.toggleInspector(sender)"))
         #expect(articleToolbar.contains("ToolbarContent"))
         #expect(!articleToolbar.contains("CustomizableToolbarContent"))
         #expect(articleToolbar.contains("ToolbarItem(placement: .navigation)"))

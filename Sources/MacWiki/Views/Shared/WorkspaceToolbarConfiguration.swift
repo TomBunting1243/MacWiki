@@ -1,9 +1,9 @@
 import SwiftData
 import SwiftUI
 
-/// The state that can legitimately change the main-window toolbar. Inspector
-/// mode and Reader/WebKit projection state are deliberately absent so changing
-/// Inspector surfaces performs zero toolbar work.
+/// The state that can legitimately change main-window toolbar presentation.
+/// Inspector mode updates only the stable native item group's selection;
+/// Reader/WebKit projection state remains deliberately absent.
 struct WorkspaceToolbarSnapshot: Equatable {
     let articleID: String?
     let articleTitle: String?
@@ -28,6 +28,7 @@ struct WorkspaceToolbarConfiguration {
     let modelContext: ModelContext
     let openURL: OpenURLAction
     let snapshot: WorkspaceToolbarSnapshot
+    let inspectorMode: InspectorMode
 
     init(
         appState: AppState,
@@ -37,6 +38,7 @@ struct WorkspaceToolbarConfiguration {
         self.appState = appState
         self.modelContext = modelContext
         self.openURL = openURL
+        inspectorMode = appState.inspectorMode
 
         let article = appState.currentArticle
         snapshot = WorkspaceToolbarSnapshot(

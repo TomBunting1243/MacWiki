@@ -175,8 +175,8 @@ fi
   printf -- '- Reader fixture source: isolated production `ArticleBodyCache`; network: forced offline\n'
   printf -- '- Reader assertions: native pane-tracking toolbar command reachability; every Reader control stays between dividers 1 and 2; Inspector toggle stays right-aligned inside the Reader; Read/Unread changes in place and restores; exactly one native Find UI\n'
   printf -- '- Workspace assertions: four visible AppKit pane regions, Inspector spanning the full Reader pane height, all eight auxiliary visibility states, 20 independent Lists/List Contents cycles, and stable Reader Web-area identity\n'
-  printf -- '- Inspector assertions: selector aligned in the Inspector top accessory; Info/Notes/References content; live toolbar identity/frame sampling during 12 rapid mode cycles; six native Inspector hide/restore cycles\n'
-  printf -- '- Narrow-window assertion: with Lists intentionally hidden, restoring List Contents and Inspector preserves the 900-point window and a usable Reader\n'
+  printf -- '- Inspector assertions: native tab group aligned in the Inspector toolbar plane with stable identity/frame and exactly one selected tab; Info/Notes/References content; live toolbar sampling during 12 rapid mode cycles; six hide/restore cycles plus one interrupted transition; no collapsed ghost chrome\n'
+  printf -- '- Narrow-window assertion: with Lists intentionally hidden, restoring List Contents and Inspector preserves the 900-point window, a usable Reader, and tab-group containment inside the Inspector\n'
   printf -- '- Visual-only follow-up: materials, hover/pressed treatment, animation quality, and perceived jank still require fresh Computer Use evidence; placement and transition stability are independently asserted through AX geometry.\n'
   printf -- '- AX evidence: `%s`\n' "$AX_RESULT"
   printf -- '- Production preferences/data touched: **No** — state, defaults, persistence, and caches were isolated.\n'

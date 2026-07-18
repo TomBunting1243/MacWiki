@@ -7,10 +7,8 @@ private let workspaceToolbarLogger = Logger(subsystem: "com.macwiki", category: 
 /// toolbar item, so native sizing, hover treatment, accessibility, validation,
 /// and compact-width overflow remain available without hand-built chrome.
 @MainActor
-final class WorkspaceToolbarController: NSObject,
-    NSToolbarDelegate,
-    NSToolbarItemValidation,
-    NSSharingServicePickerToolbarItemDelegate
+final class WorkspaceToolbarController: NSObject, NSToolbarDelegate,
+    NSToolbarItemValidation, NSSharingServicePickerToolbarItemDelegate
 {
     private weak var splitController: AppKitWorkspaceNavigationController?
     private var configuration: WorkspaceToolbarConfiguration
@@ -21,6 +19,7 @@ final class WorkspaceToolbarController: NSObject,
     private let popoverPresenter = WorkspaceToolbarPopoverPresenter()
     private var lastConsumedReaderStyleRequestID: UUID?
     private var lastConsumedPageViewsRequestID: UUID?
+    private let inspectorModesController: WorkspaceInspectorToolbarItemController
 
     init(
         splitController: AppKitWorkspaceNavigationController,
@@ -28,6 +27,10 @@ final class WorkspaceToolbarController: NSObject,
     ) {
         self.splitController = splitController
         self.configuration = configuration
+        inspectorModesController = WorkspaceInspectorToolbarItemController(
+            appState: configuration.appState,
+            isPlaneVisible: splitController.inspectorPaneVisible
+        )
         super.init()
     }
 
@@ -79,14 +82,22 @@ final class WorkspaceToolbarController: NSObject,
     func update(configuration: WorkspaceToolbarConfiguration) {
         let previousSnapshot = self.configuration.snapshot
         self.configuration = configuration
+        inspectorModesController.update(appState: configuration.appState)
 
         if previousSnapshot.articleID != configuration.snapshot.articleID {
             popoverPresenter.close()
         }
 
-        guard previousSnapshot != configuration.snapshot else { return }
+        guard previousSnapshot != configuration.snapshot else {
+            inspectorModesController.updateSelection(to: configuration.inspectorMode)
+            return
+        }
         refreshItems()
         consumePresentationRequests()
+    }
+
+    func setInspectorPlaneVisible(_ isVisible: Bool) {
+        inspectorModesController.setPlaneVisible(isVisible, in: installedToolbar)
     }
 
     func invalidate() {
@@ -146,104 +157,117 @@ final class WorkspaceToolbarController: NSObject,
 
         switch itemIdentifier {
         case .workspaceListsDirectoryBoundary:
-            return trackingSeparator(
+            return WorkspaceToolbarItemFactory.trackingSeparator(
                 identifier: itemIdentifier,
                 splitView: splitController.splitView,
                 dividerIndex: 0
             )
         case .workspaceDirectoryReaderBoundary:
-            return trackingSeparator(
+            return WorkspaceToolbarItemFactory.trackingSeparator(
                 identifier: itemIdentifier,
                 splitView: splitController.splitView,
                 dividerIndex: 1
             )
         case .workspaceReaderInspectorBoundary:
-            return trackingSeparator(
+            return WorkspaceToolbarItemFactory.trackingSeparator(
                 identifier: itemIdentifier,
                 splitView: splitController.splitView,
                 dividerIndex: 2
             )
+        case .workspaceInspectorModes:
+            return inspectorModesController.makeItem(identifier: itemIdentifier)
         case .workspaceLists:
-            let item = buttonItem(
+            let item = WorkspaceToolbarItemFactory.button(
                 identifier: itemIdentifier,
                 label: "Lists",
                 symbol: "sidebar.left",
+                target: self,
                 action: #selector(toggleLists(_:))
             )
             item.visibilityPriority = .high
             return item
         case .workspaceDirectory:
-            let item = buttonItem(
+            let item = WorkspaceToolbarItemFactory.button(
                 identifier: itemIdentifier,
                 label: "List Contents",
                 symbol: "sidebar.squares.leading",
+                target: self,
                 action: #selector(toggleDirectory(_:))
             )
             item.visibilityPriority = .high
             return item
         case .workspaceBack:
-            return buttonItem(
+            return WorkspaceToolbarItemFactory.button(
                 identifier: itemIdentifier,
                 label: "Back",
                 symbol: "chevron.left",
+                target: self,
                 action: #selector(goBack(_:))
             )
         case .workspaceForward:
-            return buttonItem(
+            return WorkspaceToolbarItemFactory.button(
                 identifier: itemIdentifier,
                 label: "Forward",
                 symbol: "chevron.right",
+                target: self,
                 action: #selector(goForward(_:))
             )
         case .workspaceSearch:
-            return buttonItem(
+            return WorkspaceToolbarItemFactory.button(
                 identifier: itemIdentifier,
                 label: "Search Wikipedia",
                 symbol: "magnifyingglass",
+                target: self,
                 action: #selector(searchWikipedia(_:))
             )
         case .workspaceSave:
-            return buttonItem(
+            return WorkspaceToolbarItemFactory.button(
                 identifier: itemIdentifier,
                 label: "Save Article",
                 symbol: "bookmark",
+                target: self,
                 action: #selector(showSavePopover(_:))
             )
         case .workspaceReadState:
-            let item = buttonItem(
+            let item = WorkspaceToolbarItemFactory.button(
                 identifier: itemIdentifier,
                 label: "Mark as Read",
                 symbol: "circle",
+                target: self,
                 action: #selector(toggleReadState(_:))
             )
             item.possibleLabels = ["Mark as Read", "Mark as Unread"]
             return item
         case .workspaceFind:
-            return buttonItem(
+            return WorkspaceToolbarItemFactory.button(
                 identifier: itemIdentifier,
                 label: "Find in Page",
                 symbol: "text.magnifyingglass",
+                target: self,
                 action: #selector(findInPage(_:))
             )
         case .workspaceReaderStyle:
-            return buttonItem(
+            return WorkspaceToolbarItemFactory.button(
                 identifier: itemIdentifier,
                 label: "Reader Style",
                 symbol: "textformat.size",
+                target: self,
                 action: #selector(showReaderStylePopover(_:))
             )
         case .workspacePageViews:
-            return buttonItem(
+            return WorkspaceToolbarItemFactory.button(
                 identifier: itemIdentifier,
                 label: "Page Views",
                 symbol: "chart.xyaxis.line",
+                target: self,
                 action: #selector(showPageViewsPopover(_:))
             )
         case .workspaceOpenBrowser:
-            return buttonItem(
+            return WorkspaceToolbarItemFactory.button(
                 identifier: itemIdentifier,
                 label: "Open in Browser",
                 symbol: "safari",
+                target: self,
                 action: #selector(openInBrowser(_:))
             )
         case .workspaceShare:
@@ -260,10 +284,11 @@ final class WorkspaceToolbarController: NSObject,
             item.delegate = self
             return item
         case .workspaceInspectorToggle:
-            let item = buttonItem(
+            let item = WorkspaceToolbarItemFactory.button(
                 identifier: itemIdentifier,
                 label: "Inspector",
                 symbol: "sidebar.right",
+                target: self,
                 action: #selector(toggleInspector(_:))
             )
             item.visibilityPriority = .high
@@ -290,6 +315,8 @@ final class WorkspaceToolbarController: NSObject,
             return hasArticle && !snapshot.navigationLocked
         case .workspaceInspectorToggle:
             return true
+        case .workspaceInspectorModes:
+            return inspectorModesController.isPlaneVisible
         default:
             return true
         }
@@ -360,43 +387,7 @@ final class WorkspaceToolbarController: NSObject,
     }
 
     @objc private func toggleInspector(_ sender: Any?) {
-        configuration.appState.toggleInspectorVisibility()
-        refreshFromLiveState()
-    }
-
-    private func trackingSeparator(
-        identifier: NSToolbarItem.Identifier,
-        splitView: NSSplitView,
-        dividerIndex: Int
-    ) -> NSTrackingSeparatorToolbarItem {
-        let item = NSTrackingSeparatorToolbarItem(
-            identifier: identifier,
-            splitView: splitView,
-            dividerIndex: dividerIndex
-        )
-        item.visibilityPriority = .high
-        return item
-    }
-
-    private func buttonItem(
-        identifier: NSToolbarItem.Identifier,
-        label: String,
-        symbol: String,
-        action: Selector
-    ) -> NSToolbarItem {
-        let item = NSToolbarItem(itemIdentifier: identifier)
-        item.label = label
-        item.paletteLabel = label
-        item.toolTip = label
-        item.image = NSImage(
-            systemSymbolName: symbol,
-            accessibilityDescription: label
-        )
-        item.isBordered = true
-        item.style = .plain
-        item.target = self
-        item.action = action
-        return item
+        splitController?.toggleInspector(sender)
     }
 
     private func refreshFromLiveState() {
@@ -413,6 +404,10 @@ final class WorkspaceToolbarController: NSObject,
         guard let toolbar = installedToolbar else { return }
         let snapshot = configuration.snapshot
 
+        inspectorModesController.setPlaneVisible(
+            inspectorModesController.isPlaneVisible,
+            in: toolbar
+        )
         toolbar.validateVisibleItems()
 
         for item in toolbar.items {
@@ -439,6 +434,11 @@ final class WorkspaceToolbarController: NSObject,
                 item.toolTip = snapshot.inspectorVisible
                     ? "Hide Inspector"
                     : "Show Inspector"
+            case .workspaceInspectorModes:
+                inspectorModesController.updateSelection(
+                    of: item,
+                    to: configuration.inspectorMode
+                )
             default:
                 break
             }

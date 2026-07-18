@@ -70,7 +70,6 @@ private struct MainWorkspaceShell: View {
             readerRevision: workspaceAppearanceRevision,
             inspectorRevision: workspaceAppearanceRevision,
             readerAccessoryRevision: workspaceAppearanceRevision,
-            inspectorAccessoryRevision: workspaceAppearanceRevision,
             toolbarConfiguration: WorkspaceToolbarConfiguration(
                 appState: appState,
                 modelContext: modelContext,
@@ -110,9 +109,6 @@ private struct MainWorkspaceShell: View {
                     showsTopDivider: false,
                     onNewLabelWithArticle: onNewLabelWithArticle
                 )
-            ),
-            inspectorAccessory: workspaceEnvironment(
-                InspectorHeaderBar(selection: $appState.inspectorMode)
             )
         )
         // The semantic AppKit Sidebar and Inspector own full-height titlebar

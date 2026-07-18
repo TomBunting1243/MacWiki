@@ -10,6 +10,12 @@ struct ReaderTopChromeLayoutTests {
     @Test("main reader commands use one directly owned native AppKit toolbar")
     func mainReaderUsesNativeWindowToolbar() throws {
         let toolbar = try source("Sources/MacWiki/Views/Shared/WorkspaceToolbarController.swift")
+        let toolbarItemFactory = try source(
+            "Sources/MacWiki/Views/Shared/WorkspaceToolbarItemFactory.swift"
+        )
+        let inspectorToolbarItem = try source(
+            "Sources/MacWiki/Views/Shared/WorkspaceInspectorToolbarItemController.swift"
+        )
         let configuration = try source("Sources/MacWiki/Views/Shared/WorkspaceToolbarConfiguration.swift")
         let bridge = try source("Sources/MacWiki/Views/Shared/AppKitWorkspaceNavigationSplitView.swift")
         let shell = try source("Sources/MacWiki/Views/Shared/MainWindowShell.swift")
@@ -24,13 +30,13 @@ struct ReaderTopChromeLayoutTests {
         #expect(toolbar.contains("window.toolbar = toolbar"))
         #expect(toolbar.contains("toolbar.allowsUserCustomization = false"))
         #expect(toolbar.contains("toolbar.autosavesConfiguration = false"))
-        #expect(toolbar.contains("NSToolbarItem(itemIdentifier: identifier)"))
+        #expect(toolbarItemFactory.contains("NSToolbarItem(itemIdentifier: identifier)"))
         #expect(toolbar.contains("NSSharingServicePickerToolbarItem(itemIdentifier: itemIdentifier)"))
-        #expect(toolbar.contains("item.target = self"))
-        #expect(toolbar.contains("item.action = action"))
+        #expect(toolbarItemFactory.contains("item.target = target"))
+        #expect(toolbarItemFactory.contains("item.action = action"))
         #expect(!toolbar.contains("NSHostingView"))
         #expect(configuration.contains("struct WorkspaceToolbarSnapshot: Equatable"))
-        #expect(configuration.contains("mode and Reader/WebKit projection state are deliberately absent"))
+        #expect(configuration.contains("Inspector mode updates only the stable native item group's selection"))
         #expect(bridge.contains("toolbarController = WorkspaceToolbarController("))
         #expect(bridge.contains("toolbarController?.update(configuration: configuration)"))
         #expect(shell.contains("toolbarConfiguration: WorkspaceToolbarConfiguration("))
@@ -40,11 +46,13 @@ struct ReaderTopChromeLayoutTests {
         #expect(shell.contains("ReaderColumnView()"))
         #expect(shell.contains("readerAccessory: workspaceEnvironment("))
         #expect(shell.contains("InspectorColumnView(includesHeader: false)"))
-        #expect(shell.contains("inspectorAccessory: workspaceEnvironment("))
-        #expect(shell.contains("InspectorHeaderBar(selection: $appState.inspectorMode)"))
+        #expect(!shell.contains("inspectorAccessory:"))
+        #expect(toolbar.contains("inspectorModesController.makeItem(identifier:"))
+        #expect(inspectorToolbarItem.contains("NSToolbarItemGroup("))
+        #expect(inspectorToolbarItem.contains("item.role = .tabs"))
         #expect(!tabAccessories.contains("appState.toggleInspectorVisibility()"))
         #expect(!tabAccessories.contains("toggle-reader-inspector"))
-        #expect(toolbar.contains("configuration.appState.toggleInspectorVisibility()"))
+        #expect(toolbar.contains("splitController?.toggleInspector(sender)"))
         #expect(!FileManager.default.fileExists(
             atPath: repositoryRoot
                 .appending(path: "Sources/MacWiki/Views/Shared/MainWindowReaderToolbar.swift")
@@ -71,6 +79,9 @@ struct ReaderTopChromeLayoutTests {
         let inspectorBoundaryIndex = try #require(
             identifiers.firstIndex(of: .workspaceReaderInspectorBoundary)
         )
+        let inspectorModesIndex = try #require(
+            identifiers.firstIndex(of: .workspaceInspectorModes)
+        )
 
         #expect(Set(identifiers).count == identifiers.count)
         #expect(listsIndex < listsBoundaryIndex)
@@ -80,6 +91,7 @@ struct ReaderTopChromeLayoutTests {
         #expect(flexibleSpaceIndex < saveIndex)
         #expect(saveIndex < inspectorToggleIndex)
         #expect(inspectorToggleIndex + 1 == inspectorBoundaryIndex)
+        #expect(inspectorBoundaryIndex + 1 == inspectorModesIndex)
         for identifier in WorkspaceToolbarLayout.readerItemIdentifiers {
             let index = try #require(identifiers.firstIndex(of: identifier))
             #expect(index > directoryBoundaryIndex)
@@ -87,7 +99,10 @@ struct ReaderTopChromeLayoutTests {
         }
 
         let toolbar = try source("Sources/MacWiki/Views/Shared/WorkspaceToolbarController.swift")
-        #expect(toolbar.components(separatedBy: "NSTrackingSeparatorToolbarItem(").count - 1 == 1)
+        let toolbarItemFactory = try source(
+            "Sources/MacWiki/Views/Shared/WorkspaceToolbarItemFactory.swift"
+        )
+        #expect(toolbarItemFactory.components(separatedBy: "NSTrackingSeparatorToolbarItem(").count - 1 == 1)
         #expect(toolbar.contains("dividerIndex: 0"))
         #expect(toolbar.contains("dividerIndex: 1"))
         #expect(toolbar.contains("dividerIndex: 2"))
@@ -131,7 +146,7 @@ struct ReaderTopChromeLayoutTests {
         #expect(toolbar.contains("configuration.appState.goForward()"))
         #expect(toolbar.contains("configuration.appState.startSearch(context: .navigation)"))
         #expect(toolbar.contains("configuration.appState.presentFindOnPage()"))
-        #expect(toolbar.contains("configuration.appState.toggleInspectorVisibility()"))
+        #expect(toolbar.contains("splitController?.toggleInspector(sender)"))
         #expect(popoverPresenter.contains("SaveToListPopover(article: article)"))
         #expect(popoverPresenter.contains("ReaderStylePopover()"))
         #expect(popoverPresenter.contains("SidebarPageViewsPopoverContent("))

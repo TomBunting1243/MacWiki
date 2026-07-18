@@ -9,20 +9,40 @@ struct InspectorHeaderBar: View {
     }
 
     var body: some View {
+        inspectorModePicker
+            .padding(.horizontal, Layout.horizontalPadding)
+            .padding(.top, 2)
+            .frame(
+                maxWidth: .infinity,
+                maxHeight: .infinity,
+                alignment: .top
+            )
+            .frame(height: ColumnChromeMetrics.secondaryBarHeight)
+            .overlay(alignment: .bottom) {
+                Rectangle()
+                    .fill(Color.primary.opacity(ColumnChromeMetrics.dividerOpacity(for: colorScheme)))
+                    .frame(height: 0.5)
+            }
+    }
+
+    @ViewBuilder
+    private var inspectorModePicker: some View {
+        if #available(macOS 27, *) {
+            picker
+                .pickerStyle(.tabs)
+        } else {
+            picker
+                .pickerStyle(.segmented)
+        }
+    }
+
+    private var picker: some View {
         Picker("Inspector mode", selection: $selection) {
             Text("Info").tag(InspectorMode.info)
             Text("Notes").tag(InspectorMode.notes)
             Text("References").tag(InspectorMode.references)
         }
-        .pickerStyle(.segmented)
         .labelsHidden()
         .accessibilityLabel("Inspector mode")
-        .padding(.horizontal, Layout.horizontalPadding)
-        .frame(height: ColumnChromeMetrics.secondaryBarHeight)
-        .overlay(alignment: .bottom) {
-            Rectangle()
-                .fill(Color.primary.opacity(ColumnChromeMetrics.dividerOpacity(for: colorScheme)))
-                .frame(height: 0.5)
-        }
     }
 }

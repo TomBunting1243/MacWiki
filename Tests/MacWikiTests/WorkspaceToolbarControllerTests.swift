@@ -30,9 +30,24 @@ struct WorkspaceToolbarControllerTests {
         let rightBoundary = try #require(
             toolbar.items.firstIndex { $0.itemIdentifier == .workspaceReaderInspectorBoundary }
         )
+        let inspectorModesIndex = try #require(
+            toolbar.items.firstIndex { $0.itemIdentifier == .workspaceInspectorModes }
+        )
         for identifier in WorkspaceToolbarLayout.readerItemIdentifiers {
             let index = try #require(toolbar.items.firstIndex { $0.itemIdentifier == identifier })
             #expect(index < rightBoundary)
+        }
+        #expect(inspectorModesIndex == rightBoundary + 1)
+
+        let inspectorModes = try #require(
+            toolbar.items[inspectorModesIndex] as? NSToolbarItemGroup
+        )
+        #expect(inspectorModes.controlRepresentation == .expanded)
+        #expect(inspectorModes.selectionMode == .selectOne)
+        #expect(inspectorModes.selectedIndex == 0)
+        #expect(inspectorModes.subitems.map(\.label) == InspectorMode.allCases.map(\.rawValue))
+        if #available(macOS 27, *) {
+            #expect(inspectorModes.role == .tabs)
         }
 
         for item in toolbar.items where WorkspaceToolbarLayout.readerItemIdentifiers.contains(item.itemIdentifier) {
@@ -54,11 +69,25 @@ struct WorkspaceToolbarControllerTests {
         let toolbarIdentity = ObjectIdentifier(toolbar)
         let itemIdentities = toolbar.items.map(ObjectIdentifier.init)
         let itemOrder = toolbar.items.map(\.itemIdentifier)
+        let readItem = try #require(
+            toolbar.items.first { $0.itemIdentifier == .workspaceReadState }
+        )
+        let readImage = try #require(readItem.image)
+        let readPresentation = (readItem.label, readItem.toolTip, readItem.isEnabled)
+        let inspectorBoundary = try #require(
+            toolbar.items.first { $0.itemIdentifier == .workspaceReaderInspectorBoundary }
+        )
+        let inspectorModes = try #require(
+            toolbar.items.first { $0.itemIdentifier == .workspaceInspectorModes }
+                as? NSToolbarItemGroup
+        )
+        let inspectorModesIdentity = ObjectIdentifier(inspectorModes)
 
         for index in 0..<50 {
-            fixture.appState.inspectorMode = InspectorMode.allCases[
+            let mode = InspectorMode.allCases[
                 index % InspectorMode.allCases.count
             ]
+            fixture.appState.inspectorMode = mode
             fixture.toolbarController.update(
                 configuration: fixture.makeConfiguration()
             )
@@ -66,7 +95,49 @@ struct WorkspaceToolbarControllerTests {
             #expect(ObjectIdentifier(try #require(fixture.window.toolbar)) == toolbarIdentity)
             #expect(toolbar.items.map(ObjectIdentifier.init) == itemIdentities)
             #expect(toolbar.items.map(\.itemIdentifier) == itemOrder)
+            #expect(ObjectIdentifier(inspectorModes) == inspectorModesIdentity)
+            #expect(inspectorModes.selectedIndex == InspectorMode.allCases.firstIndex(of: mode))
+            #expect(readItem.image === readImage)
+            #expect((readItem.label, readItem.toolTip, readItem.isEnabled) == readPresentation)
         }
+
+        inspectorModes.selectedIndex = try #require(
+            InspectorMode.allCases.firstIndex(of: .references)
+        )
+        let action = try #require(inspectorModes.action)
+        let referencesSubitem = try #require(inspectorModes.subitems.last)
+        #expect(NSApp.sendAction(action, to: inspectorModes.target, from: referencesSubitem))
+        #expect(fixture.appState.inspectorMode == .references)
+
+        fixture.appState.inspectorVisible = false
+        fixture.toolbarController.update(configuration: fixture.makeConfiguration())
+        #expect(inspectorModes.isEnabled)
+        #expect(!inspectorModes.isHidden)
+        #expect(!inspectorBoundary.isHidden)
+        fixture.toolbarController.setInspectorPlaneVisible(false)
+        #expect(!inspectorModes.isEnabled)
+        #expect(inspectorModes.isHidden)
+        #expect(inspectorBoundary.isHidden)
+        #expect(ObjectIdentifier(inspectorModes) == inspectorModesIdentity)
+
+        fixture.appState.inspectorMode = .info
+        fixture.toolbarController.update(configuration: fixture.makeConfiguration())
+        #expect(!inspectorModes.isEnabled)
+        #expect(inspectorModes.isHidden)
+        #expect(inspectorBoundary.isHidden)
+        #expect(inspectorModes.selectedIndex == 0)
+        #expect(ObjectIdentifier(inspectorModes) == inspectorModesIdentity)
+
+        fixture.appState.inspectorVisible = true
+        fixture.toolbarController.update(configuration: fixture.makeConfiguration())
+        #expect(!inspectorModes.isEnabled)
+        #expect(inspectorModes.isHidden)
+        #expect(inspectorBoundary.isHidden)
+        fixture.toolbarController.setInspectorPlaneVisible(true)
+        #expect(inspectorModes.isEnabled)
+        #expect(!inspectorModes.isHidden)
+        #expect(!inspectorBoundary.isHidden)
+        #expect(ObjectIdentifier(inspectorModes) == inspectorModesIdentity)
     }
 
     @Test("Read action updates native presentation and persistence in both directions")
@@ -107,6 +178,57 @@ struct WorkspaceToolbarControllerTests {
         #expect(readItem.toolTip == "Mark as Read")
         #expect(readItem.image?.accessibilityDescription == "Mark as Read")
         #expect(persistedReadState.isRead == false)
+    }
+
+    @Test("Inspector action starts one native split and toolbar-plane transition")
+    func inspectorActionUsesNativeSplitTransition() throws {
+        let fixture = try makeFixture()
+        defer { fixture.tearDown() }
+        fixture.splitController.onInspectorToolbarVisibilityChange = {
+            fixture.toolbarController.setInspectorPlaneVisible($0)
+        }
+        fixture.toolbarController.install(on: fixture.window)
+        let toolbar = try #require(fixture.window.toolbar)
+        let toggle = try #require(
+            toolbar.items.first { $0.itemIdentifier == .workspaceInspectorToggle }
+        )
+        let modes = try #require(
+            toolbar.items.first { $0.itemIdentifier == .workspaceInspectorModes }
+        )
+        let boundary = try #require(
+            toolbar.items.first { $0.itemIdentifier == .workspaceReaderInspectorBoundary }
+        )
+
+        #expect(NSApp.sendAction(try #require(toggle.action), to: toggle.target, from: toggle))
+        #expect(modes.isHidden)
+        #expect(boundary.isHidden)
+        #expect(toggle.toolTip == "Show Inspector")
+    }
+
+    @Test("Divider collapse keeps Inspector toolbar chrome attached to the pane")
+    func dividerCollapseUpdatesInspectorToolbarPlane() throws {
+        let fixture = try makeFixture()
+        defer { fixture.tearDown() }
+        fixture.splitController.onInspectorToolbarVisibilityChange = {
+            fixture.toolbarController.setInspectorPlaneVisible($0)
+        }
+        fixture.toolbarController.install(on: fixture.window)
+        let toolbar = try #require(fixture.window.toolbar)
+        let modes = try #require(
+            toolbar.items.first { $0.itemIdentifier == .workspaceInspectorModes }
+        )
+        let boundary = try #require(
+            toolbar.items.first { $0.itemIdentifier == .workspaceReaderInspectorBoundary }
+        )
+        let inspectorItem = fixture.splitController.splitViewItems[3]
+
+        inspectorItem.isCollapsed = true
+        #expect(modes.isHidden)
+        #expect(boundary.isHidden)
+
+        inspectorItem.isCollapsed = false
+        #expect(!modes.isHidden)
+        #expect(!boundary.isHidden)
     }
 
     @Test("sharing and validation follow the live article and navigation lock")

@@ -17,6 +17,7 @@ extension NSToolbarItem.Identifier {
     static let workspaceShare = Self("com.macwiki.workspace.toolbar.share")
     static let workspaceInspectorToggle = Self("com.macwiki.workspace.toolbar.inspector-toggle")
     static let workspaceReaderInspectorBoundary = Self("com.macwiki.workspace.toolbar.boundary.reader-inspector")
+    static let workspaceInspectorModes = Self("com.macwiki.workspace.toolbar.inspector-modes")
 }
 
 enum WorkspaceToolbarLayout {
@@ -41,7 +42,8 @@ enum WorkspaceToolbarLayout {
         .workspaceOpenBrowser,
         .workspaceShare,
         .workspaceInspectorToggle,
-        .workspaceReaderInspectorBoundary
+        .workspaceReaderInspectorBoundary,
+        .workspaceInspectorModes
     ]
 
     static let readerItemIdentifiers: Set<NSToolbarItem.Identifier> = [

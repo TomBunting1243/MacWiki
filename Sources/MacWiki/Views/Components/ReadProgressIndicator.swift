@@ -22,8 +22,6 @@ private struct PieSlice: Shape {
 }
 
 struct ReadProgressIndicator: View {
-    @Environment(\.macWikiAccessibilityPersonalization.reduceMotion) private var reduceMotion
-
     let progress: Double
     let isRead: Bool
     let tint: Color
@@ -43,6 +41,5 @@ struct ReadProgressIndicator: View {
                 .strokeBorder(trackColor, lineWidth: lineWidth)
         }
         .frame(width: size, height: size)
-        .animation(reduceMotion ? nil : .easeInOut(duration: 0.15), value: fillProgress)
     }
 }

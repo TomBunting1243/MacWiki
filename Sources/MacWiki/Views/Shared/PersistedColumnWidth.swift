@@ -3,7 +3,7 @@ import SwiftUI
 enum MainWindowColumnWidth {
     static let sidebarRange: ClosedRange<CGFloat> = 176...260
     static let directoryRange: ClosedRange<CGFloat> = 260...420
-    static let inspectorRange: ClosedRange<CGFloat> = 270...460
+    static let inspectorRange: ClosedRange<CGFloat> = 320...460
 
     static func clampedStorageValue(
         _ width: CGFloat,
