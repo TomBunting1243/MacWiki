@@ -88,7 +88,6 @@ struct ReaderTabItemView: View {
     private var showsSemanticStatusCluster: Bool {
         !tab.isPlaceholder &&
         tabWidth >= 132 &&
-        isActive &&
         (showsSavedMarker || showsHighlightMarker || showsReadMarker)
     }
 
@@ -96,7 +95,6 @@ struct ReaderTabItemView: View {
         showProgressTrack &&
         !tab.isPlaceholder &&
         tabWidth >= 132 &&
-        isActive &&
         (normalizedProgress > 0.12 || isReadComplete)
     }
 
@@ -247,21 +245,50 @@ struct ReaderTabItemView: View {
     @ViewBuilder
     private var tabSelectionBackground: some View {
         let darkMode = colorScheme == .dark
+        let reduceTransparency = accessibilityPersonalization.reduceTransparency
         let shape = RoundedRectangle(cornerRadius: tabCornerRadius, style: .continuous)
         shape
             .fill(
                 isActive
                     ? Color(nsColor: .selectedContentBackgroundColor)
-                        .opacity(isKeyWindow ? (darkMode ? 0.24 : 0.18) : 0.09)
-                    : Color.primary.opacity(isHovered ? (darkMode ? 0.075 : 0.055) : 0)
+                        .opacity(
+                            reduceTransparency
+                                ? (darkMode ? 0.36 : 0.28)
+                                : (isKeyWindow ? (darkMode ? 0.24 : 0.18) : 0.09)
+                        )
+                    : Color.primary.opacity(
+                        max(
+                            TabChromeHierarchy.inactiveSurfaceOpacity(
+                                darkMode: darkMode,
+                                isHovered: isHovered
+                            ),
+                            reduceTransparency ? (darkMode ? 0.065 : 0.040) : 0
+                        )
+                    )
             )
             .overlay {
-                if accessibilityPersonalization.reduceTransparency || increasedContrast {
-                    shape.strokeBorder(
-                        Color.primary.opacity(increasedContrast ? 0.30 : (isActive ? 0.15 : 0.08)),
-                        lineWidth: increasedContrast ? 1 : 0.5
-                    )
-                }
+                shape.strokeBorder(
+                    isActive
+                        ? Color.accentColor.opacity(
+                            TabChromeHierarchy.borderOpacity(
+                                isActive: true,
+                                isHovered: isHovered,
+                                isKeyWindow: isKeyWindow,
+                                darkMode: darkMode,
+                                increasedContrast: increasedContrast
+                            )
+                        )
+                        : Color(nsColor: .separatorColor).opacity(
+                            TabChromeHierarchy.borderOpacity(
+                                isActive: false,
+                                isHovered: isHovered,
+                                isKeyWindow: isKeyWindow,
+                                darkMode: darkMode,
+                                increasedContrast: increasedContrast
+                            )
+                        ),
+                    lineWidth: increasedContrast ? 1 : 0.5
+                )
             }
     }
 
@@ -313,6 +340,7 @@ struct ReaderTabItemView: View {
             }
         }
         .padding(.trailing, 1)
+        .opacity(isActive ? 1 : 0.82)
         .accessibilityHidden(true)
     }
 
@@ -324,12 +352,24 @@ struct ReaderTabItemView: View {
 
             ZStack(alignment: .leading) {
                 Capsule(style: .continuous)
-                    .fill(Color.primary.opacity(TabChromeHierarchy.progressTrackOpacity(darkMode: darkMode)))
+                    .fill(
+                        Color.primary.opacity(
+                            TabChromeHierarchy.progressTrackOpacity(
+                                darkMode: darkMode,
+                                isActive: isActive
+                            )
+                        )
+                    )
 
                 Capsule(style: .continuous)
                     .fill(
                         Color.primary
-                            .opacity(TabChromeHierarchy.progressFillOpacity(darkMode: darkMode))
+                            .opacity(
+                                TabChromeHierarchy.progressFillOpacity(
+                                    darkMode: darkMode,
+                                    isActive: isActive
+                                )
+                            )
                     )
                     .frame(width: fillWidth)
             }

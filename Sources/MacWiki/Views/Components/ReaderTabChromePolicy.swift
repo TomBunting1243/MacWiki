@@ -24,12 +24,44 @@ enum TabChromeHierarchy {
         darkMode ? 0.84 : 0.82
     }
 
-    static func progressTrackOpacity(darkMode: Bool) -> Double {
-        darkMode ? 0.09 : 0.07
+    static func inactiveSurfaceOpacity(darkMode: Bool, isHovered: Bool) -> Double {
+        if isHovered {
+            return darkMode ? 0.075 : 0.055
+        }
+        return darkMode ? 0.035 : 0.018
     }
 
-    static func progressFillOpacity(darkMode: Bool) -> Double {
-        darkMode ? 0.54 : 0.46
+    static func borderOpacity(
+        isActive: Bool,
+        isHovered: Bool,
+        isKeyWindow: Bool,
+        darkMode: Bool,
+        increasedContrast: Bool
+    ) -> Double {
+        if increasedContrast {
+            return isKeyWindow ? 0.72 : 0.52
+        }
+        if isActive {
+            return isKeyWindow ? (darkMode ? 0.34 : 0.28) : 0.20
+        }
+        if isHovered {
+            return darkMode ? 0.88 : 0.96
+        }
+        return darkMode ? 0.62 : 0.78
+    }
+
+    static func progressTrackOpacity(darkMode: Bool, isActive: Bool) -> Double {
+        if isActive {
+            return darkMode ? 0.09 : 0.07
+        }
+        return darkMode ? 0.11 : 0.09
+    }
+
+    static func progressFillOpacity(darkMode: Bool, isActive: Bool) -> Double {
+        if isActive {
+            return darkMode ? 0.54 : 0.46
+        }
+        return darkMode ? 0.48 : 0.40
     }
 
     static func activeLiftYOffset() -> CGFloat {

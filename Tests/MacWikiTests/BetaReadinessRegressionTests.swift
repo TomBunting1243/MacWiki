@@ -49,6 +49,35 @@ struct BetaReadinessRegressionTests {
         #expect(value == "Active tab, saved, has highlights, 62% read")
     }
 
+    @Test func inactiveTabsRetainBoundariesAndReadingAccompaniments() throws {
+        let tabItem = try source("Sources/MacWiki/Views/Components/ReaderTabItemView.swift")
+        let statusVisibility = sourceSection(
+            tabItem,
+            startingAt: "private var showsSemanticStatusCluster",
+            endingBefore: "private var showsProgressTrack"
+        )
+        let progressVisibility = sourceSection(
+            tabItem,
+            startingAt: "private var showsProgressTrack",
+            endingBefore: "private var tabAccessibilityValue"
+        )
+
+        #expect(!statusVisibility.contains("isActive"))
+        #expect(!progressVisibility.contains("isActive"))
+        #expect(tabItem.contains("Color(nsColor: .separatorColor).opacity("))
+        #expect(TabChromeHierarchy.borderOpacity(
+            isActive: false,
+            isHovered: false,
+            isKeyWindow: true,
+            darkMode: false,
+            increasedContrast: false
+        ) > 0)
+        #expect(TabChromeHierarchy.progressFillOpacity(
+            darkMode: false,
+            isActive: false
+        ) > 0)
+    }
+
     @Test func articleListRowsExposeArticleIdentityAndIndependentReadAction() throws {
         let rowSource = try source("Sources/MacWiki/Views/Sidebar/Directory/ArticleListAccessibility.swift")
         #expect(!rowSource.contains(".accessibilityElement(children: .contain)"))

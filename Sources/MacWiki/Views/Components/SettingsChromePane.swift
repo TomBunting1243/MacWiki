@@ -33,7 +33,7 @@ struct SettingsChromePane: View {
                 Toggle("Reading Progress Rail", isOn: $showTabProgressTrack)
                 Toggle("Active Tab Depth", isOn: $showTabActiveDepth)
 
-                SettingsHelpText("These power-user cues make saved, highlighted, read, and active-depth state visible directly in the reader tab strip.")
+                SettingsHelpText("These power-user cues keep saved, highlighted, read, and reading-position state visible across the reader tab strip, including inactive tabs.")
             }
         }
     }
