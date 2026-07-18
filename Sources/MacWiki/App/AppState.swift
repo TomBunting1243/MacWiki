@@ -354,6 +354,8 @@ final class AppState {
         let id: UUID
         let text: String
         let cssColor: String
+        let elementPath: String
+        let startOffset: Int
         let contextBefore: String
         let contextAfter: String
     }

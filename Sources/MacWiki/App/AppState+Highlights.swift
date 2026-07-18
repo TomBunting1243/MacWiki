@@ -25,6 +25,8 @@ extension AppState.HighlightRehydrateRequest {
             id: highlight.id,
             text: highlight.text,
             cssColor: highlight.color.cssColor,
+            elementPath: highlight.elementPath ?? "",
+            startOffset: highlight.startOffset,
             contextBefore: highlight.contextBefore ?? "",
             contextAfter: highlight.contextAfter ?? ""
         )
@@ -35,6 +37,8 @@ extension AppState.HighlightRehydrateRequest {
             id: highlight.id,
             text: highlight.text,
             cssColor: highlight.color.cssColor,
+            elementPath: highlight.elementPath ?? "",
+            startOffset: highlight.startOffset,
             contextBefore: highlight.contextBefore ?? "",
             contextAfter: highlight.contextAfter ?? ""
         )

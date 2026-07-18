@@ -529,6 +529,8 @@ struct WebView: NSViewRepresentable {
                 "id": pending.id.uuidString,
                 "text": pending.text,
                 "color": pending.cssColor,
+                "elementPath": pending.elementPath,
+                "startOffset": pending.startOffset,
                 "contextBefore": pending.contextBefore,
                 "contextAfter": pending.contextAfter
             ]

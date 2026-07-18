@@ -108,7 +108,7 @@ struct InspectorPanel: View {
         }
         .overlay(alignment: .bottom) {
             if appState.isHighlightRehydrateInProgress {
-                HighlightToastView(toast: HighlightRehydrateToast(message: "Rehydrating…", isSuccess: true), showsSpinner: true)
+                HighlightToastView(toast: HighlightRehydrateToast(message: "Restoring highlight…", isSuccess: true), showsSpinner: true)
                     .padding(.horizontal, 16)
                     .padding(.bottom, 12)
                     .transition(toastTransition)
@@ -124,7 +124,7 @@ struct InspectorPanel: View {
         .onChange(of: appState.lastHighlightRehydrateResult) { _, newValue in
             guard let result = newValue else { return }
             let toast = HighlightRehydrateToast(
-                message: result.success ? "Rehydrate succeeded" : "Rehydrate failed",
+                message: result.success ? "Highlight restored" : "Highlight couldn’t be found",
                 isSuccess: result.success
             )
             withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2)) {

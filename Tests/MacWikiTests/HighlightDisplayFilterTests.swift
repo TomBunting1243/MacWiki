@@ -45,6 +45,10 @@ struct HighlightDisplayFilterTests {
             text: "[note 2]",
             sectionTitle: "Notes"
         ))
+        #expect(HighlightDisplayFilter.isCitationNoise(
+            text: "[1][2][3–5]",
+            sectionTitle: "History"
+        ))
     }
 
     @Test func filtersObviousReferenceRowsButKeepsRegularProse() {

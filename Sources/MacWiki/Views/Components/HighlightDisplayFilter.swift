@@ -70,10 +70,7 @@ enum HighlightDisplayFilter {
             "external links"
         ].contains(sectionTitle)
 
-        let isBareReferenceMarker = text.range(
-            of: #"^\[(?:\d+|note\s+\d+|[a-z])\]$"#,
-            options: [.regularExpression, .caseInsensitive]
-        ) != nil
+        let isBareReferenceMarker = HighlightNoteText.displayText(for: text).isEmpty
         if isBareReferenceMarker {
             return true
         }

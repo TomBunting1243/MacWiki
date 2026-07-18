@@ -230,6 +230,8 @@ struct AppStateBoundaryTests {
             id: highlightID,
             text: "important",
             cssColor: "#ffd60a",
+            elementPath: "p[1]",
+            startOffset: 4,
             contextBefore: "very ",
             contextAfter: " text"
         )

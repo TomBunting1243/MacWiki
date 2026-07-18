@@ -88,7 +88,7 @@ struct NativeDesignRegressionTests {
         #expect(inspectorModes.contains(".priority: priority.rawValue"))
         #expect(inspectorModes.contains("showsSpinner || toast.isSuccess ? .medium : .high"))
         #expect(inspectorPanel.contains("appState.isHighlightRehydrateInProgress"))
-        #expect(inspectorPanel.contains("result.success ? \"Rehydrate succeeded\" : \"Rehydrate failed\""))
+        #expect(inspectorPanel.contains("result.success ? \"Highlight restored\" : \"Highlight couldn’t be found\""))
         #expect(inspectorPanel.contains("VSplitView"))
         #expect(inspectorPanel.contains("ScrollViewReader"))
         #expect(inspectorPanel.contains("tableOfContentsSection"))

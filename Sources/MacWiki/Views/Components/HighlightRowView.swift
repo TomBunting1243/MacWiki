@@ -100,13 +100,13 @@ struct HighlightRowView: View {
             labelRow
 
             if isExpanded {
-                Text(highlight.text)
+                Text(displayedHighlightText)
                     .font(.callout)
                     .lineSpacing(2)
                     .foregroundStyle(.primary)
                     .layoutPriority(1)
             } else {
-                Text(highlight.text)
+                Text(displayedHighlightText)
                     .font(.callout)
                     .lineLimit(3)
                     .lineSpacing(2)
@@ -262,7 +262,7 @@ struct HighlightRowView: View {
         Divider()
 
         Button {
-            _ = SystemBridge.copyText(highlight.text)
+            _ = SystemBridge.copyText(displayedHighlightText)
         } label: {
             SwiftUI.Label("Copy Text", systemImage: "doc.on.doc")
         }
@@ -392,6 +392,10 @@ struct HighlightRowView: View {
             return section
         }
         return "Overview"
+    }
+
+    private var displayedHighlightText: String {
+        HighlightNoteText.displayText(for: highlight.text)
     }
 
     private var noteEditor: some View {

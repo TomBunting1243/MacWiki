@@ -45,6 +45,8 @@ struct InspectorHighlightSnapshot: Identifiable, Equatable {
     let note: String?
     let color: HighlightColor
     let articleTitle: String
+    let elementPath: String?
+    let startOffset: Int
     let contextBefore: String?
     let contextAfter: String?
     let sectionTitle: String?
@@ -59,6 +61,8 @@ struct InspectorHighlightSnapshot: Identifiable, Equatable {
         note = highlight.note
         color = highlight.color
         articleTitle = highlight.articleTitle
+        elementPath = highlight.elementPath
+        startOffset = highlight.startOffset
         contextBefore = highlight.contextBefore
         contextAfter = highlight.contextAfter
         sectionTitle = highlight.sectionTitle
@@ -122,6 +126,8 @@ struct InspectorArticleSnapshotRefreshKey: Hashable {
         let note: String?
         let colorRaw: String
         let articleTitle: String
+        let elementPath: String?
+        let startOffset: Int
         let contextBefore: String?
         let contextAfter: String?
         let sectionTitle: String?
@@ -138,6 +144,8 @@ struct InspectorArticleSnapshotRefreshKey: Hashable {
             note = highlight.note
             colorRaw = highlight.colorRaw
             articleTitle = highlight.articleTitle
+            elementPath = highlight.elementPath
+            startOffset = highlight.startOffset
             contextBefore = highlight.contextBefore
             contextAfter = highlight.contextAfter
             sectionTitle = highlight.sectionTitle

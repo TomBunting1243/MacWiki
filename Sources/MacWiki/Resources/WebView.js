@@ -2645,7 +2645,9 @@ window.applyHighlights = function (highlights) {
             h.contextBefore,
             h.contextAfter,
             searchCache,
-            false
+            false,
+            h.elementPath || '',
+            Number.isInteger(h.startOffset) ? h.startOffset : 0
         );
         if (success) {
             successCount++;
@@ -2675,7 +2677,9 @@ window.retryHighlight = function (payload) {
         payload.contextBefore,
         payload.contextAfter,
         searchCache,
-        true
+        true,
+        payload.elementPath || '',
+        Number.isInteger(payload.startOffset) ? payload.startOffset : 0
     );
 };
 
@@ -2712,13 +2716,33 @@ window.scrollToHighlight = function (id) {
 };
 
 // Restore a single highlight by finding text in document
-function restoreHighlight(id, text, color, contextBefore, contextAfter, searchCache, allowNormalizedFallback) {
+function restoreHighlight(
+    id,
+    text,
+    color,
+    contextBefore,
+    contextAfter,
+    searchCache,
+    allowNormalizedFallback,
+    elementPath,
+    startOffset
+) {
     if (!text || text.length === 0) return false;
 
-    // Find text using character offset approach
-    var range = findTextRange(text, contextBefore, contextAfter, searchCache);
+    // Prefer the stored DOM path. It is both faster and less ambiguous when the
+    // same quote occurs several times, while the document-wide context search
+    // remains the resilience fallback when Wikipedia changes its structure.
+    var range = findTextRangeInAnchoredElement(
+        text,
+        elementPath,
+        startOffset,
+        allowNormalizedFallback
+    );
+    if (!range) {
+        range = findTextRange(text, contextBefore, contextAfter, searchCache, document.body);
+    }
     if (!range && allowNormalizedFallback) {
-        range = findTextRangeNormalized(text, searchCache);
+        range = findTextRangeNormalized(text, searchCache, document.body);
     }
     if (!range) {
         return false;
@@ -2742,6 +2766,58 @@ function restoreHighlight(id, text, color, contextBefore, contextAfter, searchCa
     } else {
         return highlightWithMarks(id, range, color);
     }
+}
+
+function elementForStoredPath(elementPath) {
+    if (!elementPath || typeof elementPath !== 'string') return null;
+
+    var current = document.body;
+    var segments = elementPath.split('/').filter(Boolean);
+    for (var i = 0; i < segments.length; i++) {
+        var match = /^([A-Za-z][A-Za-z0-9-]*)\[(\d+)\]$/.exec(segments[i]);
+        if (!match) return null;
+
+        var expectedTag = match[1].toLowerCase();
+        var expectedIndex = Number(match[2]);
+        if (!Number.isInteger(expectedIndex) || expectedIndex < 1) return null;
+
+        var matchingIndex = 0;
+        var resolvedChild = null;
+        for (var childIndex = 0; childIndex < current.children.length; childIndex++) {
+            var child = current.children[childIndex];
+            if (child.tagName.toLowerCase() !== expectedTag) continue;
+            matchingIndex++;
+            if (matchingIndex === expectedIndex) {
+                resolvedChild = child;
+                break;
+            }
+        }
+
+        if (!resolvedChild) return null;
+        current = resolvedChild;
+    }
+
+    return current === document.body ? null : current;
+}
+
+function findTextRangeInAnchoredElement(text, elementPath, startOffset, allowNormalizedFallback) {
+    var element = elementForStoredPath(elementPath);
+    if (!element) return null;
+
+    var searchText = text.trim();
+    if (!searchText) return null;
+
+    var elementCache = buildTextSearchCache(element);
+    var offset = Number.isInteger(startOffset) ? startOffset : -1;
+    if (offset >= 0 && elementCache.bodyText.slice(offset, offset + searchText.length) === searchText) {
+        return createRangeFromOffsets(element, offset, offset + searchText.length, elementCache);
+    }
+
+    var range = findTextRange(text, '', '', elementCache, element);
+    if (!range && allowNormalizedFallback) {
+        range = findTextRangeNormalized(text, elementCache, element);
+    }
+    return range;
 }
 
 function buildTextSearchCache(root) {
@@ -2792,7 +2868,7 @@ function findTextNodeEntryForOffset(textNodes, offset) {
 }
 
 // Find text and create a Range object
-function findTextRange(text, contextBefore, contextAfter, searchCache) {
+function findTextRange(text, contextBefore, contextAfter, searchCache, root) {
     var bodyText =
         (searchCache && typeof searchCache.bodyText === 'string')
             ? searchCache.bodyText
@@ -2836,7 +2912,7 @@ function findTextRange(text, contextBefore, contextAfter, searchCache) {
     var endIndex = startIndex + searchText.length;
 
     // Convert character offsets to Range
-    return createRangeFromOffsets(document.body, startIndex, endIndex, searchCache);
+    return createRangeFromOffsets(root || document.body, startIndex, endIndex, searchCache);
 }
 
 function normalizeTextForSearch(text) {
@@ -2886,7 +2962,7 @@ function normalizeSearchText(text) {
     return normalized.trim();
 }
 
-function findTextRangeNormalized(text, searchCache) {
+function findTextRangeNormalized(text, searchCache, root) {
     var bodyText =
         (searchCache && typeof searchCache.bodyText === 'string')
             ? searchCache.bodyText
@@ -2903,7 +2979,7 @@ function findTextRangeNormalized(text, searchCache) {
     if (endIndex < 0 || endIndex >= normalizedBody.indexMap.length) return null;
     var endOffset = normalizedBody.indexMap[endIndex] + 1;
 
-    return createRangeFromOffsets(document.body, startOffset, endOffset, searchCache);
+    return createRangeFromOffsets(root || document.body, startOffset, endOffset, searchCache);
 }
 
 // Create Range from character offsets
