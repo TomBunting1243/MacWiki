@@ -312,6 +312,7 @@ struct ArticleView: View {
     @State private var isHoveringLinkHoverPreview = false
     @State private var pendingLinkHoverRevealHapticTask: Task<Void, Never>?
     @State private var lastLinkHoverRevealHapticTimestamp: TimeInterval = 0
+    @State private var isTableOfContentsOverlayExpanded = false
     @AppStorage(ReaderAppearanceStorageKey.fontPreset) private var readerFontPreset: ReaderFontPreset = ReaderAppearance.default.fontPreset
     @AppStorage(ReaderAppearanceStorageKey.fontSize) private var readerFontSize: Double = ReaderAppearance.default.fontSize
     @AppStorage(ReaderAppearanceStorageKey.lineHeight) private var readerLineHeight: Double = ReaderAppearance.default.lineHeight
@@ -320,6 +321,7 @@ struct ArticleView: View {
     @AppStorage(ReaderAppearanceStorageKey.horizontalPadding) private var readerHorizontalPadding: Double = ReaderAppearance.default.horizontalPadding
     @AppStorage(ReaderAppearanceStorageKey.headingScale) private var readerHeadingScale: Double = ReaderAppearance.default.headingScale
     @AppStorage(AppStorageKey.Reader.linkPreviewImmediateModifier) private var linkPreviewImmediateModifier: ReaderLinkPreviewImmediateModifier = .default
+    @AppStorage(AppStorageKey.Reader.tableOfContentsPlacement) private var tableOfContentsPlacement: ReaderTableOfContentsPlacement = .inspector
     @AppStorage(AppStorageKey.Chrome.liquidGlassChrome) private var liquidGlassChrome = true
     @AppStorage(MacWikiGlassRuntime.forceLegacyFallbackKey) private var forceLegacyGlassFallback = false
 
@@ -500,6 +502,25 @@ struct ArticleView: View {
                     .zIndex(6)
             }
         }
+        .overlay(alignment: tableOfContentsOverlayAlignment) {
+            if tableOfContentsPlacement.usesReaderOverlay,
+               !appState.currentArticleTableOfContents.isEmpty {
+                ReaderTableOfContentsOverlay(
+                    items: appState.currentArticleTableOfContents,
+                    activeSectionID: appState.currentVisibleTableOfContentsSectionId,
+                    placement: tableOfContentsPlacement,
+                    isExpanded: $isTableOfContentsOverlayExpanded,
+                    onSelect: { sectionID in
+                        appState.pendingTableOfContentsScrollTarget = sectionID
+                    }
+                )
+                .padding(.horizontal, 12)
+                .padding(.top, tableOfContentsOverlayTopPadding)
+                .padding(.bottom, 12)
+                .transition(tableOfContentsOverlayTransition)
+                .zIndex(5)
+            }
+        }
         .overlay(alignment: .bottom) {
             // Show "Mark as read?" prompt when scrolled significantly and article is unread
             if showMarkAsReadPrompt && isArticleUnreadState {
@@ -562,6 +583,9 @@ struct ArticleView: View {
                 await refreshArticleForHighlightReconciliation(request: request)
             }
         }
+        .onChange(of: tableOfContentsPlacement) { _, _ in
+            isTableOfContentsOverlayExpanded = false
+        }
         .onChange(of: scrollPosition) { oldValue, newValue in
             promptPolicy.noteScrollChange(oldValue: oldValue, newValue: newValue)
         }
@@ -573,6 +597,24 @@ struct ArticleView: View {
             reduceMotion ? nil : ReaderMotion.promptSpring,
             value: showMarkAsReadPrompt
         )
+    }
+
+    private var tableOfContentsOverlayAlignment: Alignment {
+        tableOfContentsPlacement == .readerLeading ? .topLeading : .topTrailing
+    }
+
+    private var tableOfContentsOverlayTopPadding: CGFloat {
+        findOnPageTopPadding + (
+            tableOfContentsPlacement == .readerTrailing && appState.showFindOnPage
+                ? 46
+                : 0
+        )
+    }
+
+    private var tableOfContentsOverlayTransition: AnyTransition {
+        guard !reduceMotion else { return .opacity }
+        let edge: Edge = tableOfContentsPlacement == .readerLeading ? .leading : .trailing
+        return .move(edge: edge).combined(with: .opacity)
     }
 
     @ViewBuilder

@@ -8,6 +8,7 @@ struct ReaderStylePopover: View {
     @AppStorage(ReaderAppearanceStorageKey.contentWidth) private var readerContentWidth: Double = ReaderAppearance.default.contentWidth
     @AppStorage(ReaderAppearanceStorageKey.horizontalPadding) private var readerHorizontalPadding: Double = ReaderAppearance.default.horizontalPadding
     @AppStorage(ReaderAppearanceStorageKey.headingScale) private var readerHeadingScale: Double = ReaderAppearance.default.headingScale
+    @AppStorage(AppStorageKey.Reader.tableOfContentsPlacement) private var tableOfContentsPlacement: ReaderTableOfContentsPlacement = .inspector
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -79,6 +80,16 @@ struct ReaderStylePopover: View {
                 step: 0.01,
                 valueText: readerHeadingScale.formatted(.number.precision(.fractionLength(2))) + "x"
             )
+
+            Divider()
+
+            Picker("Contents", selection: $tableOfContentsPlacement) {
+                ForEach(ReaderTableOfContentsPlacement.allCases) { placement in
+                    Text(placement.rawValue).tag(placement)
+                }
+            }
+            .pickerStyle(.menu)
+            .help(tableOfContentsPlacement.helpText)
         }
         .padding(14)
         .frame(width: 320)

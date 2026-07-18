@@ -69,6 +69,7 @@ struct SettingsPreferencesPersistenceTests {
             .double(id: "reading.horizontalPadding", storageKey: ReaderAppearanceStorageKey.horizontalPadding, value: 56),
             .double(id: "reading.headingScale", storageKey: ReaderAppearanceStorageKey.headingScale, value: 1.08),
             .string(id: "reading.linkPreviewImmediateModifier", storageKey: AppStorageKey.Reader.linkPreviewImmediateModifier, value: ReaderLinkPreviewImmediateModifier.off.rawValue),
+            .string(id: "reading.tableOfContentsPlacement", storageKey: AppStorageKey.Reader.tableOfContentsPlacement, value: ReaderTableOfContentsPlacement.readerTrailing.rawValue),
             .string(id: "library.sidebarSortOrder", storageKey: AppStorageKey.ListsSidebar.sortOrder, value: ListSortOrder.name.rawValue),
             .string(id: "library.defaultSaveList", storageKey: AppStorageKey.OptionClickSave.defaultListID, value: UUID(uuidString: "11111111-1111-1111-1111-111111111111")!.uuidString),
             .string(id: "library.labelDisplayMode", storageKey: AppStorageKey.Labels.displayMode, value: LabelDisplayMode.coloredDot.rawValue),
@@ -117,6 +118,8 @@ struct SettingsPreferencesPersistenceTests {
             "Heading Scale"
         case "reading.linkPreviewImmediateModifier":
             "Immediate Reveal"
+        case "reading.tableOfContentsPlacement":
+            "Location"
         case "library.sidebarSortOrder":
             "Sidebar Sort"
         case "library.defaultSaveList":

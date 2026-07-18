@@ -56,7 +56,7 @@ public enum SettingsCatalog {
         SettingsCatalogSection(
             id: .reading,
             title: "Reading",
-            summary: "Reader typography, page width, spacing, and link preview behavior.",
+            summary: "Reader typography, page width, spacing, Contents placement, and link preview behavior.",
             systemImage: "textformat.size",
             options: [
                 option(
@@ -138,6 +138,16 @@ public enum SettingsCatalog {
                     control: "Picker",
                     values: ["Off", "Command"],
                     codeReference: "AppStorageKey.Reader.linkPreviewImmediateModifier"
+                ),
+                option(
+                    id: "reading.tableOfContentsPlacement",
+                    title: "Contents Location",
+                    summary: "Keeps article Contents in the Inspector or moves it to a temporary Reader-edge overlay.",
+                    storageKey: "reader.tableOfContentsPlacement",
+                    defaultValue: "Inspector",
+                    control: "Picker",
+                    values: ["Inspector", "Left Overlay", "Right Overlay"],
+                    codeReference: "AppStorageKey.Reader.tableOfContentsPlacement"
                 )
             ]
         ),

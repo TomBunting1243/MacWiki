@@ -16,6 +16,7 @@ struct InspectorPanel: View {
     @State private var articleSnapshot = InspectorArticleSnapshot.empty
     @State private var showStaleHighlights = true
     @State private var showArchivedHighlights = false
+    @AppStorage(AppStorageKey.Reader.tableOfContentsPlacement) private var tableOfContentsPlacement: ReaderTableOfContentsPlacement = .inspector
     @State private var selectedReferenceIDs: Set<String> = []
     let includesHeader: Bool
 
@@ -170,14 +171,19 @@ struct InspectorPanel: View {
     private var infoContent: some View {
         Group {
             if let article = appState.currentArticle {
-                VSplitView {
-                    infoDetails(article)
-                        .frame(minHeight: InspectorLayout.detailsMinimumHeight)
+                if tableOfContentsPlacement == .inspector {
+                    VSplitView {
+                        infoDetails(article)
+                            .frame(minHeight: InspectorLayout.detailsMinimumHeight)
 
-                    tableOfContentsPane
-                        .frame(minHeight: InspectorLayout.contentsMinimumHeight)
+                        tableOfContentsPane
+                            .frame(minHeight: InspectorLayout.contentsMinimumHeight)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                } else {
+                    infoDetails(article)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             } else {
                 ColumnEmptyStateView(
                     title: "No Article",

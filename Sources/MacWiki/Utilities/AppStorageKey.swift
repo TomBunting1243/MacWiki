@@ -8,6 +8,7 @@ enum AppStorageKey {
 
     enum Reader {
         static let linkPreviewImmediateModifier = "reader.linkPreviewImmediateModifier"
+        static let tableOfContentsPlacement = "reader.tableOfContentsPlacement"
     }
 
     enum Search {

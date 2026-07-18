@@ -10,6 +10,7 @@ struct SettingsReadingPane: View {
     @AppStorage(ReaderAppearanceStorageKey.horizontalPadding) private var readerHorizontalPadding: Double = ReaderAppearance.default.horizontalPadding
     @AppStorage(ReaderAppearanceStorageKey.headingScale) private var readerHeadingScale: Double = ReaderAppearance.default.headingScale
     @AppStorage(AppStorageKey.Reader.linkPreviewImmediateModifier) private var linkPreviewImmediateModifier: ReaderLinkPreviewImmediateModifier = .default
+    @AppStorage(AppStorageKey.Reader.tableOfContentsPlacement) private var tableOfContentsPlacement: ReaderTableOfContentsPlacement = .inspector
 
     var body: some View {
         let section = SettingsCatalog.section(.reading)
@@ -114,6 +115,17 @@ struct SettingsReadingPane: View {
                 .pickerStyle(.menu)
 
                 SettingsHelpText("Command reveals a linked article preview immediately while preserving Command-click for opening the linked article in a new tab.")
+            }
+
+            SettingsGroup("Contents", systemImage: "list.bullet.indent") {
+                Picker("Location", selection: $tableOfContentsPlacement) {
+                    ForEach(ReaderTableOfContentsPlacement.allCases) { placement in
+                        Text(placement.rawValue).tag(placement)
+                    }
+                }
+                .pickerStyle(.segmented)
+
+                SettingsHelpText(tableOfContentsPlacement.helpText)
             }
         }
     }
