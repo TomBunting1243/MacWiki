@@ -297,8 +297,17 @@ struct BetaReadinessRegressionTests {
         #expect(sidebar.contains("title: \"New Tag\""))
         #expect(sidebar.contains("identifier: \"sidebar-new-tag-empty\""))
         #expect(sidebar.contains("SidebarEmptyCollectionButton("))
-        #expect(emptyCollectionButton.contains("button.setAccessibilityLabel(title)"))
-        #expect(emptyCollectionButton.contains("button.setAccessibilityIdentifier(identifier)"))
+        #expect(emptyCollectionButton.contains("button.setAccessibilityLabel(configuration.title)"))
+        #expect(emptyCollectionButton.contains("button.setAccessibilityIdentifier(configuration.identifier)"))
+        #expect(emptyCollectionButton.contains(
+            "guard context.coordinator.configuration != configuration else { return }"
+        ))
+        #expect(emptyCollectionButton.contains("configureBaseAppearance(of: button)"))
+        #expect(!sourceSection(
+            emptyCollectionButton,
+            startingAt: "func updateNSView",
+            endingBefore: "private var configuration"
+        ).contains("configureBaseAppearance"))
     }
 
     @Test func iconOnlyReaderAndFilterControlsExposeState() throws {

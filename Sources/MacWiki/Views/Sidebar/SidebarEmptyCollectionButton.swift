@@ -4,6 +4,12 @@ import SwiftUI
 /// A native unbordered sidebar action used where SwiftUI drops button titles
 /// from the macOS accessibility tree inside an otherwise empty `List` section.
 struct SidebarEmptyCollectionButton: NSViewRepresentable {
+    fileprivate struct Configuration: Equatable {
+        let title: String
+        let systemImage: String
+        let identifier: String
+    }
+
     let title: String
     let systemImage: String
     let identifier: String
@@ -21,32 +27,59 @@ struct SidebarEmptyCollectionButton: NSViewRepresentable {
             target: context.coordinator,
             action: #selector(Coordinator.performAction)
         )
-        configure(button, coordinator: context.coordinator)
+        configureBaseAppearance(of: button)
+        apply(configuration, to: button, coordinator: context.coordinator)
         return button
     }
 
     func updateNSView(_ button: NSButton, context: Context) {
-        configure(button, coordinator: context.coordinator)
+        context.coordinator.action = action
+        guard context.coordinator.configuration != configuration else { return }
+        apply(configuration, to: button, coordinator: context.coordinator)
     }
 
-    private func configure(_ button: NSButton, coordinator: Coordinator) {
-        coordinator.action = action
-        button.title = title
-        button.image = NSImage(systemSymbolName: systemImage, accessibilityDescription: nil)
+    private var configuration: Configuration {
+        Configuration(title: title, systemImage: systemImage, identifier: identifier)
+    }
+
+    private func configureBaseAppearance(of button: NSButton) {
         button.imagePosition = .imageLeading
         button.imageScaling = .scaleProportionallyDown
         button.isBordered = false
         button.alignment = .left
         button.controlSize = .small
         button.contentTintColor = .secondaryLabelColor
-        button.setAccessibilityLabel(title)
         button.setAccessibilityRole(.button)
-        button.setAccessibilityIdentifier(identifier)
+    }
+
+    private func apply(
+        _ configuration: Configuration,
+        to button: NSButton,
+        coordinator: Coordinator
+    ) {
+        let previous = coordinator.configuration
+        coordinator.action = action
+
+        if previous?.title != configuration.title {
+            button.title = configuration.title
+            button.setAccessibilityLabel(configuration.title)
+        }
+        if previous?.systemImage != configuration.systemImage {
+            button.image = NSImage(
+                systemSymbolName: configuration.systemImage,
+                accessibilityDescription: nil
+            )
+        }
+        if previous?.identifier != configuration.identifier {
+            button.setAccessibilityIdentifier(configuration.identifier)
+        }
+        coordinator.configuration = configuration
     }
 
     @MainActor
     final class Coordinator: NSObject {
         var action: () -> Void
+        fileprivate var configuration: Configuration?
 
         init(action: @escaping () -> Void) {
             self.action = action
