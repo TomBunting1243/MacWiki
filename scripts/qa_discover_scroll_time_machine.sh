@@ -265,15 +265,20 @@ activate_macwiki
 sleep 0.7
 
 discover_selected="false"
+discover_process_survived="false"
 ax_selection_output=""
 if ax_selection_output="$(select_discover_via_accessibility 2>&1)"; then
   discover_selected="true"
+  sleep 1
+  if kill -0 "$QA_APP_PID" 2>/dev/null; then
+    discover_process_survived="true"
+  fi
 fi
 printf '%s\n' "$ax_selection_output" >"$OUTPUT_DIR/01-ax-selection.txt"
 
 time_machine_found="false"
 ax_verification_output=""
-if [[ "$discover_selected" == "true" ]] && ax_verification_output="$(verify_discover_via_accessibility 2>&1)"; then
+if [[ "$discover_process_survived" == "true" ]] && ax_verification_output="$(verify_discover_via_accessibility 2>&1)"; then
   time_machine_found="true"
 fi
 printf '%s\n' "$ax_verification_output" >"$OUTPUT_DIR/02-ax-discover-time-machine.txt"
@@ -317,7 +322,7 @@ coverage_csv="$OUTPUT_DIR/time_machine_date_coverage.csv"
 } >"$coverage_csv"
 
 qa_status="PASS"
-if [[ "$discover_selected" != "true" || "$time_machine_found" != "true" ]]; then
+if [[ "$discover_selected" != "true" || "$discover_process_survived" != "true" || "$time_machine_found" != "true" ]]; then
   qa_status="FAIL"
 fi
 
@@ -339,6 +344,7 @@ report_path="$OUTPUT_DIR/report.md"
   echo "- Before (reported): Discover smart list scroll felt jerky, and Time Machine was not working."
   echo "- After (this QA run):"
   echo "  - Discover selected through exact-PID accessibility: \`$discover_selected\`"
+  echo "  - Exact candidate process survived Discovery presentation: \`$discover_process_survived\`"
   echo "  - Discover surface and Time Machine semantics reached through accessibility scrolling: \`$time_machine_found\`"
   echo
   echo "## Date Coverage (API)"

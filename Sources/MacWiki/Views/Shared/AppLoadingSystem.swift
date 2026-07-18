@@ -86,13 +86,11 @@ struct AppLoadingActivityMark: View {
         if compact {
             ProgressView()
                 .controlSize(.mini)
-                .tint(tone.accentColor(for: colorScheme, override: tint))
                 .accessibilityLabel(accessibilityLabel)
                 .frame(width: 16, height: 12)
         } else {
             ProgressView()
                 .controlSize(.small)
-                .tint(tone.accentColor(for: colorScheme, override: tint))
                 .accessibilityLabel(accessibilityLabel)
                 .frame(width: 22, height: 16)
                 .padding(4)

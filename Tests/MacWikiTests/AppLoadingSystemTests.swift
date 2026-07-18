@@ -7,6 +7,10 @@ struct AppLoadingSystemTests {
         let styleSource = try source("Sources/MacWiki/Views/Shared/AppLoadingStyle.swift")
 
         #expect(loadingSource.contains("ProgressView()"))
+        // ProgressView already resolves the native control accent through its
+        // NSAppearance. Feeding Color.accentColor back through `.tint` creates
+        // a recursive appearance dependency on current macOS SDKs.
+        #expect(!loadingSource.contains(".tint("))
         #expect(!loadingSource.contains("TimelineView"))
         #expect(!loadingSource.contains("AppLoadingBeacon"))
         #expect(!loadingSource.contains("AppLoadingScanlineOverlay"))

@@ -54,8 +54,9 @@ qa_assert_candidate_manifest_matches_executable "$BUILD_INFO_PLIST"
 mkdir -p "$OUTPUT_DIR"
 APP_LOG="$OUTPUT_DIR/app.log"
 AX_RESULT="$OUTPUT_DIR/reader-inspector-ax.json"
+POPOVER_RESULT="$OUTPUT_DIR/page-views-popover-ax.json"
 REPORT_PATH="$OUTPUT_DIR/report.md"
-rm -f "$APP_LOG" "$AX_RESULT" "$REPORT_PATH"
+rm -f "$APP_LOG" "$AX_RESULT" "$POPOVER_RESULT" "$REPORT_PATH"
 
 cleanup() {
   qa_stop_exact
@@ -71,7 +72,9 @@ qa_assert_isolated_path "$ARTICLE_CACHE_DIR" "$QA_HOME"
 qa_assert_no_conflicting_processes
 mkdir -p "$ARTICLE_CACHE_DIR"
 AX_DRIVER_BIN="$QA_HOME/ax-reader-inspector-journey"
+POPOVER_DRIVER_BIN="$QA_HOME/ax-verify-toolbar-popover"
 swiftc "$SCRIPT_DIR/ax_reader_inspector_journey.swift" -o "$AX_DRIVER_BIN"
+swiftc "$SCRIPT_DIR/ax_verify_toolbar_popover.swift" -o "$POPOVER_DRIVER_BIN"
 
 # Article session persistence intentionally excludes HTML. Seed the app's
 # production disk-cache format inside the disposable QA home, then force the
@@ -150,6 +153,20 @@ if ! jq -e '
   echo "Reader/inspector AX evidence omitted native toolbar geometry or stability proof." >&2
   exit 1
 fi
+if ! qa_run_command_with_timeout 20 "$POPOVER_DRIVER_BIN" \
+  "$QA_APP_PID" "Page Views" "Views" >"$POPOVER_RESULT"; then
+  echo "Page Views toolbar popover did not present visible content." >&2
+  exit 1
+fi
+if ! jq -e '
+  .toolbarLabel == "Page Views"
+  and .expectedContent == "Views"
+  and (.observedContent | index("Views") != null)
+' "$POPOVER_RESULT" >/dev/null; then
+  echo "Page Views popover evidence omitted its visible content." >&2
+  exit 1
+fi
+kill -0 "$QA_APP_PID"
 READER_PID="$QA_APP_PID"
 qa_stop_exact
 if rg -n "fatal error|precondition failed|assertion failed|AttributeGraph: cycle detected" "$APP_LOG"; then
@@ -173,12 +190,13 @@ fi
   printf -- '- Isolated QA home: `%s`\n' "$QA_HOME"
   printf -- '- Seeded public article: `%s`\n' "$ARTICLE_TITLE"
   printf -- '- Reader fixture source: isolated production `ArticleBodyCache`; network: forced offline\n'
-  printf -- '- Reader assertions: native pane-tracking toolbar command reachability; every Reader control stays between dividers 1 and 2; Inspector toggle stays right-aligned inside the Reader; Read/Unread changes in place and restores; exactly one native Find UI\n'
+  printf -- '- Reader assertions: native pane-tracking toolbar command reachability; every Reader control stays between dividers 1 and 2; Inspector toggle stays right-aligned inside the Reader; Read/Unread changes in place and restores; Page Views presents visible popover content; exactly one native Find UI\n'
   printf -- '- Workspace assertions: four visible AppKit pane regions, Inspector spanning the full Reader pane height, all eight auxiliary visibility states, 20 independent Lists/List Contents cycles, and stable Reader Web-area identity\n'
   printf -- '- Inspector assertions: native tab group aligned in the Inspector toolbar plane with stable identity/frame and exactly one selected tab; Info/Notes/References content; live toolbar sampling during 12 rapid mode cycles; six hide/restore cycles plus one interrupted transition; no collapsed ghost chrome\n'
   printf -- '- Narrow-window assertion: with Lists intentionally hidden, restoring List Contents and Inspector preserves the 900-point window, a usable Reader, and tab-group containment inside the Inspector\n'
   printf -- '- Visual-only follow-up: materials, hover/pressed treatment, animation quality, and perceived jank still require fresh Computer Use evidence; placement and transition stability are independently asserted through AX geometry.\n'
   printf -- '- AX evidence: `%s`\n' "$AX_RESULT"
+  printf -- '- Page Views popover evidence: `%s`\n' "$POPOVER_RESULT"
   printf -- '- Production preferences/data touched: **No** — state, defaults, persistence, and caches were isolated.\n'
 } >"$REPORT_PATH"
 
