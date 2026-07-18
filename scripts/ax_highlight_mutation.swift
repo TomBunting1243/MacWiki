@@ -175,6 +175,30 @@ private func pressButton(
     }
 }
 
+private func pressInspectorMode(
+    in application: AXUIElement,
+    named name: String,
+    failure: String
+) throws {
+    let allowedRoles = Set([kAXRadioButtonRole as String, "AXTab", kAXButtonRole as String])
+    var lastError: AXError = .cannotComplete
+    let succeeded = wait(timeout: 8) {
+        guard let candidate = elements(in: application).first(where: { element in
+            allowedRoles.contains(role(of: element))
+                && strings(of: element).contains(name)
+                && actionNames(of: element).contains(kAXPressAction as String)
+        }) else { return false }
+        lastError = AXUIElementPerformAction(candidate, kAXPressAction as CFString)
+        return lastError == .success
+    }
+    guard succeeded else {
+        if lastError == .cannotComplete {
+            throw MutationError.missing(failure)
+        }
+        throw MutationError.actionFailed(name, lastError)
+    }
+}
+
 private func performNamedAction(
     in application: AXUIElement,
     named name: String,
@@ -247,7 +271,7 @@ do {
     AXUIElementSetAttributeValue(application, kAXFrontmostAttribute as CFString, kCFBooleanTrue)
 
     trace("opening Notes inspector mode")
-    try pressButton(in: application, named: "Notes", failure: "Inspector mode omitted an actionable Notes control.")
+    try pressInspectorMode(in: application, named: "Notes", failure: "Inspector mode omitted an actionable Notes control.")
     _ = try waitForElement(
         in: application,
         named: highlightText,

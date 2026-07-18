@@ -154,6 +154,26 @@ private func pressButton(in application: AXUIElement, named name: String) throws
     }
 }
 
+private func pressInspectorMode(in application: AXUIElement, named name: String) throws {
+    let allowedRoles = Set([kAXRadioButtonRole as String, "AXTab", kAXButtonRole as String])
+    var lastError = AXError.cannotComplete
+    let succeeded = wait(timeout: 8) {
+        guard let control = elements(in: application).first(where: { candidate in
+            allowedRoles.contains(role(of: candidate))
+                && strings(of: candidate).contains(name)
+                && actionNames(of: candidate).contains(kAXPressAction as String)
+        }) else { return false }
+        lastError = AXUIElementPerformAction(control, kAXPressAction as CFString)
+        return lastError == .success
+    }
+    guard succeeded else {
+        if lastError == .cannotComplete {
+            throw HighlightSelectionError.missing("Reader omitted an actionable \(name) inspector mode.")
+        }
+        throw HighlightSelectionError.actionFailed(name, lastError)
+    }
+}
+
 private func parameterizedValue(
     _ name: CFString,
     parameter: CFTypeRef,
@@ -288,7 +308,7 @@ private func selectedMarkerText(in webArea: AXUIElement) -> String? {
 }
 
 private func assertNotesRow(in application: AXUIElement, selectedText: String) throws {
-    try pressButton(in: application, named: "Notes")
+    try pressInspectorMode(in: application, named: "Notes")
     guard wait(timeout: 12, condition: {
         element(in: application, named: selectedText, matchingContains: true) != nil &&
             element(in: application, role: kAXButtonRole as String, named: "Add Note") != nil

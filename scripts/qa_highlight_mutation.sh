@@ -15,6 +15,7 @@ STORE_PATH="$QA_HOME/Library/Application Support/default.store"
 ARTICLE_TITLE="${ARTICLE_TITLE:-Ada Lovelace}"
 HIGHLIGHT_TEXT="${HIGHLIGHT_TEXT:-QA highlight verifies native Notes actions}"
 NOTE_TEXT="${NOTE_TEXT:-QA note persisted through the native editor}"
+MACWIKI_QA_VISUAL_HOLD_SECONDS="${MACWIKI_QA_VISUAL_HOLD_SECONDS:-0}"
 INFO_PLIST="$APP_BUNDLE_PATH/Contents/Info.plist"
 BUILD_INFO_PLIST="$APP_BUNDLE_PATH/Contents/Resources/BuildInfo.plist"
 
@@ -24,6 +25,10 @@ source "$SCRIPT_DIR/lib/qa_process_safety.sh"
 [[ -x "$APP_BIN" ]] || { echo "Candidate binary is not executable: $APP_BIN" >&2; exit 1; }
 [[ -f "$INFO_PLIST" ]] || { echo "Candidate Info.plist is missing: $INFO_PLIST" >&2; exit 1; }
 [[ -f "$BUILD_INFO_PLIST" ]] || { echo "Candidate BuildInfo.plist is missing: $BUILD_INFO_PLIST" >&2; exit 1; }
+[[ "$MACWIKI_QA_VISUAL_HOLD_SECONDS" =~ ^[0-9]+$ ]] || {
+  echo "Visual hold must be a non-negative whole number of seconds." >&2
+  exit 1
+}
 
 VERSION="$(plutil -extract CFBundleShortVersionString raw "$INFO_PLIST")"
 BUILD="$(plutil -extract CFBundleVersion raw "$INFO_PLIST")"
@@ -89,6 +94,11 @@ jq -n \
 /usr/bin/defaults write "${QA_DEFAULTS_SUITE:?}" qa.fixture.highlight.text -string "$HIGHLIGHT_TEXT"
 
 qa_launch_candidate "$APP_LOG"
+
+if (( MACWIKI_QA_VISUAL_HOLD_SECONDS > 0 )); then
+  echo "Visual inspection hold: PID $QA_APP_PID for ${MACWIKI_QA_VISUAL_HOLD_SECONDS}s" >&2
+  sleep "$MACWIKI_QA_VISUAL_HOLD_SECONDS"
+fi
 
 APP_PID="$QA_APP_PID" qa_run_command_with_timeout 120 swift "$SCRIPT_DIR/ax_highlight_mutation.swift" \
   "$QA_APP_PID" "$HIGHLIGHT_TEXT" "$NOTE_TEXT" >"$AX_RESULT" 2>"$DRIVER_LOG" || qa_status=$?
