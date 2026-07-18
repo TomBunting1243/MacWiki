@@ -26,7 +26,6 @@ trap cleanup EXIT INT TERM
 mkdir -p "$OUTPUT_DIR"
 qa_prepare_isolated_home
 qa_assert_no_conflicting_processes
-/usr/bin/defaults write "$QA_DEFAULTS_SUITE" discoverOpenMode -string "Reader Page"
 
 export MACWIKI_QA_NETWORK_MODE=offline
 qa_launch_candidate "$APP_LOG"

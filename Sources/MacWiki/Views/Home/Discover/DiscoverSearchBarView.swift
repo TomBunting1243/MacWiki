@@ -10,70 +10,41 @@ struct DiscoverSearchBarView: View {
     let onClearSearch: () -> Void
 
     @FocusState.Binding var isSearchFocused: Bool
-    @Environment(\.colorScheme) private var colorScheme
-
     var body: some View {
         @Bindable var searchCoordinator = searchCoordinator
 
-        HStack(spacing: 10) {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(.secondary)
-
+        HStack(spacing: 8) {
             TextField("Search Wikipedia", text: $searchCoordinator.searchText)
-                .textFieldStyle(.plain)
-                .font(DiscoverTypography.cardBody.weight(.medium))
+                .textFieldStyle(.roundedBorder)
+                .controlSize(.large)
                 .focused($isSearchFocused)
                 .onSubmit(onOpenSelectedResult)
+                .accessibilityLabel("Search Wikipedia")
 
             if searchCoordinator.isLoading {
-                AppLoadingActivityMark(
-                    tone: .accent,
-                    accessibilityLabel: "Searching Discover"
-                )
-            } else if !searchCoordinator.hasQuery {
-                Button(action: onRefreshDiscover) {
-                    Group {
-                        if discoverFeedStore.isLoading {
-                            AppLoadingActivityMark(
-                                tone: .accent,
-                                accessibilityLabel: "Refreshing Discover"
-                            )
-                        } else {
-                            Image(systemName: "arrow.clockwise")
-                                .font(.system(size: 13, weight: .semibold))
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                }
-                .buttonStyle(DiscoverInteractivePressStyle())
-                .disabled(discoverFeedStore.isLoading)
-                .help(discoverFeedStore.isLoading ? "Refreshing Discover…" : "Refresh Discover")
-                .accessibilityLabel("Refresh Discover")
-                .accessibilityValue(discoverFeedStore.isLoading ? "Refreshing" : "Ready")
+                ProgressView()
+                    .controlSize(.small)
+                    .accessibilityLabel("Searching Discover")
             } else if searchCoordinator.hasInput {
-                Button(action: onClearSearch) {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 14))
-                        .foregroundStyle(.tertiary)
-                }
-                .buttonStyle(DiscoverInteractivePressStyle())
-                .accessibilityLabel("Clear Search")
+                Button("Clear Search", systemImage: "xmark.circle.fill", action: onClearSearch)
+                    .labelStyle(.iconOnly)
+                    .buttonStyle(.borderless)
+                    .accessibilityLabel("Clear Search")
+                    .help("Clear Search")
+            } else if discoverFeedStore.isLoading {
+                ProgressView()
+                    .controlSize(.small)
+                    .accessibilityLabel("Refreshing Discover")
+            } else {
+                Button("Refresh Discover", systemImage: "arrow.clockwise", action: onRefreshDiscover)
+                    .labelStyle(.iconOnly)
+                    .buttonStyle(.borderless)
+                    .accessibilityLabel("Refresh Discover")
+                    .help("Refresh Discover")
+                    .accessibilityValue(discoverFeedStore.isLoading ? "Refreshing" : "Ready")
             }
         }
-        .padding(.horizontal, 13)
-        .padding(.vertical, 9)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .discoverSurfaceChrome(
-            cornerRadius: 12,
-            tintColors: [
-                Color(nsColor: .windowBackgroundColor).opacity(colorScheme == .dark ? 0.018 : 0.055)
-            ],
-            borderOpacity: 0.38,
-            shadowOpacity: 0.035,
-            shadowRadius: 6,
-            shadowY: 2
-        )
         .onMoveCommand(perform: onMoveSelection)
     }
 }

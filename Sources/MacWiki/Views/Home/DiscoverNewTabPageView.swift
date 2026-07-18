@@ -16,12 +16,18 @@ struct DiscoverNewTabPageView: View {
         supportsTrending: false,
         searchPrefetchLimit: 24
     )
-    @State private var screenModel = DiscoverScreenModel()
+    @State private var screenModel: DiscoverScreenModel
     @State private var articleLookupModel = DiscoverArticleLookupModel()
     @State private var isAppeared = false
     @State private var responsiveLayout = DiscoverResponsiveLayoutProfile.initial
 
     @FocusState private var isSearchFocused: Bool
+
+    init(discoverFeedStore: DiscoverFeedStore) {
+        _screenModel = State(
+            initialValue: DiscoverScreenModel(discoverFeedStore: discoverFeedStore)
+        )
+    }
 
     private var discoverReferenceDate: Date {
         screenModel.discoverReferenceDate
@@ -143,7 +149,7 @@ struct DiscoverNewTabPageView: View {
                 isAppeared = false
             }
             searchCoordinator.cancel()
-            screenModel.handleDisappear()
+            screenModel.handleDisappear(cancelFeed: false)
         }
         .onChange(of: reduceMotion) { _, reduced in
             if reduced {

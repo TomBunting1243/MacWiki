@@ -212,19 +212,9 @@ public enum SettingsCatalog {
         SettingsCatalogSection(
             id: .navigation,
             title: "Navigation",
-            summary: "Discover entry points, new-tab defaults, Recents scope, and sidebar discovery chrome.",
+            summary: "Discover companion controls, new-tab defaults, and Recents scope.",
             systemImage: "point.topleft.down.curvedto.point.bottomright.up",
             options: [
-                option(
-                    id: "navigation.discoverOpenMode",
-                    title: "Discover Button Opens",
-                    summary: "Chooses whether Discover opens the sidebar view or full reader page.",
-                    storageKey: "discoverOpenMode",
-                    defaultValue: "Sidebar",
-                    control: "Picker",
-                    values: ["Sidebar", "Reader Page"],
-                    codeReference: "AppStorageKey.Discover.openMode"
-                ),
                 option(
                     id: "navigation.discoverStartMode",
                     title: "New Tab Starts With",

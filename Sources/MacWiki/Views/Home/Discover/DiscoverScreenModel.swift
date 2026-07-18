@@ -110,12 +110,14 @@ final class DiscoverScreenModel {
         return task
     }
 
-    func handleDisappear() {
+    func handleDisappear(cancelFeed: Bool = true) {
         discoverDateLoadTask?.cancel()
         discoverDateLoadTask = nil
         resetTimeMachineLensDrag()
         dismissSearchResultPageViewsPopover()
-        cancelAction()
+        if cancelFeed {
+            cancelAction()
+        }
     }
 
     func shiftDiscoverDate(days: Int) {

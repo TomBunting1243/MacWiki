@@ -35,7 +35,6 @@ enum AppStorageKey {
     }
 
     enum Discover {
-        static let openMode = "discoverOpenMode"
         static let sidebarTimeMachineHidden = "discover.sidebar.timeMachineHidden"
     }
 

@@ -46,12 +46,13 @@ struct SidebarDiscoverFeedPresentationTests {
         )
         let discoverSurface = try #require(source.range(of: "func discoverSections() -> some View"))
         let sectionSource = String(source[discoverSurface.lowerBound...])
-        let hiddenBranch = try #require(sectionSource.range(of: "if discoverSidebarTimeMachineHidden"))
+        let controls = try #require(sectionSource.range(of: "SidebarDiscoverTimeMachineView("))
         let loadingStatus = try #require(
             sectionSource.range(of: "if sidebarDiscoverFeedPresentation.showsSelectedDateLoadingStatus")
         )
 
-        #expect(loadingStatus.lowerBound > hiddenBranch.lowerBound)
+        #expect(loadingStatus.lowerBound > controls.lowerBound)
+        #expect(sectionSource.contains("isHidden: $discoverSidebarTimeMachineHidden"))
         #expect(sectionSource.contains("SidebarDiscoverRetainedEditionWarning("))
         #expect(sectionSource.contains("queueDiscoverLoadDebounced(forceRefresh: true, delayNanoseconds: 0)"))
         #expect(sectionSource.contains(".allowsHitTesting(!isSidebarTimeTraveling)"))

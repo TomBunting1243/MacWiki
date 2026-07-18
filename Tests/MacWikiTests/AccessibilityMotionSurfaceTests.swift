@@ -10,10 +10,12 @@ struct AccessibilityMotionSurfaceTests {
         let sidebarSearch = try source("Sources/MacWiki/Views/Sidebar/SidebarSearchView.swift")
         let searchResults = try source("Sources/MacWiki/Views/Sidebar/Search/SidebarSearchResultsView.swift")
         let timeMachine = try source("Sources/MacWiki/Views/Home/Discover/DiscoverTimeMachineControlsView.swift")
-        let directory = try source("Sources/MacWiki/Views/Sidebar/DirectoryView.swift")
+        let sidebarTimeMachine = try source(
+            "Sources/MacWiki/Views/Sidebar/Directory/SidebarDiscoverTimeMachineView.swift"
+        )
         let listsSidebar = try source("Sources/MacWiki/Views/Sidebar/ListsSidebar.swift")
 
-        for surface in [highlightRow, sidebarSearch, searchResults, timeMachine] {
+        for surface in [highlightRow, sidebarSearch, searchResults, timeMachine, sidebarTimeMachine] {
             #expect(surface.contains("@Environment(\\.macWikiAccessibilityPersonalization.reduceMotion)"))
         }
 
@@ -22,11 +24,13 @@ struct AccessibilityMotionSurfaceTests {
         #expect(sidebarSearch.contains("withAnimation(reduceMotion ? nil : ColumnMotion.sidebarVisibility)"))
         #expect(searchResults.contains("withAnimation(reduceMotion ? nil : .easeOut(duration: 0.15))"))
         #expect(searchResults.contains("proxy.scrollTo(newValue, anchor: .center)"))
-        #expect(timeMachine.components(separatedBy: "reduceMotion\n                                ? .opacity").count - 1 == 2)
+        #expect(timeMachine.contains(".transition(reduceMotion ? .opacity"))
         #expect(timeMachine.contains(".animation(reduceMotion ? nil : .easeOut(duration: 0.14), value: isScanning)"))
-        #expect(directory.components(separatedBy: "withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.18))").count - 1 == 2)
-        #expect(directory.components(separatedBy: ".discoverSurfaceChrome(").count - 1 >= 2)
-        #expect(!directory.contains(".fill(.ultraThinMaterial)"))
+        #expect(sidebarTimeMachine.components(separatedBy: "withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.16))").count - 1 == 2)
+        #expect(sidebarTimeMachine.contains("GroupBox"))
+        #expect(sidebarTimeMachine.contains("ControlGroup"))
+        #expect(!sidebarTimeMachine.contains("discoverSurfaceChrome"))
+        #expect(!sidebarTimeMachine.contains("strokeBorder"))
         #expect(listsSidebar.contains("withAnimation(reduceMotion ? nil : .default)"))
     }
 
@@ -35,16 +39,16 @@ struct AccessibilityMotionSurfaceTests {
 
         #expect(source.contains(".accessibilityLabel(\"Refresh Discover\")"))
         #expect(source.contains(".accessibilityValue(discoverFeedStore.isLoading ? \"Refreshing\" : \"Ready\")"))
-        #expect(source.contains(".help(\"Refresh Discover\")"))
+        #expect(source.contains(".help(discoverFeedStore.isLoading ? \"Refreshing Discover…\" : \"Refresh Discover\")"))
 
-        #expect(source.contains(".accessibilityLabel(\"Jump to Date\")"))
-        #expect(source.contains(".accessibilityValue(Text(screenModel.discoverTimeMachineDateLabel))"))
-        #expect(source.contains(".help(\"Jump to a relative date\")"))
+        #expect(source.contains("Menu(\"Jump\", systemImage: \"calendar.badge.clock\")"))
+        #expect(source.contains(".help(\"Jump to another edition\")"))
 
-        #expect(source.components(separatedBy: "accessibilityLabel: \"Previous Day\"").count - 1 == 2)
-        #expect(source.components(separatedBy: "accessibilityLabel: \"Next Day\"").count - 1 == 2)
-        #expect(source.contains(".accessibilityLabel(Text(accessibilityLabel))"))
-        #expect(source.contains(".help(Text(help))"))
+        #expect(source.contains("Button(\"Previous Day\", systemImage: \"chevron.left\")"))
+        #expect(source.contains("Button(\"Next Day\", systemImage: \"chevron.right\")"))
+        #expect(source.contains("DatePicker("))
+        #expect(source.contains(".datePickerStyle(.field)"))
+        #expect(source.contains(".accessibilityLabel(\"Edition Date\")"))
     }
 
     private func source(_ relativePath: String) throws -> String {

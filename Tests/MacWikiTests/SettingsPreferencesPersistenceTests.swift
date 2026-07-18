@@ -75,7 +75,6 @@ struct SettingsPreferencesPersistenceTests {
             .string(id: "library.labelDisplayMode", storageKey: AppStorageKey.Labels.displayMode, value: LabelDisplayMode.coloredDot.rawValue),
             .string(id: "library.highlightMarkerStyle", storageKey: AppStorageKey.Highlights.markerStyle, value: HighlightMarkerStyle.background.rawValue),
             .bool(id: "library.highlightHeaderWrap", storageKey: AppStorageKey.Highlights.headerWrap, value: true),
-            .string(id: "navigation.discoverOpenMode", storageKey: AppStorageKey.Discover.openMode, value: DiscoverOpenMode.readerPage.rawValue),
             .bool(id: "navigation.hideSidebarTimeMachine", storageKey: AppStorageKey.Discover.sidebarTimeMachineHidden, value: true),
             .string(id: "navigation.recentsScope", storageKey: AppStorageKey.Recents.scope, value: RecentsScope.allTabs.rawValue),
             .bool(id: "chrome.tabBarLiquidGlass", storageKey: AppStorageKey.Chrome.liquidGlassChrome, value: false),
@@ -130,8 +129,6 @@ struct SettingsPreferencesPersistenceTests {
             "Highlight Marker"
         case "library.highlightHeaderWrap":
             "Wrap Highlight Header"
-        case "navigation.discoverOpenMode":
-            "Discover Button Opens"
         case "navigation.hideSidebarTimeMachine":
             "Hide Sidebar Time Machine"
         case "navigation.recentsScope":

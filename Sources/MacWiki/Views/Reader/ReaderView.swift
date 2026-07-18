@@ -262,8 +262,10 @@ struct ReaderView: View {
 }
 /// New tab page routes to the dedicated Discover experience.
 struct NewTabPageView: View {
+    @Environment(AppState.self) private var appState
+
     var body: some View {
-        DiscoverNewTabPageView()
+        DiscoverNewTabPageView(discoverFeedStore: appState.discoverFeedStore)
     }
 }
 

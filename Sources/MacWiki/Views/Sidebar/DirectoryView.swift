@@ -5,7 +5,6 @@ struct DirectoryView: View {
     @Environment(AppState.self) private var appState
     @Environment(\.modelContext) private var modelContext
     @Environment(\.colorScheme) private var colorScheme
-    @Environment(\.macWikiAccessibilityPersonalization.reduceMotion) private var reduceMotion
     @AppStorage(AppStorageKey.Recents.scope) private var recentsScope: RecentsScope = .currentTab
     @AppStorage(AppStorageKey.Discover.sidebarTimeMachineHidden) private var discoverSidebarTimeMachineHidden = false
     @AppStorage(ExperimentFlag.wikiHopPOCEnabled.key) private var wikiHopPOCEnabled = false
@@ -26,7 +25,6 @@ struct DirectoryView: View {
 
     @State private var localLabelFilter: Label? = nil
     @State private var localTagFilter: Tag? = nil
-    @State private var discoverFeedStore = DiscoverFeedStore()
     @State private var discoverTrendPulseStore = DiscoverTrendPulseStore()
     @State private var metadataHydrator = ArticleMetadataHydrator()
     @State private var supplementalReadFilter: DirectoryReadFilter = .all
@@ -40,12 +38,13 @@ struct DirectoryView: View {
     @State private var pendingPageViewsRowKey: String?
     @State private var activePageViewsPopover: SidebarPageViewsPopoverPayload?
     @State private var discoverDateLoadTask: Task<Void, Never>?
-    @State private var isTimeMachineDatePickerPresented = false
-    @State private var timeMachineLensLastDragX: CGFloat?
-    @State private var timeMachineLensDragAccumulatedX: CGFloat = 0
     @State private var topObscuredHeight: CGFloat = 38
 
     private let wikipediaService = WikipediaService.shared
+
+    private var discoverFeedStore: DiscoverFeedStore {
+        appState.discoverFeedStore
+    }
 
     private var selectedDiscoverDate: Date {
         get { appState.selectedDiscoverDate }
@@ -589,7 +588,6 @@ struct DirectoryView: View {
         .onChange(of: rootSelection) { _, newValue in
             if newValue != .discover {
                 discoverDateLoadTask?.cancel()
-                discoverFeedStore.cancel()
                 discoverTrendPulseStore.cancel()
             }
         }
@@ -1393,24 +1391,9 @@ struct DirectoryView: View {
 }
 
 extension DirectoryView {
-    private var canStepDiscoverDateForward: Bool {
-        discoverReferenceDate < Calendar.current.startOfDay(for: Date())
-    }
 
-    private var timeMachineAccentPrimary: Color {
-        Color(nsColor: .systemPurple)
-    }
-
-    private var timeMachineAccentSecondary: Color {
-        Color(nsColor: .systemIndigo)
-    }
-
-    private var timeMachineControlFillColor: Color {
-        timeMachineAccentPrimary.opacity(colorScheme == .dark ? 0.22 : 0.13)
-    }
-
-    private var timeMachineControlStrokeColor: Color {
-        timeMachineAccentSecondary.opacity(colorScheme == .dark ? 0.34 : 0.20)
+    private var discoverTimeMachineHeaderDateLabel: String {
+        AppPresentationFormatting.longDate(discoverReferenceDate)
     }
 
     private func queueDiscoverLoadDebounced(
@@ -1428,449 +1411,23 @@ extension DirectoryView {
         }
     }
 
-    private func shiftDiscoverDate(days: Int) {
-        let calendar = Calendar.current
-        let today = calendar.startOfDay(for: Date())
-        let shifted = calendar.date(byAdding: .day, value: days, to: discoverReferenceDate) ?? discoverReferenceDate
-        selectedDiscoverDate = min(shifted, today)
-    }
-
-    private func shiftDiscoverDate(years: Int) {
-        let calendar = Calendar.current
-        let today = calendar.startOfDay(for: Date())
-        let shifted = calendar.date(byAdding: .year, value: years, to: discoverReferenceDate) ?? discoverReferenceDate
-        selectedDiscoverDate = min(shifted, today)
-    }
-
-    private var discoverTimeMachineCompactDateLabel: String {
-        AppPresentationFormatting.abbreviatedMonthDay(discoverReferenceDate)
-    }
-
-    private var discoverTimeMachineHeaderDateLabel: String {
-        AppPresentationFormatting.longDate(discoverReferenceDate)
-    }
-
-    private var discoverTimeMachineLongDateLabel: String {
-        AppPresentationFormatting.longDate(discoverReferenceDate)
-    }
-
-    private var discoverTimeMachineMediumDateLabel: String {
-        AppPresentationFormatting.abbreviatedDate(discoverReferenceDate)
-    }
-
-    private var isDiscoverDateToday: Bool {
-        Calendar.current.isDate(discoverReferenceDate, inSameDayAs: Date())
-    }
-
-    private enum SidebarTimeMachineQuickShortcut: Hashable {
-        case today
-        case yesterday
-        case week
-        case month
-        case year
-        case fiveYears
-
-        var title: String {
-            switch self {
-            case .today: return "Today"
-            case .yesterday: return "Yesterday"
-            case .week: return "7D"
-            case .month: return "30D"
-            case .year: return "1Y"
-            case .fiveYears: return "5Y"
-            }
-        }
-
-        /// Conservative width estimate (button content + horizontal chrome)
-        /// used to choose a guaranteed-fit shortcut subset.
-        var estimatedWidth: CGFloat {
-            switch self {
-            case .today: return 52
-            case .yesterday: return 76
-            case .week: return 40
-            case .month: return 44
-            case .year: return 40
-            case .fiveYears: return 40
-            }
-        }
-    }
-
-    @ViewBuilder
-    private func timeMachineStepButton(
-        _ symbol: String,
-        disabled: Bool = false,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            Image(systemName: symbol)
-                .font(.system(size: 9.5, weight: .semibold))
-                .frame(width: 20, height: 18)
-        }
-        .buttonStyle(.borderless)
-        .disabled(disabled)
-        .foregroundStyle(.primary.opacity(disabled ? 0.36 : 0.86))
-        .background(timeMachineControlFillColor, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                .strokeBorder(timeMachineControlStrokeColor, lineWidth: 0.6)
-        )
-    }
-
-    @ViewBuilder
-    private var timeMachineTemporalLensButton: some View {
-        Button {
-            isTimeMachineDatePickerPresented.toggle()
-        } label: {
-            HStack(spacing: 4) {
-                Image(systemName: "timeline.selection")
-                    .font(.system(size: 9.5, weight: .semibold))
-
-                ViewThatFits(in: .horizontal) {
-                    Text(discoverTimeMachineLongDateLabel)
-                        .font(.system(size: 10, weight: .semibold, design: .rounded))
-                        .monospacedDigit()
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.86)
-
-                    Text(discoverTimeMachineMediumDateLabel)
-                        .font(.system(size: 10, weight: .semibold, design: .rounded))
-                        .monospacedDigit()
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.86)
-
-                    Text(discoverTimeMachineCompactDateLabel)
-                        .font(.system(size: 10, weight: .semibold, design: .rounded))
-                        .monospacedDigit()
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.86)
-                }
-            }
-            .padding(.horizontal, 8)
-            .frame(height: 20)
-            .frame(maxWidth: .infinity, alignment: .center)
-        }
-        .buttonStyle(.borderless)
-        .foregroundStyle(.primary.opacity(0.88))
-        .background(timeMachineControlFillColor, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                .strokeBorder(timeMachineControlStrokeColor, lineWidth: 0.6)
-        )
-        .popover(isPresented: $isTimeMachineDatePickerPresented, arrowEdge: .bottom) {
-            VStack(alignment: .leading, spacing: 8) {
-                DatePicker(
-                    "Jump to date",
-                    selection: selectedDiscoverDateBinding,
-                    in: ...Date(),
-                    displayedComponents: [.date]
-                )
-                .datePickerStyle(.graphical)
-                .labelsHidden()
-
-                HStack(spacing: 8) {
-                    Button("Today") {
-                        selectedDiscoverDate = Date()
-                    }
-                    .disabled(isDiscoverDateToday)
-
-                    Spacer(minLength: 0)
-
-                    Button("Done") {
-                        isTimeMachineDatePickerPresented = false
-                    }
-                }
-                .font(.system(size: 11.5, weight: .semibold))
-            }
-            .padding(10)
-            .frame(width: 250)
-        }
-        .simultaneousGesture(
-            DragGesture(minimumDistance: 5)
-                .onChanged { value in
-                    if let lastX = timeMachineLensLastDragX {
-                        stepTimeMachineLensByDrag(deltaX: value.location.x - lastX)
-                    }
-                    timeMachineLensLastDragX = value.location.x
-                }
-                .onEnded { _ in
-                    resetTimeMachineLensDrag()
-                }
-        )
-        .help("Temporal Lens: drag left/right to scrub days")
-    }
-
-    @ViewBuilder
-    private var timeMachineSecondaryControlsRow: some View {
-        GeometryReader { proxy in
-            let shortcuts = visibleTimeMachineQuickShortcuts(for: proxy.size.width)
-
-            HStack(spacing: 5) {
-                ForEach(shortcuts, id: \.self) { shortcut in
-                    timeMachineQuickJumpButton(shortcut.title, disabled: shortcut == .today && isDiscoverDateToday) {
-                        handleTimeMachineQuickShortcut(shortcut)
-                    }
-                }
-                Spacer(minLength: 0)
-                timeMachineJumpMenuButton
-                timeMachineRefreshButton
-            }
-            .frame(width: proxy.size.width, alignment: .leading)
-        }
-        .frame(height: 20)
-    }
-
-    private func visibleTimeMachineQuickShortcuts(for availableWidth: CGFloat) -> [SidebarTimeMachineQuickShortcut] {
-        let candidates: [[SidebarTimeMachineQuickShortcut]] = [
-            [.today, .yesterday, .week, .month, .year, .fiveYears],
-            [.today, .week, .month, .year, .fiveYears],
-            [.today, .week, .year],
-            [.today, .week],
-            [.today],
-            []
-        ]
-
-        for candidate in candidates {
-            if requiredWidthForQuickShortcuts(candidate) <= availableWidth {
-                return candidate
-            }
-        }
-        return []
-    }
-
-    private func requiredWidthForQuickShortcuts(_ shortcuts: [SidebarTimeMachineQuickShortcut]) -> CGFloat {
-        let shortcutWidth = shortcuts.reduce(CGFloat.zero) { partial, shortcut in
-            partial + shortcut.estimatedWidth
-        }
-        let shortcutSpacing = CGFloat(max(shortcuts.count - 1, 0)) * 5
-        let trailingControlsWidth: CGFloat = 24 + 24 + 5
-        return shortcutWidth + shortcutSpacing + trailingControlsWidth
-    }
-
-    private func handleTimeMachineQuickShortcut(_ shortcut: SidebarTimeMachineQuickShortcut) {
-        switch shortcut {
-        case .today:
-            selectedDiscoverDate = Date()
-        case .yesterday:
-            shiftDiscoverDate(days: -1)
-        case .week:
-            shiftDiscoverDate(days: -7)
-        case .month:
-            shiftDiscoverDate(days: -30)
-        case .year:
-            shiftDiscoverDate(years: -1)
-        case .fiveYears:
-            shiftDiscoverDate(years: -5)
-        }
-    }
-
-    @ViewBuilder
-    private func timeMachineQuickJumpButton(
-        _ title: String,
-        disabled: Bool = false,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            Text(title)
-                .font(.system(size: 9.5, weight: .semibold, design: .rounded))
-                .monospacedDigit()
-                .padding(.horizontal, 8)
-                .frame(height: 20)
-        }
-        .buttonStyle(.borderless)
-        .disabled(disabled)
-        .foregroundStyle(.primary.opacity(disabled ? 0.36 : 0.86))
-        .background(timeMachineAccentPrimary.opacity(colorScheme == .dark ? 0.17 : 0.11), in: Capsule(style: .continuous))
-        .overlay(
-            Capsule(style: .continuous)
-                .strokeBorder(timeMachineControlStrokeColor, lineWidth: 0.6)
-        )
-    }
-
-    private func stepTimeMachineLensByDrag(deltaX: CGFloat) {
-        timeMachineLensDragAccumulatedX += deltaX
-        let threshold: CGFloat = 18
-
-        while abs(timeMachineLensDragAccumulatedX) >= threshold {
-            let isForward = timeMachineLensDragAccumulatedX > 0
-            shiftDiscoverDate(days: isForward ? 1 : -1)
-            timeMachineLensDragAccumulatedX += isForward ? -threshold : threshold
-        }
-    }
-
-    private func resetTimeMachineLensDrag() {
-        timeMachineLensLastDragX = nil
-        timeMachineLensDragAccumulatedX = 0
-    }
-
-    @ViewBuilder
-    private var timeMachineRefreshButton: some View {
-        Button {
-            queueDiscoverLoadDebounced(forceRefresh: true, delayNanoseconds: 0)
-        } label: {
-            Image(systemName: discoverFeedStore.isLoading ? "arrow.triangle.2.circlepath.circle.fill" : "arrow.clockwise")
-                .font(.system(size: 10, weight: .semibold))
-                .frame(width: 22, height: 20)
-        }
-        .buttonStyle(.borderless)
-        .foregroundStyle(.primary.opacity(discoverFeedStore.isLoading ? 0.38 : 0.86))
-        .background(timeMachineControlFillColor, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                .strokeBorder(timeMachineControlStrokeColor, lineWidth: 0.6)
-        )
-        .disabled(discoverFeedStore.isLoading)
-        .help("Refresh Discover")
-    }
-
-    @ViewBuilder
-    private var timeMachineJumpMenuButton: some View {
-        Menu {
-            Button("Today", systemImage: "sun.max") {
-                selectedDiscoverDate = Date()
-            }
-            .disabled(isDiscoverDateToday)
-
-            Button("Yesterday", systemImage: "clock.arrow.circlepath") {
-                shiftDiscoverDate(days: -1)
-            }
-            Button("7 days ago", systemImage: "calendar.badge.clock") {
-                shiftDiscoverDate(days: -7)
-            }
-            Button("30 days ago", systemImage: "calendar") {
-                shiftDiscoverDate(days: -30)
-            }
-            Button("1 year ago", systemImage: "clock.arrow.circlepath") {
-                shiftDiscoverDate(years: -1)
-            }
-            Button("5 years ago", systemImage: "clock.arrow.2.circlepath") {
-                shiftDiscoverDate(years: -5)
-            }
-
-            Divider()
-
-            Button("Hide Time Machine", systemImage: "eye.slash") {
-                withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.18)) {
-                    discoverSidebarTimeMachineHidden = true
-                }
-            }
-        } label: {
-            Image(systemName: "calendar.badge.clock")
-                .font(.system(size: 10, weight: .semibold))
-                .frame(width: 22, height: 20)
-        }
-        .buttonStyle(.borderless)
-        .foregroundStyle(.primary.opacity(0.86))
-        .background(timeMachineControlFillColor, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                .strokeBorder(timeMachineControlStrokeColor, lineWidth: 0.6)
-        )
-    }
 
     @ViewBuilder
     func discoverSections() -> some View {
         Section {
-            if discoverSidebarTimeMachineHidden {
-                HStack(spacing: 8) {
-                    Image(systemName: "clock.badge.xmark")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(.secondary)
-                        .frame(width: 20, height: 20)
-                        .background(Color.primary.opacity(0.08), in: Circle())
-
-                    Text("Time Machine hidden")
-                        .font(.system(size: 11.5, weight: .semibold, design: .rounded))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-
-                    Spacer(minLength: 0)
-
-                    Button("Show") {
-                        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.18)) {
-                            discoverSidebarTimeMachineHidden = false
-                        }
-                    }
-                    .buttonStyle(.borderless)
-                    .font(.system(size: 10.5, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(Color.primary.opacity(0.08), in: Capsule())
-                    .overlay(
-                        Capsule()
-                            .strokeBorder(Color.primary.opacity(0.12), lineWidth: 0.7)
-                    )
+            SidebarDiscoverTimeMachineView(
+                selectedDate: selectedDiscoverDateBinding,
+                isHidden: $discoverSidebarTimeMachineHidden,
+                visibleEditionDateLabel: discoverFeedStore.feed?.dateLabel,
+                isLoading: discoverFeedStore.isLoading,
+                isTimeTraveling: isSidebarTimeTraveling,
+                onRefresh: {
+                    queueDiscoverLoadDebounced(forceRefresh: true, delayNanoseconds: 0)
                 }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 8)
-                .discoverSurfaceChrome(
-                    cornerRadius: 12,
-                    material: .thin,
-                    borderOpacity: colorScheme == .dark ? 0.14 : 0.10
-                )
-                .padding(.vertical, 3)
-                .listRowSeparator(.hidden)
-                .listRowInsets(EdgeInsets(top: 3, leading: 0, bottom: 3, trailing: 0))
-            } else {
-                VStack(alignment: .leading, spacing: 7) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "clock.arrow.trianglehead.counterclockwise.rotate.90")
-                            .font(.system(size: 10.5, weight: .semibold))
-                            .symbolRenderingMode(.hierarchical)
-                            .foregroundStyle(timeMachineAccentPrimary.opacity(0.92))
-                            .frame(width: 18, height: 18)
-
-                        Text("Time Machine")
-                            .font(.system(size: 11.5, weight: .semibold, design: .rounded))
-                            .foregroundStyle(.primary.opacity(0.90))
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.90)
-                            .layoutPriority(1)
-
-                        Spacer(minLength: 0)
-                    }
-
-                    HStack(spacing: 5) {
-                        timeMachineStepButton("chevron.left") {
-                            shiftDiscoverDate(days: -1)
-                        }
-
-                        timeMachineTemporalLensButton
-                            .frame(maxWidth: .infinity, alignment: .center)
-                            .layoutPriority(1)
-
-                        timeMachineStepButton("chevron.right", disabled: !canStepDiscoverDateForward) {
-                            shiftDiscoverDate(days: 1)
-                        }
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                    timeMachineSecondaryControlsRow
-                    .padding(.top, 1)
-                }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 8)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .discoverSurfaceChrome(
-                    cornerRadius: 10,
-                    material: .thin,
-                    tintColors: [
-                        timeMachineAccentPrimary.opacity(colorScheme == .dark ? 0.22 : 0.14),
-                        timeMachineAccentSecondary.opacity(colorScheme == .dark ? 0.14 : 0.09),
-                        .clear
-                    ],
-                    borderColor: timeMachineControlStrokeColor,
-                    borderOpacity: colorScheme == .dark ? 0.75 : 0.85,
-                    shadowOpacity: colorScheme == .dark ? 0.16 : 0.07,
-                    shadowRadius: 4,
-                    shadowY: 1
-                )
-                .animation(reduceMotion ? nil : .easeOut(duration: 0.14), value: isSidebarTimeTraveling)
-                .help("Time Machine lets you see what people were reading in the past.")
-                .padding(.vertical, 3)
-                .listRowSeparator(.hidden)
-                .listRowInsets(EdgeInsets(top: 3, leading: 0, bottom: 3, trailing: 0))
-            }
+            )
+            .padding(.vertical, 3)
+            .listRowSeparator(.hidden)
+            .listRowInsets(EdgeInsets(top: 3, leading: 0, bottom: 3, trailing: 0))
         }
 
         if sidebarDiscoverFeedPresentation.showsSelectedDateLoadingStatus {

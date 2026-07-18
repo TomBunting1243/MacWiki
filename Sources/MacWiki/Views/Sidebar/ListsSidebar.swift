@@ -55,7 +55,6 @@ struct ListsSidebar: View {
     @State private var editingName: String = ""
     @State private var showRenameAlert = false
     @State private var iconPickerList: ReadingList?
-    @AppStorage(AppStorageKey.Discover.openMode) private var discoverOpenMode: DiscoverOpenMode = .sidebar
     @AppStorage(ExperimentFlag.wikiHopPOCEnabled.key) private var isWikiHopEnabled = false
     @AppStorage(AppStorageKey.Features.wikiHopPostV1Enabled) private var isWikiHopPostV1Enabled = false
 
@@ -761,7 +760,7 @@ struct ListsSidebar: View {
             selectedTag = nil
             rootSelection = root
 
-            if root == .discover, discoverOpenMode == .readerPage {
+            if root == .discover {
                 appState.showDiscoverPage()
             }
         case .list(let listId):

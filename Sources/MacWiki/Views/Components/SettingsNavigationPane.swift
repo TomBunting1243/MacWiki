@@ -2,7 +2,6 @@ import SwiftUI
 import MacWikiSettingsCatalog
 
 struct SettingsNavigationPane: View {
-    @AppStorage(AppStorageKey.Discover.openMode) private var discoverOpenMode: DiscoverOpenMode = .sidebar
     @AppStorage(AppStorageKey.Discover.sidebarTimeMachineHidden) private var discoverSidebarTimeMachineHidden = false
     @AppStorage(AppStorageKey.Recents.scope) private var recentsScope: RecentsScope = .currentTab
 
@@ -15,14 +14,9 @@ struct SettingsNavigationPane: View {
             systemImage: section.systemImage
         ) {
             SettingsGroup("Discover", systemImage: "safari") {
-                Picker("Discover Button Opens", selection: $discoverOpenMode) {
-                    ForEach(DiscoverOpenMode.allCases, id: \.self) { mode in
-                        Text(mode.rawValue).tag(mode)
-                    }
-                }
-                .pickerStyle(.menu)
-
                 Toggle("Hide Sidebar Time Machine", isOn: $discoverSidebarTimeMachineHidden)
+
+                SettingsHelpText("Discover opens its full editorial page. List Contents can remain visible as a compact companion edition.")
             }
 
             SettingsGroup("Recents", systemImage: "clock.arrow.circlepath") {

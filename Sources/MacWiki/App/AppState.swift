@@ -28,6 +28,13 @@ enum AppStatePersistenceMode: Equatable, Sendable {
 final class AppState {
     let tabSessionStore: TabSessionStore
 
+    /// One scene-owned Discover feed keeps the directory companion and the
+    /// full editorial page on the same loading, error, and cache boundary.
+    /// Individual surfaces still own their presentation state, but they no
+    /// longer start competing network pipelines for the same edition.
+    @ObservationIgnored
+    let discoverFeedStore = DiscoverFeedStore()
+
     @ObservationIgnored
     let persistenceMode: AppStatePersistenceMode
 
