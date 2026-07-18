@@ -28,7 +28,7 @@ struct AccessibilityMotionSurfaceTests {
         #expect(timeMachine.contains(".animation(reduceMotion ? nil : .easeOut(duration: 0.14), value: isScanning)"))
         #expect(sidebarTimeMachine.components(separatedBy: "withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.16))").count - 1 == 2)
         #expect(sidebarTimeMachine.contains("GroupBox"))
-        #expect(sidebarTimeMachine.contains("ControlGroup"))
+        #expect(!sidebarTimeMachine.contains("ControlGroup"))
         #expect(!sidebarTimeMachine.contains("discoverSurfaceChrome"))
         #expect(!sidebarTimeMachine.contains("strokeBorder"))
         #expect(listsSidebar.contains("withAnimation(reduceMotion ? nil : .default)"))
@@ -48,13 +48,14 @@ struct AccessibilityMotionSurfaceTests {
         #expect(timeMachineSource.contains("Button(\"Next Day\", systemImage: \"chevron.right\")"))
         #expect(timeMachineSource.contains("DatePicker("))
         #expect(timeMachineSource.contains(".datePickerStyle(.field)"))
-        #expect(timeMachineSource.contains(".frame(minWidth: 120)"))
+        #expect(timeMachineSource.contains(".frame(width: 126)"))
+        #expect(!timeMachineSource.contains("ControlGroup"))
         #expect(timeMachineSource.contains(".accessibilityLabel(\"Edition Date\")"))
 
         let sidebarSource = try source(
             "Sources/MacWiki/Views/Sidebar/Directory/SidebarDiscoverTimeMachineView.swift"
         )
-        #expect(sidebarSource.contains(".frame(minWidth: 108)"))
+        #expect(sidebarSource.contains(".frame(width: 112)"))
     }
 
     private func source(_ relativePath: String) throws -> String {

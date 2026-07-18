@@ -3,7 +3,7 @@ import SwiftUI
 
 /// Native temporal navigation for the editorial Discover page.
 ///
-/// DatePicker, ControlGroup, Menu, and standard Button styles deliberately own
+/// DatePicker, Menu, and standard bordered Button styles deliberately own
 /// the control appearance. Discovery used to paint rounded rectangles around
 /// borderless buttons, which became visually tiny and brittle as the reader
 /// column resized.
@@ -61,7 +61,7 @@ struct DiscoverTimeMachineControlsView: View {
     @ViewBuilder
     private func wideControls(screenModel: DiscoverScreenModel) -> some View {
         HStack(spacing: 10) {
-            dateControlGroup(screenModel: screenModel)
+            dateControls(screenModel: screenModel)
 
             Spacer(minLength: 12)
 
@@ -73,7 +73,7 @@ struct DiscoverTimeMachineControlsView: View {
     @ViewBuilder
     private func compactControls(screenModel: DiscoverScreenModel) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            dateControlGroup(screenModel: screenModel)
+            dateControls(screenModel: screenModel)
 
             HStack(spacing: 8) {
                 jumpMenu(screenModel: screenModel)
@@ -84,14 +84,15 @@ struct DiscoverTimeMachineControlsView: View {
     }
 
     @ViewBuilder
-    private func dateControlGroup(screenModel: DiscoverScreenModel) -> some View {
+    private func dateControls(screenModel: DiscoverScreenModel) -> some View {
         @Bindable var screenModel = screenModel
 
-        ControlGroup {
+        HStack(spacing: 6) {
             Button("Previous Day", systemImage: "chevron.left") {
                 screenModel.shiftDiscoverDate(days: -1)
             }
             .labelStyle(.iconOnly)
+            .buttonStyle(.bordered)
             .help("Previous Day")
 
             DatePicker(
@@ -102,7 +103,7 @@ struct DiscoverTimeMachineControlsView: View {
             )
             .labelsHidden()
             .datePickerStyle(.field)
-            .frame(minWidth: 120)
+            .frame(width: 126)
             .layoutPriority(1)
             .accessibilityLabel("Edition Date")
 
@@ -110,6 +111,7 @@ struct DiscoverTimeMachineControlsView: View {
                 screenModel.shiftDiscoverDate(days: 1)
             }
             .labelStyle(.iconOnly)
+            .buttonStyle(.bordered)
             .disabled(!screenModel.canStepDiscoverDateForward)
             .help("Next Day")
         }

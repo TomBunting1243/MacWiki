@@ -44,11 +44,12 @@ struct SidebarDiscoverTimeMachineView: View {
         } else {
             GroupBox {
                 VStack(alignment: .leading, spacing: 8) {
-                    ControlGroup {
+                    HStack(spacing: 5) {
                         Button("Previous Day", systemImage: "chevron.left") {
                             shift(days: -1)
                         }
                         .labelStyle(.iconOnly)
+                        .buttonStyle(.bordered)
                         .help("Previous Day")
 
                         DatePicker(
@@ -59,7 +60,7 @@ struct SidebarDiscoverTimeMachineView: View {
                         )
                         .labelsHidden()
                         .datePickerStyle(.field)
-                        .frame(minWidth: 108)
+                        .frame(width: 112)
                         .layoutPriority(1)
                         .accessibilityLabel("Edition Date")
 
@@ -67,6 +68,7 @@ struct SidebarDiscoverTimeMachineView: View {
                             shift(days: 1)
                         }
                         .labelStyle(.iconOnly)
+                        .buttonStyle(.bordered)
                         .disabled(!canStepForward)
                         .help("Next Day")
                     }
