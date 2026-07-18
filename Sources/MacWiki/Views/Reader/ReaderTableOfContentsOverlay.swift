@@ -21,40 +21,80 @@ struct ReaderTableOfContentsOverlay: View {
     }
 
     var body: some View {
-        MacWikiGlassGroup(spacing: 8) {
-            Group {
-                if isExpanded {
-                    expandedPanel
-                        .transition(panelTransition)
-                } else {
-                    compactControl
-                        .transition(panelTransition)
-                }
+        Group {
+            if isExpanded {
+                expandedPanel
+                    .transition(panelTransition)
+            } else {
+                compactControl
+                    .transition(panelTransition)
             }
         }
-        .animation(
-            personalization.reduceMotion ? nil : .smooth(duration: 0.22),
-            value: isExpanded
-        )
     }
 
+    @ViewBuilder
     private var compactControl: some View {
+        if personalization.reduceTransparency {
+            compactControlButton
+                .background {
+                    let shape = compactShape
+                    shape.fill(Color(nsColor: .controlBackgroundColor))
+                        .overlay { surfaceBorder(shape: shape) }
+                }
+        } else if #available(macOS 26, *), usesNativeGlass {
+            compactControlButton
+                .glassEffect(.regular.interactive(), in: .rect(cornerRadius: Metrics.compactCornerRadius))
+                .overlay { surfaceBorder(shape: compactShape) }
+        } else {
+            compactControlButton
+                .background {
+                    let shape = compactShape
+                    shape.fill(.regularMaterial)
+                        .overlay { surfaceBorder(shape: shape) }
+                }
+        }
+    }
+
+    private var compactControlButton: some View {
         Button {
             setExpanded(true)
         } label: {
             Image(systemName: "list.bullet.indent")
                 .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.primary)
                 .frame(width: Metrics.compactSize, height: Metrics.compactSize)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .background { compactSurface }
         .accessibilityLabel("Show article contents")
         .accessibilityValue(placement.rawValue)
         .help("Show Contents")
     }
 
+    @ViewBuilder
     private var expandedPanel: some View {
+        if personalization.reduceTransparency {
+            expandedPanelContent
+                .background {
+                    let shape = panelShape
+                    shape.fill(Color(nsColor: .windowBackgroundColor))
+                        .overlay { surfaceBorder(shape: shape) }
+                }
+        } else if #available(macOS 26, *), usesNativeGlass {
+            expandedPanelContent
+                .glassEffect(.regular, in: .rect(cornerRadius: Metrics.panelCornerRadius))
+                .overlay { surfaceBorder(shape: panelShape) }
+        } else {
+            expandedPanelContent
+                .background {
+                    let shape = panelShape
+                    shape.fill(.regularMaterial)
+                        .overlay { surfaceBorder(shape: shape) }
+                }
+        }
+    }
+
+    private var expandedPanelContent: some View {
         VStack(spacing: 0) {
             header
 
@@ -81,10 +121,7 @@ struct ReaderTableOfContentsOverlay: View {
             }
         }
         .frame(width: Metrics.panelWidth, height: Metrics.panelHeight)
-        .background { panelSurface }
-        .clipShape(
-            RoundedRectangle(cornerRadius: Metrics.panelCornerRadius, style: .continuous)
-        )
+        .clipShape(panelShape)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Article contents")
     }
@@ -98,6 +135,7 @@ struct ReaderTableOfContentsOverlay: View {
             VStack(alignment: .leading, spacing: 1) {
                 Text("On This Page")
                     .font(.headline)
+                    .foregroundStyle(.primary)
                 Text("\(items.count) sections")
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
@@ -156,41 +194,12 @@ struct ReaderTableOfContentsOverlay: View {
         .accessibilityValue(isActive ? "Current section" : "")
     }
 
-    @ViewBuilder
-    private var compactSurface: some View {
-        let shape = RoundedRectangle(cornerRadius: Metrics.compactCornerRadius, style: .continuous)
-        if personalization.reduceTransparency {
-            shape.fill(Color(nsColor: .controlBackgroundColor))
-                .overlay { surfaceBorder(shape: shape) }
-        } else if #available(macOS 26, *), usesNativeGlass {
-            shape
-                .fill(.clear)
-                .glassEffect(.regular.interactive(), in: .rect(cornerRadius: Metrics.compactCornerRadius))
-                .overlay { surfaceBorder(shape: shape) }
-        } else {
-            shape.fill(.regularMaterial)
-                .overlay { surfaceBorder(shape: shape) }
-        }
+    private var compactShape: RoundedRectangle {
+        RoundedRectangle(cornerRadius: Metrics.compactCornerRadius, style: .continuous)
     }
 
-    @ViewBuilder
-    private var panelSurface: some View {
-        let shape = RoundedRectangle(cornerRadius: Metrics.panelCornerRadius, style: .continuous)
-        if personalization.reduceTransparency {
-            shape.fill(Color(nsColor: .windowBackgroundColor))
-                .overlay { surfaceBorder(shape: shape) }
-        } else if #available(macOS 26, *), usesNativeGlass {
-            shape
-                .fill(.clear)
-                .glassEffect(.regular, in: .rect(cornerRadius: Metrics.panelCornerRadius))
-                .overlay {
-                    shape.fill(Color(nsColor: .windowBackgroundColor).opacity(colorScheme == .dark ? 0.04 : 0.025))
-                }
-                .overlay { surfaceBorder(shape: shape) }
-        } else {
-            shape.fill(.regularMaterial)
-                .overlay { surfaceBorder(shape: shape) }
-        }
+    private var panelShape: RoundedRectangle {
+        RoundedRectangle(cornerRadius: Metrics.panelCornerRadius, style: .continuous)
     }
 
     private func surfaceBorder(shape: RoundedRectangle) -> some View {
