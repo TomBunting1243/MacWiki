@@ -1322,6 +1322,7 @@ struct BetaReadinessRegressionTests {
         let stage = try source("Sources/MacWiki/Views/Home/Discover/DiscoverTimeMachineStageView.swift")
 
         #expect(surface.contains("let onRetry: () -> Void"))
+        #expect(surface.contains("title: Text(\"Discover Unavailable\")"))
         #expect(surface.contains("Button(\"Try Again\", systemImage: \"arrow.clockwise\", action: onRetry)"))
         #expect(surface.contains(".keyboardShortcut(.defaultAction)"))
         #expect(stage.contains("onRetry: screenModel.refreshDiscover"))
@@ -1335,7 +1336,7 @@ struct BetaReadinessRegressionTests {
         #expect(!harness.contains("discoverOpenMode"))
         #expect(harness.contains("ax_select_sidebar_root.swift"))
         #expect(harness.contains("\"$QA_APP_PID\" Discover"))
-        #expect(harness.contains("\"Discover feed unavailable\""))
+        #expect(harness.contains("\"Discover Unavailable\""))
         #expect(harness.contains("kill -0 \"$QA_APP_PID\""))
         #expect(!harness.contains("killall"))
 

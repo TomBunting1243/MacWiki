@@ -32,7 +32,7 @@ qa_launch_candidate "$APP_LOG"
 qa_run_command_with_timeout 30 swift "$SCRIPT_DIR/ax_select_sidebar_root.swift" \
   "$QA_APP_PID" Discover >"$SELECTION_RESULT"
 qa_run_command_with_timeout 40 swift "$SCRIPT_DIR/ax_reader_offline_retry.swift" \
-  "$QA_APP_PID" "Discover feed unavailable" >"$AX_RESULT"
+  "$QA_APP_PID" "Discover Unavailable" >"$AX_RESULT"
 kill -0 "$QA_APP_PID"
 
 cat >"$REPORT_PATH" <<REPORT
@@ -44,7 +44,7 @@ cat >"$REPORT_PATH" <<REPORT
 - Isolated defaults suite: \`$QA_DEFAULTS_SUITE\`
 - Native route: exact-PID sidebar \`Discover\` button → reader-page Discover surface
 - Injected mode: \`offline\` (accepted only with a trusted QA defaults suite)
-- Initial state: Discover exposed “Discover feed unavailable,” the actionable offline explanation, and a default-action “Try Again” button.
+- Initial state: Discover exposed “Discover Unavailable,” the actionable offline explanation, and a default-action “Try Again” button.
 - Retry: the exact button accepted native \`AXPress\`; Discover returned to the recoverable offline state without crashing.
 - Selection evidence: \`$SELECTION_RESULT\`
 - AX evidence: \`$AX_RESULT\`
