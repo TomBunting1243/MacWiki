@@ -166,11 +166,24 @@ extension DiscoverFeedSections {
             collapsedPreviewTitles: todayMostReadPreviewTitles
         ) {
             if todayMostReadItems.isEmpty {
-                DiscoverPlaylistPlaceholder(
-                    text: todayMostReadStore.isLoading
-                        ? "Loading today's most read..."
-                        : "Today's Most Read is unavailable right now."
-                )
+                if todayMostReadStore.errorMessage != nil {
+                    DiscoverPlaylistPlaceholder(
+                        text: DiscoverTodayMostReadPresentation.placeholder(
+                            isLoading: false,
+                            hasFailure: true
+                        ),
+                        actionTitle: "Try Again"
+                    ) {
+                        todayMostReadStore.queueLoad(forceRefresh: true)
+                    }
+                } else {
+                    DiscoverPlaylistPlaceholder(
+                        text: DiscoverTodayMostReadPresentation.placeholder(
+                            isLoading: todayMostReadStore.isLoading,
+                            hasFailure: false
+                        )
+                    )
+                }
             } else {
                 todayMostReadRows(columnCount: columnCount)
             }

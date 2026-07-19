@@ -1,6 +1,21 @@
 import Foundation
 import SwiftUI
 
+enum DiscoverTodayMostReadPresentation {
+    static func metadata(isLoading: Bool, hasFailure: Bool, itemCount: Int) -> String {
+        if isLoading { return "Refreshing" }
+        if hasFailure { return "Unavailable" }
+        if itemCount == 0 { return "No ranking today" }
+        return "\(itemCount) articles today"
+    }
+
+    static func placeholder(isLoading: Bool, hasFailure: Bool) -> String {
+        if isLoading { return "Loading today's most read..." }
+        if hasFailure { return "Today's ranking is unavailable right now." }
+        return "No articles are ranked today."
+    }
+}
+
 extension DiscoverFeedSections {
     var allTimeMostReadStore: DiscoverAllTimeMostReadStore {
         editionModel.allTimeMostRead
@@ -228,7 +243,11 @@ extension DiscoverFeedSections {
     }
 
     var todayMostReadMeta: String {
-        todayMostReadStore.isLoading ? "Refreshing" : "\(todayMostReadItems.count) articles today"
+        DiscoverTodayMostReadPresentation.metadata(
+            isLoading: todayMostReadStore.isLoading,
+            hasFailure: todayMostReadStore.errorMessage != nil,
+            itemCount: todayMostReadItems.count
+        )
     }
 
     var todayMostReadPreviewTitles: [String] {

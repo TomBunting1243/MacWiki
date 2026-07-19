@@ -256,15 +256,40 @@ struct DiscoverExpandableCollectionCard<Content: View>: View {
 
 struct DiscoverPlaylistPlaceholder: View {
     let text: String
+    let actionTitle: String?
+    let action: (() -> Void)?
+
+    init(text: String) {
+        self.text = text
+        actionTitle = nil
+        action = nil
+    }
+
+    init(text: String, actionTitle: String, action: @escaping () -> Void) {
+        self.text = text
+        self.actionTitle = actionTitle
+        self.action = action
+    }
 
     var body: some View {
-        Text(text)
-            .font(DiscoverTypography.cardMetadata.weight(.medium))
-            .foregroundStyle(.secondary)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 8)
-            .background(Color.primary.opacity(0.03), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        HStack(alignment: .center, spacing: 12) {
+            Text(text)
+                .font(DiscoverTypography.cardMetadata.weight(.medium))
+                .foregroundStyle(.secondary)
+
+            Spacer(minLength: 8)
+
+            if let actionTitle, let action {
+                Button(actionTitle, systemImage: "arrow.clockwise", action: action)
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(Color.primary.opacity(0.03), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .accessibilityElement(children: .contain)
     }
 }
 
