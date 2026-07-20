@@ -3,7 +3,7 @@ import SwiftData
 
 @MainActor
 enum ReadStateSync {
-    static func normalizedTitle(_ title: String) -> String {
+    nonisolated static func normalizedTitle(_ title: String) -> String {
         title
             .lowercased()
             .replacingOccurrences(of: "_", with: " ")

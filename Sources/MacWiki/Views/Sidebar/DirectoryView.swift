@@ -290,9 +290,9 @@ struct DirectoryView: View {
         return Self.discoverFeedDateFormatter.date(from: dateKey) ?? discoverReferenceDate
     }
 
-    private var discoverTrendingItems: [WikipediaService.SearchResult] {
+    private var discoverMetadataItems: [WikipediaService.SearchResult] {
         guard let feed = discoverFeedStore.feed else { return [] }
-        return discoverMostReadItems(from: feed)
+        return SidebarDiscoverMostReadPolicy.selection(from: feed).items
     }
 
     private var discoverPulseItems: [WikipediaService.SearchResult] {
@@ -301,7 +301,10 @@ struct DirectoryView: View {
         if let featuredArticle = feed.featuredArticle {
             items.append(featuredArticle)
         }
-        items.append(contentsOf: discoverMostReadItems(from: feed))
+        let selection = SidebarDiscoverMostReadPolicy.selection(from: feed)
+        if selection.supportsTrendPulse {
+            items.append(contentsOf: selection.items)
+        }
         return items
     }
 
@@ -333,7 +336,7 @@ struct DirectoryView: View {
         guard !isSidebarSearchPresented else { return [] }
 
         if rootSelection == .discover {
-            return discoverTrendingItems.map { result in
+            return discoverMetadataItems.map { result in
                 metadataHydrationRequest(for: discoverArticle(from: result))
             }
         }
@@ -396,38 +399,6 @@ struct DirectoryView: View {
         }
 
         return hasher.finalize()
-    }
-
-    private func discoverMostReadItems(
-        from feed: WikipediaService.DiscoverFeed,
-        limit: Int = 24
-    ) -> [WikipediaService.SearchResult] {
-        let trendingItems = Array(feed.trending.prefix(limit))
-        guard trendingItems.isEmpty else { return trendingItems }
-
-        var deduped: [WikipediaService.SearchResult] = []
-        var seenTitles = Set<String>()
-
-        func appendUnique(_ items: [WikipediaService.SearchResult]) {
-            guard deduped.count < limit else { return }
-            for item in items {
-                let key = ReadStateSync.normalizedTitle(item.title)
-                guard !key.isEmpty else { continue }
-                guard seenTitles.insert(key).inserted else { continue }
-                deduped.append(item)
-                if deduped.count >= limit {
-                    break
-                }
-            }
-        }
-
-        appendUnique(feed.inTheNews)
-        appendUnique(feed.newsStories.flatMap(\.links))
-        let primaryTimeline = feed.onThisDaySelected.isEmpty ? feed.onThisDay : feed.onThisDaySelected
-        appendUnique(primaryTimeline.compactMap(\.article))
-        appendUnique(feed.didYouKnow.compactMap(\.article))
-
-        return deduped
     }
 
     private var shouldShowTopDirectoryChrome: Bool {
@@ -1484,7 +1455,7 @@ extension DirectoryView {
 
     @ViewBuilder
     private func sidebarDiscoverFeedSections(_ feed: WikipediaService.DiscoverFeed) -> some View {
-        let mostReadItems = discoverMostReadItems(from: feed)
+        let mostReadSelection = SidebarDiscoverMostReadPolicy.selection(from: feed)
 
         if let featured = feed.featuredArticle {
             Section("Featured Article") {
@@ -1492,17 +1463,22 @@ extension DirectoryView {
             }
         }
 
-        Section("Most Read") {
-            if mostReadItems.isEmpty {
+        Section {
+            if mostReadSelection.items.isEmpty {
                 Text("Most Read is temporarily unavailable for this date.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .padding(.vertical, 4)
             } else {
-                ForEach(mostReadItems) { result in
-                    discoverArticleRow(result, showTrendPulse: true)
+                ForEach(mostReadSelection.items) { result in
+                    discoverArticleRow(
+                        result,
+                        showTrendPulse: mostReadSelection.supportsTrendPulse
+                    )
                 }
             }
+        } header: {
+            Text(mostReadSelection.sectionTitle)
         }
 
         if !feed.newsStories.isEmpty {
