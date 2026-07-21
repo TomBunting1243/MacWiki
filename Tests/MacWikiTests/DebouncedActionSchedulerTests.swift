@@ -9,7 +9,10 @@ struct DebouncedActionSchedulerTests {
         let scheduler = DebouncedActionScheduler(delay: .milliseconds(25))
         var runCount = 0
         let clock = ContinuousClock()
-        let deadline = clock.now + .seconds(2)
+        // The complete suite runs many MainActor integration tests concurrently.
+        // Keep this deadline tolerant of executor contention while polling at the
+        // same short cadence, so an unloaded run remains just as fast.
+        let deadline = clock.now + .seconds(10)
 
         scheduler.schedule {
             runCount += 1
