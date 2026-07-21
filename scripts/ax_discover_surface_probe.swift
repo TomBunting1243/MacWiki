@@ -41,6 +41,19 @@ func flattenedElements(from root: AXUIElement, limit: Int = 6_000) -> [AXUIEleme
     return result
 }
 
+func flattenedApplicationElements(from application: AXUIElement, limit: Int = 6_000) -> [AXUIElement] {
+    let windows: [AXUIElement] = attribute(kAXWindowsAttribute as CFString, from: application) ?? []
+    let focusedWindow: AXUIElement? = attribute(kAXFocusedWindowAttribute as CFString, from: application)
+    let roots = windows.isEmpty ? focusedWindow.map { [$0] } ?? [] : windows
+    guard !roots.isEmpty else { return flattenedElements(from: application, limit: limit) }
+
+    var result: [AXUIElement] = []
+    for window in roots where result.count < limit {
+        result.append(contentsOf: flattenedElements(from: window, limit: limit - result.count))
+    }
+    return result
+}
+
 func strings(for element: AXUIElement) -> [String] {
     [
         attribute(kAXTitleAttribute as CFString, from: element) as String?,
@@ -121,6 +134,18 @@ func advanceScrollbar(in scrollArea: AXUIElement) -> Bool {
     return updated > current
 }
 
+func exposesNativeVerticalScrolling(_ scrollArea: AXUIElement, actions: [String]) -> Bool {
+    if actions.contains(where: { supportsAction($0, element: scrollArea) }) {
+        return true
+    }
+    if (attribute(kAXVerticalScrollBarAttribute as CFString, from: scrollArea) as AXUIElement?) != nil {
+        return true
+    }
+    return flattenedElements(from: scrollArea, limit: 1_500).contains {
+        role(of: $0) == (kAXScrollBarRole as String)
+    }
+}
+
 do {
     guard CommandLine.arguments.count == 2,
           let pid = pid_t(CommandLine.arguments[1]) else {
@@ -129,12 +154,16 @@ do {
     guard AXIsProcessTrusted() else { throw DiscoverProbeError.accessibilityUnavailable }
 
     let application = AXUIElementCreateApplication(pid)
+    NSRunningApplication(processIdentifier: pid)?.activate()
+    Thread.sleep(forTimeInterval: 0.2)
+    let windows: [AXUIElement] = attribute(kAXWindowsAttribute as CFString, from: application) ?? []
+    windows.forEach { _ = AXUIElementPerformAction($0, kAXRaiseAction as CFString) }
     let deadline = Date().addingTimeInterval(30)
     var lastObserved: [String] = []
     var discoverElements: [AXUIElement] = []
 
     while Date() < deadline {
-        discoverElements = flattenedElements(from: application)
+        discoverElements = flattenedApplicationElements(from: application)
         lastObserved = uniqueStrings(in: discoverElements)
 
         let hasReaderSearch = contains("Search Wikipedia", in: lastObserved)
@@ -175,11 +204,18 @@ do {
     }
     let readerScrollArea = scrollAreas.first { area in
         let values = uniqueStrings(in: flattenedElements(from: area, limit: 1_500))
-        return contains("Search Wikipedia", in: values) && contains("Time Machine", in: values)
+        return contains("Search Wikipedia", in: values)
+            && exposesNativeVerticalScrolling(area, actions: scrollActions)
     }
     guard let readerScrollArea else {
-        let summaries = scrollAreas.map { actionNames(for: $0).joined(separator: ",") }
-        throw DiscoverProbeError.surfaceMissing(["Scroll actions: \(summaries.joined(separator: " | "))"])
+        let summaries = scrollAreas.map { area in
+            let actions = actionNames(for: area).joined(separator: ",")
+            let values = uniqueStrings(in: flattenedElements(from: area, limit: 1_500))
+                .prefix(16)
+                .joined(separator: ",")
+            return "Actions=[\(actions)] Values=[\(values)]"
+        }
+        throw DiscoverProbeError.surfaceMissing(["Scroll areas: \(summaries.joined(separator: " | "))"])
     }
     NSRunningApplication(processIdentifier: pid)?.activate()
     Thread.sleep(forTimeInterval: 0.15)

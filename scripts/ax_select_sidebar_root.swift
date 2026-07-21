@@ -1,6 +1,7 @@
 #!/usr/bin/env swift
 
 import ApplicationServices
+import AppKit
 import Foundation
 
 enum SidebarSelectionError: LocalizedError {
@@ -40,6 +41,19 @@ func flattenedElements(from root: AXUIElement, limit: Int = 5_000) -> [AXUIEleme
     return result
 }
 
+func flattenedApplicationElements(from application: AXUIElement, limit: Int = 5_000) -> [AXUIElement] {
+    let windows: [AXUIElement] = attribute(kAXWindowsAttribute as CFString, from: application) ?? []
+    let focusedWindow: AXUIElement? = attribute(kAXFocusedWindowAttribute as CFString, from: application)
+    let roots = windows.isEmpty ? focusedWindow.map { [$0] } ?? [] : windows
+    guard !roots.isEmpty else { return flattenedElements(from: application, limit: limit) }
+
+    var result: [AXUIElement] = []
+    for window in roots where result.count < limit {
+        result.append(contentsOf: flattenedElements(from: window, limit: limit - result.count))
+    }
+    return result
+}
+
 func labels(for element: AXUIElement) -> [String] {
     [
         attribute(kAXTitleAttribute as CFString, from: element) as String?,
@@ -66,11 +80,15 @@ do {
 
     let targetLabel = CommandLine.arguments[2]
     let application = AXUIElementCreateApplication(pid)
+    NSRunningApplication(processIdentifier: pid)?.activate()
+    Thread.sleep(forTimeInterval: 0.2)
+    let windows: [AXUIElement] = attribute(kAXWindowsAttribute as CFString, from: application) ?? []
+    windows.forEach { _ = AXUIElementPerformAction($0, kAXRaiseAction as CFString) }
     let deadline = Date().addingTimeInterval(15)
     var target: AXUIElement?
     var selectableRow: AXUIElement?
     while Date() < deadline {
-        let applicationElements = flattenedElements(from: application)
+        let applicationElements = flattenedApplicationElements(from: application)
         target = applicationElements.first { element in
             let role: String = attribute(kAXRoleAttribute as CFString, from: element) ?? ""
             return role == (kAXButtonRole as String)

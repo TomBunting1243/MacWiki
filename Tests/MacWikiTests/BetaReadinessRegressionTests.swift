@@ -1412,6 +1412,11 @@ struct BetaReadinessRegressionTests {
         #expect(discoverScript.contains("verify_discover_via_accessibility()"))
         #expect(discoverScript.contains("discover_process_survived"))
         #expect(discoverScript.contains("kill -0 \"$QA_APP_PID\""))
+        let selectorCondition = try #require(discoverScript.range(of: "if ax_selection_output="))
+        let selectionLog = try #require(discoverScript.range(of: "01-ax-selection.txt"))
+        let survivalCheck = try #require(discoverScript.range(of: "if kill -0 \"$QA_APP_PID\""))
+        #expect(selectorCondition.lowerBound < selectionLog.lowerBound)
+        #expect(selectionLog.lowerBound < survivalCheck.lowerBound)
         #expect(!discoverScript.contains("discoverOpenMode"))
         #expect(discoverScript.contains("App binary: \\`$APP_BIN\\`"))
         #expect(!discoverScript.contains("DerivedData/MacWiki-hgaamxiclllsfufsrrsbkmjdjcle"))
@@ -1420,11 +1425,27 @@ struct BetaReadinessRegressionTests {
         #expect(!discoverScript.contains("osascript"))
 
         #expect(discoverProbe.contains("AXUIElementCreateApplication(pid)"))
+        #expect(discoverProbe.contains("kAXWindowsAttribute"))
+        #expect(discoverProbe.contains("kAXFocusedWindowAttribute"))
+        #expect(discoverProbe.contains("flattenedApplicationElements(from: application)"))
+        #expect(!discoverProbe.contains("discoverElements = flattenedElements(from: application)"))
+        #expect(discoverProbe.contains("NSRunningApplication(processIdentifier: pid)?.activate()"))
         #expect(discoverProbe.contains("READER_PAGE_VISIBLE=true"))
         #expect(discoverProbe.contains("NATIVE_PAGE_SCROLL=true"))
         #expect(discoverProbe.contains("AXScrollDownByPage"))
+        #expect(discoverProbe.contains("exposesNativeVerticalScrolling(area, actions: scrollActions)"))
         #expect(discoverProbe.contains("kAXVerticalScrollBarAttribute"))
         #expect(discoverProbe.contains("AXUIElementSetAttributeValue"))
+
+        let sidebarSelector = try source("scripts/ax_select_sidebar_root.swift")
+        let offlineRetryProbe = try source("scripts/ax_reader_offline_retry.swift")
+        for exactProcessProbe in [sidebarSelector, offlineRetryProbe] {
+            #expect(exactProcessProbe.contains("kAXWindowsAttribute"))
+            #expect(exactProcessProbe.contains("kAXFocusedWindowAttribute"))
+            #expect(exactProcessProbe.contains("flattenedApplicationElements(from: application)"))
+            #expect(exactProcessProbe.contains("NSRunningApplication(processIdentifier: pid)?.activate()"))
+            #expect(exactProcessProbe.contains("kAXRaiseAction"))
+        }
     }
 
     @Test func readingListQAHarnessesUsePortableAppBinaryDefaults() throws {
@@ -2136,8 +2157,8 @@ struct BetaReadinessRegressionTests {
 
         #expect(directorySource.contains("private var isSidebarTimeTraveling: Bool"))
         #expect(directorySource.contains("sidebarDiscoverFeedSections(feed)"))
-        #expect(directorySource.contains(".allowsHitTesting(!isSidebarTimeTraveling)"))
-        #expect(directorySource.contains(".accessibilityHidden(isSidebarTimeTraveling)"))
+        #expect(!directorySource.contains(".allowsHitTesting(!isSidebarTimeTraveling)"))
+        #expect(!directorySource.contains(".accessibilityHidden(isSidebarTimeTraveling)"))
         #expect(directorySource.contains("sidebarDiscoverFeedPresentation.showsSelectedDateLoadingStatus"))
         #expect(stateViews.contains("ProgressView()"))
         #expect(stateViews.contains(".accessibilityLabel(Text(\"Loading selected date\"))"))

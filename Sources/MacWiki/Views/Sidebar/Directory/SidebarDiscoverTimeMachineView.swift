@@ -24,99 +24,120 @@ struct SidebarDiscoverTimeMachineView: View {
         referenceDate < Calendar.current.startOfDay(for: Date())
     }
 
+    private var isBusy: Bool {
+        isLoading || isTimeTraveling
+    }
+
     var body: some View {
-        if isHidden {
-            HStack(spacing: 8) {
-                SwiftUI.Label("Time Machine Hidden", systemImage: "clock.badge.xmark")
-                    .foregroundStyle(.secondary)
-
-                Spacer(minLength: 8)
-
-                Button("Show") {
-                    withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.16)) {
-                        isHidden = false
+        VStack(spacing: 0) {
+            if isHidden {
+                HStack {
+                    Button("Show Time Machine", systemImage: "clock.arrow.trianglehead.counterclockwise.rotate.90") {
+                        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.16)) {
+                            isHidden = false
+                        }
                     }
+                    .buttonStyle(.borderless)
+
+                    Spacer(minLength: 0)
                 }
+                .font(.subheadline)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+            } else {
+                ViewThatFits(in: .horizontal) {
+                    wideControls
+                    compactControls
+                }
+                .controlSize(.regular)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
             }
-            .font(.caption)
-            .padding(.vertical, 6)
-            .accessibilityElement(children: .contain)
-        } else {
-            GroupBox {
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack(spacing: 5) {
-                        Button("Previous Day", systemImage: "chevron.left") {
-                            shift(days: -1)
-                        }
-                        .labelStyle(.iconOnly)
-                        .buttonStyle(.bordered)
-                        .help("Previous Day")
 
-                        DatePicker(
-                            "Edition Date",
-                            selection: $selectedDate,
-                            in: ...Date(),
-                            displayedComponents: [.date]
-                        )
-                        .labelsHidden()
-                        .datePickerStyle(.field)
-                        .frame(width: 112)
-                        .layoutPriority(1)
-                        .accessibilityLabel("Edition Date")
+            Divider()
+        }
+        .help("Browse Wikipedia editions from another day.")
+    }
 
-                        Button("Next Day", systemImage: "chevron.right") {
-                            shift(days: 1)
-                        }
-                        .labelStyle(.iconOnly)
-                        .buttonStyle(.bordered)
-                        .disabled(!canStepForward)
-                        .help("Next Day")
-                    }
+    private var wideControls: some View {
+        HStack(spacing: 10) {
+            timeMachineLabel
 
-                    HStack(spacing: 8) {
-                        if isLoading || isTimeTraveling {
-                            ProgressView()
-                                .controlSize(.small)
-                                .accessibilityLabel("Loading selected date")
-                        }
+            Spacer(minLength: 8)
 
-                        jumpMenu
-
-                        Button("Refresh", systemImage: "arrow.clockwise", action: onRefresh)
-                            .labelStyle(.iconOnly)
-                            .disabled(isLoading)
-                            .accessibilityLabel("Refresh Discover")
-                            .accessibilityValue(isLoading ? "Refreshing" : "Ready")
-                            .help("Refresh Discover")
-
-                        Spacer(minLength: 0)
-                    }
-                }
-                .controlSize(.small)
-            } label: {
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    SwiftUI.Label(
-                        "Time Machine",
-                        systemImage: "clock.arrow.trianglehead.counterclockwise.rotate.90"
-                    )
-
-                    Spacer(minLength: 6)
-
-                    if let visibleEditionDateLabel,
-                       !visibleEditionDateLabel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                        Text(visibleEditionDateLabel)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                    }
-                }
-                .font(.caption)
-            }
-            .help("Browse Wikipedia editions from another day.")
+            dateControls
+            optionsMenu
         }
     }
 
-    private var jumpMenu: some View {
-        Menu("Jump", systemImage: "calendar.badge.clock") {
+    private var compactControls: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                timeMachineLabel
+
+                Spacer(minLength: 8)
+
+                optionsMenu
+            }
+
+            dateControls
+        }
+    }
+
+    private var timeMachineLabel: some View {
+        HStack(spacing: 6) {
+            SwiftUI.Label(
+                "Time Machine",
+                systemImage: "clock.arrow.trianglehead.counterclockwise.rotate.90"
+            )
+            .font(.subheadline.weight(.semibold))
+
+            if isBusy {
+                ProgressView()
+                    .controlSize(.small)
+                    .accessibilityLabel("Loading selected date")
+            }
+        }
+        .lineLimit(1)
+        .fixedSize(horizontal: true, vertical: false)
+        .accessibilityElement(children: .combine)
+        .accessibilityValue(visibleEditionDateLabel ?? "")
+    }
+
+    private var dateControls: some View {
+        HStack(spacing: 4) {
+            Button("Previous Day", systemImage: "chevron.left") {
+                shift(days: -1)
+            }
+            .labelStyle(.iconOnly)
+            .buttonStyle(.borderless)
+            .help("Previous Day")
+
+            DatePicker(
+                "Edition Date",
+                selection: $selectedDate,
+                in: ...Date(),
+                displayedComponents: [.date]
+            )
+            .labelsHidden()
+            .datePickerStyle(.field)
+            .frame(width: 112)
+            .layoutPriority(1)
+            .accessibilityLabel("Edition Date")
+
+            Button("Next Day", systemImage: "chevron.right") {
+                shift(days: 1)
+            }
+            .labelStyle(.iconOnly)
+            .buttonStyle(.borderless)
+            .disabled(!canStepForward)
+            .help("Next Day")
+        }
+        .disabled(isBusy)
+    }
+
+    private var optionsMenu: some View {
+        Menu("Time Machine Options", systemImage: "calendar.badge.clock") {
             Button("Today", systemImage: "sun.max") {
                 selectedDate = Date()
             }
@@ -132,13 +153,19 @@ struct SidebarDiscoverTimeMachineView: View {
 
             Divider()
 
+            Button("Refresh", systemImage: "arrow.clockwise", action: onRefresh)
+                .disabled(isLoading)
+
             Button("Hide Time Machine", systemImage: "eye.slash") {
                 withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.16)) {
                     isHidden = true
                 }
             }
         }
-        .menuIndicator(.visible)
+        .labelStyle(.iconOnly)
+        .menuIndicator(.hidden)
+        .help("Jump to another edition")
+        .accessibilityLabel("Time Machine options")
     }
 
     private func shift(days: Int) {

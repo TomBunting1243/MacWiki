@@ -1396,9 +1396,8 @@ extension DirectoryView {
                     queueDiscoverLoadDebounced(forceRefresh: true, delayNanoseconds: 0)
                 }
             )
-            .padding(.vertical, 3)
             .listRowSeparator(.hidden)
-            .listRowInsets(EdgeInsets(top: 3, leading: 0, bottom: 3, trailing: 0))
+            .listRowInsets(EdgeInsets())
         }
 
         if sidebarDiscoverFeedPresentation.showsSelectedDateLoadingStatus {
@@ -1448,8 +1447,6 @@ extension DirectoryView {
             }
 
             sidebarDiscoverFeedSections(feed)
-                .allowsHitTesting(!isSidebarTimeTraveling)
-                .accessibilityHidden(isSidebarTimeTraveling)
         }
     }
 

@@ -122,12 +122,12 @@ discover_process_survived="false"
 ax_selection_output=""
 if ax_selection_output="$(select_discover_via_accessibility 2>&1)"; then
   discover_selected="true"
-  sleep 1
-  if kill -0 "$QA_APP_PID" 2>/dev/null; then
-    discover_process_survived="true"
-  fi
 fi
 printf '%s\n' "$ax_selection_output" >"$OUTPUT_DIR/01-ax-selection.txt"
+sleep 1
+if kill -0 "$QA_APP_PID" 2>/dev/null; then
+  discover_process_survived="true"
+fi
 
 time_machine_found="false"
 ax_verification_output=""

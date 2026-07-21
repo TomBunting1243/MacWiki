@@ -1,6 +1,7 @@
 #!/usr/bin/env swift
 
 import ApplicationServices
+import AppKit
 import Foundation
 
 enum ReaderOfflineError: LocalizedError {
@@ -46,6 +47,14 @@ func stringAttribute(_ name: CFString, from element: AXUIElement) -> String {
     return ""
 }
 
+func elementAttribute(_ name: CFString, from element: AXUIElement) -> AXUIElement? {
+    guard let value = attributeValue(name, from: element),
+          CFGetTypeID(value) == AXUIElementGetTypeID() else {
+        return nil
+    }
+    return (value as! AXUIElement)
+}
+
 func flattenedElements(from root: AXUIElement, limit: Int = 5_000) -> [AXUIElement] {
     var result: [AXUIElement] = []
     var pending = [root]
@@ -57,8 +66,21 @@ func flattenedElements(from root: AXUIElement, limit: Int = 5_000) -> [AXUIEleme
     return result
 }
 
+func flattenedApplicationElements(from application: AXUIElement, limit: Int = 5_000) -> [AXUIElement] {
+    let windows = attributeValue(kAXWindowsAttribute as CFString, from: application) as? [AXUIElement] ?? []
+    let focusedWindow = elementAttribute(kAXFocusedWindowAttribute as CFString, from: application)
+    let roots = windows.isEmpty ? focusedWindow.map { [$0] } ?? [] : windows
+    guard !roots.isEmpty else { return flattenedElements(from: application, limit: limit) }
+
+    var result: [AXUIElement] = []
+    for window in roots where result.count < limit {
+        result.append(contentsOf: flattenedElements(from: window, limit: limit - result.count))
+    }
+    return result
+}
+
 func visibleText(in application: AXUIElement) -> [String] {
-    flattenedElements(from: application).flatMap { element in
+    flattenedApplicationElements(from: application).flatMap { element in
         [
             stringAttribute(kAXTitleAttribute as CFString, from: element),
             stringAttribute(kAXDescriptionAttribute as CFString, from: element),
@@ -68,7 +90,7 @@ func visibleText(in application: AXUIElement) -> [String] {
 }
 
 func retryButton(in application: AXUIElement) -> AXUIElement? {
-    flattenedElements(from: application).first { element in
+    flattenedApplicationElements(from: application).first { element in
         guard stringAttribute(kAXRoleAttribute as CFString, from: element) == (kAXButtonRole as String) else {
             return false
         }
@@ -98,6 +120,10 @@ do {
     guard AXIsProcessTrusted() else { throw ReaderOfflineError.accessibilityUnavailable }
 
     let application = AXUIElementCreateApplication(pid)
+    NSRunningApplication(processIdentifier: pid)?.activate()
+    Thread.sleep(forTimeInterval: 0.2)
+    let windows = attributeValue(kAXWindowsAttribute as CFString, from: application) as? [AXUIElement] ?? []
+    windows.forEach { _ = AXUIElementPerformAction($0, kAXRaiseAction as CFString) }
     let initialDeadline = Date().addingTimeInterval(20)
     var initialText: [String] = []
     var button: AXUIElement?

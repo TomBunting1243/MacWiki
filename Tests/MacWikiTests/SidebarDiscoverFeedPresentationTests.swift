@@ -55,8 +55,8 @@ struct SidebarDiscoverFeedPresentationTests {
         #expect(sectionSource.contains("isHidden: $discoverSidebarTimeMachineHidden"))
         #expect(sectionSource.contains("SidebarDiscoverRetainedEditionWarning("))
         #expect(sectionSource.contains("queueDiscoverLoadDebounced(forceRefresh: true, delayNanoseconds: 0)"))
-        #expect(sectionSource.contains(".allowsHitTesting(!isSidebarTimeTraveling)"))
-        #expect(sectionSource.contains(".accessibilityHidden(isSidebarTimeTraveling)"))
+        #expect(!sectionSource.contains(".allowsHitTesting(!isSidebarTimeTraveling)"))
+        #expect(!sectionSource.contains(".accessibilityHidden(isSidebarTimeTraveling)"))
 
         let stateViewsSource = try String(
             contentsOf: repositoryRoot().appendingPathComponent(

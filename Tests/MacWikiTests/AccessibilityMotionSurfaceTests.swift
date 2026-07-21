@@ -27,7 +27,10 @@ struct AccessibilityMotionSurfaceTests {
         #expect(timeMachine.contains(".transition(reduceMotion ? .opacity"))
         #expect(timeMachine.contains(".animation(reduceMotion ? nil : .easeOut(duration: 0.14), value: isScanning)"))
         #expect(sidebarTimeMachine.components(separatedBy: "withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.16))").count - 1 == 2)
-        #expect(sidebarTimeMachine.contains("GroupBox"))
+        #expect(sidebarTimeMachine.contains("ViewThatFits(in: .horizontal)"))
+        #expect(sidebarTimeMachine.contains("wideControls"))
+        #expect(sidebarTimeMachine.contains("compactControls"))
+        #expect(!sidebarTimeMachine.contains("GroupBox"))
         #expect(!sidebarTimeMachine.contains("ControlGroup"))
         #expect(!sidebarTimeMachine.contains("discoverSurfaceChrome"))
         #expect(!sidebarTimeMachine.contains("strokeBorder"))
@@ -56,6 +59,9 @@ struct AccessibilityMotionSurfaceTests {
             "Sources/MacWiki/Views/Sidebar/Directory/SidebarDiscoverTimeMachineView.swift"
         )
         #expect(sidebarSource.contains(".frame(width: 112)"))
+        #expect(sidebarSource.contains(".buttonStyle(.borderless)"))
+        #expect(sidebarSource.contains(".menuIndicator(.hidden)"))
+        #expect(sidebarSource.contains(".disabled(isBusy)"))
     }
 
     private func source(_ relativePath: String) throws -> String {
