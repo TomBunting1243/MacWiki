@@ -133,4 +133,81 @@ struct DirectorySnapshotBuilderTests {
         #expect(snapshot.visibleReadCount == 1)
         #expect(snapshot.visibleUnreadCount == 1)
     }
+
+    @Test func buildVisibleSnapshotCountsInMemoryHistoryReadStateWithoutPersistedBacking() {
+        let readArticle = Article(id: "read", title: "Read in Memory", isRead: true)
+        let unreadArticle = Article(id: "unread", title: "Unread in Memory", isRead: false)
+        let tab = ArticleTab(
+            content: .history(
+                items: [
+                    HistoryItem(article: readArticle),
+                    HistoryItem(article: unreadArticle)
+                ],
+                currentIndex: 1
+            )
+        )
+        let indexes = DirectoryArticleIndexes(
+            articleStates: [],
+            highlights: [],
+            savedArticles: []
+        )
+
+        let snapshot = DirectorySnapshotBuilder.buildVisibleSnapshot(
+            selectedList: nil,
+            selectedLabel: nil,
+            selectedTag: nil,
+            rootSelection: .recents,
+            recentsScope: .currentTab,
+            activeTabId: tab.id,
+            openTabs: [tab],
+            recentArticles: [],
+            savedArticles: [],
+            articleStates: [],
+            highlights: [],
+            localLabelFilter: nil,
+            localTagFilter: nil,
+            supplementalReadFilter: .all,
+            supplementalSortMode: .recent,
+            articleIndexes: indexes,
+            resolvedSavedArticleWordCount: { $0.wordCount ?? 0 },
+            resolvedArticleWordCount: { $0.wordCount ?? 0 }
+        )
+
+        #expect(snapshot.visibleTitles == ["Unread in Memory", "Read in Memory"])
+        #expect(snapshot.visibleReadCount == 1)
+        #expect(snapshot.visibleUnreadCount == 1)
+    }
+
+    @Test func buildVisibleSnapshotCountsInMemoryRecentReadStateWithoutPersistedBacking() {
+        let readArticle = Article(id: "read", title: "Read Recent", isRead: true)
+        let unreadArticle = Article(id: "unread", title: "Unread Recent", isRead: false)
+        let indexes = DirectoryArticleIndexes(
+            articleStates: [], highlights: [], savedArticles: []
+        )
+
+        let snapshot = DirectorySnapshotBuilder.buildVisibleSnapshot(
+            selectedList: nil,
+            selectedLabel: nil,
+            selectedTag: nil,
+            rootSelection: .recents,
+            recentsScope: .allTabs,
+            activeTabId: nil,
+            openTabs: [],
+            recentArticles: [readArticle, unreadArticle],
+            savedArticles: [],
+            articleStates: [],
+            highlights: [],
+            localLabelFilter: nil,
+            localTagFilter: nil,
+            supplementalReadFilter: .all,
+            supplementalSortMode: .recent,
+            articleIndexes: indexes,
+            resolvedSavedArticleWordCount: { $0.wordCount ?? 0 },
+            resolvedArticleWordCount: { $0.wordCount ?? 0 }
+        )
+
+        #expect(snapshot.visibleTitles == ["Read Recent", "Unread Recent"])
+        #expect(snapshot.visibleReadCount == 1)
+        #expect(snapshot.visibleUnreadCount == 1)
+    }
 }

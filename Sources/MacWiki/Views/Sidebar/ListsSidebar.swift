@@ -641,11 +641,13 @@ struct ListsSidebar: View {
                 area: area,
                 lists: listsInArea(area),
                 childAreas: childAreas(of: area),
+                totalListCount: resolvedCollectionsSnapshot.totalListCount(in: area),
                 parentAreaByID: resolvedCollectionsSnapshot.parentAreaByID,
                 selectedAreaIDs: $selectedAreaIDs,
                 listRow: listRow,
                 listsInArea: listsInArea,
                 childAreasOf: childAreas,
+                totalListCountInArea: resolvedCollectionsSnapshot.totalListCount,
                 onRename: { areaToRename in
                     editingArea = areaToRename
                     editingAreaName = areaToRename.name
@@ -1607,11 +1609,13 @@ private struct AreaRowView<ListRow: View>: View {
     let area: Area
     let lists: [ReadingList]
     let childAreas: [Area]
+    let totalListCount: Int
     let parentAreaByID: [UUID: UUID?]
     @Binding var selectedAreaIDs: Set<UUID>
     let listRow: (ReadingList) -> ListRow
     let listsInArea: (Area) -> [ReadingList]
     let childAreasOf: (Area) -> [Area]
+    let totalListCountInArea: (Area) -> Int
     let onRename: (Area) -> Void
     let onRequestDelete: (Set<UUID>) -> Void
     let onExpansionChange: (Area, Bool) -> Void
@@ -1631,17 +1635,6 @@ private struct AreaRowView<ListRow: View>: View {
 
     private var deleteActionLabel: String {
         deleteTargetAreaIDs.count > 1 ? "Delete Selected Folders" : "Delete Folder"
-    }
-
-    /// Total count of lists in this area and all nested areas
-    private var totalListCount: Int {
-        lists.count + childAreas.reduce(0) { $0 + countListsRecursive(in: $1) }
-    }
-
-    private func countListsRecursive(in area: Area) -> Int {
-        let directLists = listsInArea(area).count
-        let nestedLists = childAreasOf(area).reduce(0) { $0 + countListsRecursive(in: $1) }
-        return directLists + nestedLists
     }
 
     private var isDropTargeted: Bool {
@@ -1667,11 +1660,13 @@ private struct AreaRowView<ListRow: View>: View {
                     area: childArea,
                     lists: listsInArea(childArea),
                     childAreas: childAreasOf(childArea),
+                    totalListCount: totalListCountInArea(childArea),
                     parentAreaByID: parentAreaByID,
                     selectedAreaIDs: $selectedAreaIDs,
                     listRow: listRow,
                     listsInArea: listsInArea,
                     childAreasOf: childAreasOf,
+                    totalListCountInArea: totalListCountInArea,
                     onRename: onRename,
                     onRequestDelete: onRequestDelete,
                     onExpansionChange: onExpansionChange,

@@ -161,14 +161,16 @@ do {
     let deadline = Date().addingTimeInterval(30)
     var lastObserved: [String] = []
     var discoverElements: [AXUIElement] = []
+    var didOpenTimeMachine = false
 
     while Date() < deadline {
         discoverElements = flattenedApplicationElements(from: application)
         lastObserved = uniqueStrings(in: discoverElements)
 
         let hasReaderSearch = contains("Search Wikipedia", in: lastObserved)
-        let hasTimeMachine = contains("Time Machine", in: lastObserved)
-            && (contains("Edition Date", in: lastObserved) || contains("Previous Day", in: lastObserved))
+        let hasTimeMachineButton = contains("Time Machine", in: lastObserved)
+        let hasTimeMachineControls = contains("Edition Date", in: lastObserved)
+            || contains("Previous Day", in: lastObserved)
         let hasEdition = [
             "Featured Article",
             "Most Read",
@@ -177,8 +179,22 @@ do {
             "Discover Unavailable"
         ].contains { contains($0, in: lastObserved) }
 
-        if hasReaderSearch && hasTimeMachine && hasEdition {
+        if hasReaderSearch && hasTimeMachineButton && hasTimeMachineControls && hasEdition {
             break
+        }
+
+        if hasTimeMachineButton, !hasTimeMachineControls, !didOpenTimeMachine,
+           let timeMachineButton = discoverElements.first(where: { element in
+               role(of: element) == (kAXButtonRole as String)
+                   && strings(for: element).contains(where: {
+                       $0.localizedCaseInsensitiveContains("Time Machine")
+                   })
+                   && supportsAction(kAXPressAction as String, element: element)
+           }) {
+            let pressResult = AXUIElementPerformAction(timeMachineButton, kAXPressAction as CFString)
+            didOpenTimeMachine = pressResult == .success
+            Thread.sleep(forTimeInterval: 0.2)
+            continue
         }
 
         Thread.sleep(forTimeInterval: 0.15)

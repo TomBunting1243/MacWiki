@@ -54,6 +54,9 @@ struct TagArticlesView: View {
         hasher.combine(readFilter == .unread)
         hasher.combine(sortMode.rawValue)
         hasher.combine(localTagFilter?.id)
+        for id in allTags.map(\.id).sorted(by: { $0.uuidString < $1.uuidString }) {
+            hasher.combine(id)
+        }
 
         if sortMode == .articleLength {
             for title in visibleSnapshotCandidateTitles {
@@ -74,13 +77,20 @@ struct TagArticlesView: View {
     }
 
     private func refreshVisibleSnapshot() {
+        let resolvedTagFilter = localTagFilter.flatMap { filter in
+            allTags.contains(where: { $0.id == filter.id }) ? filter : nil
+        }
+        if localTagFilter != nil && resolvedTagFilter == nil {
+            localTagFilter = nil
+        }
+
         visibleSnapshot = TagArticlesSnapshot(
             tag: tag,
             articleStates: articleStates,
             highlights: allHighlights,
             readFilter: readFilter,
             sortMode: sortMode,
-            tagFilter: localTagFilter,
+            tagFilter: resolvedTagFilter,
             articleIndexes: articleIndexes,
             resolvedWordCount: resolvedWordCount(for:)
         )

@@ -105,4 +105,64 @@ struct ListsSidebarAreaPlannerTests {
         #expect(ListsSidebarAreaPlanner.isDescendant(areaID: areaB, of: areaA, parentAreaByID: parentAreaByID))
         #expect(!ListsSidebarAreaPlanner.isDescendant(areaID: areaA, of: unrelated, parentAreaByID: parentAreaByID))
     }
+
+    @Test func buildDeletionPlanBreaksAncestryCyclesOutsideTheCandidateSet() {
+        let selected = Area(name: "Selected")
+        let cycleA = Area(name: "Cycle A")
+        let cycleB = Area(name: "Cycle B")
+        selected.parentId = cycleA.id
+        cycleA.parentId = cycleB.id
+        cycleB.parentId = cycleA.id
+
+        let snapshot = ListsSidebarSnapshot(
+            lists: [], areas: [selected, cycleA, cycleB], labels: [], tags: [],
+            savedArticles: [], highlights: [], articleStates: [], sortOrder: .manual
+        )
+
+        let plan = ListsSidebarAreaPlanner.buildDeletionPlan(
+            requestedAreaIDs: [selected.id],
+            snapshot: snapshot
+        )
+
+        #expect(plan?.rootAreaIDs == [selected.id])
+        #expect(plan?.subtreeAreaIDs == [selected.id])
+    }
+
+    @Test func buildDeletionPlanTreatsSelfParentedCandidateAsItsOwnRoot() {
+        let selected = Area(name: "Selected")
+        selected.parentId = selected.id
+        let snapshot = ListsSidebarSnapshot(
+            lists: [], areas: [selected], labels: [], tags: [], savedArticles: [],
+            highlights: [], articleStates: [], sortOrder: .manual
+        )
+
+        let plan = ListsSidebarAreaPlanner.buildDeletionPlan(
+            requestedAreaIDs: [selected.id], snapshot: snapshot
+        )
+
+        #expect(plan?.rootAreaIDs == [selected.id])
+        #expect(plan?.subtreeAreaIDs == [selected.id])
+    }
+
+    @Test func buildDeletionPlanChoosesOneStableRootForSelectedCycle() {
+        let first = Area(name: "First")
+        first.sortOrder = 0
+        let second = Area(name: "Second")
+        second.sortOrder = 1
+        first.parentId = second.id
+        second.parentId = first.id
+        let snapshot = ListsSidebarSnapshot(
+            lists: [], areas: [second, first], labels: [], tags: [], savedArticles: [],
+            highlights: [], articleStates: [], sortOrder: .manual
+        )
+
+        let plan = ListsSidebarAreaPlanner.buildDeletionPlan(
+            requestedAreaIDs: [first.id, second.id], snapshot: snapshot
+        )
+
+        #expect(plan?.rootAreaIDs == [first.id])
+        #expect(plan?.subtreeAreaIDs == [first.id, second.id])
+        #expect(plan?.folderCount == 1)
+        #expect(plan?.nestedFolderCount == 1)
+    }
 }

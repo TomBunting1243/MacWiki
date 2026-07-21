@@ -38,6 +38,7 @@ struct DirectoryView: View {
     @State private var pendingPageViewsRowKey: String?
     @State private var activePageViewsPopover: SidebarPageViewsPopoverPayload?
     @State private var discoverDateLoadTask: Task<Void, Never>?
+    @State private var isSidebarTimeMachinePresented = false
     @State private var topObscuredHeight: CGFloat = 38
 
     private let wikipediaService = WikipediaService.shared
@@ -129,6 +130,12 @@ struct DirectoryView: View {
         hasher.combine(localTagFilter?.id)
         hasher.combine(supplementalReadFilter == .unread)
         hasher.combine(supplementalSortMode.rawValue)
+        for id in labels.map(\.id).sorted(by: { $0.uuidString < $1.uuidString }) {
+            hasher.combine(id)
+        }
+        for id in tags.map(\.id).sorted(by: { $0.uuidString < $1.uuidString }) {
+            hasher.combine(id)
+        }
 
         if let list = selectedList {
             hasher.combine(list.filterMode.rawValue)
@@ -443,6 +450,19 @@ struct DirectoryView: View {
     }
 
     private func refreshVisibleSnapshot() {
+        let resolvedLocalLabelFilter = localLabelFilter.flatMap { filter in
+            labels.contains(where: { $0.id == filter.id }) ? filter : nil
+        }
+        let resolvedLocalTagFilter = localTagFilter.flatMap { filter in
+            tags.contains(where: { $0.id == filter.id }) ? filter : nil
+        }
+        if localLabelFilter != nil && resolvedLocalLabelFilter == nil {
+            localLabelFilter = nil
+        }
+        if localTagFilter != nil && resolvedLocalTagFilter == nil {
+            localTagFilter = nil
+        }
+
         visibleSnapshot = DirectorySnapshotBuilder.buildVisibleSnapshot(
             selectedList: selectedList,
             selectedLabel: selectedLabel,
@@ -455,8 +475,8 @@ struct DirectoryView: View {
             savedArticles: savedArticles,
             articleStates: articleStates,
             highlights: highlights,
-            localLabelFilter: localLabelFilter,
-            localTagFilter: localTagFilter,
+            localLabelFilter: resolvedLocalLabelFilter,
+            localTagFilter: resolvedLocalTagFilter,
             supplementalReadFilter: supplementalReadFilter,
             supplementalSortMode: supplementalSortMode,
             articleIndexes: articleIndexes,
@@ -520,6 +540,9 @@ struct DirectoryView: View {
         VStack(spacing: 0) {
             if isSidebarSearchPresented {
                 SidebarSearchView(model: sidebarSearchModel)
+                    .onAppear {
+                        isSidebarTimeMachinePresented = false
+                    }
             } else {
                 directoryList
             }
@@ -560,10 +583,19 @@ struct DirectoryView: View {
             if newValue != .discover {
                 discoverDateLoadTask?.cancel()
                 discoverTrendPulseStore.cancel()
+                isSidebarTimeMachinePresented = false
+            }
+        }
+        .onChange(of: discoverSidebarTimeMachineHidden) { _, isHidden in
+            if isHidden {
+                isSidebarTimeMachinePresented = false
             }
         }
         .onDisappear {
             flushScheduledModelContextSave()
+            isSidebarTimeMachinePresented = false
+            discoverDateLoadTask?.cancel()
+            discoverTrendPulseStore.cancel()
             metadataHydrator.cancel()
         }
         .confirmationDialog(
@@ -923,74 +955,81 @@ struct DirectoryView: View {
             discoverHeaderControls
         } else {
             ControlGroup {
-                directoryUnreadFilterButton
-                directorySortMenu
+                directoryViewOptionsMenu
                 directoryBatchActionsMenu
             }
-            .controlSize(.small)
+            .controlSize(.regular)
         }
     }
 
     private var discoverHeaderControls: some View {
-        ControlGroup {
-            Button {
-                queueDiscoverLoadDebounced(forceRefresh: true, delayNanoseconds: 0)
-            } label: {
-                SwiftUI.Label("Refresh Discover", systemImage: "arrow.clockwise")
-                    .labelStyle(.iconOnly)
-                    .font(.system(size: ChromeIconMetrics.symbolPointSize, weight: ChromeIconMetrics.regularWeight))
-                    .imageScale(.medium)
-                    .foregroundStyle(.secondary)
-                    .frame(width: TopChromeControlMetrics.groupButtonSize, height: TopChromeControlMetrics.groupButtonSize)
+        ViewThatFits(in: .horizontal) {
+            ControlGroup {
+                discoverTimeMachineButton
+                discoverRefreshButton
             }
+            .fixedSize(horizontal: true, vertical: false)
+
+            ControlGroup {
+                discoverTimeMachineButton
+                discoverRefreshButton
+            }
+            .labelStyle(.iconOnly)
+            .fixedSize(horizontal: true, vertical: false)
+        }
+        .controlSize(.regular)
+    }
+
+    @ViewBuilder
+    private var discoverTimeMachineButton: some View {
+        if !discoverSidebarTimeMachineHidden {
+            Button("Time Machine", systemImage: "clock.arrow.trianglehead.counterclockwise.rotate.90") {
+                isSidebarTimeMachinePresented.toggle()
+            }
+            .help("Browse Wikipedia editions from another day")
+            .accessibilityValue(discoverFeedStore.isLoading ? "Updating" : discoverTimeMachineHeaderDateLabel)
+            .popover(isPresented: $isSidebarTimeMachinePresented, arrowEdge: .top) {
+                SidebarDiscoverTimeMachineView(
+                    selectedDate: selectedDiscoverDateBinding,
+                    isHidden: $discoverSidebarTimeMachineHidden,
+                    visibleEditionDateLabel: discoverFeedStore.feed?.dateLabel,
+                    isLoading: discoverFeedStore.isLoading,
+                    isTimeTraveling: isSidebarTimeTraveling,
+                    onRefresh: refreshDiscover
+                )
+            }
+        }
+    }
+
+    private var discoverRefreshButton: some View {
+        Button("Refresh", systemImage: "arrow.clockwise", action: refreshDiscover)
             .disabled(discoverFeedStore.isLoading)
-            .help("Refresh Discover")
-        }
-        .controlSize(.small)
+            .help(discoverFeedStore.isLoading ? "Refreshing Discover…" : "Refresh Discover")
+            .accessibilityLabel("Refresh Discover")
+            .accessibilityValue(discoverFeedStore.isLoading ? "Refreshing" : "Ready")
     }
 
-    private var directoryUnreadFilterButton: some View {
-        let unreadFilterEnabled = isUnreadFilterEnabled
-
-        return Button {
-            toggleUnreadFilter()
-        } label: {
-            Image(systemName: unreadFilterEnabled ? "circle.inset.filled" : "circle")
-                .font(.system(size: ChromeIconMetrics.symbolPointSize, weight: ChromeIconMetrics.regularWeight))
-                .imageScale(.medium)
-                .foregroundStyle(unreadFilterEnabled ? Color.accentColor : .secondary)
-                .frame(width: TopChromeControlMetrics.groupButtonSize, height: TopChromeControlMetrics.groupButtonSize)
-        }
-        .help(unreadFilterEnabled ? "Show all articles" : "Show unread only")
-        .accessibilityLabel("Unread only")
-        .accessibilityValue(unreadFilterEnabled ? "Enabled" : "Disabled")
+    private func refreshDiscover() {
+        queueDiscoverLoadDebounced(forceRefresh: true, delayNanoseconds: 0)
     }
 
-    private var directorySortMenu: some View {
-        let sortMode = activeDirectorySortMode
+    private var directoryViewOptionsMenu: some View {
+        Menu("View", systemImage: "line.3.horizontal.decrease") {
+            Picker("Show", selection: directoryUnreadOnlyBinding) {
+                Text("All Articles").tag(false)
+                Text("Unread Only").tag(true)
+            }
 
-        return Menu {
-            ForEach(DirectorySupplementalSortMode.allCases, id: \.self) { mode in
-                Button {
-                    setDirectorySortMode(mode)
-                } label: {
-                    HStack {
-                        Text(mode.rawValue)
-                        if sortMode == mode {
-                            Image(systemName: "checkmark")
-                        }
-                    }
+            Picker("Sort", selection: directorySortModeBinding) {
+                ForEach(DirectorySupplementalSortMode.allCases, id: \.self) { mode in
+                    Text(mode.rawValue).tag(mode)
                 }
             }
-        } label: {
-            SwiftUI.Label("Sort Articles", systemImage: "arrow.up.arrow.down")
-                .labelStyle(.iconOnly)
-                .font(.system(size: ChromeIconMetrics.symbolPointSize, weight: ChromeIconMetrics.regularWeight))
-                .imageScale(.medium)
-                .foregroundStyle(.secondary)
-                .frame(width: TopChromeControlMetrics.groupButtonSize, height: TopChromeControlMetrics.groupButtonSize)
         }
-        .help("Sort")
+        .help("Filter and sort articles")
+        .accessibilityValue(
+            "\(isUnreadFilterEnabled ? "Unread only" : "All articles"), sorted by \(activeDirectorySortMode.rawValue)"
+        )
     }
 
     private var directoryBatchActionsMenu: some View {
@@ -1067,14 +1106,23 @@ struct DirectoryView: View {
             }
             .disabled(visibleReadCount == 0)
         } label: {
-            SwiftUI.Label("Batch Actions", systemImage: "ellipsis.circle")
-                .labelStyle(.iconOnly)
-                .font(.system(size: ChromeIconMetrics.symbolPointSize, weight: ChromeIconMetrics.regularWeight))
-                .imageScale(.medium)
-                .foregroundStyle(.secondary)
-                .frame(width: TopChromeControlMetrics.groupButtonSize, height: TopChromeControlMetrics.groupButtonSize)
+            SwiftUI.Label("Actions", systemImage: "ellipsis.circle")
         }
         .help("Batch actions")
+    }
+
+    private var directoryUnreadOnlyBinding: Binding<Bool> {
+        Binding(
+            get: { isUnreadFilterEnabled },
+            set: { setDirectoryUnreadFilterEnabled($0) }
+        )
+    }
+
+    private var directorySortModeBinding: Binding<DirectorySupplementalSortMode> {
+        Binding(
+            get: { activeDirectorySortMode },
+            set: { setDirectorySortMode($0) }
+        )
     }
 
     private var isUnreadFilterEnabled: Bool {
@@ -1084,12 +1132,12 @@ struct DirectoryView: View {
         return supplementalReadFilter == .unread
     }
 
-    private func toggleUnreadFilter() {
+    private func setDirectoryUnreadFilterEnabled(_ isEnabled: Bool) {
         if let list = selectedList {
-            list.filterMode = (list.filterMode == .unread) ? .all : .unread
+            list.filterMode = isEnabled ? .unread : .all
             requestModelContextSave()
         } else {
-            supplementalReadFilter = (supplementalReadFilter == .unread) ? .all : .unread
+            supplementalReadFilter = isEnabled ? .unread : .all
         }
     }
 
@@ -1385,21 +1433,6 @@ extension DirectoryView {
 
     @ViewBuilder
     func discoverSections() -> some View {
-        Section {
-            SidebarDiscoverTimeMachineView(
-                selectedDate: selectedDiscoverDateBinding,
-                isHidden: $discoverSidebarTimeMachineHidden,
-                visibleEditionDateLabel: discoverFeedStore.feed?.dateLabel,
-                isLoading: discoverFeedStore.isLoading,
-                isTimeTraveling: isSidebarTimeTraveling,
-                onRefresh: {
-                    queueDiscoverLoadDebounced(forceRefresh: true, delayNanoseconds: 0)
-                }
-            )
-            .listRowSeparator(.hidden)
-            .listRowInsets(EdgeInsets())
-        }
-
         if sidebarDiscoverFeedPresentation.showsSelectedDateLoadingStatus {
             Section {
                 SidebarDiscoverSelectedDateLoadingStatus(selectedDate: discoverReferenceDate)

@@ -15,7 +15,7 @@ struct AccessibilityMotionSurfaceTests {
         )
         let listsSidebar = try source("Sources/MacWiki/Views/Sidebar/ListsSidebar.swift")
 
-        for surface in [highlightRow, sidebarSearch, searchResults, timeMachine, sidebarTimeMachine] {
+        for surface in [highlightRow, sidebarSearch, searchResults, timeMachine] {
             #expect(surface.contains("@Environment(\\.macWikiAccessibilityPersonalization.reduceMotion)"))
         }
 
@@ -26,12 +26,11 @@ struct AccessibilityMotionSurfaceTests {
         #expect(searchResults.contains("proxy.scrollTo(newValue, anchor: .center)"))
         #expect(timeMachine.contains(".transition(reduceMotion ? .opacity"))
         #expect(timeMachine.contains(".animation(reduceMotion ? nil : .easeOut(duration: 0.14), value: isScanning)"))
-        #expect(sidebarTimeMachine.components(separatedBy: "withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.16))").count - 1 == 2)
-        #expect(sidebarTimeMachine.contains("ViewThatFits(in: .horizontal)"))
-        #expect(sidebarTimeMachine.contains("wideControls"))
-        #expect(sidebarTimeMachine.contains("compactControls"))
+        #expect(!sidebarTimeMachine.contains("withAnimation"))
+        #expect(!sidebarTimeMachine.contains("ViewThatFits"))
+        #expect(sidebarTimeMachine.contains("ControlGroup"))
+        #expect(sidebarTimeMachine.contains(".frame(width: 286)"))
         #expect(!sidebarTimeMachine.contains("GroupBox"))
-        #expect(!sidebarTimeMachine.contains("ControlGroup"))
         #expect(!sidebarTimeMachine.contains("discoverSurfaceChrome"))
         #expect(!sidebarTimeMachine.contains("strokeBorder"))
         #expect(listsSidebar.contains("withAnimation(reduceMotion ? nil : .default)"))
@@ -58,9 +57,12 @@ struct AccessibilityMotionSurfaceTests {
         let sidebarSource = try source(
             "Sources/MacWiki/Views/Sidebar/Directory/SidebarDiscoverTimeMachineView.swift"
         )
-        #expect(sidebarSource.contains(".frame(width: 112)"))
-        #expect(sidebarSource.contains(".buttonStyle(.borderless)"))
-        #expect(sidebarSource.contains(".menuIndicator(.hidden)"))
+        #expect(sidebarSource.contains("DatePicker("))
+        #expect(sidebarSource.contains(".datePickerStyle(.field)"))
+        #expect(sidebarSource.contains("ControlGroup"))
+        #expect(sidebarSource.contains("Button(\"Hide from List Contents\", systemImage: \"eye.slash\")"))
+        #expect(!sidebarSource.contains(".menuIndicator(.hidden)"))
+        #expect(!sidebarSource.contains(".frame(width: 112)"))
         #expect(sidebarSource.contains(".disabled(isBusy)"))
     }
 

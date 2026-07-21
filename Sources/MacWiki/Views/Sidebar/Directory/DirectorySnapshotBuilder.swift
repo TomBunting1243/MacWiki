@@ -94,8 +94,27 @@ enum DirectorySnapshotBuilder {
             visibleTitles = recentArticlesSnapshot.map(\.title)
         }
 
-        let counts = visibleTitles.reduce(into: (read: 0, unread: 0)) { result, title in
-            if articleIndexes.effectiveReadState(for: title, fallback: false) {
+        let visibleReadStates: [Bool]
+        if selectedList != nil {
+            visibleReadStates = listArticles.map {
+                articleIndexes.effectiveReadState(for: $0.title, fallback: $0.isRead)
+            }
+        } else if !tabHistoryItems.isEmpty {
+            visibleReadStates = tabHistoryItems.map {
+                articleIndexes.effectiveReadState(for: $0.article.title, fallback: $0.article.isRead)
+            }
+        } else if !recentArticlesSnapshot.isEmpty {
+            visibleReadStates = recentArticlesSnapshot.map {
+                articleIndexes.effectiveReadState(for: $0.title, fallback: $0.isRead)
+            }
+        } else {
+            visibleReadStates = visibleTitles.map {
+                articleIndexes.effectiveReadState(for: $0, fallback: false)
+            }
+        }
+
+        let counts = visibleReadStates.reduce(into: (read: 0, unread: 0)) { result, isRead in
+            if isRead {
                 result.read += 1
             } else {
                 result.unread += 1

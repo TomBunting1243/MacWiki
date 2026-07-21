@@ -339,15 +339,18 @@ struct BetaReadinessRegressionTests {
         ).contains("configureBaseAppearance"))
     }
 
-    @Test func iconOnlyReaderAndFilterControlsExposeState() throws {
+    @Test func readerAndDirectoryFilterControlsExposeState() throws {
         let searchHeader = try source("Sources/MacWiki/Views/Sidebar/Search/SidebarSearchHeaderView.swift")
         let directory = try source("Sources/MacWiki/Views/Sidebar/DirectoryView.swift")
         let reader = try source("Sources/MacWiki/Views/Reader/ReaderView.swift")
 
         #expect(searchHeader.contains(".accessibilityLabel(\"Unread only\")"))
         #expect(searchHeader.contains(".accessibilityValue(model.readFilter == .unread ? \"Enabled\" : \"Disabled\")"))
-        #expect(directory.contains(".accessibilityLabel(\"Unread only\")"))
-        #expect(directory.contains(".accessibilityValue(unreadFilterEnabled ? \"Enabled\" : \"Disabled\")"))
+        #expect(directory.contains("Menu(\"View\", systemImage: \"line.3.horizontal.decrease\")"))
+        #expect(directory.contains("Picker(\"Show\", selection: directoryUnreadOnlyBinding)"))
+        #expect(directory.contains("Text(\"All Articles\").tag(false)"))
+        #expect(directory.contains("Text(\"Unread Only\").tag(true)"))
+        #expect(!directory.contains("TopChromeControlMetrics.groupButtonSize"))
         #expect(reader.contains(".accessibilityLabel(\"Dismiss finished-reading prompt\")"))
     }
 

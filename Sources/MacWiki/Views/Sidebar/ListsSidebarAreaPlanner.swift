@@ -91,15 +91,26 @@ enum ListsSidebarAreaPlanner {
             return ListsSidebarSnapshot.compareAreasForSortOrder(lhs, rhs)
         }
 
-        return sorted.filter { areaID in
-            var currentParentID = snapshot.areaIndexByID[areaID]?.parentId
-            while let parentID = currentParentID {
-                if candidateIDs.contains(parentID) {
-                    return false
-                }
-                currentParentID = snapshot.areaIndexByID[parentID]?.parentId
+        var roots: [UUID] = []
+        var coveredAreaIDs: Set<UUID> = []
+
+        for candidateID in sorted {
+            guard !coveredAreaIDs.contains(candidateID) else { continue }
+
+            let candidateSubtree = areaSubtreeIDs(for: candidateID, snapshot: snapshot)
+            roots.removeAll { candidateSubtree.contains($0) }
+            roots.append(candidateID)
+
+            coveredAreaIDs = roots.reduce(into: []) { covered, rootID in
+                covered.formUnion(areaSubtreeIDs(for: rootID, snapshot: snapshot))
             }
-            return true
+        }
+
+        return roots.sorted { lhsID, rhsID in
+            guard let lhs = snapshot.areaIndexByID[lhsID], let rhs = snapshot.areaIndexByID[rhsID] else {
+                return lhsID.uuidString < rhsID.uuidString
+            }
+            return ListsSidebarSnapshot.compareAreasForSortOrder(lhs, rhs)
         }
     }
 
