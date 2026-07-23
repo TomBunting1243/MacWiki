@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Testing
 
@@ -182,6 +183,25 @@ struct DiscoverEditorialDesignRegressionTests {
         #expect(rows.contains("SidebarPageViewsPopoverButton("))
         #expect(!rows.contains(".popover(isPresented:"))
         #expect(!discoverRows.contains(".popover(isPresented:"))
+    }
+
+    @Test @MainActor
+    func discoverSidebarStatisticsPillsKeepReadableNativeMetrics() {
+        let button = SidebarPageViewsPopoverButton.PageViewsButton()
+
+        button.configure(
+            pulse: nil,
+            style: .pulse,
+            title: "Readable statistics"
+        )
+
+        #expect(button.intrinsicContentSize.height >= 26)
+        #expect(button.layer?.cornerRadius == 13)
+        #expect(
+            button.contentCompressionResistancePriority(for: .horizontal)
+                == .required
+        )
+        #expect(button.contentHuggingPriority(for: .horizontal) == .required)
     }
 
     @Test func leavingDirectoryClearsPageViewsPresentationState() throws {

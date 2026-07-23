@@ -244,7 +244,7 @@ extension SidebarPageViewsPopoverButton {
             let base = super.intrinsicContentSize
             switch layoutStyle {
             case .pulse:
-                return NSSize(width: base.width + 14, height: max(21, base.height + 4))
+                return NSSize(width: base.width + 24, height: max(26, base.height + 8))
             case .iconOnly:
                 return NSSize(width: max(28, base.width), height: max(28, base.height))
             }
@@ -258,16 +258,19 @@ extension SidebarPageViewsPopoverButton {
             layoutStyle = style
             isBordered = style == .iconOnly
             bezelStyle = style == .iconOnly ? .accessoryBarAction : .inline
+            controlSize = style == .iconOnly ? .regular : .small
             imagePosition = style == .iconOnly ? .imageOnly : .imageLeading
             imageScaling = .scaleProportionallyDown
+            setContentHuggingPriority(.required, for: .horizontal)
+            setContentCompressionResistancePriority(.required, for: .horizontal)
             wantsLayer = style == .pulse
             layer?.masksToBounds = style == .pulse
-            layer?.cornerRadius = style == .pulse ? 10.5 : 0
+            layer?.cornerRadius = style == .pulse ? 13 : 0
             layer?.borderWidth = style == .pulse ? 0.7 : 0
 
             let presentation = PulsePresentation(pulse: pulse)
             let symbolConfiguration = NSImage.SymbolConfiguration(
-                pointSize: style == .iconOnly ? ChromeIconMetrics.symbolPointSize : 10,
+                pointSize: style == .iconOnly ? ChromeIconMetrics.symbolPointSize : 11.5,
                 weight: .semibold
             )
             image = NSImage(
@@ -389,7 +392,7 @@ extension SidebarPageViewsPopoverButton {
             let result = NSMutableAttributedString(
                 string: deltaText,
                 attributes: [
-                    .font: NSFont.systemFont(ofSize: 10, weight: .semibold),
+                    .font: NSFont.systemFont(ofSize: 11.5, weight: .semibold),
                     .foregroundColor: tint
                 ]
             )
@@ -397,7 +400,7 @@ extension SidebarPageViewsPopoverButton {
                 result.append(NSAttributedString(
                     string: "  \(viewsText)",
                     attributes: [
-                        .font: NSFont.systemFont(ofSize: 10, weight: .medium),
+                        .font: NSFont.systemFont(ofSize: 11, weight: .medium),
                         .foregroundColor: NSColor.secondaryLabelColor
                     ]
                 ))
