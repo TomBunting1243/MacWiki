@@ -123,21 +123,18 @@ if let chosen = candidates.max(by: { $0.area < $1.area }) {
         )
         return rect.intersects(chosen.bounds)
     }
-    guard !hasOccludingLayerZeroWindow else {
-        fputs("Refusing rectangle capture because another layer-zero window overlaps the exact PID target.\n", stderr)
-        exit(2)
-    }
     print([
         String(chosen.number),
         String(Int(chosen.bounds.minX.rounded())),
         String(Int(chosen.bounds.minY.rounded())),
         String(Int(chosen.bounds.width.rounded())),
-        String(Int(chosen.bounds.height.rounded()))
+        String(Int(chosen.bounds.height.rounded())),
+        hasOccludingLayerZeroWindow ? "1" : "0"
     ].joined(separator: ","))
 }
 SWIFT
 )"
-  printf '%s\n' "$resolved" | awk '/^[0-9]+,-?[0-9]+,-?[0-9]+,[0-9]+,[0-9]+$/ { value = $0 } END { print value }'
+  printf '%s\n' "$resolved" | awk '/^[0-9]+,-?[0-9]+,-?[0-9]+,[0-9]+,[0-9]+,[01]$/ { value = $0 } END { print value }'
 }
 
 run_screencapture_with_timeout() {
@@ -157,17 +154,23 @@ run_screencapture_with_timeout() {
 }
 
 capture_succeeded=0
-window_number=""
 for attempt in 1 2 3; do
+  window_number=""
+  window_x=""
+  window_y=""
+  window_width=""
+  window_height=""
+  window_occluded=""
   capture_target="$(resolve_window_number)"
   if [[ -n "$capture_target" ]]; then
-    IFS=',' read -r window_number window_x window_y window_width window_height <<<"$capture_target"
+    IFS=',' read -r window_number window_x window_y window_width window_height window_occluded <<<"$capture_target"
   fi
   if [[ -n "$window_number" ]] && run_screencapture_with_timeout -x -l "$window_number" "$output_path" 2>/dev/null; then
     capture_succeeded=1
     break
   fi
-  if [[ -n "$window_number" ]] && run_screencapture_with_timeout -x -R"$window_x,$window_y,$window_width,$window_height" "$output_path" 2>/dev/null; then
+  if [[ -n "$window_number" && "$window_occluded" == "0" ]] \
+    && run_screencapture_with_timeout -x -R"$window_x,$window_y,$window_width,$window_height" "$output_path" 2>/dev/null; then
     capture_succeeded=1
     break
   fi
