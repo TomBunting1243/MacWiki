@@ -1,5 +1,26 @@
 import SwiftUI
 
+private struct ReaderTabNativeGlassModifier: ViewModifier {
+    let isEnabled: Bool
+    let tint: Color
+    let cornerRadius: CGFloat
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if #available(macOS 26, *), isEnabled {
+            content
+                .glassEffect(
+                    .regular
+                        .tint(tint)
+                        .interactive(),
+                    in: .rect(cornerRadius: cornerRadius)
+                )
+        } else {
+            content
+        }
+    }
+}
+
 /// Individual draggable tab item component
 struct ReaderTabItemView: View {
     @Environment(\.colorScheme) private var colorScheme
@@ -195,6 +216,16 @@ struct ReaderTabItemView: View {
                     }
                 }
                 .contentShape(RoundedRectangle(cornerRadius: tabCornerRadius))
+                // Liquid Glass must follow the complete label layout. Applying
+                // it to a background shape instead can composite the native
+                // refraction above the text in optimized macOS 27 builds.
+                .modifier(
+                    ReaderTabNativeGlassModifier(
+                        isEnabled: usesNativeGlass && !isDragged,
+                        tint: nativeGlassTint,
+                        cornerRadius: tabCornerRadius
+                    )
+                )
             }
             .buttonStyle(.plain)
             .accessibilityElement(children: .combine)
@@ -280,12 +311,6 @@ struct ReaderTabItemView: View {
         } else if #available(macOS 26, *), usesNativeGlass {
             shape
                 .fill(.clear)
-                .glassEffect(
-                    .regular
-                        .tint(nativeGlassTint)
-                        .interactive(),
-                    in: .rect(cornerRadius: tabCornerRadius)
-                )
                 .overlay { tabBorder(shape: shape, darkMode: darkMode) }
         } else if liquidGlassChrome {
             shape
