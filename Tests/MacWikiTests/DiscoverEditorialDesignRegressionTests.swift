@@ -178,6 +178,7 @@ struct DiscoverEditorialDesignRegressionTests {
         #expect(timeMachineControls.contains("popoverDidClose"))
         #expect(timeMachineControls.contains("name: .sidebarPageViewsHandoffReady"))
         #expect(timeMachineControls.contains("let pendingHandoffWindow = pendingPageViewsHandoffWindow"))
+        #expect(timeMachineControls.contains("popover.behavior = .semitransient"))
         #expect(timeMachineControls.contains("popover?.animates = false"))
         #expect(timeMachineControls.contains("announcePageViewsHandoffReady(for: pendingHandoffWindow)"))
         #expect(rows.contains("SidebarPageViewsPopoverButton("))
@@ -197,6 +198,8 @@ struct DiscoverEditorialDesignRegressionTests {
 
         #expect(button.intrinsicContentSize.height >= 26)
         #expect(button.layer?.cornerRadius == 13)
+        #expect(button.imageHugsTitle)
+        #expect(button.alignment == .center)
         #expect(
             button.contentCompressionResistancePriority(for: .horizontal)
                 == .required

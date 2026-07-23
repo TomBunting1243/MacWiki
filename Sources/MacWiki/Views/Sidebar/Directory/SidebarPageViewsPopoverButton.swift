@@ -261,6 +261,8 @@ extension SidebarPageViewsPopoverButton {
             controlSize = style == .iconOnly ? .regular : .small
             imagePosition = style == .iconOnly ? .imageOnly : .imageLeading
             imageScaling = .scaleProportionallyDown
+            imageHugsTitle = style == .pulse
+            alignment = .center
             setContentHuggingPriority(.required, for: .horizontal)
             setContentCompressionResistancePriority(.required, for: .horizontal)
             wantsLayer = style == .pulse

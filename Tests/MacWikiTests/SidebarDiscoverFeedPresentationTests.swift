@@ -95,7 +95,7 @@ struct SidebarDiscoverFeedPresentationTests {
         #expect(accessorySource.contains("longDiscoverDateLabel"))
         #expect(nativeControlsSource.contains("NSSegmentedControl"))
         #expect(nativeControlsSource.contains("NSPopover"))
-        #expect(nativeControlsSource.contains("popover.behavior = .transient"))
+        #expect(nativeControlsSource.contains("popover.behavior = .semitransient"))
         #expect(nativeControlsSource.contains("popover.show("))
         #expect(!sectionSource.contains("SidebarDiscoverTimeMachineView("))
         #expect(sectionSource.contains("SidebarDiscoverRetainedEditionWarning("))

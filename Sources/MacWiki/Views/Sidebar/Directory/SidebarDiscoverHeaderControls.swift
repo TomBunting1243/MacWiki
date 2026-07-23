@@ -171,7 +171,10 @@ struct SidebarDiscoverHeaderControls<PopoverContent: View>: NSViewRepresentable 
             )
 
             let popover = NSPopover()
-            popover.behavior = .transient
+            // Keep same-window controls interactive so a statistics click
+            // reaches its native button and can request the coordinated
+            // Time Machine-to-statistics handoff on the first click.
+            popover.behavior = .semitransient
             popover.animates = true
             popover.delegate = self
             popover.contentViewController = hostingController
