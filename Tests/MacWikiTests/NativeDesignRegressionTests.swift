@@ -145,6 +145,28 @@ struct NativeDesignRegressionTests {
         #expect(tabItem.contains("isKeyWindow && isActive && !isDragged"))
         #expect(tabItem.contains("ReaderTabContextMenuContent("))
         #expect(!tabItem.contains("@Environment(\\.modelContext)"))
+        let completedLabelRange = try #require(
+            tabItem.range(
+                of: ".contentShape(RoundedRectangle(cornerRadius: tabCornerRadius))"
+            )
+        )
+        let nativeGlassRange = try #require(
+            tabItem.range(of: "ReaderTabNativeGlassModifier(")
+        )
+        #expect(completedLabelRange.lowerBound < nativeGlassRange.lowerBound)
+        let selectionBackgroundStart = try #require(
+            tabItem.range(of: "private var tabSelectionBackground: some View")
+        )
+        let nativeTintStart = try #require(
+            tabItem.range(
+                of: "private var nativeGlassTint: Color",
+                range: selectionBackgroundStart.upperBound..<tabItem.endIndex
+            )
+        )
+        let selectionBackground = tabItem[
+            selectionBackgroundStart.lowerBound..<nativeTintStart.lowerBound
+        ]
+        #expect(!selectionBackground.contains(".glassEffect("))
 
         #expect(tabContextMenu.contains("@Environment(\\.modelContext)"))
         #expect(tabContextMenu.contains("DebouncedActionScheduler"))

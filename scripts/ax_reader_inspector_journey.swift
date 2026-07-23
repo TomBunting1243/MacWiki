@@ -865,10 +865,34 @@ do {
         while true {
             let toolbar = try refreshNativeToolbar()
             let toolbarElements = elements(in: toolbar, limit: 300)
-            guard CFEqual(toolbar, baselineToolbar),
-                  toolbarElements.count == baselineToolbarElementCount else {
+            guard CFEqual(toolbar, baselineToolbar) else {
                 throw JourneyError.missing(
-                    "Inspector mode switching replaced or structurally mutated the native toolbar."
+                    "Inspector mode switching replaced the native toolbar."
+                )
+            }
+            guard toolbarElements.count == baselineToolbarElementCount else {
+                let baselineDescriptors = baselineToolbarElements.map {
+                    let role = stringAttribute(kAXRoleAttribute as CFString, from: $0)
+                    return ([role] + accessibilityLabels(of: $0))
+                        .filter { !$0.isEmpty }
+                        .joined(separator: "|")
+                }
+                let currentDescriptors = toolbarElements.map {
+                    let role = stringAttribute(kAXRoleAttribute as CFString, from: $0)
+                    return ([role] + accessibilityLabels(of: $0))
+                        .filter { !$0.isEmpty }
+                        .joined(separator: "|")
+                }
+                let removed = baselineDescriptors.filter {
+                    !currentDescriptors.contains($0)
+                }
+                let added = currentDescriptors.filter {
+                    !baselineDescriptors.contains($0)
+                }
+                throw JourneyError.missing(
+                    "Inspector mode switching changed the native toolbar AX tree "
+                        + "from \(baselineToolbarElementCount) to \(toolbarElements.count) elements; "
+                        + "removed=\(removed); added=\(added)."
                 )
             }
             let frames = try toolbarFrames(

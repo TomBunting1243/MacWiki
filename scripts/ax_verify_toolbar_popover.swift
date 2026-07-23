@@ -88,6 +88,22 @@ private func processIsAlive(_ pid: Int32) -> Bool {
     kill(pid, 0) == 0
 }
 
+private func dismissTransientPresentation(in pid: Int32) throws {
+    guard let keyDown = CGEvent(
+        keyboardEventSource: nil,
+        virtualKey: 53,
+        keyDown: true
+    ), let keyUp = CGEvent(
+        keyboardEventSource: nil,
+        virtualKey: 53,
+        keyDown: false
+    ) else {
+        throw VerificationError.missing("Could not create a targeted Escape event.")
+    }
+    keyDown.postToPid(pid)
+    keyUp.postToPid(pid)
+}
+
 do {
     guard CommandLine.arguments.count == 4,
           let pid = Int32(CommandLine.arguments[1]) else {
@@ -151,6 +167,20 @@ do {
                         || $0.localizedCaseInsensitiveContains("unavailable")
                 }
             )
+            try dismissTransientPresentation(in: pid)
+            let dismissalDeadline = Date().addingTimeInterval(2)
+            var transientContentRemains = true
+            repeat {
+                RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+                transientContentRemains = elements(in: application).flatMap(labels).contains {
+                    $0.localizedCaseInsensitiveCompare(expectedContent) == .orderedSame
+                }
+            } while transientContentRemains && Date() < dismissalDeadline
+            guard !transientContentRemains else {
+                throw VerificationError.missing(
+                    "\(toolbarLabel) remained open after its exact-process Escape dismissal."
+                )
+            }
             let encoder = JSONEncoder()
             encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
             FileHandle.standardOutput.write(try encoder.encode(result))
