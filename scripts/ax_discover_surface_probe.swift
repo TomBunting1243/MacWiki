@@ -77,6 +77,10 @@ func contains(_ pattern: String, in values: [String]) -> Bool {
     values.contains { $0.localizedCaseInsensitiveContains(pattern) }
 }
 
+func containsExact(_ expected: String, in values: [String]) -> Bool {
+    values.contains { $0.localizedCaseInsensitiveCompare(expected) == .orderedSame }
+}
+
 func supportsAction(_ name: String, element: AXUIElement) -> Bool {
     var values: CFArray?
     guard AXUIElementCopyActionNames(element, &values) == .success,
@@ -110,12 +114,31 @@ func setNumericAttribute(_ name: CFString, on element: AXUIElement, to value: Do
     return AXUIElementSetAttributeValue(element, name, NSNumber(value: value)) == .success
 }
 
-func advanceScrollbar(in scrollArea: AXUIElement) -> Bool {
+func verticalScrollbar(in scrollArea: AXUIElement) -> AXUIElement? {
     let directScrollbar: AXUIElement? = attribute(kAXVerticalScrollBarAttribute as CFString, from: scrollArea)
     let descendantScrollbar = flattenedElements(from: scrollArea, limit: 1_500).first {
         role(of: $0) == (kAXScrollBarRole as String)
     }
-    guard let scrollbar = directScrollbar ?? descendantScrollbar else { return false }
+    return directScrollbar ?? descendantScrollbar
+}
+
+func resetScrollbarToMinimum(in scrollArea: AXUIElement) -> Bool {
+    guard let scrollbar = verticalScrollbar(in: scrollArea) else { return false }
+    let current = numericAttribute(kAXValueAttribute as CFString, from: scrollbar) ?? 0
+    let minimum = numericAttribute(kAXMinValueAttribute as CFString, from: scrollbar) ?? 0
+    if current <= minimum + 0.000_1 {
+        return true
+    }
+    guard setNumericAttribute(kAXValueAttribute as CFString, on: scrollbar, to: minimum) else {
+        return false
+    }
+    Thread.sleep(forTimeInterval: 0.15)
+    let updated = numericAttribute(kAXValueAttribute as CFString, from: scrollbar) ?? current
+    return updated < current
+}
+
+func advanceScrollbar(in scrollArea: AXUIElement) -> Bool {
+    guard let scrollbar = verticalScrollbar(in: scrollArea) else { return false }
 
     let current = numericAttribute(kAXValueAttribute as CFString, from: scrollbar) ?? 0
     let minimum = numericAttribute(kAXMinValueAttribute as CFString, from: scrollbar) ?? 0
@@ -161,6 +184,7 @@ do {
     let deadline = Date().addingTimeInterval(30)
     var lastObserved: [String] = []
     var discoverElements: [AXUIElement] = []
+    var didActivateDiscoverPage = false
     var didOpenTimeMachine = false
 
     while Date() < deadline {
@@ -169,8 +193,10 @@ do {
 
         let hasReaderSearch = contains("Search Wikipedia", in: lastObserved)
         let hasTimeMachineButton = contains("Time Machine", in: lastObserved)
-        let hasTimeMachineControls = contains("Edition Date", in: lastObserved)
-            || contains("Previous Day", in: lastObserved)
+        let hasTimeMachineControls = containsExact("Browse Wikipedia editions", in: lastObserved)
+            && containsExact("Edition Navigation", in: lastObserved)
+            && contains("Edition Date", in: lastObserved)
+            && contains("Previous Day", in: lastObserved)
         let hasEdition = [
             "Featured Article",
             "Most Read",
@@ -178,9 +204,47 @@ do {
             "Loading discover feed",
             "Discover Unavailable"
         ].contains { contains($0, in: lastObserved) }
+        let hasActiveDiscoverPageTab = discoverElements.contains { element in
+            guard role(of: element) == (kAXButtonRole as String) else { return false }
+            let values = strings(for: element)
+            return containsExact("Discover", in: values)
+                && containsExact("Active tab", in: values)
+        }
 
         if hasReaderSearch && hasTimeMachineButton && hasTimeMachineControls && hasEdition {
             break
+        }
+
+        // Discover is the app's native placeholder/new-tab page. A restored
+        // QA session may instead have an article tab active, so explicitly
+        // reuse an existing Discover tab or create one before probing the
+        // reader surface. Sidebar selection alone correctly owns List Contents
+        // and is not a guarantee about the independent active reader tab.
+        if !hasActiveDiscoverPageTab, !didActivateDiscoverPage {
+            let discoverTab = discoverElements.first { element in
+                guard role(of: element) == (kAXButtonRole as String),
+                      supportsAction(kAXPressAction as String, element: element) else {
+                    return false
+                }
+                let values = strings(for: element)
+                return containsExact("Discover", in: values)
+                    && contains("Opens this tab", in: values)
+            }
+            let newTabButton = discoverElements.first { element in
+                guard role(of: element) == (kAXButtonRole as String),
+                      supportsAction(kAXPressAction as String, element: element) else {
+                    return false
+                }
+                return containsExact("New Tab", in: strings(for: element))
+            }
+            if let pageButton = discoverTab ?? newTabButton {
+                didActivateDiscoverPage = AXUIElementPerformAction(
+                    pageButton,
+                    kAXPressAction as CFString
+                ) == .success
+                Thread.sleep(forTimeInterval: 0.2)
+                continue
+            }
         }
 
         if hasTimeMachineButton, !hasTimeMachineControls, !didOpenTimeMachine,
@@ -202,7 +266,10 @@ do {
 
     let hasReaderSearch = contains("Search Wikipedia", in: lastObserved)
     let hasTimeMachine = contains("Time Machine", in: lastObserved)
-        && (contains("Edition Date", in: lastObserved) || contains("Previous Day", in: lastObserved))
+        && containsExact("Browse Wikipedia editions", in: lastObserved)
+        && containsExact("Edition Navigation", in: lastObserved)
+        && contains("Edition Date", in: lastObserved)
+        && contains("Previous Day", in: lastObserved)
     let hasEdition = [
         "Featured Article",
         "Most Read",
@@ -212,6 +279,18 @@ do {
     ].contains { contains($0, in: lastObserved) }
     guard hasReaderSearch, hasTimeMachine, hasEdition else {
         throw DiscoverProbeError.surfaceMissing(Array(lastObserved.prefix(160)))
+    }
+
+    // The Time Machine control is a transient native popover. Close it before
+    // proving the underlying reader scroll surface so the popover does not
+    // correctly intercept the page-scroll action.
+    if let popover = discoverElements.first(where: {
+        role(of: $0) == "AXPopover"
+            && supportsAction(kAXCancelAction as String, element: $0)
+    }) {
+        _ = AXUIElementPerformAction(popover, kAXCancelAction as CFString)
+        Thread.sleep(forTimeInterval: 0.15)
+        discoverElements = flattenedApplicationElements(from: application)
     }
 
     let scrollActions = ["AXScrollDownByPage", "AXScrollDown"]
@@ -235,11 +314,15 @@ do {
     }
     NSRunningApplication(processIdentifier: pid)?.activate()
     Thread.sleep(forTimeInterval: 0.15)
+    // A restored Discover tab can legitimately reopen at the bottom. Normalize
+    // the native scrollbar before proving forward movement so the harness does
+    // not misdiagnose a valid, already-scrolled reader as non-scrollable.
+    _ = resetScrollbarToMinimum(in: readerScrollArea)
     let supportedScrollActions = scrollActions.filter { supportsAction($0, element: readerScrollArea) }
-    let performedScrollAction = supportedScrollActions.first { action in
+    let advancedScrollbar = advanceScrollbar(in: readerScrollArea)
+    let performedScrollAction = advancedScrollbar ? nil : supportedScrollActions.first { action in
         AXUIElementPerformAction(readerScrollArea, action as CFString) == .success
     }
-    let advancedScrollbar = performedScrollAction == nil && advanceScrollbar(in: readerScrollArea)
     guard performedScrollAction != nil || advancedScrollbar else {
         throw DiscoverProbeError.surfaceMissing([
             "Native scroll actions and scrollbar value could not advance: \(supportedScrollActions.joined(separator: ","))"

@@ -6,7 +6,6 @@ extension DiscoverFeedSections {
         if hasTimeCapsuleDetails {
             DiscoverEditorialPanel(
                 accent: Color.mint.opacity(0.84),
-                tone: .archive,
                 contentPadding: isCompactLayout ? 14 : 18
             ) {
                 VStack(alignment: .leading, spacing: isCompactLayout ? 14 : 18) {
@@ -94,8 +93,7 @@ extension DiscoverFeedSections {
     var timeMachineStage: some View {
         if hasTimeMachineSurface {
             DiscoverEditorialPanel(
-                accent: Color.indigo.opacity(0.84),
-                tone: .timewarp,
+                accent: TimeMachineVisualLanguage.electricViolet.opacity(0.86),
                 contentPadding: isCompactLayout ? 14 : 18
             ) {
                 VStack(alignment: .leading, spacing: isCompactLayout ? 14 : 18) {
@@ -107,7 +105,7 @@ extension DiscoverFeedSections {
                         if !timeMachineDisplayDateLabel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                             Text(timeMachineDisplayDateLabel)
                                 .font(DiscoverTypography.editionDate.weight(.semibold))
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(TimeMachineVisualLanguage.ultraviolet)
                                 .lineLimit(1)
                                 .padding(.horizontal, 10)
                                 .padding(.vertical, 6)

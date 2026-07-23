@@ -75,7 +75,8 @@ struct DiscoverNewsCard: View {
                         .fill(Color.primary.opacity(0.04))
                     image
                         .resizable()
-                        .aspectRatio(contentMode: .fill)
+                        .aspectRatio(contentMode: .fit)
+                        .padding(6)
                 }
             } placeholder: {
                 AppLoadingThumbnailPlaceholder(
@@ -122,6 +123,8 @@ struct DiscoverCompactArticleCard: View {
     let trendPulse: WikipediaService.TrendPulse?
     var onTrendTapped: ((WikipediaService.TrendPulse) -> Void)? = nil
     let onOpen: (WikipediaService.SearchResult, Bool) -> Void
+    @Environment(\.macWikiAccessibilityPersonalization.reduceMotion) private var reduceMotion
+    @State private var isHovered = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -172,16 +175,20 @@ struct DiscoverCompactArticleCard: View {
             cornerRadius: 12,
             material: .regular,
             borderColor: Color.primary,
-            borderOpacity: 0.08,
+            borderOpacity: isHovered ? 0.28 : 0.08,
             borderWidth: 0.8
         )
         .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .discoverHoverEffect(.card, isActive: isHovered, reduceMotion: reduceMotion)
+        .onHover { isHovered = $0 }
     }
 }
 
 struct DiscoverTrendPulseBadge: View {
     let pulse: WikipediaService.TrendPulse
     let onTap: () -> Void
+    @Environment(\.macWikiAccessibilityPersonalization.reduceMotion) private var reduceMotion
+    @State private var isHovered = false
 
     private var deltaFraction: Double? {
         guard let previous = pulse.previousViews, previous > 0 else { return nil }
@@ -233,10 +240,10 @@ struct DiscoverTrendPulseBadge: View {
             }
             .padding(.horizontal, 8)
             .padding(.vertical, 3.5)
-            .background(trendColor.opacity(0.10), in: Capsule(style: .continuous))
+            .background(trendColor.opacity(isHovered ? 0.16 : 0.10), in: Capsule(style: .continuous))
             .overlay {
                 Capsule(style: .continuous)
-                    .strokeBorder(trendColor.opacity(0.18), lineWidth: 0.7)
+                    .strokeBorder(trendColor.opacity(isHovered ? 0.38 : 0.18), lineWidth: 0.7)
             }
             .contentShape(Capsule())
         }
@@ -245,5 +252,7 @@ struct DiscoverTrendPulseBadge: View {
         .accessibilityLabel("\(deltaText), \(latestViewsText) views")
         .accessibilityHint("Show views details")
         .help("Show views details")
+        .discoverHoverEffect(.chip, isActive: isHovered, reduceMotion: reduceMotion)
+        .onHover { isHovered = $0 }
     }
 }

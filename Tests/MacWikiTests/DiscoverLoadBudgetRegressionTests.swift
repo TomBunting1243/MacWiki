@@ -45,8 +45,10 @@ struct DiscoverLoadBudgetRegressionTests {
         #expect(feedStore.contains("let initialPrefetchBudget = 10"))
         #expect(feedStore.contains("feed.inTheNews.prefix(4)"))
         #expect(feedStore.contains("feed.trending.prefix(4)"))
-        #expect(trendStore.contains("batchSize: Int = 6"))
+        #expect(trendStore.contains("batchSize: Int = 4"))
         #expect(trendStore.contains("batchStart + batchSize"))
+        #expect(trendStore.contains("automaticRetryLimit: Int = 8"))
+        #expect(trendStore.contains("Self.isTransient(error)"))
         #expect(trendingService.contains("let monthlyFetchBatchSize = 6"))
         #expect(trendingService.contains("let summaryFetchBatchSize = 6"))
     }

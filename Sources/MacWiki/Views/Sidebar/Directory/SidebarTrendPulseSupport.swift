@@ -2,7 +2,6 @@ import SwiftUI
 
 struct SidebarTrendPulseChip: View {
     let pulse: WikipediaService.TrendPulse
-    var onChartRequested: (() -> Void)? = nil
 
     private var deltaFraction: Double? {
         guard let previous = pulse.previousViews, previous > 0 else { return nil }
@@ -55,18 +54,8 @@ struct SidebarTrendPulseChip: View {
     }
 
     var body: some View {
-        Group {
-            if let onChartRequested {
-                Button(action: onChartRequested) {
-                    chipLabel
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("\(deltaText), \(viewsText)")
-                .accessibilityHint("Show recent pageview chart")
-            } else {
-                chipLabel
-            }
-        }
+        chipLabel
+            .accessibilityLabel("\(deltaText), \(viewsText)")
         .help("Views from recent daily pageviews")
     }
 }

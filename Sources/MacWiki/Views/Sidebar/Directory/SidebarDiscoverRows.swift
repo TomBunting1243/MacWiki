@@ -1,5 +1,52 @@
 import SwiftUI
 
+struct SidebarDiscoverStatsButton: View {
+    let title: String
+    let referenceDate: Date
+    @Binding var isPresented: Bool
+
+    var body: some View {
+        SidebarPageViewsPopoverButton(
+            configuration: SidebarPageViewsPopoverConfiguration(
+                title: title,
+                referenceDate: referenceDate,
+                initialPulse: nil,
+                style: .iconOnly,
+                isPresented: $isPresented,
+                onRequestPresentation: {
+                    isPresented = true
+                }
+            )
+        )
+        .fixedSize(horizontal: true, vertical: true)
+    }
+}
+
+struct SidebarDiscoverSectionHeader: View {
+    let title: LocalizedStringResource
+    let count: Int
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text(title)
+                .font(.caption.weight(.semibold))
+                .textCase(.uppercase)
+                .foregroundStyle(.secondary)
+
+            Spacer(minLength: 4)
+
+            Text(count.formatted())
+                .font(.caption2.monospacedDigit())
+                .foregroundStyle(.tertiary)
+                .accessibilityLabel("\(count) items")
+        }
+        .padding(.horizontal, 10)
+        .padding(.top, 8)
+        .padding(.bottom, 2)
+        .accessibilityElement(children: .combine)
+    }
+}
+
 struct DiscoverTimelineRow: View {
     let event: WikipediaService.DiscoverFeed.OnThisDayEvent
     let referenceDate: Date
@@ -8,14 +55,26 @@ struct DiscoverTimelineRow: View {
     @State private var showingPageViewsPopover = false
 
     var body: some View {
-        Button {
-            if let article = event.article {
-                onOpenArticle(article, SystemBridge.isCommandPressed)
+        HStack(alignment: .top, spacing: 4) {
+            Button {
+                if let article = event.article {
+                    onOpenArticle(article, SystemBridge.isCommandPressed)
+                }
+            } label: {
+                rowContent
             }
-        } label: {
-            rowContent
+            .buttonStyle(.plain)
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            if let article = event.article {
+                SidebarDiscoverStatsButton(
+                    title: article.title,
+                    referenceDate: referenceDate,
+                    isPresented: $showingPageViewsPopover
+                )
+            }
         }
-        .buttonStyle(.plain)
+        .sidebarDiscoverInteractiveHover(isEnabled: event.article != nil)
         .disabled(event.article == nil)
         .contextMenu {
             if let article = event.article {
@@ -24,14 +83,6 @@ struct DiscoverTimelineRow: View {
                     onOpen: { onOpenArticle(article, false) },
                     onOpenInNewTab: { onOpenArticle(article, true) },
                     onShowPageViews: { showingPageViewsPopover = true }
-                )
-            }
-        }
-        .popover(isPresented: $showingPageViewsPopover, arrowEdge: .trailing) {
-            if let article = event.article {
-                SidebarPageViewsPopoverContent(
-                    title: article.title,
-                    referenceDate: referenceDate
                 )
             }
         }
@@ -73,35 +124,26 @@ struct DiscoverFactRow: View {
     @State private var showingPageViewsPopover = false
 
     var body: some View {
-        Button {
-            if let article = fact.article {
-                onOpenArticle(article, SystemBridge.isCommandPressed)
-            }
-        } label: {
-            HStack(alignment: .top, spacing: 8) {
-                Image(systemName: "lightbulb")
-                    .font(MacWikiTypography.compactRowMetadata)
-                    .foregroundStyle(.secondary)
-                    .padding(.top, 1)
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(fact.text)
-                        .font(MacWikiTypography.compactRowBody)
-                        .lineSpacing(2)
-                        .lineLimit(3)
-                    if let article = fact.article {
-                        Text(article.title)
-                            .font(MacWikiTypography.compactRowMetadata)
-                            .foregroundStyle(Color.accentColor)
-                            .lineLimit(1)
-                    }
+        HStack(alignment: .top, spacing: 4) {
+            Button {
+                if let article = fact.article {
+                    onOpenArticle(article, SystemBridge.isCommandPressed)
                 }
-
-                Spacer(minLength: 0)
+            } label: {
+                factContent
             }
-            .contentShape(Rectangle())
+            .buttonStyle(.plain)
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            if let article = fact.article {
+                SidebarDiscoverStatsButton(
+                    title: article.title,
+                    referenceDate: referenceDate,
+                    isPresented: $showingPageViewsPopover
+                )
+            }
         }
-        .buttonStyle(.plain)
+        .sidebarDiscoverInteractiveHover(isEnabled: fact.article != nil)
         .disabled(fact.article == nil)
         .contextMenu {
             if let article = fact.article {
@@ -113,15 +155,32 @@ struct DiscoverFactRow: View {
                 )
             }
         }
-        .popover(isPresented: $showingPageViewsPopover, arrowEdge: .trailing) {
-            if let article = fact.article {
-                SidebarPageViewsPopoverContent(
-                    title: article.title,
-                    referenceDate: referenceDate
-                )
-            }
-        }
         .discoverContentRowSpacing()
+    }
+
+    private var factContent: some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: "lightbulb")
+                .font(MacWikiTypography.compactRowMetadata)
+                .foregroundStyle(.secondary)
+                .padding(.top, 1)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(fact.text)
+                    .font(MacWikiTypography.compactRowBody)
+                    .lineSpacing(2)
+                    .lineLimit(3)
+                if let article = fact.article {
+                    Text(article.title)
+                        .font(MacWikiTypography.compactRowMetadata)
+                        .foregroundStyle(Color.accentColor)
+                        .lineLimit(1)
+                }
+            }
+
+            Spacer(minLength: 0)
+        }
+        .contentShape(Rectangle())
     }
 }
 
@@ -148,17 +207,32 @@ struct DiscoverStoryRow: View {
             if !story.links.isEmpty {
                 FlowLayout(spacing: 6) {
                     ForEach(story.links.prefix(4)) { article in
-                        Button {
-                            onOpenArticle(article, SystemBridge.isCommandPressed)
-                        } label: {
-                            Text(article.title)
-                                .font(MacWikiTypography.compactRowMetadata)
-                                .lineLimit(1)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
-                                .background(Color.accentColor.opacity(0.12), in: Capsule())
+                        HStack(spacing: 2) {
+                            Button {
+                                onOpenArticle(article, SystemBridge.isCommandPressed)
+                            } label: {
+                                Text(article.title)
+                                    .font(MacWikiTypography.compactRowMetadata)
+                                    .lineLimit(1)
+                            }
+                            .buttonStyle(.plain)
+
+                            SidebarDiscoverStatsButton(
+                                title: article.title,
+                                referenceDate: referenceDate,
+                                isPresented: Binding(
+                                    get: { activePageViewsTitle == article.title },
+                                    set: { isPresented in
+                                        activePageViewsTitle = isPresented ? article.title : nil
+                                    }
+                                )
+                            )
                         }
-                        .buttonStyle(.plain)
+                        .padding(.leading, 8)
+                        .padding(.trailing, 4)
+                        .padding(.vertical, 4)
+                        .background(Color.accentColor.opacity(0.12), in: Capsule())
+                        .sidebarDiscoverInteractiveHover()
                         .contextMenu {
                             ArticleQuickActionsMenuContent(
                                 title: article.title,
@@ -166,25 +240,6 @@ struct DiscoverStoryRow: View {
                                 onOpenInNewTab: { onOpenArticle(article, true) },
                                 onShowPageViews: { activePageViewsTitle = article.title }
                             )
-                        }
-                        .popover(
-                            isPresented: Binding(
-                                get: { activePageViewsTitle == article.title },
-                                set: { isPresented in
-                                    guard !isPresented else { return }
-                                    if activePageViewsTitle == article.title {
-                                        activePageViewsTitle = nil
-                                    }
-                                }
-                            ),
-                            arrowEdge: .trailing
-                        ) {
-                            if activePageViewsTitle == article.title {
-                                SidebarPageViewsPopoverContent(
-                                    title: article.title,
-                                    referenceDate: referenceDate
-                                )
-                            }
                         }
                     }
                 }
@@ -267,14 +322,26 @@ struct DiscoverHolidayListRow: View {
     @State private var showingPageViewsPopover = false
 
     var body: some View {
-        Button {
-            if let article = holiday.article {
-                onOpenArticle(article, SystemBridge.isCommandPressed)
+        HStack(alignment: .top, spacing: 4) {
+            Button {
+                if let article = holiday.article {
+                    onOpenArticle(article, SystemBridge.isCommandPressed)
+                }
+            } label: {
+                rowContent
             }
-        } label: {
-            rowContent
+            .buttonStyle(.plain)
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            if let article = holiday.article {
+                SidebarDiscoverStatsButton(
+                    title: article.title,
+                    referenceDate: referenceDate,
+                    isPresented: $showingPageViewsPopover
+                )
+            }
         }
-        .buttonStyle(.plain)
+        .sidebarDiscoverInteractiveHover(isEnabled: holiday.article != nil)
         .disabled(holiday.article == nil)
         .contextMenu {
             if let article = holiday.article {
@@ -283,14 +350,6 @@ struct DiscoverHolidayListRow: View {
                     onOpen: { onOpenArticle(article, false) },
                     onOpenInNewTab: { onOpenArticle(article, true) },
                     onShowPageViews: { showingPageViewsPopover = true }
-                )
-            }
-        }
-        .popover(isPresented: $showingPageViewsPopover, arrowEdge: .trailing) {
-            if let article = holiday.article {
-                SidebarPageViewsPopoverContent(
-                    title: article.title,
-                    referenceDate: referenceDate
                 )
             }
         }
@@ -331,5 +390,28 @@ extension View {
             .padding(.vertical, 8)
             .listRowSeparator(.hidden)
             .listRowInsets(EdgeInsets(top: 3, leading: 0, bottom: 3, trailing: 0))
+    }
+
+    func sidebarDiscoverInteractiveHover(isEnabled: Bool = true) -> some View {
+        modifier(SidebarDiscoverInteractiveHoverModifier(isEnabled: isEnabled))
+    }
+}
+
+private struct SidebarDiscoverInteractiveHoverModifier: ViewModifier {
+    let isEnabled: Bool
+    @Environment(\.macWikiAccessibilityPersonalization.reduceMotion) private var reduceMotion
+    @State private var isHovered = false
+
+    func body(content: Content) -> some View {
+        content
+            .background {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(Color.accentColor.opacity(isHovered ? 0.085 : 0))
+            }
+            .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: isHovered)
+            .onHover { hovering in
+                isHovered = isEnabled && hovering
+            }
     }
 }

@@ -97,7 +97,8 @@ struct BetaReadinessRegressionTests {
         #expect(!contextMenuSource.contains("appState.updateReadState(forTitle: article.title"))
 
         let itemSource = try source("Sources/MacWiki/Views/Sidebar/Directory/DirectoryArticleRowViews.swift")
-        #expect(itemSource.contains(".onTapGesture(perform: onTap)"))
+        #expect(itemSource.contains(".onTapGesture {"))
+        #expect(itemSource.contains("selectionPresentation.handlesPrimaryTap("))
         #expect(itemSource.contains(".accessibilityLabel(isRead ? \"Mark as unread\" : \"Mark as read\")"))
         #expect(itemSource.contains(".accessibilityHidden(true)"))
         #expect(!itemSource.contains("Button(action: onTap)"))
@@ -146,6 +147,29 @@ struct BetaReadinessRegressionTests {
         #expect(runner.contains("runtimeDiagnosticCheckpoints"))
         #expect(runner.contains("recordRuntimeDiagnostics(\"marked read\")"))
         #expect(runner.contains("recordRuntimeDiagnostics(\"restored unread\")"))
+    }
+
+    @Test func nativeArticleSelectionDefersModifiedClicksToTheNativeList() {
+        #expect(ArticleListSelectionPresentation.custom.handlesPrimaryTap(
+            isCommandPressed: false,
+            isShiftPressed: false
+        ))
+        #expect(ArticleListSelectionPresentation.custom.handlesPrimaryTap(
+            isCommandPressed: true,
+            isShiftPressed: true
+        ))
+        #expect(ArticleListSelectionPresentation.native.handlesPrimaryTap(
+            isCommandPressed: false,
+            isShiftPressed: false
+        ))
+        #expect(!ArticleListSelectionPresentation.native.handlesPrimaryTap(
+            isCommandPressed: true,
+            isShiftPressed: false
+        ))
+        #expect(!ArticleListSelectionPresentation.native.handlesPrimaryTap(
+            isCommandPressed: false,
+            isShiftPressed: true
+        ))
     }
 
     @Test func persistedColumnWidthsRejectInvalidValuesAndClampToSupportedRanges() {
@@ -341,16 +365,18 @@ struct BetaReadinessRegressionTests {
 
     @Test func readerAndDirectoryFilterControlsExposeState() throws {
         let searchHeader = try source("Sources/MacWiki/Views/Sidebar/Search/SidebarSearchHeaderView.swift")
-        let directory = try source("Sources/MacWiki/Views/Sidebar/DirectoryView.swift")
+        let directoryAccessory = try source(
+            "Sources/MacWiki/Views/Columns/DirectoryColumnAccessoryView.swift"
+        )
         let reader = try source("Sources/MacWiki/Views/Reader/ReaderView.swift")
 
         #expect(searchHeader.contains(".accessibilityLabel(\"Unread only\")"))
         #expect(searchHeader.contains(".accessibilityValue(model.readFilter == .unread ? \"Enabled\" : \"Disabled\")"))
-        #expect(directory.contains("Menu(\"View\", systemImage: \"line.3.horizontal.decrease\")"))
-        #expect(directory.contains("Picker(\"Show\", selection: directoryUnreadOnlyBinding)"))
-        #expect(directory.contains("Text(\"All Articles\").tag(false)"))
-        #expect(directory.contains("Text(\"Unread Only\").tag(true)"))
-        #expect(!directory.contains("TopChromeControlMetrics.groupButtonSize"))
+        #expect(directoryAccessory.contains("Menu(\"View\", systemImage: \"line.3.horizontal.decrease\")"))
+        #expect(directoryAccessory.contains("Picker(\"Show\", selection: unreadFilterBinding)"))
+        #expect(directoryAccessory.contains("Text(\"All Articles\").tag(false)"))
+        #expect(directoryAccessory.contains("Text(\"Unread Only\").tag(true)"))
+        #expect(!directoryAccessory.contains("TopChromeControlMetrics.groupButtonSize"))
         #expect(reader.contains(".accessibilityLabel(\"Dismiss finished-reading prompt\")"))
     }
 
@@ -953,9 +979,8 @@ struct BetaReadinessRegressionTests {
         #expect(appSource.contains(".windowToolbarStyle(.unified(showsTitle: false))"))
         #expect(!appSource.contains(".toolbarBackgroundVisibility(.hidden, for: .windowToolbar)"))
 
-        #expect(columnChrome.contains("struct SidebarPaneBackground"))
+        #expect(!columnChrome.contains("struct SidebarPaneBackground"))
         #expect(!columnChrome.contains("struct ReaderTabLaneBackground"))
-        #expect(columnChrome.contains("@Environment(\\.macWikiAccessibilityPersonalization.reduceTransparency)"))
         #expect(!mainToolbar.contains("glassEffect"))
         #expect(!mainToolbar.contains("reduceTransparency"))
         #expect(tabItem.contains("accessibilityPersonalization.colorSchemeContrast == .increased"))
@@ -1344,6 +1369,9 @@ struct BetaReadinessRegressionTests {
         #expect(!harness.contains("killall"))
 
         #expect(selector.contains("AXUIElementCreateApplication(pid)"))
+        #expect(selector.contains("Prefer the semantic Sidebar row"))
+        #expect(selector.range(of: "for row in applicationElements")!.lowerBound
+            < selector.range(of: "role == (kAXButtonRole as String)")!.lowerBound)
         #expect(selector.contains("role == (kAXButtonRole as String)"))
         #expect(selector.contains("AXUIElementPerformAction(target, kAXPressAction"))
     }
@@ -1436,9 +1464,11 @@ struct BetaReadinessRegressionTests {
         #expect(discoverProbe.contains("READER_PAGE_VISIBLE=true"))
         #expect(discoverProbe.contains("NATIVE_PAGE_SCROLL=true"))
         #expect(discoverProbe.contains("AXScrollDownByPage"))
+        #expect(discoverProbe.contains("containsExact(\"New Tab\", in: strings(for: element))"))
         #expect(discoverProbe.contains("exposesNativeVerticalScrolling(area, actions: scrollActions)"))
         #expect(discoverProbe.contains("kAXVerticalScrollBarAttribute"))
         #expect(discoverProbe.contains("AXUIElementSetAttributeValue"))
+        #expect(discoverProbe.contains("resetScrollbarToMinimum(in: readerScrollArea)"))
 
         let sidebarSelector = try source("scripts/ax_select_sidebar_root.swift")
         let offlineRetryProbe = try source("scripts/ax_reader_offline_retry.swift")
@@ -1994,10 +2024,11 @@ struct BetaReadinessRegressionTests {
         #expect(projectionTests.contains("#expect(invalidations.value == 0)"))
     }
 
-    @Test func sidebarSearchOwnsItsNativeTopSafeArea() throws {
+    @Test func sidebarSearchDelegatesTopChromeToTheDirectoryAccessory() throws {
         let source = try source("Sources/MacWiki/Views/Sidebar/SidebarSearchView.swift")
 
-        #expect(source.contains(".safeAreaPadding(.top)"))
+        #expect(!source.contains(".safeAreaPadding(.top)"))
+        #expect(!source.contains(".safeAreaInset(edge: .top"))
         #expect(!source.contains(".padding(.top, ReaderTabLaneMetrics.height)"))
         #expect(!source.contains("topObscuredHeight"))
     }
@@ -2102,6 +2133,9 @@ struct BetaReadinessRegressionTests {
     @Test func discoverDirectoryAndReaderShareOneSessionDate() throws {
         let appStateSource = try source("Sources/MacWiki/App/AppState.swift")
         let directorySource = try source("Sources/MacWiki/Views/Sidebar/DirectoryView.swift")
+        let directoryAccessorySource = try source(
+            "Sources/MacWiki/Views/Columns/DirectoryColumnAccessoryView.swift"
+        )
         let readerSource = try source("Sources/MacWiki/Views/Home/DiscoverNewTabPageView.swift")
         let readerHostSource = try source("Sources/MacWiki/Views/Reader/ReaderView.swift")
 
@@ -2115,7 +2149,9 @@ struct BetaReadinessRegressionTests {
         #expect(readerHostSource.contains("DiscoverNewTabPageView(discoverFeedStore: appState.discoverFeedStore)"))
         #expect(!directorySource.contains("@State private var selectedDiscoverDate"))
         #expect(directorySource.contains("get { appState.selectedDiscoverDate }"))
-        #expect(directorySource.contains("selectedDate: selectedDiscoverDateBinding"))
+        #expect(directoryAccessorySource.contains("selectedDate: Binding("))
+        #expect(directoryAccessorySource.contains("get: { appState.selectedDiscoverDate }"))
+        #expect(directoryAccessorySource.contains("set: { appState.selectedDiscoverDate = $0 }"))
         #expect(readerSource.contains("screenModel.selectedDiscoverDate = appState.selectedDiscoverDate"))
         #expect(readerSource.contains(".onChange(of: appState.selectedDiscoverDate)"))
         #expect(readerSource.contains("appState.selectedDiscoverDate = newDate"))

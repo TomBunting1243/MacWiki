@@ -102,7 +102,10 @@ struct InspectorPanel: View {
 
             inspectorContent
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                .padding(.top, InspectorLayout.contentTopPadding)
+                .padding(
+                    .top,
+                    includesHeader ? InspectorLayout.contentTopPadding : 0
+                )
                 .transaction { transaction in
                     transaction.animation = nil
                 }

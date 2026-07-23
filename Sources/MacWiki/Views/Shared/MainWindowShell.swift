@@ -43,6 +43,7 @@ private struct MainWorkspaceShell: View {
     @AppStorage(AppStorageKey.MainWindow.directoryWidth) private var directoryWidth = AppStorageKey.MainWindow.directoryWidthDefault
     @AppStorage(AppStorageKey.MainWindow.inspectorWidth) private var inspectorWidth = AppStorageKey.MainWindow.inspectorWidthDefault
     @State private var openWindowHandler = WorkspaceOpenWindowHandler()
+    @State private var directoryColumnState = DirectoryColumnState()
 
     @Binding var selectedList: ReadingList?
     @Binding var selectedLabel: Label?
@@ -69,6 +70,7 @@ private struct MainWorkspaceShell: View {
             directoryRevision: directoryContentRevision,
             readerRevision: workspaceAppearanceRevision,
             inspectorRevision: workspaceAppearanceRevision,
+            directoryAccessoryRevision: directoryContentRevision,
             readerAccessoryRevision: workspaceAppearanceRevision,
             toolbarConfiguration: WorkspaceToolbarConfiguration(
                 appState: appState,
@@ -93,6 +95,7 @@ private struct MainWorkspaceShell: View {
                     selectedLabel: selectedLabel,
                     selectedTag: selectedTag,
                     sidebarSearchModel: sidebarSearchModel,
+                    columnState: directoryColumnState,
                     onNewLabelWithArticle: onNewLabelWithArticle,
                     onNewTagWithArticle: onNewTagWithArticle
                 )
@@ -103,6 +106,16 @@ private struct MainWorkspaceShell: View {
             ),
             inspector: workspaceEnvironment(
                 InspectorColumnView(includesHeader: false)
+            ),
+            directoryAccessory: workspaceEnvironment(
+                DirectoryColumnAccessoryView(
+                    selectedList: $selectedList,
+                    rootSelection: $rootSelection,
+                    selectedLabel: selectedLabel,
+                    selectedTag: selectedTag,
+                    sidebarSearchModel: sidebarSearchModel,
+                    columnState: directoryColumnState
+                )
             ),
             readerAccessory: workspaceEnvironment(
                 TabBarView(

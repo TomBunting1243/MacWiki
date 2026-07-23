@@ -1,11 +1,26 @@
 import SwiftUI
 
+enum ArticleListSelectionPresentation {
+    case custom
+    case native
+
+    /// Native List selection owns modified clicks so macOS can add, remove, or
+    /// range-select rows without the article-opening gesture fighting focus.
+    func handlesPrimaryTap(
+        isCommandPressed: Bool,
+        isShiftPressed: Bool
+    ) -> Bool {
+        self != .native || (!isCommandPressed && !isShiftPressed)
+    }
+}
+
 struct ArticleListItem<Content: View>: View {
     let accessibilityTitle: String
     let isRead: Bool
     let progress: Double
     let isCurrent: Bool
     let isSelected: Bool
+    let selectionPresentation: ArticleListSelectionPresentation
     let onToggleRead: (() -> Void)?
     let onTap: () -> Void
     let label: Label?
@@ -22,7 +37,7 @@ struct ArticleListItem<Content: View>: View {
 
     private var rowFill: Color {
         let isKeyWindow = appearsActive
-        if isSelected {
+        if selectionPresentation == .custom, isSelected {
             return Color(nsColor: .controlBackgroundColor)
                 .opacity(colorScheme == .dark ? (isKeyWindow ? 0.24 : 0.18) : (isKeyWindow ? 0.50 : 0.40))
         }
@@ -39,7 +54,7 @@ struct ArticleListItem<Content: View>: View {
 
     private var rowStroke: Color {
         let isKeyWindow = appearsActive
-        if isSelected {
+        if selectionPresentation == .custom, isSelected {
             return Color.accentColor.opacity(colorScheme == .dark ? (isKeyWindow ? 0.15 : 0.11) : (isKeyWindow ? 0.12 : 0.09))
         }
         if isCurrent {
@@ -59,6 +74,7 @@ struct ArticleListItem<Content: View>: View {
         progress: Double = 0,
         isCurrent: Bool = false,
         isSelected: Bool = false,
+        selectionPresentation: ArticleListSelectionPresentation = .custom,
         label: Label? = nil,
         onToggleRead: (() -> Void)? = nil,
         onTap: @escaping () -> Void,
@@ -69,6 +85,7 @@ struct ArticleListItem<Content: View>: View {
         self.progress = progress
         self.isCurrent = isCurrent
         self.isSelected = isSelected
+        self.selectionPresentation = selectionPresentation
         self.label = label
         self.onToggleRead = onToggleRead
         self.onTap = onTap
@@ -129,7 +146,15 @@ struct ArticleListItem<Content: View>: View {
                 }
         }
         .contentShape(Rectangle())
-        .onTapGesture(perform: onTap)
+        .onTapGesture {
+            guard selectionPresentation.handlesPrimaryTap(
+                isCommandPressed: SystemBridge.isCommandPressed,
+                isShiftPressed: SystemBridge.isShiftPressed
+            ) else {
+                return
+            }
+            onTap()
+        }
         .listRowSeparator(.hidden)
         .listRowInsets(EdgeInsets(top: 2, leading: 0, bottom: 2, trailing: 0))
         .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: isHovered)
@@ -170,6 +195,10 @@ struct ArticleRow: View {
         )
     }
 
+    private var readingTimeText: String? {
+        article.wordCount.map { ArticlePresentationFormatter.readingTimeText(forWordCount: $0) }
+    }
+
     private var hasFooterMetadata: Bool {
         wordCountText != nil || label != nil || listName != nil
     }
@@ -196,10 +225,20 @@ struct ArticleRow: View {
                 .lineLimit(2)
 
             VStack(alignment: .leading, spacing: 6) {
-                HStack(spacing: 8) {
+                FlowLayout(spacing: 8) {
                     Text(wordCountText ?? " ")
                         .font(MacWikiTypography.articleListMetadata)
                         .foregroundStyle(wordCountText == nil ? AnyShapeStyle(.clear) : AnyShapeStyle(.secondary))
+                        .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
+
+                    if let readingTimeText {
+                        SwiftUI.Label(readingTimeText, systemImage: "clock")
+                            .font(MacWikiTypography.articleListMetadata)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .fixedSize(horizontal: true, vertical: false)
+                    }
 
                     if let label {
                         Button {
@@ -218,7 +257,7 @@ struct ArticleRow: View {
                         )
                     }
                 }
-                .frame(minHeight: 12, alignment: .leading)
+                .frame(maxWidth: .infinity, minHeight: 12, alignment: .leading)
 
                 if !tags.isEmpty {
                     FlowLayout(spacing: 6) {
@@ -254,7 +293,7 @@ struct ArticleRowWithFetch: View {
     var tags: [Tag] = []
     var selectedTagId: UUID? = nil
     var trendPulse: WikipediaService.TrendPulse? = nil
-    var onTrendPulseTap: ((WikipediaService.TrendPulse) -> Void)? = nil
+    var pageViewsPresentation: SidebarPageViewsPopoverConfiguration? = nil
     var onTagClick: ((Tag) -> Void)? = nil
     private let subheadLineLimit = 2
 
@@ -281,11 +320,17 @@ struct ArticleRowWithFetch: View {
         )
     }
 
+    private var readingTimeText: String? {
+        resolvedWordCount.map { ArticlePresentationFormatter.readingTimeText(forWordCount: $0) }
+    }
+
     private var displayedDescription: String { resolvedDescription ?? " " }
     private var displayedExtract: String { resolvedExtract ?? " \n " }
     private var hasDescription: Bool { resolvedDescription != nil }
     private var hasExtract: Bool { resolvedExtract != nil }
-    private var hasFooterMetadata: Bool { wordCountText != nil || label != nil || listName != nil }
+    private var hasFooterMetadata: Bool {
+        wordCountText != nil || label != nil || listName != nil
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -294,12 +339,14 @@ struct ArticleRowWithFetch: View {
                 .foregroundStyle(.primary)
                 .lineLimit(2)
 
-            if let trendPulse {
+            if let pageViewsPresentation {
+                SidebarPageViewsPopoverButton(configuration: pageViewsPresentation)
+                    .fixedSize(horizontal: true, vertical: true)
+                    .padding(.top, 1)
+                    .padding(.bottom, 1)
+            } else if let trendPulse {
                 SidebarTrendPulseChip(
-                    pulse: trendPulse,
-                    onChartRequested: {
-                        onTrendPulseTap?(trendPulse)
-                    }
+                    pulse: trendPulse
                 )
                 .padding(.top, 1)
                 .padding(.bottom, 1)
@@ -320,10 +367,20 @@ struct ArticleRowWithFetch: View {
                 .lineLimit(2)
 
             VStack(alignment: .leading, spacing: 6) {
-                HStack(spacing: 8) {
+                FlowLayout(spacing: 8) {
                     Text(wordCountText ?? " ")
                         .font(MacWikiTypography.articleListMetadata)
                         .foregroundStyle(wordCountText == nil ? AnyShapeStyle(.clear) : AnyShapeStyle(.secondary))
+                        .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
+
+                    if let readingTimeText {
+                        SwiftUI.Label(readingTimeText, systemImage: "clock")
+                            .font(MacWikiTypography.articleListMetadata)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .fixedSize(horizontal: true, vertical: false)
+                    }
 
                     if let label {
                         Button {
@@ -341,8 +398,9 @@ struct ArticleRowWithFetch: View {
                             tint: .secondary
                         )
                     }
+
                 }
-                .frame(minHeight: 12, alignment: .leading)
+                .frame(maxWidth: .infinity, minHeight: 12, alignment: .leading)
 
                 if !tags.isEmpty {
                     FlowLayout(spacing: 6) {

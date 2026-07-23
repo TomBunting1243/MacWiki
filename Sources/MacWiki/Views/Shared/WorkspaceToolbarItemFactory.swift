@@ -27,10 +27,14 @@ enum WorkspaceToolbarItemFactory {
         item.label = label
         item.paletteLabel = label
         item.toolTip = label
+        let configuration = NSImage.SymbolConfiguration(
+            pointSize: ChromeIconMetrics.symbolPointSize,
+            weight: .regular
+        )
         item.image = NSImage(
             systemSymbolName: symbol,
             accessibilityDescription: label
-        )
+        )?.withSymbolConfiguration(configuration)
         item.isBordered = true
         item.style = .plain
         item.target = target

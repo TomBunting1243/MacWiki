@@ -4,9 +4,7 @@ import SwiftData
 struct DirectoryView: View {
     @Environment(AppState.self) private var appState
     @Environment(\.modelContext) private var modelContext
-    @Environment(\.colorScheme) private var colorScheme
     @AppStorage(AppStorageKey.Recents.scope) private var recentsScope: RecentsScope = .currentTab
-    @AppStorage(AppStorageKey.Discover.sidebarTimeMachineHidden) private var discoverSidebarTimeMachineHidden = false
     @AppStorage(ExperimentFlag.wikiHopPOCEnabled.key) private var wikiHopPOCEnabled = false
     @AppStorage(AppStorageKey.Features.wikiHopPostV1Enabled) private var wikiHopPostV1Enabled = false
     @Binding var selectedList: ReadingList?
@@ -14,6 +12,7 @@ struct DirectoryView: View {
     var selectedLabel: Label?
     var selectedTag: Tag?
     let sidebarSearchModel: SidebarSearchSurfaceModel
+    let columnState: DirectoryColumnState
     let onNewLabelWithArticle: (SavedArticle) -> Void
     let onNewTagWithArticle: (Article) -> Void
     @Query(sort: \ReadingList.updatedAt, order: .reverse) private var allLists: [ReadingList]
@@ -23,25 +22,55 @@ struct DirectoryView: View {
     @Query(sort: \Highlight.createdAt, order: .reverse) private var highlights: [Highlight]
     @Query(sort: \Tag.sortOrder) private var tags: [Tag]
 
-    @State private var localLabelFilter: Label? = nil
-    @State private var localTagFilter: Tag? = nil
     @State private var discoverTrendPulseStore = DiscoverTrendPulseStore()
     @State private var metadataHydrator = ArticleMetadataHydrator()
-    @State private var supplementalReadFilter: DirectoryReadFilter = .all
-    @State private var supplementalSortMode: DirectorySupplementalSortMode = .recent
-    @State private var selectedSavedArticleIDs: Set<UUID> = []
-    @State private var selectionAnchorSavedArticleID: UUID?
-    @State private var showDeleteSelectedConfirmation = false
-    @State private var articleIndexesSnapshot = DirectoryArticleIndexes.empty
-    @State private var visibleSnapshot = DirectoryVisibleSnapshot.empty
     @State private var saveScheduler = DebouncedActionScheduler()
     @State private var pendingPageViewsRowKey: String?
     @State private var activePageViewsPopover: SidebarPageViewsPopoverPayload?
     @State private var discoverDateLoadTask: Task<Void, Never>?
-    @State private var isSidebarTimeMachinePresented = false
-    @State private var topObscuredHeight: CGFloat = 38
+    @State private var discoverPulseRefreshGeneration = 0
 
     private let wikipediaService = WikipediaService.shared
+
+    private var localLabelFilter: Label? {
+        get { columnState.localLabelFilter }
+        nonmutating set { columnState.localLabelFilter = newValue }
+    }
+
+    private var localTagFilter: Tag? {
+        get { columnState.localTagFilter }
+        nonmutating set { columnState.localTagFilter = newValue }
+    }
+
+    private var supplementalReadFilter: DirectoryReadFilter {
+        get { columnState.supplementalReadFilter }
+        nonmutating set { columnState.supplementalReadFilter = newValue }
+    }
+
+    private var supplementalSortMode: DirectorySupplementalSortMode {
+        get { columnState.supplementalSortMode }
+        nonmutating set { columnState.supplementalSortMode = newValue }
+    }
+
+    private var selectedSavedArticleIDs: Set<UUID> {
+        get { columnState.selectedSavedArticleIDs }
+        nonmutating set { columnState.selectedSavedArticleIDs = newValue }
+    }
+
+    private var selectionAnchorSavedArticleID: UUID? {
+        get { columnState.selectionAnchorSavedArticleID }
+        nonmutating set { columnState.selectionAnchorSavedArticleID = newValue }
+    }
+
+    private var articleIndexesSnapshot: DirectoryArticleIndexes {
+        get { columnState.articleIndexesSnapshot }
+        nonmutating set { columnState.articleIndexesSnapshot = newValue }
+    }
+
+    private var visibleSnapshot: DirectoryVisibleSnapshot {
+        get { columnState.visibleSnapshot }
+        nonmutating set { columnState.visibleSnapshot = newValue }
+    }
 
     private var discoverFeedStore: DiscoverFeedStore {
         appState.discoverFeedStore
@@ -50,13 +79,6 @@ struct DirectoryView: View {
     private var selectedDiscoverDate: Date {
         get { appState.selectedDiscoverDate }
         nonmutating set { appState.selectedDiscoverDate = newValue }
-    }
-
-    private var selectedDiscoverDateBinding: Binding<Date> {
-        Binding(
-            get: { appState.selectedDiscoverDate },
-            set: { appState.selectedDiscoverDate = $0 }
-        )
     }
 
     private var isWikiHopAvailable: Bool {
@@ -196,6 +218,23 @@ struct DirectoryView: View {
         return hasher.finalize()
     }
 
+    private var accessoryCollectionsFingerprint: Int {
+        var hasher = Hasher()
+        for list in allLists {
+            hasher.combine(list.id)
+            hasher.combine(list.name)
+        }
+        for label in labels {
+            hasher.combine(label.id)
+            hasher.combine(label.name)
+        }
+        for tag in tags {
+            hasher.combine(tag.id)
+            hasher.combine(tag.name)
+        }
+        return hasher.finalize()
+    }
+
     private func savedArticle(for title: String) -> SavedArticle? {
         articleIndexes.savedArticle(for: title)
     }
@@ -299,43 +338,26 @@ struct DirectoryView: View {
 
     private var discoverMetadataItems: [WikipediaService.SearchResult] {
         guard let feed = discoverFeedStore.feed else { return [] }
-        return SidebarDiscoverMostReadPolicy.selection(from: feed).items
+        return SidebarDiscoverArticleInventory.renderedArticleRows(in: feed)
     }
 
     private var discoverPulseItems: [WikipediaService.SearchResult] {
         guard let feed = discoverFeedStore.feed else { return [] }
-        var items: [WikipediaService.SearchResult] = []
-        if let featuredArticle = feed.featuredArticle {
-            items.append(featuredArticle)
-        }
-        let selection = SidebarDiscoverMostReadPolicy.selection(from: feed)
-        if selection.supportsTrendPulse {
-            items.append(contentsOf: selection.items)
-        }
-        return items
+        return SidebarDiscoverArticleInventory.renderedArticleRows(in: feed)
     }
 
-    private func titleFingerprint<S: Sequence>(
-        _ titles: S,
-        seeds: [AnyHashable] = []
-    ) -> Int where S.Element == String {
-        var hasher = Hasher()
-        for seed in seeds {
-            hasher.combine(seed)
-        }
-        for title in titles {
-            hasher.combine(ReadStateSync.normalizedTitle(title))
-        }
-        return hasher.finalize()
-    }
-
-    private var discoverTrendingPulseLoadKey: Int {
+    private var discoverTrendingPulseLoadKey: SidebarDiscoverPulseLoadIdentity {
         guard rootSelection == .discover, let feed = discoverFeedStore.feed else {
-            return titleFingerprint([], seeds: [AnyHashable("inactive-discover-pulse")])
+            return SidebarDiscoverPulseLoadIdentity(
+                dateKey: nil,
+                titles: [],
+                refreshGeneration: discoverPulseRefreshGeneration
+            )
         }
-        return titleFingerprint(
-            discoverPulseItems.map(\.title),
-            seeds: [AnyHashable(feed.dateKey), AnyHashable("discover-pulse")]
+        return SidebarDiscoverPulseLoadIdentity(
+            dateKey: feed.dateKey,
+            titles: discoverPulseItems.map(\.title),
+            refreshGeneration: discoverPulseRefreshGeneration
         )
     }
 
@@ -408,37 +430,8 @@ struct DirectoryView: View {
         return hasher.finalize()
     }
 
-    private var shouldShowTopDirectoryChrome: Bool {
-        selectedList != nil ||
-        selectedLabel != nil ||
-        selectedTag != nil ||
-        rootSelection == .discover ||
-        rootSelection == .recents
-    }
-
     private var isSidebarSearchPresented: Bool {
         appState.showSearch
-    }
-
-    private var topDirectoryTitle: String {
-        if let list = selectedList {
-            return list.name
-        }
-        if let label = selectedLabel {
-            return label.name
-        }
-        if let tag = selectedTag {
-            return tag.name
-        }
-        if rootSelection == .discover {
-            return "Discover"
-        }
-        if recentsScope == .currentTab,
-           let activeId = appState.activeTabId,
-           appState.openTabs.contains(where: { $0.id == activeId }) {
-            return "Tab History"
-        }
-        return "Recent"
     }
 
     private func refreshArticleIndexesSnapshot() {
@@ -483,6 +476,7 @@ struct DirectoryView: View {
             resolvedSavedArticleWordCount: resolvedWordCount(for:),
             resolvedArticleWordCount: resolvedWordCount(for:)
         )
+        columnState.visibleSnapshotScopeKey = selectionResetKey
     }
 
     private func requestModelContextSave() {
@@ -531,22 +525,60 @@ struct DirectoryView: View {
             SidebarPageViewsPopoverContent(
                 title: payload.title,
                 referenceDate: payload.referenceDate,
-                initialPulse: payload.initialPulse
+                initialPulse: payload.initialPulse,
+                onPulseLoaded: { pulse in
+                    guard rootSelection == .discover else { return }
+                    discoverTrendPulseStore.record(
+                        pulse,
+                        for: payload.title,
+                        referenceDate: payload.referenceDate
+                    )
+                }
             )
         }
     }
 
     var body: some View {
+        directoryContentPlane
+    }
+
+    private var directoryContentPlane: some View {
+        directoryContentLifecycle
+            .confirmationDialog(
+                "Delete selected articles?",
+                isPresented: Binding(
+                    get: { columnState.showDeleteSelectedConfirmation },
+                    set: { columnState.showDeleteSelectedConfirmation = $0 }
+                ),
+                titleVisibility: .visible
+            ) {
+                Button("Delete", role: .destructive) {
+                    deleteSelectedSavedArticles()
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This will remove \(selectedSavedArticleCount) selected article\(selectedSavedArticleCount == 1 ? "" : "s").")
+            }
+    }
+
+    private var directoryContentRoot: some View {
         VStack(spacing: 0) {
             if isSidebarSearchPresented {
-                SidebarSearchView(model: sidebarSearchModel)
-                    .onAppear {
-                        isSidebarTimeMachinePresented = false
-                    }
+                SidebarSearchView(
+                    model: sidebarSearchModel,
+                    isSearchFieldFocused: Binding(
+                        get: { columnState.isSearchFieldFocused },
+                        set: { columnState.isSearchFieldFocused = $0 }
+                    )
+                )
             } else {
                 directoryList
             }
         }
+    }
+
+    private var directoryContentSnapshots: some View {
+        directoryContentRoot
         .task(id: isSidebarSearchPresented ? nil : articleIndexesFingerprint) {
             guard !isSidebarSearchPresented else { return }
             await Task.yield()
@@ -557,7 +589,17 @@ struct DirectoryView: View {
             await Task.yield()
             refreshVisibleSnapshot()
         }
+        .task(id: accessoryCollectionsFingerprint) {
+            columnState.availableLists = allLists
+            columnState.availableLabels = labels
+            columnState.availableTags = tags
+        }
+    }
+
+    private var directoryContentSelectionLifecycle: some View {
+        directoryContentSnapshots
         .onChange(of: selectionResetKey) {
+            columnState.visibleSnapshotScopeKey = nil
             localLabelFilter = nil
             localTagFilter = nil
             clearSavedArticleSelection()
@@ -573,6 +615,16 @@ struct DirectoryView: View {
         .onChange(of: localTagFilter?.id) { _, _ in
             clearSavedArticleSelection()
         }
+        .onChange(of: selectedSavedArticleIDs) { _, selectedIDs in
+            reconcileSelectionAnchor(with: selectedIDs)
+        }
+        .onChange(of: columnState.commandRequest?.id) { _, _ in
+            handleColumnCommandIfNeeded()
+        }
+    }
+
+    private var directoryContentLifecycle: some View {
+        directoryContentSelectionLifecycle
         .onChange(of: selectedDiscoverDate) { _, _ in
             guard rootSelection == .discover else { return }
             activePageViewsPopover = nil
@@ -580,71 +632,42 @@ struct DirectoryView: View {
             queueDiscoverLoadDebounced()
         }
         .onChange(of: rootSelection) { _, newValue in
+            activePageViewsPopover = nil
+            pendingPageViewsRowKey = nil
             if newValue != .discover {
                 discoverDateLoadTask?.cancel()
                 discoverTrendPulseStore.cancel()
-                isSidebarTimeMachinePresented = false
-            }
-        }
-        .onChange(of: discoverSidebarTimeMachineHidden) { _, isHidden in
-            if isHidden {
-                isSidebarTimeMachinePresented = false
             }
         }
         .onDisappear {
             flushScheduledModelContextSave()
-            isSidebarTimeMachinePresented = false
+            activePageViewsPopover = nil
+            pendingPageViewsRowKey = nil
             discoverDateLoadTask?.cancel()
             discoverTrendPulseStore.cancel()
             metadataHydrator.cancel()
         }
-        .confirmationDialog(
-            "Delete selected articles?",
-            isPresented: $showDeleteSelectedConfirmation,
-            titleVisibility: .visible
-        ) {
-            Button("Delete", role: .destructive) {
-                deleteSelectedSavedArticles()
-            }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("This will remove \(selectedSavedArticleCount) selected article\(selectedSavedArticleCount == 1 ? "" : "s").")
-        }
     }
 
-    private var pinnedDirectoryHeaderHeight: CGFloat { 68 }
-
-    private var plainDirectoryTopInset: CGFloat {
-        max(0, topObscuredHeight) + 10
+    private func reconcileSelectionAnchor(with selectedIDs: Set<UUID>) {
+        guard !selectedIDs.isEmpty else {
+            selectionAnchorSavedArticleID = nil
+            return
+        }
+        if let anchor = selectionAnchorSavedArticleID, selectedIDs.contains(anchor) {
+            return
+        }
+        selectionAnchorSavedArticleID = orderedVisibleSavedArticleIDs.first {
+            selectedIDs.contains($0)
+        }
     }
 
     private var directoryList: some View {
         ZStack(alignment: .top) {
             directoryScrollSurface
-            .contentMargins(
-                .top,
-                shouldShowTopDirectoryChrome ? pinnedDirectoryHeaderHeight : plainDirectoryTopInset,
-                for: .scrollIndicators
-            )
-            .safeAreaInset(edge: .top, spacing: 0) {
-                if shouldShowTopDirectoryChrome {
-                    directoryPinnedHeader
-                }
-            }
 
             if shouldShowRecentsEmptyStateOverlay {
                 recentsEmptyStateOverlay
-            }
-        }
-        .background {
-            GeometryReader { proxy in
-                Color.clear
-                    .onAppear {
-                        updateTopObscuredHeight(proxy.safeAreaInsets.top)
-                    }
-                    .onChange(of: proxy.safeAreaInsets.top) { _, newValue in
-                        updateTopObscuredHeight(newValue)
-                    }
             }
         }
         .task(id: rootSelection) {
@@ -659,7 +682,8 @@ struct DirectoryView: View {
             }
             discoverTrendPulseStore.queueLoad(
                 results: discoverPulseItems,
-                referenceDate: discoverTrendReferenceDate
+                referenceDate: discoverTrendReferenceDate,
+                refreshGeneration: discoverPulseRefreshGeneration
             )
         }
         .task(id: pinnedArticleFingerprint) {
@@ -683,6 +707,13 @@ struct DirectoryView: View {
                 }
             }
             .scrollIndicators(.visible)
+        } else if selectedList != nil {
+            List(selection: Binding(
+                get: { columnState.selectedSavedArticleIDs },
+                set: { columnState.selectedSavedArticleIDs = $0 }
+            )) {
+                directoryContent
+            }
         } else {
             List {
                 directoryContent
@@ -717,20 +748,12 @@ struct DirectoryView: View {
     }
 
     private var recentsEmptyStateOverlay: some View {
-        VStack(spacing: 0) {
-            Color.clear.frame(
-                height: shouldShowTopDirectoryChrome
-                    ? pinnedDirectoryHeaderHeight
-                    : plainDirectoryTopInset
-            )
-
-            ColumnEmptyStateView(
-                title: "No Recent Articles",
-                systemImage: "doc.text",
-                description: "Search for an article to get started",
-                style: .quiet
-            )
-        }
+        ColumnEmptyStateView(
+            title: "No Recent Articles",
+            systemImage: "doc.text",
+            description: "Search for an article to get started",
+            style: .quiet
+        )
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .allowsHitTesting(false)
     }
@@ -824,6 +847,7 @@ struct DirectoryView: View {
                             localTagFilter = (localTagFilter?.id == tag.id) ? nil : tag
                         },
                         isSelected: selectedSavedArticleIDs.contains(savedArticle.id),
+                        selectionPresentation: .native,
                         onOpenArticle: { _ in
                             handleSavedArticlePrimaryAction(savedArticle)
                         },
@@ -834,302 +858,69 @@ struct DirectoryView: View {
                             onNewTagWithArticle(article)
                         }
                     )
+                    .tag(savedArticle.id)
                 }
             }
         }
     }
 
-    // MARK: - Directory Controls
+    // MARK: - Directory Commands
 
-    private var directoryPinnedHeader: some View {
-        HStack(alignment: .bottom, spacing: 12) {
-            directoryHeaderIdentity
-
-            Spacer(minLength: 12)
-
-            directoryHeaderControls
-        }
-        .padding(.horizontal, 12)
-        .padding(.top, 16)
-        .padding(.bottom, 10)
-        .background(.bar)
-        .overlay(alignment: .bottom) {
-            Rectangle()
-                .fill(Color.primary.opacity(ColumnChromeMetrics.dividerOpacity(for: colorScheme)))
-                .frame(height: 0.5)
-        }
-    }
-
-    private var directoryTopContentSpacerRow: some View {
-        Color.clear
-            .frame(height: plainDirectoryTopInset)
-            .listRowSeparator(.hidden)
-            .listRowInsets(EdgeInsets())
-    }
-
-    private func updateTopObscuredHeight(_ newValue: CGFloat) {
-        let resolved = max(0, newValue)
-        guard abs(topObscuredHeight - resolved) > 0.5 else { return }
-        DispatchQueue.main.async {
-            guard abs(topObscuredHeight - resolved) > 0.5 else { return }
-            topObscuredHeight = resolved
-        }
-    }
-
-    private var directoryHeaderIdentity: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(topDirectoryTitle)
-                .font(MacWikiTypography.columnHeaderTitle)
-                .foregroundStyle(.primary)
-                .lineLimit(1)
-
-            directoryHeaderMetadataLine
-        }
-    }
-
-    @ViewBuilder
-    private var directoryHeaderMetadataLine: some View {
-        if rootSelection == .discover {
-            discoverHeaderMetadataLine
-        } else {
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: 6) {
-                    directoryCountLabel
-
-                    if hasSelectedSavedArticles {
-                        Text("·")
-                            .font(MacWikiTypography.columnHeaderMetadata)
-                            .foregroundStyle(.tertiary)
-
-                        directorySelectionLabel
-                    }
-                }
-
-                directoryCountLabel
+    private func handleColumnCommandIfNeeded() {
+        guard let request = columnState.commandRequest else { return }
+        defer {
+            if columnState.commandRequest?.id == request.id {
+                columnState.commandRequest = nil
             }
         }
-    }
 
-    private var discoverHeaderMetadataLine: some View {
-        HStack(spacing: 6) {
-            Text(discoverTimeMachineHeaderDateLabel)
-                .font(MacWikiTypography.columnHeaderMetadata)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-
-            if discoverFeedStore.isLoading {
-                Text("·")
-                    .font(MacWikiTypography.columnHeaderMetadata)
-                    .foregroundStyle(.tertiary)
-
-                Text(discoverFeedStore.feed == nil ? "Loading" : "Updating")
-                    .font(MacWikiTypography.columnHeaderMetadata)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-            }
+        switch request.command {
+        case .refreshDiscover:
+            queueDiscoverLoadDebounced(forceRefresh: true, delayNanoseconds: 0)
+        case .markSearchVisible(let asRead):
+            markVisibleSearchRows(asRead: asRead)
+        case .saveSearchVisible(let listID):
+            guard let list = allLists.first(where: { $0.id == listID }) else { return }
+            saveVisibleSearchRows(to: list)
+        case .clearSelection:
+            clearSavedArticleSelection()
+        case .setSelectionLabel(let labelID):
+            applyLabelToSelectedSavedArticles(labelID)
+        case .addSelectionTag(let tagID):
+            guard let tag = tags.first(where: { $0.id == tagID }) else { return }
+            addTagToSelectedSavedArticles(tag)
+        case .removeSelectionTag(let tagID):
+            guard let tag = tags.first(where: { $0.id == tagID }) else { return }
+            removeTagFromSelectedSavedArticles(tag)
+        case .addSelectionToList(let listID):
+            guard let list = allLists.first(where: { $0.id == listID }) else { return }
+            addSelectedSavedArticles(to: list)
+        case .requestDeleteSelection:
+            columnState.showDeleteSelectedConfirmation = true
+        case .markVisible(let asRead):
+            batchMarkVisibleArticles(asRead: asRead)
+        case .setUnreadFilter(let isEnabled):
+            setDirectoryUnreadFilterEnabled(isEnabled)
+        case .setSortMode(let mode):
+            setDirectorySortMode(mode)
         }
     }
 
-    private var directoryCountLabel: some View {
-        HStack(spacing: 3) {
-            Text("\(directoryVisibleArticleCount)")
-                .font(MacWikiTypography.columnHeaderMetadata)
-                .monospacedDigit()
-                .foregroundStyle(.secondary)
-
-            Text(directoryVisibleArticleCount == 1 ? "article" : "articles")
-                .font(MacWikiTypography.columnHeaderMetadata)
-                .foregroundStyle(.secondary)
-        }
-    }
-
-    private var directorySelectionLabel: some View {
-        Text("\(selectedSavedArticleCount) selected")
-            .font(MacWikiTypography.columnHeaderMetadata)
-            .foregroundStyle(.secondary)
-    }
-
-    @ViewBuilder
-    private var directoryHeaderControls: some View {
-        if rootSelection == .discover {
-            discoverHeaderControls
-        } else {
-            ControlGroup {
-                directoryViewOptionsMenu
-                directoryBatchActionsMenu
-            }
-            .controlSize(.regular)
-        }
-    }
-
-    private var discoverHeaderControls: some View {
-        ViewThatFits(in: .horizontal) {
-            ControlGroup {
-                discoverTimeMachineButton
-                discoverRefreshButton
-            }
-            .fixedSize(horizontal: true, vertical: false)
-
-            ControlGroup {
-                discoverTimeMachineButton
-                discoverRefreshButton
-            }
-            .labelStyle(.iconOnly)
-            .fixedSize(horizontal: true, vertical: false)
-        }
-        .controlSize(.regular)
-    }
-
-    @ViewBuilder
-    private var discoverTimeMachineButton: some View {
-        if !discoverSidebarTimeMachineHidden {
-            Button("Time Machine", systemImage: "clock.arrow.trianglehead.counterclockwise.rotate.90") {
-                isSidebarTimeMachinePresented.toggle()
-            }
-            .help("Browse Wikipedia editions from another day")
-            .accessibilityValue(discoverFeedStore.isLoading ? "Updating" : discoverTimeMachineHeaderDateLabel)
-            .popover(isPresented: $isSidebarTimeMachinePresented, arrowEdge: .top) {
-                SidebarDiscoverTimeMachineView(
-                    selectedDate: selectedDiscoverDateBinding,
-                    isHidden: $discoverSidebarTimeMachineHidden,
-                    visibleEditionDateLabel: discoverFeedStore.feed?.dateLabel,
-                    isLoading: discoverFeedStore.isLoading,
-                    isTimeTraveling: isSidebarTimeTraveling,
-                    onRefresh: refreshDiscover
-                )
-            }
-        }
-    }
-
-    private var discoverRefreshButton: some View {
-        Button("Refresh", systemImage: "arrow.clockwise", action: refreshDiscover)
-            .disabled(discoverFeedStore.isLoading)
-            .help(discoverFeedStore.isLoading ? "Refreshing Discover…" : "Refresh Discover")
-            .accessibilityLabel("Refresh Discover")
-            .accessibilityValue(discoverFeedStore.isLoading ? "Refreshing" : "Ready")
-    }
-
-    private func refreshDiscover() {
-        queueDiscoverLoadDebounced(forceRefresh: true, delayNanoseconds: 0)
-    }
-
-    private var directoryViewOptionsMenu: some View {
-        Menu("View", systemImage: "line.3.horizontal.decrease") {
-            Picker("Show", selection: directoryUnreadOnlyBinding) {
-                Text("All Articles").tag(false)
-                Text("Unread Only").tag(true)
-            }
-
-            Picker("Sort", selection: directorySortModeBinding) {
-                ForEach(DirectorySupplementalSortMode.allCases, id: \.self) { mode in
-                    Text(mode.rawValue).tag(mode)
-                }
-            }
-        }
-        .help("Filter and sort articles")
-        .accessibilityValue(
-            "\(isUnreadFilterEnabled ? "Unread only" : "All articles"), sorted by \(activeDirectorySortMode.rawValue)"
+    private func markVisibleSearchRows(asRead: Bool) {
+        ArticleLibraryActions.batchMarkTitles(
+            sidebarSearchModel.visibleSnapshot.visibleTitles,
+            asRead: asRead,
+            modelContext: modelContext,
+            appState: appState
         )
     }
 
-    private var directoryBatchActionsMenu: some View {
-        Menu {
-            if hasSelectedSavedArticles {
-                Button("Clear Selection") {
-                    clearSavedArticleSelection()
-                }
-
-                if !labels.isEmpty {
-                    Menu("Set Label on Selected") {
-                        Button("None") {
-                            applyLabelToSelectedSavedArticles(nil)
-                        }
-                        Divider()
-                        ForEach(labels) { label in
-                            Button(label.name) {
-                                applyLabelToSelectedSavedArticles(label.id)
-                            }
-                        }
-                    }
-                }
-
-                if !tags.isEmpty {
-                    Menu("Add Tag to Selected") {
-                        ForEach(tags) { tag in
-                            Button(tag.name) {
-                                addTagToSelectedSavedArticles(tag)
-                            }
-                        }
-                    }
-
-                    Menu("Remove Tag from Selected") {
-                        ForEach(tags) { tag in
-                            Button(tag.name) {
-                                removeTagFromSelectedSavedArticles(tag)
-                            }
-                        }
-                    }
-                }
-
-                if !selectionEligibleTargetLists.isEmpty {
-                    Menu("Add Selected to List") {
-                        ForEach(selectionEligibleTargetLists) { list in
-                            Button(list.name) {
-                                addSelectedSavedArticles(to: list)
-                            }
-                        }
-                    }
-                }
-
-                Divider()
-
-                Button(role: .destructive) {
-                    showDeleteSelectedConfirmation = true
-                } label: {
-                    SwiftUI.Label("Delete Selected", systemImage: "trash")
-                }
-
-                Divider()
-            }
-
-            Button {
-                batchMarkVisibleArticles(asRead: true)
-            } label: {
-                SwiftUI.Label("Mark Visible as Read", systemImage: "checkmark.circle")
-            }
-            .disabled(visibleUnreadCount == 0)
-
-            Button {
-                batchMarkVisibleArticles(asRead: false)
-            } label: {
-                SwiftUI.Label("Mark Visible as Unread", systemImage: "circle")
-            }
-            .disabled(visibleReadCount == 0)
-        } label: {
-            SwiftUI.Label("Actions", systemImage: "ellipsis.circle")
-        }
-        .help("Batch actions")
-    }
-
-    private var directoryUnreadOnlyBinding: Binding<Bool> {
-        Binding(
-            get: { isUnreadFilterEnabled },
-            set: { setDirectoryUnreadFilterEnabled($0) }
+    private func saveVisibleSearchRows(to list: ReadingList) {
+        SearchResultActions.saveAllToList(
+            sidebarSearchModel.visibleSnapshot.rows,
+            list: list,
+            modelContext: modelContext
         )
-    }
-
-    private var directorySortModeBinding: Binding<DirectorySupplementalSortMode> {
-        Binding(
-            get: { activeDirectorySortMode },
-            set: { setDirectorySortMode($0) }
-        )
-    }
-
-    private var isUnreadFilterEnabled: Bool {
-        if let list = selectedList {
-            return list.filterMode == .unread
-        }
-        return supplementalReadFilter == .unread
     }
 
     private func setDirectoryUnreadFilterEnabled(_ isEnabled: Bool) {
@@ -1139,20 +930,6 @@ struct DirectoryView: View {
         } else {
             supplementalReadFilter = isEnabled ? .unread : .all
         }
-    }
-
-    private var activeDirectorySortMode: DirectorySupplementalSortMode {
-        if let list = selectedList {
-            switch list.sortMode {
-            case .title:
-                return .title
-            case .articleLength:
-                return .articleLength
-            case .addedDate, .manual:
-                return .recent
-            }
-        }
-        return supplementalSortMode
     }
 
     private func setDirectorySortMode(_ mode: DirectorySupplementalSortMode) {
@@ -1175,20 +952,12 @@ struct DirectoryView: View {
         directoryVisibleSnapshot.visibleTitles
     }
 
-    private var directoryVisibleArticleCount: Int {
-        directoryVisibleTitles.count
-    }
-
     private var canMultiSelectSavedArticles: Bool {
         selectedList != nil
     }
 
     private var selectedSavedArticleCount: Int {
         selectedSavedArticleIDs.count
-    }
-
-    private var hasSelectedSavedArticles: Bool {
-        selectedSavedArticleCount > 0
     }
 
     private var orderedVisibleSavedArticles: [SavedArticle] {
@@ -1203,21 +972,6 @@ struct DirectoryView: View {
         let selectedIDs = selectedSavedArticleIDs
         guard !selectedIDs.isEmpty else { return [] }
         return savedArticles.filter { selectedIDs.contains($0.id) }
-    }
-
-    private var selectionEligibleTargetLists: [ReadingList] {
-        if let activeList = selectedList {
-            return allLists.filter { $0.id != activeList.id }
-        }
-        return allLists
-    }
-
-    private var visibleUnreadCount: Int {
-        directoryVisibleSnapshot.visibleUnreadCount
-    }
-
-    private var visibleReadCount: Int {
-        directoryVisibleSnapshot.visibleReadCount
     }
 
     private func clearSavedArticleSelection() {
@@ -1241,7 +995,7 @@ struct DirectoryView: View {
             return
         }
 
-        clearSavedArticleSelection()
+        selectedSavedArticleIDs = [savedArticle.id]
         selectionAnchorSavedArticleID = savedArticle.id
         openArticleFromPrimaryClick(article, inNewTab: SystemBridge.isCommandPressed)
     }
@@ -1410,16 +1164,14 @@ struct DirectoryView: View {
 }
 
 extension DirectoryView {
-
-    private var discoverTimeMachineHeaderDateLabel: String {
-        AppPresentationFormatting.longDate(discoverReferenceDate)
-    }
-
     private func queueDiscoverLoadDebounced(
         forceRefresh: Bool = false,
         delayNanoseconds: UInt64 = 170_000_000
     ) {
         discoverDateLoadTask?.cancel()
+        if forceRefresh {
+            discoverPulseRefreshGeneration &+= 1
+        }
         let targetReferenceDate = discoverReferenceDate
         discoverDateLoadTask = Task { @MainActor in
             if !forceRefresh, delayNanoseconds > 0 {
@@ -1429,7 +1181,6 @@ extension DirectoryView {
             discoverFeedStore.queueLoad(referenceDate: targetReferenceDate, forceRefresh: forceRefresh)
         }
     }
-
 
     @ViewBuilder
     func discoverSections() -> some View {
@@ -1488,8 +1239,10 @@ extension DirectoryView {
         let mostReadSelection = SidebarDiscoverMostReadPolicy.selection(from: feed)
 
         if let featured = feed.featuredArticle {
-            Section("Featured Article") {
-                discoverArticleRow(featured, showTrendPulse: true)
+            Section {
+                discoverArticleRow(featured)
+            } header: {
+                SidebarDiscoverSectionHeader(title: "Featured Article", count: 1)
             }
         }
 
@@ -1501,89 +1254,123 @@ extension DirectoryView {
                     .padding(.vertical, 4)
             } else {
                 ForEach(mostReadSelection.items) { result in
-                    discoverArticleRow(
-                        result,
-                        showTrendPulse: mostReadSelection.supportsTrendPulse
-                    )
+                    discoverArticleRow(result)
                 }
             }
         } header: {
-            Text(mostReadSelection.sectionTitle)
+            SidebarDiscoverSectionHeader(
+                title: mostReadSelection.sectionTitle,
+                count: mostReadSelection.items.count
+            )
         }
 
         if !feed.newsStories.isEmpty {
-            Section("News Briefing") {
+            Section {
                 ForEach(feed.newsStories.prefix(8)) { story in
                     DiscoverStoryRow(story: story, referenceDate: discoverTrendReferenceDate) { article, inNewTab in
                         openDiscoverArticle(article, inNewTab: inNewTab)
                     }
                 }
+            } header: {
+                SidebarDiscoverSectionHeader(
+                    title: "News Briefing",
+                    count: min(feed.newsStories.count, 8)
+                )
             }
         }
 
         if !feed.inTheNews.isEmpty {
-            Section("In the News") {
+            Section {
                 ForEach(feed.inTheNews.prefix(12)) { result in
                     discoverArticleRow(result)
                 }
+            } header: {
+                SidebarDiscoverSectionHeader(
+                    title: "In the News",
+                    count: min(feed.inTheNews.count, 12)
+                )
             }
         }
 
         let primaryTimeline = feed.onThisDaySelected.isEmpty ? feed.onThisDay : feed.onThisDaySelected
         if !primaryTimeline.isEmpty {
-            Section("This Day in History") {
+            Section {
                 ForEach(primaryTimeline.prefix(12)) { event in
                     DiscoverTimelineRow(event: event, referenceDate: discoverTrendReferenceDate) { article, inNewTab in
                         openDiscoverArticle(article, inNewTab: inNewTab)
                     }
                 }
+            } header: {
+                SidebarDiscoverSectionHeader(
+                    title: "This Day in History",
+                    count: min(primaryTimeline.count, 12)
+                )
             }
         }
 
         if !feed.onThisDayBirths.isEmpty {
-            Section("Born on This Day") {
+            Section {
                 ForEach(feed.onThisDayBirths.prefix(8)) { event in
                     DiscoverTimelineRow(event: event, referenceDate: discoverTrendReferenceDate) { article, inNewTab in
                         openDiscoverArticle(article, inNewTab: inNewTab)
                     }
                 }
+            } header: {
+                SidebarDiscoverSectionHeader(
+                    title: "Born on This Day",
+                    count: min(feed.onThisDayBirths.count, 8)
+                )
             }
         }
 
         if !feed.onThisDayDeaths.isEmpty {
-            Section("Died on This Day") {
+            Section {
                 ForEach(feed.onThisDayDeaths.prefix(8)) { event in
                     DiscoverTimelineRow(event: event, referenceDate: discoverTrendReferenceDate) { article, inNewTab in
                         openDiscoverArticle(article, inNewTab: inNewTab)
                     }
                 }
+            } header: {
+                SidebarDiscoverSectionHeader(
+                    title: "Died on This Day",
+                    count: min(feed.onThisDayDeaths.count, 8)
+                )
             }
         }
 
         if !feed.holidays.isEmpty {
-            Section("Holidays & Observances") {
+            Section {
                 ForEach(feed.holidays.prefix(8)) { holiday in
                     DiscoverHolidayListRow(holiday: holiday, referenceDate: discoverTrendReferenceDate) { article, inNewTab in
                         openDiscoverArticle(article, inNewTab: inNewTab)
                     }
                 }
+            } header: {
+                SidebarDiscoverSectionHeader(
+                    title: "Holidays & Observances",
+                    count: min(feed.holidays.count, 8)
+                )
             }
         }
 
         if !feed.didYouKnow.isEmpty {
-            Section("Did You Know?") {
+            Section {
                 ForEach(feed.didYouKnow.prefix(8)) { fact in
                     DiscoverFactRow(fact: fact, referenceDate: discoverTrendReferenceDate) { article, inNewTab in
                         openDiscoverArticle(article, inNewTab: inNewTab)
                     }
                 }
+            } header: {
+                SidebarDiscoverSectionHeader(
+                    title: "Did You Know?",
+                    count: min(feed.didYouKnow.count, 8)
+                )
             }
         }
     }
 
     private func discoverArticleRow(
-        _ result: WikipediaService.SearchResult,
-        showTrendPulse: Bool = false
+        _ result: WikipediaService.SearchResult
     ) -> some View {
         let article = discoverArticle(from: result)
         let titleKey = ReadStateSync.normalizedTitle(article.title)
@@ -1591,7 +1378,7 @@ extension DirectoryView {
         let isRead = effectiveReadState(for: article.title, fallback: article.isRead)
         let progress = readingProgress(for: article.title)
         let tags = tagsForArticle(title: article.title)
-        let trendPulse = showTrendPulse ? discoverTrendPulseStore.pulse(for: article.title) : nil
+        let trendPulse = discoverTrendPulseStore.pulse(for: article.title)
 
         return ArticleListItem(
             accessibilityTitle: article.title,
@@ -1614,21 +1401,35 @@ extension DirectoryView {
                 tags: tags,
                 selectedTagId: localTagFilter?.id,
                 trendPulse: trendPulse,
-                onTrendPulseTap: { pulse in
-                    pendingPageViewsRowKey = rowKey
-                    presentPageViewsPopover(
-                        for: article.title,
-                        rowKey: rowKey,
-                        initialPulse: pulse,
-                        referenceDate: discoverTrendReferenceDate
-                    )
-                    Task { @MainActor in
-                        try? await Task.sleep(nanoseconds: 700_000_000)
-                        if pendingPageViewsRowKey == rowKey {
-                            pendingPageViewsRowKey = nil
+                pageViewsPresentation: SidebarPageViewsPopoverConfiguration(
+                    title: article.title,
+                    referenceDate: discoverTrendReferenceDate,
+                    initialPulse: trendPulse,
+                    style: .pulse,
+                    isPresented: pageViewsPopoverBinding(for: rowKey),
+                    onRequestPresentation: {
+                        pendingPageViewsRowKey = rowKey
+                        presentPageViewsPopover(
+                            for: article.title,
+                            rowKey: rowKey,
+                            initialPulse: trendPulse,
+                            referenceDate: discoverTrendReferenceDate
+                        )
+                        Task { @MainActor in
+                            try? await Task.sleep(nanoseconds: 700_000_000)
+                            if pendingPageViewsRowKey == rowKey {
+                                pendingPageViewsRowKey = nil
+                            }
                         }
+                    },
+                    onPulseLoaded: { pulse in
+                        discoverTrendPulseStore.record(
+                            pulse,
+                            for: article.title,
+                            referenceDate: discoverTrendReferenceDate
+                        )
                     }
-                },
+                ),
                 onTagClick: { tag in
                     localTagFilter = (localTagFilter?.id == tag.id) ? nil : tag
                 }
@@ -1659,9 +1460,6 @@ extension DirectoryView {
                     )
                 }
             )
-        }
-        .popover(isPresented: pageViewsPopoverBinding(for: rowKey), arrowEdge: .trailing) {
-            pageViewsPopover(for: rowKey)
         }
         .discoverContentRowSpacing()
     }
@@ -1696,10 +1494,6 @@ extension DirectoryView {
     @ViewBuilder
     func tabHistorySection(tab: ArticleTab) -> some View {
         Section {
-            if !shouldShowTopDirectoryChrome {
-                directoryTopContentSpacerRow
-            }
-
             if tab.history.isEmpty {
                 Text("No history")
                     .foregroundStyle(.secondary)
@@ -1776,10 +1570,6 @@ extension DirectoryView {
     @ViewBuilder
     func recentArticlesSection() -> some View {
         Section {
-            if !shouldShowTopDirectoryChrome {
-                directoryTopContentSpacerRow
-            }
-
             let filteredRecents = directoryVisibleSnapshot.recentArticles
             if let tag = localTagFilter {
                 tagFilterRow(tag: tag)

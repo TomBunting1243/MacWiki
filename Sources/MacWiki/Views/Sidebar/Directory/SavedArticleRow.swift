@@ -23,6 +23,7 @@ struct SavedArticleRow: View {
     var selectedTagId: UUID? = nil
     var onTagClick: ((Tag) -> Void)? = nil
     var isSelected: Bool = false
+    var selectionPresentation: ArticleListSelectionPresentation = .custom
     var showsLabelMetadata: Bool = true
     var alwaysShowsLabelMetadata: Bool = false
     var showsListMembership: Bool = false
@@ -70,6 +71,7 @@ struct SavedArticleRow: View {
             progress: readProgress,
             isCurrent: isCurrent,
             isSelected: isSelected,
+            selectionPresentation: selectionPresentation,
             label: currentLabel,
             onToggleRead: onToggleRead,
             onTap: {

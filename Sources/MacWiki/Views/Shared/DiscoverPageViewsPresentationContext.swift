@@ -5,6 +5,34 @@ enum DiscoverPageViewsHistoryMode: Equatable, Sendable {
     case continuousToPresent
 }
 
+struct DiscoverPageViewsLoadState: Equatable, Sendable {
+    private(set) var loadedRange: ViewsPopoverTimeRange?
+
+    init(initialPointCount: Int?) {
+        guard let initialPointCount, initialPointCount > 0 else {
+            loadedRange = nil
+            return
+        }
+        loadedRange = ViewsPopoverTimeRange.matching(days: initialPointCount)
+    }
+
+    func needsLoad(
+        selectedRange: ViewsPopoverTimeRange,
+        hasPulse: Bool
+    ) -> Bool {
+        !hasPulse || loadedRange != selectedRange
+    }
+
+    func shouldDiscardPulse(beforeLoading selectedRange: ViewsPopoverTimeRange) -> Bool {
+        guard let loadedRange else { return false }
+        return loadedRange != selectedRange
+    }
+
+    mutating func recordLoad(for selectedRange: ViewsPopoverTimeRange) {
+        loadedRange = selectedRange
+    }
+}
+
 struct DiscoverPageViewsPresentationContext: Equatable, Sendable {
     let selectedDate: Date
     let historyEndDate: Date

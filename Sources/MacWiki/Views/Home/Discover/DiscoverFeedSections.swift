@@ -29,9 +29,6 @@ struct DiscoverFeedSections: View {
             mediaSpotlightSection
             temporalExplorationStage
         }
-        .background {
-            collectionsKeyboardShortcutHost
-        }
         .onAppear {
             normalizeCollectionsKeyboardFocus()
         }
@@ -50,6 +47,18 @@ struct DiscoverFeedSections: View {
         }
         .onMoveCommand { direction in
             moveCollectionsFocus(direction)
+        }
+        .onKeyPress(.return, phases: .down) { keyPress in
+            guard isCollectionsKeyboardFocusActive,
+                  canOpenFocusedCollectionItem,
+                  !isSearchFieldFocused,
+                  activePageViewsPopover == nil else {
+                return .ignored
+            }
+            openFocusedCollectionItem(
+                inNewTab: keyPress.modifiers.contains(.command)
+            )
+            return .handled
         }
         .onExitCommand {
             applyCollectionsKeyboardState(

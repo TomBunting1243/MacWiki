@@ -48,7 +48,7 @@ struct DiscoverFeatureModule: View {
     let onTrendTapped: (WikipediaService.TrendPulse) -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: 14) {
             DiscoverFeatureCard(
                 result: result,
                 teaserText: teaserText,
@@ -59,13 +59,8 @@ struct DiscoverFeatureModule: View {
                 titleLineLimit: titleLineLimit,
                 descriptionLineLimit: descriptionLineLimit,
                 onOpen: onOpen,
-                onTrendTapped: onTrendTapped,
-                showsSurface: false
+                onTrendTapped: onTrendTapped
             )
-            .padding(12)
-
-            Divider()
-                .overlay(Color.primary.opacity(0.05))
 
             Group {
                 if isVisualContextLoading {
@@ -74,8 +69,7 @@ struct DiscoverFeatureModule: View {
                         tone: .accent,
                         font: .system(size: 12.5, weight: .medium)
                     )
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 10)
+                    .padding(.vertical, 6)
                 } else if !visualContextImages.isEmpty {
                     DiscoverVisualContextStrip(
                         images: visualContextImages,
@@ -83,22 +77,15 @@ struct DiscoverFeatureModule: View {
                         showsSurface: false,
                         onOpenURL: onOpenURL
                     )
-                    .padding(12)
                 } else {
                     Text(DiscoverEditionCopy.visualContextUnavailable)
                         .font(DiscoverTypography.cardBody.weight(.medium))
                         .foregroundStyle(.secondary)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 10)
+                        .padding(.vertical, 6)
                 }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .discoverSurfaceChrome(
-            cornerRadius: 16,
-            material: .regular,
-            borderOpacity: 0.34
-        )
     }
 }
 
@@ -113,7 +100,6 @@ struct DiscoverFeatureCard: View {
     let descriptionLineLimit: Int
     let onOpen: (WikipediaService.SearchResult, Bool) -> Void
     let onTrendTapped: (WikipediaService.TrendPulse) -> Void
-    var showsSurface: Bool = true
     @Environment(\.macWikiAccessibilityPersonalization.reduceMotion) private var reduceMotion
     @State private var isHovered = false
 
@@ -193,19 +179,12 @@ struct DiscoverFeatureCard: View {
         }
         .frame(minHeight: result.thumbnailURL == nil ? 0 : heroImageHeight + 72)
         .discoverSurfaceChrome(
-            isEnabled: showsSurface,
             cornerRadius: 14,
             material: .regular,
             borderOpacity: isHovered ? 0.46 : 0.32,
             borderWidth: 0.8
         )
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .overlay {
-            if !showsSurface {
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .strokeBorder(Color(nsColor: .separatorColor).opacity(isHovered ? 0.36 : 0.18), lineWidth: 0.7)
-            }
-        }
         .discoverHoverEffect(.hero, isActive: isHovered, reduceMotion: reduceMotion)
         .onHover { isHovered = $0 }
         .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
@@ -244,7 +223,8 @@ struct DiscoverFeatureCard: View {
                         .fill(Color.primary.opacity(0.04))
                     image
                         .resizable()
-                        .aspectRatio(contentMode: .fill)
+                        .aspectRatio(contentMode: .fit)
+                        .padding(8)
                 }
             } placeholder: {
                 AppLoadingThumbnailPlaceholder(

@@ -1,4 +1,3 @@
-import Foundation
 import SwiftUI
 
 struct DiscoverVisualContextStrip: View {
@@ -6,6 +5,7 @@ struct DiscoverVisualContextStrip: View {
     let isCompactLayout: Bool
     var showsSurface: Bool = true
     let onOpenURL: (URL) -> Void
+    @State private var selectedImage: WikipediaService.VisualContextImage? = nil
 
     private var cardWidth: CGFloat {
         isCompactLayout ? 168 : 194
@@ -26,7 +26,7 @@ struct DiscoverVisualContextStrip: View {
                     ForEach(images) { image in
                         DiscoverVisualContextCard(
                             image: image,
-                            onOpenURL: onOpenURL
+                            onOpen: { selectedImage = image }
                         )
                         .frame(width: cardWidth)
                     }
@@ -34,6 +34,15 @@ struct DiscoverVisualContextStrip: View {
                 .padding(.vertical, 2)
             }
             .scrollIndicators(.hidden)
+        }
+        .sheet(item: $selectedImage) { image in
+            DiscoverMediaViewer(
+                title: DiscoverMediaPresentation.displayTitle(for: image.mediaTitle),
+                description: image.caption,
+                imageURL: image.thumbnailURL,
+                filePageURL: image.filePageURL,
+                onOpenURL: onOpenURL
+            )
         }
 
         if showsSurface {
@@ -48,47 +57,27 @@ struct DiscoverVisualContextStrip: View {
 
 struct DiscoverVisualContextCard: View {
     let image: WikipediaService.VisualContextImage
-    let onOpenURL: (URL) -> Void
+    let onOpen: () -> Void
     @Environment(\.macWikiAccessibilityPersonalization.reduceMotion) private var reduceMotion
     @State private var isHovered = false
 
     private var displayTitle: String {
-        var cleaned = image.mediaTitle.trimmingCharacters(in: .whitespacesAndNewlines)
-        if cleaned.lowercased().hasPrefix("file:") {
-            cleaned = String(cleaned.dropFirst("file:".count))
-        }
-        cleaned = cleaned.replacingOccurrences(of: "_", with: " ")
-        cleaned = cleaned.replacingOccurrences(
-            of: #"\.(jpe?g|png|gif|webp|tiff?|svg)$"#,
-            with: "",
-            options: [.regularExpression, .caseInsensitive]
-        )
-        cleaned = cleaned
-            .replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        return cleaned.isEmpty ? "Media image" : cleaned
+        DiscoverMediaPresentation.displayTitle(for: image.mediaTitle)
     }
 
     var body: some View {
-        Group {
-            if let filePageURL = image.filePageURL {
-                Button {
-                    onOpenURL(filePageURL)
-                } label: {
-                    cardContent
-                }
-            } else {
-                cardContent
-            }
+        Button(action: onOpen) {
+            cardContent
         }
         .buttonStyle(DiscoverInteractivePressStyle())
         .discoverSurfaceChrome(
             cornerRadius: 12,
             borderOpacity: isHovered ? 0.42 : 0.30
         )
-        .discoverHoverEffect(.card, isActive: isHovered && image.filePageURL != nil, reduceMotion: reduceMotion)
-        .onHover { isHovered = image.filePageURL != nil && $0 }
+        .discoverHoverEffect(.card, isActive: isHovered, reduceMotion: reduceMotion)
+        .onHover { isHovered = $0 }
         .accessibilityLabel(displayTitle)
+        .accessibilityHint("Open image in MacWiki")
     }
 
     private var cardContent: some View {
@@ -100,7 +89,8 @@ struct DiscoverVisualContextCard: View {
             ) { loadedImage in
                 loadedImage
                     .resizable()
-                    .aspectRatio(contentMode: .fill)
+                    .aspectRatio(contentMode: .fit)
+                    .padding(6)
             } placeholder: {
                 AppLoadingThumbnailPlaceholder(
                     width: 180,
@@ -196,7 +186,8 @@ struct DiscoverFeaturedImageCard: View {
     var prefersHorizontalLayout: Bool = false
     @Environment(\.openURL) private var openURL
     @Environment(\.macWikiAccessibilityPersonalization.reduceMotion) private var reduceMotion
-    @State private var isHovered = false
+    @State private var isImageHovered = false
+    @State private var isViewerPresented = false
 
     private var displayImageURL: URL? {
         image.thumbnailURL ?? image.imageURL
@@ -285,10 +276,8 @@ struct DiscoverFeaturedImageCard: View {
         .discoverSurfaceChrome(
             cornerRadius: 16,
             material: .regular,
-            borderOpacity: isHovered ? 0.46 : 0.34
+            borderOpacity: 0.34
         )
-        .discoverHoverEffect(.card, isActive: isHovered, reduceMotion: reduceMotion)
-        .onHover { isHovered = $0 }
         .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .contextMenu {
             Button {
@@ -305,13 +294,26 @@ struct DiscoverFeaturedImageCard: View {
                 }
             }
         }
+        .sheet(isPresented: $isViewerPresented) {
+            if let displayImageURL {
+                DiscoverMediaViewer(
+                    title: displayTitle,
+                    description: displayDescription,
+                    imageURL: displayImageURL,
+                    filePageURL: image.filePageURL,
+                    onOpenURL: { openURL($0) }
+                )
+            }
+        }
     }
 
     @ViewBuilder
     private var imagePanel: some View {
         let panelHeight: CGFloat = prefersHorizontalLayout ? 352 : 280
 
-        Group {
+        Button {
+            isViewerPresented = true
+        } label: {
             if let displayImageURL {
                 CachedThumbnailImage(
                     url: displayImageURL,
@@ -348,6 +350,11 @@ struct DiscoverFeaturedImageCard: View {
                 Rectangle().fill(.quaternary)
             }
         }
+        .buttonStyle(DiscoverInteractivePressStyle())
+        .accessibilityLabel(displayTitle)
+        .accessibilityHint("Open image in MacWiki")
+        .discoverHoverEffect(.card, isActive: isImageHovered, reduceMotion: reduceMotion)
+        .onHover { isImageHovered = $0 }
         .frame(maxWidth: .infinity)
         .frame(height: panelHeight)
         .clipped()
@@ -394,14 +401,9 @@ struct DiscoverFeaturedImageCard: View {
                         openURL(filePageURL)
                     } label: {
                         SwiftUI.Label("View on Commons", systemImage: "arrow.up.right.square")
-                            .labelStyle(.titleAndIcon)
-                            .font(DiscoverTypography.controlAuxiliary.weight(.semibold))
-                            .foregroundStyle(.primary)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 6)
-                            .background(.quaternary.opacity(0.6), in: Capsule())
                     }
-                    .buttonStyle(DiscoverInteractivePressStyle())
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
                 }
 
                 if let licenseText {

@@ -241,14 +241,6 @@ struct DiscoverExpandableCollectionCard<Content: View>: View {
                 }
                 .padding(.horizontal, 9)
                 .padding(.vertical, 5)
-                .background(
-                    Color(nsColor: .windowBackgroundColor).opacity(colorScheme == .dark ? 0.36 : 0.78),
-                    in: RoundedRectangle(cornerRadius: 8, style: .continuous)
-                )
-                .overlay {
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .strokeBorder(Color(nsColor: .separatorColor).opacity(0.26), lineWidth: 0.6)
-                }
             }
         }
     }
@@ -324,9 +316,9 @@ struct DiscoverPlaylistArticleRow: View {
             return statTint.opacity(colorScheme == .dark ? 0.24 : 0.17)
         }
         if isHovered {
-            return Color(nsColor: .windowBackgroundColor).opacity(colorScheme == .dark ? 0.48 : 0.84)
+            return Color.primary.opacity(colorScheme == .dark ? 0.075 : 0.045)
         }
-        return Color(nsColor: .windowBackgroundColor).opacity(colorScheme == .dark ? 0.36 : 0.74)
+        return .clear
     }
 
     private var rowStroke: Color {
@@ -334,9 +326,9 @@ struct DiscoverPlaylistArticleRow: View {
             return statTint.opacity(0.56)
         }
         if isHovered {
-            return Color(nsColor: .separatorColor).opacity(0.42)
+            return Color(nsColor: .separatorColor).opacity(0.26)
         }
-        return Color(nsColor: .separatorColor).opacity(0.20)
+        return .clear
     }
 
     var body: some View {

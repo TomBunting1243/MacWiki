@@ -57,20 +57,83 @@ struct NativeWorkspaceLayoutTests {
         #expect(items[3].maximumThickness == MainWindowColumnWidth.inspectorRange.upperBound)
     }
 
-    @Test func onlyReaderTabsUseANativeTopAlignedSplitItemAccessory() {
+    @Test func directoryAndReaderOwnIndependentNativeTopAlignedAccessories() {
+        let directoryAccessory = NSSplitViewItemAccessoryViewController()
+        directoryAccessory.view = NSView(frame: NSRect(x: 0, y: 0, width: 320, height: 68))
         let readerAccessory = NSSplitViewItemAccessoryViewController()
         readerAccessory.view = NSView(frame: NSRect(x: 0, y: 0, width: 600, height: 36))
         let fixture = makeFixture(
             width: 1_500,
+            directoryAccessoryController: directoryAccessory,
             readerAccessoryController: readerAccessory
         )
         defer { fixture.tearDown() }
         layout(fixture)
 
         #expect(fixture.controller.splitViewItems[0].topAlignedAccessoryViewControllers.isEmpty)
-        #expect(fixture.controller.splitViewItems[1].topAlignedAccessoryViewControllers.isEmpty)
+        #expect(
+            fixture.controller.splitViewItems[1].topAlignedAccessoryViewControllers
+                == [directoryAccessory]
+        )
         #expect(fixture.controller.splitViewItems[2].topAlignedAccessoryViewControllers == [readerAccessory])
         #expect(fixture.controller.splitViewItems[3].topAlignedAccessoryViewControllers.isEmpty)
+    }
+
+    @Test func listContentsDelegatesTopChromeAndSurfaceOwnership() throws {
+        let directoryColumn = try source("Sources/MacWiki/Views/Columns/DirectoryColumnView.swift")
+        let directoryAccessory = try source(
+            "Sources/MacWiki/Views/Columns/DirectoryColumnAccessoryView.swift"
+        )
+        let directory = try source("Sources/MacWiki/Views/Sidebar/DirectoryView.swift")
+        let search = try source("Sources/MacWiki/Views/Sidebar/SidebarSearchView.swift")
+        let shell = try source("Sources/MacWiki/Views/Shared/MainWindowShell.swift")
+        let split = try source(
+            "Sources/MacWiki/Views/Shared/AppKitWorkspaceNavigationSplitView.swift"
+        )
+
+        #expect(!directory.contains("topObscuredHeight"))
+        #expect(!directory.contains("plainDirectoryTopInset"))
+        #expect(!directory.contains("pinnedDirectoryHeaderHeight"))
+        #expect(!directory.contains(".safeAreaInset(edge: .top"))
+        #expect(!directory.contains(".contentMargins(\n                .top"))
+        #expect(!directory.contains("proxy.safeAreaInsets.top"))
+        #expect(!directory.contains("updateTopObscuredHeight"))
+
+        #expect(!search.contains(".safeAreaPadding(.top)"))
+        #expect(!search.contains(".safeAreaInset(edge: .top"))
+
+        #expect(shell.contains("directoryAccessory: workspaceEnvironment("))
+        #expect(shell.components(separatedBy: "DirectoryColumnView(").count - 1 == 1)
+        #expect(shell.components(separatedBy: "DirectoryColumnAccessoryView(").count - 1 == 1)
+        #expect(!directoryAccessory.contains("DirectoryView("))
+        #expect(!directoryAccessory.contains("@Query"))
+        #expect(!directoryColumn.contains("DirectoryColumnPresentation"))
+        #expect(!directory.contains("DirectoryColumnPresentation"))
+        #expect(!directory.contains("case .accessory"))
+        #expect(!directory.contains("private var directoryAccessory"))
+        #expect(split.contains("directoryController = WorkspaceDirectoryHostingController("))
+        #expect(split.contains("final class WorkspaceDirectoryHostingController"))
+        #expect(split.contains("let surface = NSVisualEffectView(frame: .zero)"))
+
+        let swiftUIDirectoryPlane = [directoryColumn, directoryAccessory, directory, search]
+            .joined(separator: "\n")
+        #expect(!swiftUIDirectoryPlane.contains("SidebarPaneBackground("))
+        #expect(!directory.contains(".background(.bar)"))
+    }
+
+    @Test func workspaceReconciliationUsesOneMainActorLayoutTransaction() throws {
+        let split = try source(
+            "Sources/MacWiki/Views/Shared/AppKitWorkspaceNavigationSplitView.swift"
+        )
+
+        #expect(!split.contains("contentUpdate: Task"))
+        #expect(!split.contains("visibilityUpdate: Task"))
+        #expect(!split.contains("nativeVisibilityUpdate: Task"))
+        #expect(!split.contains("pendingInitialWidthRestore"))
+        #expect(!split.contains("animatedRestoreDelay"))
+        #expect(!split.contains("restoreDelay"))
+        #expect(!split.contains("await Task.yield()"))
+        #expect(split.contains("restoreInitialVisibleWidthsIfFeasible()"))
     }
 
     @Test func appKitControllerSupportsEveryIndependentVisibilityCombination() {
@@ -240,6 +303,108 @@ struct NativeWorkspaceLayoutTests {
         #expect(reportedVisibility == nil)
     }
 
+    @Test func settledCompactWidthRestoresTheExplicitPaneSetWhenWindowExpands() async {
+        let fixture = makeFixture(width: 1_500)
+        let window = NSWindow(contentViewController: fixture.controller)
+        defer {
+            window.close()
+            fixture.tearDown()
+        }
+        window.setContentSize(fixture.size)
+        layout(fixture)
+        fixture.controller.setPaneVisibility(
+            listsVisible: true,
+            directoryVisible: true,
+            inspectorVisible: true,
+            animated: false
+        )
+
+        var reportedVisibility: WorkspaceNavigationPaneVisibility?
+        fixture.controller.onPaneVisibilityChange = { visibility in
+            reportedVisibility = visibility
+        }
+
+        window.setContentSize(NSSize(width: MainWindowLayout.minimumWindowWidth, height: 800))
+        window.contentView?.layoutSubtreeIfNeeded()
+        fixture.controller.view.layoutSubtreeIfNeeded()
+
+        let didCompact = await waitForNativeCondition(timeout: 3) {
+            let items = fixture.controller.splitViewItems
+            return items[0].isCollapsed || items[1].isCollapsed
+        }
+        try? await Task.sleep(for: .milliseconds(180))
+        #expect(didCompact)
+        #expect(reportedVisibility == nil)
+
+        window.setContentSize(NSSize(width: 1_760, height: 900))
+        window.contentView?.layoutSubtreeIfNeeded()
+        fixture.controller.view.layoutSubtreeIfNeeded()
+
+        let didRestore = await waitForNativeCondition(timeout: 3) {
+            fixture.controller.splitViewItems.allSatisfy { !$0.isCollapsed }
+        }
+        #expect(didRestore)
+        #expect(reportedVisibility == nil)
+    }
+
+    @Test func manualDividerCollapseAtCompactWidthRemainsExplicitWhenWindowExpands() async {
+        let fixture = makeFixture(width: MainWindowLayout.minimumWindowWidth)
+        let window = NSWindow(contentViewController: fixture.controller)
+        defer {
+            window.close()
+            fixture.tearDown()
+        }
+        window.setContentSize(fixture.size)
+        layout(fixture)
+        fixture.controller.setPaneVisibility(
+            listsVisible: true,
+            directoryVisible: true,
+            inspectorVisible: true,
+            animated: false
+        )
+
+        let didCompact = await waitForNativeCondition(timeout: 3) {
+            let items = fixture.controller.splitViewItems
+            return items[0].isCollapsed != items[1].isCollapsed
+        }
+        #expect(didCompact)
+        try? await Task.sleep(for: .milliseconds(180))
+
+        var reportedVisibility: WorkspaceNavigationPaneVisibility?
+        fixture.controller.onPaneVisibilityChange = { visibility in
+            reportedVisibility = visibility
+        }
+        let visibleLeadingItem = fixture.controller.splitViewItems[0].isCollapsed
+            ? fixture.controller.splitViewItems[1]
+            : fixture.controller.splitViewItems[0]
+        visibleLeadingItem.isCollapsed = true
+        fixture.controller.view.layoutSubtreeIfNeeded()
+        fixture.controller.splitViewDidResizeSubviews(
+            Notification(
+                name: NSSplitView.didResizeSubviewsNotification,
+                object: fixture.controller.splitView
+            )
+        )
+
+        let didReportExplicitCollapse = await waitForNativeCondition(timeout: 3) {
+            reportedVisibility?.listsVisible == false
+                && reportedVisibility?.directoryVisible == false
+                && reportedVisibility?.inspectorVisible == true
+        }
+        #expect(didReportExplicitCollapse)
+
+        window.setContentSize(NSSize(width: 1_760, height: 900))
+        window.contentView?.layoutSubtreeIfNeeded()
+        fixture.controller.view.layoutSubtreeIfNeeded()
+        try? await Task.sleep(for: .milliseconds(180))
+
+        let items = fixture.controller.splitViewItems
+        #expect(items[0].isCollapsed)
+        #expect(items[1].isCollapsed)
+        #expect(!items[2].isCollapsed)
+        #expect(!items[3].isCollapsed)
+    }
+
     @Test func firstWindowAttachmentPreservesRequestedFourPaneVisibility() async {
         let fixture = makeFixture(width: 1_800)
         fixture.controller.setPaneVisibility(
@@ -372,9 +537,16 @@ struct NativeWorkspaceLayoutTests {
         #expect(items[1].isCollapsed)
         #expect(!items[2].isCollapsed)
         #expect(!items[3].isCollapsed)
-        #expect(reportedVisibility?.listsVisible == true)
-        #expect(reportedVisibility?.directoryVisible == false)
-        #expect(reportedVisibility?.inspectorVisible == true)
+        #expect(reportedVisibility == nil)
+
+        window.setContentSize(NSSize(width: 1_760, height: 900))
+        window.contentView?.layoutSubtreeIfNeeded()
+        fixture.controller.view.layoutSubtreeIfNeeded()
+        let didRestoreBothLeadingPanes = await waitForNativeCondition(timeout: 3) {
+            let items = fixture.controller.splitViewItems
+            return !items[0].isCollapsed && !items[1].isCollapsed
+        }
+        #expect(didRestoreBothLeadingPanes)
     }
 
     @Test func supportedWindowMinimumCanPresentEitherLeadingPaneWithInspector() {
@@ -574,6 +746,7 @@ struct NativeWorkspaceLayoutTests {
         initialListsWidth: CGFloat = 220,
         initialDirectoryWidth: CGFloat = 320,
         initialInspectorWidth: CGFloat = 320,
+        directoryAccessoryController: NSSplitViewItemAccessoryViewController? = nil,
         readerAccessoryController: NSSplitViewItemAccessoryViewController? = nil
     ) -> WorkspaceFixture {
         let lists = makePaneController()
@@ -594,6 +767,7 @@ struct NativeWorkspaceLayoutTests {
             directoryController: directory,
             readerController: reader,
             inspectorController: inspector,
+            directoryAccessoryController: directoryAccessoryController,
             readerAccessoryController: readerAccessoryController,
             initialListsWidth: initialListsWidth,
             initialDirectoryWidth: initialDirectoryWidth,

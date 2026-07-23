@@ -11,22 +11,31 @@ struct SidebarPageViewsPopoverContent: View {
     let title: String
     let referenceDate: Date
     let initialPulse: WikipediaService.TrendPulse?
+    let onPulseLoaded: ((WikipediaService.TrendPulse) -> Void)?
 
     @State private var pulse: WikipediaService.TrendPulse?
     @State private var isLoading = false
     @State private var didFailLoad = false
     @State private var selectedRange: ViewsPopoverTimeRange
+    @State private var loadState: DiscoverPageViewsLoadState
 
     init(
         title: String,
         referenceDate: Date,
-        initialPulse: WikipediaService.TrendPulse? = nil
+        initialPulse: WikipediaService.TrendPulse? = nil,
+        onPulseLoaded: ((WikipediaService.TrendPulse) -> Void)? = nil
     ) {
         self.title = title
         self.referenceDate = referenceDate
         self.initialPulse = initialPulse
+        self.onPulseLoaded = onPulseLoaded
         _pulse = State(initialValue: initialPulse)
         _selectedRange = State(initialValue: ViewsPopoverTimeRange.matching(days: initialPulse?.points.count ?? 30))
+        _loadState = State(
+            initialValue: DiscoverPageViewsLoadState(
+                initialPointCount: initialPulse?.points.count
+            )
+        )
     }
 
     private var requestedDays: Int {
@@ -104,11 +113,20 @@ struct SidebarPageViewsPopoverContent: View {
 
     @MainActor
     private func loadPulseIfNeeded() async {
+        guard loadState.needsLoad(
+            selectedRange: selectedRange,
+            hasPulse: pulse != nil
+        ) else {
+            return
+        }
         await loadPulse()
     }
 
     @MainActor
     private func loadPulse() async {
+        if loadState.shouldDiscardPulse(beforeLoading: selectedRange) {
+            pulse = nil
+        }
         isLoading = true
         didFailLoad = false
         defer { isLoading = false }
@@ -121,6 +139,8 @@ struct SidebarPageViewsPopoverContent: View {
             )
             guard !Task.isCancelled else { return }
             pulse = fetched
+            loadState.recordLoad(for: selectedRange)
+            onPulseLoaded?(fetched)
         } catch {
             guard !Task.isCancelled else { return }
             didFailLoad = true

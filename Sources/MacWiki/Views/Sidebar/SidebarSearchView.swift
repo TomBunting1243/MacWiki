@@ -14,7 +14,7 @@ struct SidebarSearchView: View {
     @Query(sort: \Highlight.createdAt, order: .reverse) private var highlights: [Highlight]
 
     let model: SidebarSearchSurfaceModel
-    @State private var isSearchFieldFocused = false
+    @Binding var isSearchFieldFocused: Bool
 
     private var searchSurfaceFingerprint: Int {
         var hasher = Hasher()
@@ -69,29 +69,15 @@ struct SidebarSearchView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            SidebarSearchHeaderView(
-                model: model,
-                allLists: allLists,
-                isSearchFieldFocused: $isSearchFieldFocused,
-                onSubmit: openSelectedRowFromKeyboard,
-                onClose: dismissSearch,
-                onMarkVisibleRead: { markVisibleRows(asRead: true) },
-                onMarkVisibleUnread: { markVisibleRows(asRead: false) },
-                onSaveVisibleToList: saveVisibleRows(to:)
-            )
-
-            SidebarSearchContentView(
-                model: model,
-                allLists: allLists,
-                allLabels: allLabels,
-                allTags: allTags,
-                onRetry: model.searchCoordinator.retrySearch,
-                onOpenRow: openRow(_:inNewTab:),
-                onToggleRead: toggleReadState(for:)
-            )
-        }
-        .safeAreaPadding(.top)
+        SidebarSearchContentView(
+            model: model,
+            allLists: allLists,
+            allLabels: allLabels,
+            allTags: allTags,
+            onRetry: model.searchCoordinator.retrySearch,
+            onOpenRow: openRow(_:inNewTab:),
+            onToggleRead: toggleReadState(for:)
+        )
         .onAppear {
             if let launchQuery = appState.consumeLaunchSidebarSearchQuery() {
                 model.searchCoordinator.searchText = launchQuery
@@ -143,11 +129,6 @@ struct SidebarSearchView: View {
         performOpen(row, inNewTab: inNewTab || appState.searchContext == .newTab)
     }
 
-    private func openSelectedRowFromKeyboard() {
-        guard let row = model.selectedRow ?? model.visibleSnapshot.rows.first else { return }
-        openRow(row, inNewTab: false)
-    }
-
     private func performOpen(_ row: SidebarSearchRow, inNewTab: Bool) {
         model.select(rowID: row.id)
         if SystemBridge.isOptionPressed {
@@ -167,23 +148,6 @@ struct SidebarSearchView: View {
                 appState: appState
             )
         }
-    }
-
-    private func markVisibleRows(asRead: Bool) {
-        ArticleLibraryActions.batchMarkTitles(
-            model.visibleSnapshot.visibleTitles,
-            asRead: asRead,
-            modelContext: modelContext,
-            appState: appState
-        )
-    }
-
-    private func saveVisibleRows(to list: ReadingList) {
-        SearchResultActions.saveAllToList(
-            model.visibleSnapshot.rows,
-            list: list,
-            modelContext: modelContext
-        )
     }
 
     private func dismissSearch() {

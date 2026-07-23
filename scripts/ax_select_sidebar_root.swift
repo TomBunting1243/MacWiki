@@ -71,6 +71,15 @@ func supportsPress(_ element: AXUIElement) -> Bool {
     return actions.contains(kAXPressAction as String)
 }
 
+func supportsSelectedMutation(_ element: AXUIElement) -> Bool {
+    var isSettable = DarwinBoolean(false)
+    return AXUIElementIsAttributeSettable(
+        element,
+        kAXSelectedAttribute as CFString,
+        &isSettable
+    ) == .success && isSettable.boolValue
+}
+
 do {
     guard CommandLine.arguments.count == 3,
           let pid = pid_t(CommandLine.arguments[1]) else {
@@ -89,24 +98,33 @@ do {
     var selectableRow: AXUIElement?
     while Date() < deadline {
         let applicationElements = flattenedApplicationElements(from: application)
-        target = applicationElements.first { element in
-            let role: String = attribute(kAXRoleAttribute as CFString, from: element) ?? ""
-            return role == (kAXButtonRole as String)
-                && labels(for: element).contains(targetLabel)
-                && supportsPress(element)
-        }
-        if target == nil {
-            for row in applicationElements where
-                (attribute(kAXRoleAttribute as CFString, from: row) as String?) == (kAXRowRole as String)
-            {
-                let rowElements = flattenedElements(from: row, limit: 50)
-                guard rowElements.flatMap(labels).contains(targetLabel) else { continue }
-                selectableRow = row
-                target = rowElements.first(where: supportsPress)
-                if target == nil, supportsPress(row) {
-                    target = row
-                }
+        // Prefer the semantic Sidebar row. Discover also appears as a button
+        // inside the reader page, and a global button-first lookup can report a
+        // false-positive route change while leaving List Contents on Recents.
+        for row in applicationElements where
+            (attribute(kAXRoleAttribute as CFString, from: row) as String?) == (kAXRowRole as String)
+        {
+            let rowElements = flattenedElements(from: row, limit: 50)
+            guard rowElements.flatMap(labels).contains(targetLabel) else { continue }
+            if let pressableDescendant = rowElements.first(where: supportsPress) {
+                target = pressableDescendant
                 break
+            }
+            if supportsPress(row) {
+                target = row
+                break
+            }
+            if supportsSelectedMutation(row) {
+                selectableRow = row
+                break
+            }
+        }
+        if target == nil, selectableRow == nil {
+            target = applicationElements.first { element in
+                let role: String = attribute(kAXRoleAttribute as CFString, from: element) ?? ""
+                return role == (kAXButtonRole as String)
+                    && labels(for: element).contains(targetLabel)
+                    && supportsPress(element)
             }
         }
         if target != nil || selectableRow != nil { break }

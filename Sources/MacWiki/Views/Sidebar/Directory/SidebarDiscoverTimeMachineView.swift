@@ -27,33 +27,19 @@ struct SidebarDiscoverTimeMachineView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            popoverHeader
-            editionDatePicker
-            editionNavigationControls
-            jumpAndRefreshControls
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .center, spacing: 10) {
+                TimeMachineAccentMark(isActive: isBusy)
 
-            Button("Hide from List Contents", systemImage: "eye.slash") {
-                isHidden = true
-            }
-            .buttonStyle(.borderless)
-            .foregroundStyle(.secondary)
-            .help("You can show Time Machine again in Settings")
-        }
-        .controlSize(.regular)
-        .padding(16)
-        .frame(width: 286)
-        .help("Browse Wikipedia editions from another day")
-    }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("TIME MACHINE")
+                        .font(.caption2.weight(.bold))
+                        .tracking(0.9)
+                        .foregroundStyle(TimeMachineVisualLanguage.electricViolet)
 
-    private var popoverHeader: some View {
-        VStack(alignment: .leading, spacing: 5) {
-            HStack(spacing: 8) {
-                SwiftUI.Label(
-                    "Time Machine",
-                    systemImage: "clock.arrow.trianglehead.counterclockwise.rotate.90"
-                )
-                .font(.headline)
+                    Text("Browse Wikipedia editions")
+                        .font(.subheadline.weight(.medium))
+                }
 
                 Spacer(minLength: 8)
 
@@ -64,33 +50,39 @@ struct SidebarDiscoverTimeMachineView: View {
                 }
             }
 
-            Text(visibleEditionDescription)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .lineLimit(2)
-        }
-        .accessibilityElement(children: .combine)
-        .accessibilityValue(visibleEditionDateLabel ?? "")
-    }
+            editionDatePicker
 
-    private var visibleEditionDescription: String {
-        if let visibleEditionDateLabel {
-            return isTimeTraveling
-                ? "Showing \(visibleEditionDateLabel) while the selected edition loads."
-                : "Showing the \(visibleEditionDateLabel) edition."
+            Rectangle()
+                .fill(TimeMachineVisualLanguage.accentGradient)
+                .frame(height: 1)
+                .opacity(0.52)
+
+            HStack(spacing: 10) {
+                editionNavigationControls
+
+                Spacer(minLength: 8)
+
+                jumpMenu
+            }
         }
-        return "Choose a day to browse Wikipedia's edition for that date."
+        .controlSize(.regular)
+        .tint(TimeMachineVisualLanguage.electricViolet)
+        .padding(14)
+        .frame(width: 320)
+        .timeMachineSurfaceChrome(cornerRadius: 14)
+        .help("Browse Wikipedia editions from another day")
+        .accessibilityValue(visibleEditionDateLabel ?? "")
     }
 
     private var editionDatePicker: some View {
         DatePicker(
-            "Edition",
+            "Edition Date",
             selection: $selectedDate,
             in: ...Date(),
             displayedComponents: [.date]
         )
-        .datePickerStyle(.field)
-        .disabled(isBusy)
+        .datePickerStyle(.graphical)
+        .labelsHidden()
         .accessibilityLabel("Edition Date")
     }
 
@@ -114,25 +106,29 @@ struct SidebarDiscoverTimeMachineView: View {
             .disabled(!canStepForward)
             .help("Next Day")
         }
-        .disabled(isBusy)
         .accessibilityLabel("Edition Navigation")
     }
 
-    private var jumpAndRefreshControls: some View {
-        HStack(spacing: 10) {
-            Menu("Jump", systemImage: "calendar.badge.clock") {
-                Button("Yesterday") { shift(days: -1) }
-                Button("7 Days Ago") { shift(days: -7) }
-                Button("30 Days Ago") { shift(days: -30) }
-                Button("1 Year Ago") { shift(years: -1) }
-                Button("5 Years Ago") { shift(years: -5) }
-            }
+    private var jumpMenu: some View {
+        Menu("Jump", systemImage: "calendar") {
+            Button("Yesterday") { shift(days: -1) }
+            Button("7 Days Ago") { shift(days: -7) }
+            Button("30 Days Ago") { shift(days: -30) }
+            Button("1 Year Ago") { shift(years: -1) }
+            Button("5 Years Ago") { shift(years: -5) }
 
-            Spacer(minLength: 8)
+            Divider()
 
             Button("Refresh", systemImage: "arrow.clockwise", action: onRefresh)
                 .disabled(isLoading)
+
+            Divider()
+
+            Button("Hide from List Contents", systemImage: "eye.slash") {
+                isHidden = true
+            }
         }
+        .help("Jump to another edition or manage Time Machine")
     }
 
     private func shift(days: Int) {

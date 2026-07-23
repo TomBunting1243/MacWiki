@@ -6,9 +6,7 @@ struct DiscoverNewsStoryCard: View {
     let onOpen: (WikipediaService.SearchResult, Bool) -> Void
     let referenceDate: Date
     var showsSurface: Bool = true
-    @Environment(\.macWikiAccessibilityPersonalization.reduceMotion) private var reduceMotion
     @State private var activePageViewsTitle: String?
-    @State private var isHovered = false
 
     private var renderedStory: AttributedString {
         let cleaned = Self.sanitizedStoryText(story.story)
@@ -111,22 +109,20 @@ struct DiscoverNewsStoryCard: View {
         .discoverSurfaceChrome(
             isEnabled: showsSurface,
             cornerRadius: 14,
-            borderOpacity: isHovered ? 0.46 : 0.32
+            borderOpacity: 0.32
         )
         .background {
             if !showsSurface {
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(Color.primary.opacity(isHovered ? 0.04 : 0.018))
+                    .fill(Color.primary.opacity(0.018))
             }
         }
         .overlay {
             if !showsSurface {
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .strokeBorder(Color(nsColor: .separatorColor).opacity(isHovered ? 0.46 : 0.32), lineWidth: 0.7)
+                    .strokeBorder(Color(nsColor: .separatorColor).opacity(0.32), lineWidth: 0.7)
             }
         }
-        .discoverHoverEffect(.card, isActive: isHovered, reduceMotion: reduceMotion)
-        .onHover { isHovered = $0 }
         .contentShape(RoundedRectangle(cornerRadius: showsSurface ? 14 : 16, style: .continuous))
     }
 }

@@ -17,6 +17,7 @@ struct DiscoverPageViewsPopoverContent: View {
     @State private var isLoading = false
     @State private var didFailLoad = false
     @State private var selectedRange: ViewsPopoverTimeRange
+    @State private var loadState: DiscoverPageViewsLoadState
 
     init(
         title: String,
@@ -28,6 +29,11 @@ struct DiscoverPageViewsPopoverContent: View {
         self.initialPulse = initialPulse
         _pulse = State(initialValue: initialPulse)
         _selectedRange = State(initialValue: ViewsPopoverTimeRange.matching(days: initialPulse?.points.count ?? 30))
+        _loadState = State(
+            initialValue: DiscoverPageViewsLoadState(
+                initialPointCount: initialPulse?.points.count
+            )
+        )
     }
 
     private var requestedDays: Int {
@@ -105,11 +111,20 @@ struct DiscoverPageViewsPopoverContent: View {
 
     @MainActor
     private func loadPulseIfNeeded() async {
+        guard loadState.needsLoad(
+            selectedRange: selectedRange,
+            hasPulse: pulse != nil
+        ) else {
+            return
+        }
         await loadPulse()
     }
 
     @MainActor
     private func loadPulse() async {
+        if loadState.shouldDiscardPulse(beforeLoading: selectedRange) {
+            pulse = nil
+        }
         isLoading = true
         didFailLoad = false
         defer { isLoading = false }
@@ -122,6 +137,7 @@ struct DiscoverPageViewsPopoverContent: View {
             )
             guard !Task.isCancelled else { return }
             pulse = fetched
+            loadState.recordLoad(for: selectedRange)
         } catch {
             guard !Task.isCancelled else { return }
             didFailLoad = true

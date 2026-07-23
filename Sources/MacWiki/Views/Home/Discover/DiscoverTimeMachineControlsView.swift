@@ -3,10 +3,9 @@ import SwiftUI
 
 /// Native temporal navigation for the editorial Discover page.
 ///
-/// DatePicker, Menu, and standard bordered Button styles deliberately own
-/// the control appearance. Discovery used to paint rounded rectangles around
-/// borderless buttons, which became visually tiny and brittle as the reader
-/// column resized.
+/// Native DatePicker, Menu, and Button controls remain responsible for input;
+/// a restrained temporal palette makes this mode distinct without replacing
+/// platform control behavior.
 struct DiscoverTimeMachineControlsView: View {
     let screenModel: DiscoverScreenModel
     let discoverFeedStore: DiscoverFeedStore
@@ -18,35 +17,58 @@ struct DiscoverTimeMachineControlsView: View {
     var body: some View {
         @Bindable var screenModel = screenModel
 
-        GroupBox {
+        VStack(alignment: .leading, spacing: 12) {
+            header(screenModel: screenModel)
+
             ViewThatFits(in: .horizontal) {
                 wideControls(screenModel: screenModel)
                 compactControls(screenModel: screenModel)
             }
             .controlSize(.regular)
-        } label: {
-            HStack(alignment: .firstTextBaseline, spacing: 10) {
-                SwiftUI.Label(
-                    "Time Machine",
-                    systemImage: "clock.arrow.trianglehead.counterclockwise.rotate.90"
-                )
-                .font(DiscoverTypography.controlLabel)
+        }
+        .padding(14)
+        .timeMachineSurfaceChrome(cornerRadius: 14)
+        .tint(TimeMachineVisualLanguage.electricViolet)
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.14), value: isScanning)
+        .help("Browse Wikipedia editions from another day.")
+    }
 
-                Spacer(minLength: 8)
+    private func header(screenModel: DiscoverScreenModel) -> some View {
+        HStack(alignment: .center, spacing: 10) {
+            TimeMachineAccentMark(isActive: isScanning)
 
-                if isScanning {
-                    HStack(spacing: 6) {
-                        ProgressView()
-                            .controlSize(.small)
-                        Text("Loading \(screenModel.discoverTimeMachineDateLabel)")
-                    }
+            VStack(alignment: .leading, spacing: 2) {
+                Text("TIME MACHINE")
+                    .font(.caption2.weight(.bold))
+                    .tracking(0.9)
+                    .foregroundStyle(TimeMachineVisualLanguage.electricViolet)
+
+                Text("Browse another Wikipedia edition")
                     .font(DiscoverTypography.controlAuxiliary)
                     .foregroundStyle(.secondary)
-                    .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.97)))
-                    .accessibilityElement(children: .combine)
-                    .accessibilityLabel("Loading selected date")
-                    .accessibilityValue(screenModel.discoverTimeMachineDateLabel)
-                } else {
+            }
+
+            Spacer(minLength: 8)
+
+            if isScanning {
+                HStack(spacing: 6) {
+                    ProgressView()
+                        .controlSize(.small)
+                        .tint(TimeMachineVisualLanguage.electricViolet)
+                    Text("Loading \(screenModel.discoverTimeMachineDateLabel)")
+                }
+                .font(DiscoverTypography.controlAuxiliary)
+                .foregroundStyle(.secondary)
+                .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.97)))
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("Loading selected date")
+                .accessibilityValue(screenModel.discoverTimeMachineDateLabel)
+            } else {
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text("TEMPORAL EDITION")
+                        .font(.caption2.weight(.semibold))
+                        .tracking(0.6)
+                        .foregroundStyle(TimeMachineVisualLanguage.ultraviolet)
                     Text(discoverFeedStore.feed?.dateLabel ?? screenModel.discoverTimeMachineDateLabel)
                         .font(DiscoverTypography.editionDate)
                         .foregroundStyle(.secondary)
@@ -54,8 +76,6 @@ struct DiscoverTimeMachineControlsView: View {
                 }
             }
         }
-        .animation(reduceMotion ? nil : .easeOut(duration: 0.14), value: isScanning)
-        .help("Browse Wikipedia editions from another day.")
     }
 
     @ViewBuilder

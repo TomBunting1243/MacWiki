@@ -2,8 +2,8 @@ import SwiftUI
 
 struct SidebarSearchHeaderView: View {
     private enum Metrics {
-        static let titleFont = Font.system(size: 17, weight: .semibold)
-        static let metadataFont = Font.subheadline.weight(.semibold)
+        static let titleFont = Font.system(size: 16, weight: .semibold)
+        static let metadataFont = Font.caption.weight(.medium)
     }
 
     let model: SidebarSearchSurfaceModel
@@ -43,16 +43,16 @@ struct SidebarSearchHeaderView: View {
                         .labelStyle(.iconOnly)
                         .help("Close Search")
                 }
-                .controlSize(.small)
+                .controlSize(.regular)
             }
             .padding(.horizontal, ColumnChromeMetrics.horizontalPadding)
-            .padding(.top, 12)
-            .padding(.bottom, 10)
+            .padding(.top, 2)
 
             searchField
                 .padding(.horizontal, ColumnChromeMetrics.horizontalPadding)
-                .padding(.bottom, 12)
+                .padding(.bottom, 4)
         }
+        .frame(height: ColumnChromeMetrics.directoryBarHeight, alignment: .bottom)
         .overlay(alignment: .bottom) {
             Rectangle()
                 .fill(Color.primary.opacity(ColumnChromeMetrics.dividerOpacity(for: colorScheme)))

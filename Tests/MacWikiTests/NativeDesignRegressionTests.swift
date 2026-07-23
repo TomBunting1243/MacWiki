@@ -5,12 +5,28 @@ import Testing
 
 @MainActor
 struct NativeDesignRegressionTests {
-    @Test func sidebarSearchInheritsTheTransparentSidebarSurface() throws {
+    @Test func headerlessWorkspaceInspectorDoesNotRecreateATopGap() throws {
+        let shell = try source("Sources/MacWiki/Views/Shared/MainWindowShell.swift")
+        let inspector = try source("Sources/MacWiki/Views/Inspector/InspectorPanel.swift")
+        let chrome = try source("Sources/MacWiki/Views/Shared/ColumnTopBar.swift")
+        let directoryAccessory = try source(
+            "Sources/MacWiki/Views/Columns/DirectoryColumnAccessoryView.swift"
+        )
+
+        #expect(shell.contains("InspectorColumnView(includesHeader: false)"))
+        #expect(inspector.contains("includesHeader ? InspectorLayout.contentTopPadding : 0"))
+        #expect(chrome.contains("static let directoryBarHeight: CGFloat = 64"))
+        #expect(directoryAccessory.contains("HStack(alignment: .center"))
+        #expect(directoryAccessory.contains("alignment: .center"))
+    }
+
+    @Test func sidebarSearchInheritsTheNativeContentListSurfaceAndAccessoryInset() throws {
         let source = try source("Sources/MacWiki/Views/Sidebar/SidebarSearchView.swift")
 
         #expect(!source.contains("textBackgroundColor"))
         #expect(!source.contains("windowBackgroundColor"))
-        #expect(source.contains(".safeAreaPadding(.top)"))
+        #expect(!source.contains(".safeAreaPadding(.top)"))
+        #expect(!source.contains(".safeAreaInset(edge: .top"))
     }
 
     @Test func sidebarSelectionIsOwnedByTheNativeSidebarList() throws {
@@ -198,6 +214,8 @@ struct NativeDesignRegressionTests {
         #expect(toolbarLayout.contains(".inspectorTrackingSeparator"))
         #expect(toolbarItemFactory.contains("item.isBordered = true"))
         #expect(toolbarItemFactory.contains("item.style = .plain"))
+        #expect(toolbarItemFactory.contains("pointSize: ChromeIconMetrics.symbolPointSize"))
+        #expect(toolbarItemFactory.contains("withSymbolConfiguration(configuration)"))
         #expect(toolbar.contains("toolbar.allowsUserCustomization = false"))
         #expect(toolbar.contains("toolbar.allowsDisplayModeCustomization = false"))
         #expect(toolbar.contains("toolbar.autosavesConfiguration = false"))

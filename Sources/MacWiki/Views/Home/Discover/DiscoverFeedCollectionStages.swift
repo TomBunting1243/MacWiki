@@ -2,27 +2,6 @@ import SwiftUI
 
 extension DiscoverFeedSections {
     @ViewBuilder
-    var collectionsKeyboardShortcutHost: some View {
-        VStack(spacing: 0) {
-            Button(action: { openFocusedCollectionItem(inNewTab: false) }) {
-                EmptyView()
-            }
-            .keyboardShortcut(.return, modifiers: [])
-
-            Button(action: { openFocusedCollectionItem(inNewTab: true) }) {
-                EmptyView()
-            }
-            .keyboardShortcut(.return, modifiers: [.command])
-        }
-        .buttonStyle(.plain)
-        .frame(width: 0, height: 0)
-        .opacity(0.001)
-        .allowsHitTesting(false)
-        .accessibilityHidden(true)
-        .disabled(!canOpenFocusedCollectionItem || isSearchFieldFocused)
-    }
-
-    @ViewBuilder
     var mostReadCollectionModule: some View {
         DiscoverExpandableCollectionCard(
             title: "Most Read",
@@ -250,7 +229,7 @@ extension DiscoverFeedSections {
     @ViewBuilder
     var newsBriefingSection: some View {
         if !feed.newsStories.isEmpty {
-            DiscoverEditorialPanel(accent: Color.teal.opacity(0.84), tone: .notebook) {
+            DiscoverEditorialPanel(accent: Color.teal.opacity(0.84)) {
                 VStack(alignment: .leading, spacing: 12) {
                     DiscoverSectionHeader(
                         title: "News Briefing",
@@ -262,7 +241,7 @@ extension DiscoverFeedSections {
                                 story: story,
                                 onOpen: onOpen,
                                 referenceDate: trendReferenceDate,
-                                showsSurface: false
+                                showsSurface: true
                             )
                         }
                     }
@@ -335,7 +314,7 @@ extension DiscoverFeedSections {
     @ViewBuilder
     var mediaSpotlightImageModule: some View {
         if let featuredImage = feed.featuredImage {
-            DiscoverEditorialPanel(accent: Color.indigo.opacity(0.82), tone: .feature) {
+            DiscoverEditorialPanel(accent: Color.indigo.opacity(0.82)) {
                 VStack(alignment: .leading, spacing: 12) {
                     DiscoverSectionHeader(title: "Image of the Day", subtitle: DiscoverEditionCopy.imageOfTheDaySubtitle)
                     DiscoverFeaturedImageCard(
@@ -350,7 +329,7 @@ extension DiscoverFeedSections {
     @ViewBuilder
     var inTheNewsModule: some View {
         if !remainingNewsItems.isEmpty {
-            DiscoverEditorialPanel(accent: Color.red.opacity(0.78), tone: .notebook) {
+            DiscoverEditorialPanel(accent: Color.red.opacity(0.78)) {
                 VStack(alignment: .leading, spacing: 12) {
                     DiscoverSectionHeader(title: "In the News", subtitle: DiscoverEditionCopy.inTheNewsSubtitle)
                     LazyVGrid(

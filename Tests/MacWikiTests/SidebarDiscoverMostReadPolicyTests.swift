@@ -15,7 +15,6 @@ struct SidebarDiscoverMostReadPolicyTests {
         #expect(selection.items == ranked)
         #expect(selection.contentKind == .ranked)
         #expect(selection.sectionTitle == "Most Read")
-        #expect(selection.supportsTrendPulse)
     }
 
     @Test func editorialFallbackPreservesPriorityAndUsesTruthfulSemantics() {
@@ -38,7 +37,6 @@ struct SidebarDiscoverMostReadPolicyTests {
         #expect(selection.items == [first, recoveredID])
         #expect(selection.contentKind == .editorialFallback)
         #expect(selection.sectionTitle == "Discover Picks")
-        #expect(!selection.supportsTrendPulse)
     }
 
     @Test func emptySourcesRemainAnUnavailableMostReadSection() {
@@ -50,7 +48,6 @@ struct SidebarDiscoverMostReadPolicyTests {
         #expect(selection.items.isEmpty)
         #expect(selection.contentKind == .ranked)
         #expect(selection.sectionTitle == "Most Read")
-        #expect(!selection.supportsTrendPulse)
     }
 
     @Test func nonpositiveLimitDoesNotExposeFallbackContent() {
@@ -89,6 +86,93 @@ struct SidebarDiscoverMostReadPolicyTests {
 
         #expect(selection.items == [selected])
         #expect(selection.contentKind == .editorialFallback)
+    }
+
+    @Test func editionInventoryCountsEveryUniqueArticleDestination() {
+        let featured = result(id: "featured", title: "Featured")
+        let trend = result(id: "trend", title: "Trending")
+        let duplicateTrend = result(id: "other-id", title: "Trending")
+        let story = result(id: "story", title: "Story Link")
+        let inTheNews = result(id: "in-the-news", title: "In the News")
+        let history = result(id: "history", title: "History")
+        let born = result(id: "born", title: "Born")
+        let died = result(id: "died", title: "Died")
+
+        let feed = WikipediaService.DiscoverFeed(
+            dateKey: "2026-07-20",
+            dateLabel: "Stub",
+            featuredArticle: featured,
+            featuredImage: nil,
+            newsStories: [
+                .init(id: "news", story: "Stub", links: [story, duplicateTrend])
+            ],
+            inTheNews: [trend, inTheNews],
+            trending: [trend],
+            onThisDay: [],
+            onThisDaySelected: [timelineEvent(id: "history-event", article: history)],
+            onThisDayBirths: [timelineEvent(id: "born-event", article: born)],
+            onThisDayDeaths: [timelineEvent(id: "died-event", article: died)],
+            holidays: [],
+            didYouKnow: []
+        )
+
+        #expect(
+            SidebarDiscoverArticleInventory.articles(in: feed).map(\.title)
+                == ["Featured", "Trending", "Story Link", "In the News", "History", "Born", "Died"]
+        )
+        #expect(
+            SidebarDiscoverArticleInventory.renderedArticleRows(in: feed).map(\.title)
+                == ["Featured", "Trending", "In the News"]
+        )
+    }
+
+    @Test func renderedInventoryCapsPulsePreloadingToVisibleRows() {
+        let featured = result(id: "featured", title: "Featured")
+        let ranked = (0..<24).map { result(id: "ranked-\($0)", title: "Ranked \($0)") }
+        let news = (0..<14).map { result(id: "news-\($0)", title: "News \($0)") }
+        let feed = WikipediaService.DiscoverFeed(
+            dateKey: "2026-07-20",
+            dateLabel: "Stub",
+            featuredArticle: featured,
+            featuredImage: nil,
+            newsStories: [],
+            inTheNews: news,
+            trending: ranked,
+            onThisDay: [],
+            onThisDaySelected: [],
+            onThisDayBirths: [],
+            onThisDayDeaths: [],
+            holidays: [],
+            didYouKnow: []
+        )
+
+        let rows = SidebarDiscoverArticleInventory.renderedArticleRows(in: feed)
+
+        #expect(rows.count == 37)
+        #expect(rows.first?.title == "Featured")
+        #expect(rows.last?.title == "News 11")
+        #expect(!rows.contains(where: { $0.title == "News 12" }))
+    }
+
+    @Test func manualRefreshInvalidatesPulseLoadingWithUnchangedRows() {
+        let initial = SidebarDiscoverPulseLoadIdentity(
+            dateKey: "2026-07-20",
+            titles: ["Same Article"],
+            refreshGeneration: 3
+        )
+        let normalizedEquivalent = SidebarDiscoverPulseLoadIdentity(
+            dateKey: "2026-07-20",
+            titles: ["same_article"],
+            refreshGeneration: 3
+        )
+        let refreshed = SidebarDiscoverPulseLoadIdentity(
+            dateKey: "2026-07-20",
+            titles: ["Same Article"],
+            refreshGeneration: 4
+        )
+
+        #expect(initial == normalizedEquivalent)
+        #expect(initial != refreshed)
     }
 
     private func result(id: String, title: String) -> WikipediaService.SearchResult {

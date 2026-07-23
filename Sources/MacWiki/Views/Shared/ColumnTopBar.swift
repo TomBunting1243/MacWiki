@@ -6,6 +6,9 @@ enum ColumnChromeMetrics {
     /// unified window toolbar; matching their native control lanes prevents a
     /// stepped seam at the Reader/Inspector divider.
     static let secondaryBarHeight: CGFloat = 36
+    /// List Contents owns a two-line identity/control lane. Search reuses the
+    /// same native split-item accessory height for its field and actions.
+    static let directoryBarHeight: CGFloat = 64
     static let dividerOpacity: CGFloat = 0.065
     static let internalDividerOpacity: CGFloat = 0.035
     static let darkDividerOpacity: CGFloat = 0.038
@@ -25,10 +28,6 @@ enum ChromeIconMetrics {
     /// typographically instead of forcing ad-hoc pixel dimensions.
     static let symbolPointSize: CGFloat = 13
     static let regularWeight: Font.Weight = .regular
-}
-
-enum TopChromeControlMetrics {
-    static let groupButtonSize: CGFloat = 25
 }
 
 enum ColumnMotion {
@@ -171,27 +170,7 @@ enum TopChromeMotion {
     }
 }
 
-struct SidebarPaneBackground: View {
-    @Environment(\.macWikiAccessibilityPersonalization.reduceTransparency) private var reduceTransparency
-
-    var body: some View {
-        if reduceTransparency {
-            Rectangle()
-                .fill(Color(nsColor: .windowBackgroundColor))
-        } else if #available(macOS 26, *) {
-            Rectangle()
-                .fill(.thinMaterial)
-                .backgroundExtensionEffect()
-        } else {
-            Rectangle()
-                .fill(.thinMaterial)
-        }
-    }
-}
-
 struct WorkspaceBackdropBackground: View {
-    @Environment(\.colorScheme) private var colorScheme
-
     var body: some View {
         Color(nsColor: .windowBackgroundColor)
     }

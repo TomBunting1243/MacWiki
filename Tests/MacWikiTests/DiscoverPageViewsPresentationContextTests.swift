@@ -4,6 +4,34 @@ import Testing
 @testable import MacWiki
 
 struct DiscoverPageViewsPresentationContextTests {
+    @Test func cachedInitialRangeDoesNotReloadUntilTheSelectionChanges() {
+        var state = DiscoverPageViewsLoadState(initialPointCount: 30)
+
+        #expect(!state.needsLoad(selectedRange: .month, hasPulse: true))
+        #expect(state.needsLoad(selectedRange: .quarter, hasPulse: true))
+        #expect(state.needsLoad(selectedRange: .month, hasPulse: false))
+
+        state.recordLoad(for: .quarter)
+        #expect(!state.needsLoad(selectedRange: .quarter, hasPulse: true))
+    }
+
+    @Test func missingOrEmptyInitialPulseRequiresItsFirstLoad() {
+        let missing = DiscoverPageViewsLoadState(initialPointCount: nil)
+        let empty = DiscoverPageViewsLoadState(initialPointCount: 0)
+
+        #expect(missing.needsLoad(selectedRange: .month, hasPulse: false))
+        #expect(empty.needsLoad(selectedRange: .week, hasPulse: true))
+    }
+
+    @Test func changingRangeDiscardsThePriorRangePulseBeforeLoading() {
+        let cachedMonth = DiscoverPageViewsLoadState(initialPointCount: 30)
+        let missing = DiscoverPageViewsLoadState(initialPointCount: nil)
+
+        #expect(!cachedMonth.shouldDiscardPulse(beforeLoading: .month))
+        #expect(cachedMonth.shouldDiscardPulse(beforeLoading: .quarter))
+        #expect(!missing.shouldDiscardPulse(beforeLoading: .quarter))
+    }
+
     @Test func maxRangeUsesContinuousHistoryEndingAtToday() {
         let calendar = utcCalendar
         let selectedDate = calendar.date(from: DateComponents(year: 2020, month: 5, day: 8, hour: 18))!

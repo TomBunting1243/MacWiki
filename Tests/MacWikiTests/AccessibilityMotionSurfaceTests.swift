@@ -13,6 +13,9 @@ struct AccessibilityMotionSurfaceTests {
         let sidebarTimeMachine = try source(
             "Sources/MacWiki/Views/Sidebar/Directory/SidebarDiscoverTimeMachineView.swift"
         )
+        let temporalChrome = try source(
+            "Sources/MacWiki/Views/Home/Discover/TimeMachineVisualLanguage.swift"
+        )
         let listsSidebar = try source("Sources/MacWiki/Views/Sidebar/ListsSidebar.swift")
 
         for surface in [highlightRow, sidebarSearch, searchResults, timeMachine] {
@@ -29,10 +32,12 @@ struct AccessibilityMotionSurfaceTests {
         #expect(!sidebarTimeMachine.contains("withAnimation"))
         #expect(!sidebarTimeMachine.contains("ViewThatFits"))
         #expect(sidebarTimeMachine.contains("ControlGroup"))
-        #expect(sidebarTimeMachine.contains(".frame(width: 286)"))
+        #expect(sidebarTimeMachine.contains(".frame(width: 320)"))
         #expect(!sidebarTimeMachine.contains("GroupBox"))
-        #expect(!sidebarTimeMachine.contains("discoverSurfaceChrome"))
-        #expect(!sidebarTimeMachine.contains("strokeBorder"))
+        #expect(sidebarTimeMachine.contains(".timeMachineSurfaceChrome(cornerRadius: 14)"))
+        #expect(temporalChrome.contains("@Environment(\\.macWikiAccessibilityPersonalization)"))
+        #expect(temporalChrome.contains("personalization.reduceTransparency"))
+        #expect(temporalChrome.contains("personalization.differentiateWithoutColor"))
         #expect(listsSidebar.contains("withAnimation(reduceMotion ? nil : .default)"))
     }
 
@@ -58,12 +63,14 @@ struct AccessibilityMotionSurfaceTests {
             "Sources/MacWiki/Views/Sidebar/Directory/SidebarDiscoverTimeMachineView.swift"
         )
         #expect(sidebarSource.contains("DatePicker("))
-        #expect(sidebarSource.contains(".datePickerStyle(.field)"))
+        #expect(sidebarSource.contains(".datePickerStyle(.graphical)"))
+        #expect(sidebarSource.contains(".labelsHidden()"))
         #expect(sidebarSource.contains("ControlGroup"))
+        #expect(sidebarSource.contains("Menu(\"Jump\", systemImage: \"calendar\")"))
         #expect(sidebarSource.contains("Button(\"Hide from List Contents\", systemImage: \"eye.slash\")"))
         #expect(!sidebarSource.contains(".menuIndicator(.hidden)"))
         #expect(!sidebarSource.contains(".frame(width: 112)"))
-        #expect(sidebarSource.contains(".disabled(isBusy)"))
+        #expect(!sidebarSource.contains(".disabled(isBusy)"))
     }
 
     private func source(_ relativePath: String) throws -> String {
