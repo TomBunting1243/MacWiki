@@ -5,10 +5,12 @@ struct ReaderTabItemView: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.appearsActive) private var appearsActive
     @Environment(\.macWikiAccessibilityPersonalization) private var accessibilityPersonalization
+    @AppStorage(MacWikiGlassRuntime.forceLegacyFallbackKey) private var forceLegacyGlassFallback = false
 
     let tab: ArticleTab
     let lists: [ReadingList]
     let allLabels: [Label]
+    let liquidGlassChrome: Bool
     let isActive: Bool
     let isDragged: Bool
     let dragOffset: CGFloat
@@ -71,6 +73,13 @@ struct ReaderTabItemView: View {
 
     private var increasedContrast: Bool {
         accessibilityPersonalization.colorSchemeContrast == .increased
+    }
+
+    private var usesNativeGlass: Bool {
+        MacWikiGlassRuntime.usesNativeGlass(
+            isEnabled: liquidGlassChrome,
+            forceLegacyFallback: forceLegacyGlassFallback
+        ) && !accessibilityPersonalization.reduceTransparency
     }
 
     private var showsSavedMarker: Bool {
@@ -245,51 +254,112 @@ struct ReaderTabItemView: View {
     @ViewBuilder
     private var tabSelectionBackground: some View {
         let darkMode = colorScheme == .dark
-        let reduceTransparency = accessibilityPersonalization.reduceTransparency
         let shape = RoundedRectangle(cornerRadius: tabCornerRadius, style: .continuous)
-        shape
-            .fill(
-                isActive
-                    ? Color(nsColor: .selectedContentBackgroundColor)
-                        .opacity(
-                            reduceTransparency
-                                ? (darkMode ? 0.36 : 0.28)
-                                : (isKeyWindow ? (darkMode ? 0.24 : 0.18) : 0.09)
+
+        if accessibilityPersonalization.reduceTransparency {
+            shape
+                .fill(Color(nsColor: .controlBackgroundColor))
+                .overlay {
+                    if isActive {
+                        shape.fill(
+                            (isKeyWindow ? Color.accentColor : Color.primary)
+                                .opacity(isKeyWindow ? 0.14 : 0.07)
                         )
-                    : Color.primary.opacity(
-                        max(
+                    } else {
+                        shape.fill(
+                            Color.primary.opacity(
+                                TabChromeHierarchy.inactiveSurfaceOpacity(
+                                    darkMode: darkMode,
+                                    isHovered: isHovered
+                                )
+                            )
+                        )
+                    }
+                }
+                .overlay { tabBorder(shape: shape, darkMode: darkMode) }
+        } else if #available(macOS 26, *), usesNativeGlass {
+            shape
+                .fill(.clear)
+                .glassEffect(
+                    .regular
+                        .tint(nativeGlassTint)
+                        .interactive(),
+                    in: .rect(cornerRadius: tabCornerRadius)
+                )
+                .overlay { tabBorder(shape: shape, darkMode: darkMode) }
+        } else if liquidGlassChrome {
+            shape
+                .fill(.thinMaterial)
+                .overlay {
+                    shape.fill(
+                        Color(nsColor: .controlBackgroundColor)
+                            .opacity(isActive ? (darkMode ? 0.16 : 0.32) : (darkMode ? 0.08 : 0.20))
+                    )
+                }
+                .overlay {
+                    if isActive {
+                        shape.fill(
+                            Color.accentColor.opacity(isKeyWindow ? (darkMode ? 0.12 : 0.09) : 0.04)
+                        )
+                    }
+                }
+                .overlay { tabBorder(shape: shape, darkMode: darkMode) }
+        } else {
+            shape
+                .fill(
+                    isActive
+                        ? Color(nsColor: .selectedContentBackgroundColor)
+                            .opacity(isKeyWindow ? (darkMode ? 0.24 : 0.18) : 0.09)
+                        : Color.primary.opacity(
                             TabChromeHierarchy.inactiveSurfaceOpacity(
                                 darkMode: darkMode,
                                 isHovered: isHovered
-                            ),
-                            reduceTransparency ? (darkMode ? 0.065 : 0.040) : 0
-                        )
-                    )
-            )
-            .overlay {
-                shape.strokeBorder(
-                    isActive
-                        ? Color.accentColor.opacity(
-                            TabChromeHierarchy.borderOpacity(
-                                isActive: true,
-                                isHovered: isHovered,
-                                isKeyWindow: isKeyWindow,
-                                darkMode: darkMode,
-                                increasedContrast: increasedContrast
                             )
                         )
-                        : Color(nsColor: .separatorColor).opacity(
-                            TabChromeHierarchy.borderOpacity(
-                                isActive: false,
-                                isHovered: isHovered,
-                                isKeyWindow: isKeyWindow,
-                                darkMode: darkMode,
-                                increasedContrast: increasedContrast
-                            )
-                        ),
-                    lineWidth: increasedContrast ? 1 : 0.5
                 )
-            }
+                .overlay { tabBorder(shape: shape, darkMode: darkMode) }
+        }
+    }
+
+    private var nativeGlassTint: Color {
+        if isActive && isKeyWindow {
+            return Color.accentColor.opacity(colorScheme == .dark ? 0.18 : 0.14)
+        }
+        if isActive {
+            return Color.primary.opacity(0.055)
+        }
+        if isHovered {
+            return Color.primary.opacity(0.035)
+        }
+        return .clear
+    }
+
+    private func tabBorder(
+        shape: RoundedRectangle,
+        darkMode: Bool
+    ) -> some View {
+        shape.strokeBorder(
+            isActive
+                ? Color.accentColor.opacity(
+                    TabChromeHierarchy.borderOpacity(
+                        isActive: true,
+                        isHovered: isHovered,
+                        isKeyWindow: isKeyWindow,
+                        darkMode: darkMode,
+                        increasedContrast: increasedContrast
+                    )
+                )
+                : Color(nsColor: .separatorColor).opacity(
+                    TabChromeHierarchy.borderOpacity(
+                        isActive: false,
+                        isHovered: isHovered,
+                        isKeyWindow: isKeyWindow,
+                        darkMode: darkMode,
+                        increasedContrast: increasedContrast
+                    )
+                ),
+            lineWidth: increasedContrast ? 1 : 0.5
+        )
     }
 
     private var faviconView: some View {
