@@ -18,6 +18,7 @@ struct ArticleLoadingSkeletonView: View {
 
     let articleTitle: String
     let phase: Phase
+    @Environment(\.readerChromeUnderlapHeight) private var readerChromeUnderlapHeight
 
     private func resolvedTopPadding(for availableWidth: CGFloat, topSafeArea: CGFloat) -> CGFloat {
         let compactWidthBoost: CGFloat
@@ -31,7 +32,7 @@ struct ArticleLoadingSkeletonView: View {
         default:
             compactWidthBoost = 0
         }
-        return topSafeArea + 18 + compactWidthBoost
+        return topSafeArea + readerChromeUnderlapHeight + 18 + compactWidthBoost
     }
 
     var body: some View {

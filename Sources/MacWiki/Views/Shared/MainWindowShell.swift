@@ -103,6 +103,10 @@ private struct MainWorkspaceShell: View {
             reader: workspaceEnvironment(
                 ReaderColumnView()
                     .id("main-reader-column")
+                    .environment(
+                        \.readerChromeUnderlapHeight,
+                        ReaderTabLaneMetrics.height
+                    )
             ),
             inspector: workspaceEnvironment(
                 InspectorColumnView(includesHeader: false)

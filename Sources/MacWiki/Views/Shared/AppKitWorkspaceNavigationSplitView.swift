@@ -238,7 +238,8 @@ struct AppKitWorkspaceNavigationSplitView<
             )
             readerAccessoryController = WorkspaceSplitItemAccessoryController(
                 box: readerAccessoryBox,
-                height: ColumnChromeMetrics.secondaryBarHeight
+                height: ColumnChromeMetrics.secondaryBarHeight,
+                allowsContentUnderlap: true
             )
             listsController.sizingOptions = []
             readerController.sizingOptions = []
@@ -463,17 +464,24 @@ final class WorkspaceSplitItemAccessoryController<Content: View>:
     private let hostingController: NSHostingController<WorkspaceHostingRoot<Content>>
     private let height: CGFloat
     private let material: NSVisualEffectView.Material?
+    private let allowsContentUnderlap: Bool
 
     fileprivate init(
         box: WorkspaceHostingBox<Content>,
         height: CGFloat,
-        material: NSVisualEffectView.Material? = nil
+        material: NSVisualEffectView.Material? = nil,
+        allowsContentUnderlap: Bool = false
     ) {
         hostingController = NSHostingController(rootView: WorkspaceHostingRoot(box: box))
         self.height = height
         self.material = material
+        self.allowsContentUnderlap = allowsContentUnderlap
         super.init(nibName: nil, bundle: nil)
         preferredContentSize = NSSize(width: 0, height: height)
+        automaticallyAppliesContentInsets = !allowsContentUnderlap
+        if #available(macOS 26.1, *), allowsContentUnderlap {
+            preferredScrollEdgeEffectStyle = .soft
+        }
     }
 
     @available(*, unavailable)

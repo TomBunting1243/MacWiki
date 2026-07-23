@@ -6,6 +6,7 @@ struct DiscoverNewTabPageView: View {
     @Environment(AppState.self) private var appState
     @Environment(\.modelContext) private var modelContext
     @Environment(\.macWikiAccessibilityPersonalization.reduceMotion) private var reduceMotion
+    @Environment(\.readerChromeUnderlapHeight) private var readerChromeUnderlapHeight
     @Query(sort: \ReadingList.updatedAt, order: .reverse) private var allLists: [ReadingList]
     @Query(sort: \Label.sortOrder) private var allLabels: [Label]
     @Query(sort: \Tag.sortOrder) private var allTags: [Tag]
@@ -109,7 +110,10 @@ struct DiscoverNewTabPageView: View {
                 .frame(maxWidth: responsiveLayout.pageMaxWidth, alignment: .leading)
                 .frame(maxWidth: .infinity, alignment: .center)
                 .padding(.horizontal, responsiveLayout.horizontalPadding)
-                .padding(.top, 24)
+                // This inset belongs to the scroll content, not the viewport.
+                // It clears the floating tab lane at rest and naturally scrolls
+                // away so the edition can pass beneath the native glass.
+                .padding(.top, 24 + readerChromeUnderlapHeight)
                 .padding(.bottom, 48)
                 .onGeometryChange(for: DiscoverResponsiveLayoutProfile?.self) { proxy in
                     DiscoverResponsiveLayoutProfile(width: proxy.size.width)

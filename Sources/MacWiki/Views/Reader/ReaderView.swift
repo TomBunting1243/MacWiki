@@ -287,6 +287,7 @@ struct ArticleView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.macWikiAccessibilityPersonalization) private var accessibilityPersonalization
+    @Environment(\.readerChromeUnderlapHeight) private var readerChromeUnderlapHeight
     @Query(sort: \ReadingList.updatedAt, order: .reverse) private var allLists: [ReadingList]
     @Query private var highlightsForArticle: [Highlight]
 
@@ -410,7 +411,9 @@ struct ArticleView: View {
             compactWidthBoost = 0
         }
         let resolved: CGFloat
-        if hasToolbarControls {
+        if readerChromeUnderlapHeight > 0 {
+            resolved = readerChromeUnderlapHeight + 12 + compactWidthBoost
+        } else if hasToolbarControls {
             let chromeOverlapInset = max(
                 8,
                 resolvedTopObscuredHeight - 44
@@ -430,6 +433,9 @@ struct ArticleView: View {
             compactWidthBoost = 4
         default:
             compactWidthBoost = 0
+        }
+        if readerChromeUnderlapHeight > 0 {
+            return readerChromeUnderlapHeight + 8 + compactWidthBoost
         }
         if hasToolbarControls {
             return resolvedTopObscuredHeight + 8 + compactWidthBoost
