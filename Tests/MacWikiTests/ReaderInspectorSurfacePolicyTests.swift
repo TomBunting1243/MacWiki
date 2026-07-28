@@ -39,10 +39,10 @@ struct ReaderInspectorSurfacePolicyTests {
             baseBorderWidth: 0.7
         )
 
-        #expect(!policy.usesOpaqueBackground)
+        #expect(policy.usesOpaqueBackground)
         #expect(policy.borderOpacity == 0.28)
         #expect(policy.borderWidth == 1)
-        #expect(policy.shadowMultiplier == 1)
+        #expect(policy.shadowMultiplier == 0)
     }
 
     @Test func standardProfilePreservesRequestedMaterialTreatment() {

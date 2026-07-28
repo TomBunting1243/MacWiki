@@ -40,11 +40,11 @@ struct DiscoverSurfacePolicyTests {
             baseBorderOpacity: 0.34
         )
 
-        #expect(!policy.usesOpaqueBackground)
-        #expect(policy.usesNativeGlass)
+        #expect(policy.usesOpaqueBackground)
+        #expect(!policy.usesNativeGlass)
         #expect(policy.borderOpacity == 0.62)
         #expect(policy.borderWidth == 1)
-        #expect(policy.shadowMultiplier == 1)
+        #expect(policy.shadowMultiplier == 0)
     }
 
     @Test func standardPolicyPreservesNativeGlassAndRequestedBorder() {

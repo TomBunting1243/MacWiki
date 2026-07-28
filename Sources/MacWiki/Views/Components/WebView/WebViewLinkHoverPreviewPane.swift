@@ -186,11 +186,12 @@ struct LinkHoverPreviewPane: View {
         colorScheme == .dark
     }
 
-    private var usesNativeGlass: Bool {
-        MacWikiGlassRuntime.usesNativeGlass(
+    private var glassPolicy: MacWikiGlassRuntime.SurfacePolicy {
+        MacWikiGlassRuntime.surfacePolicy(
             isEnabled: liquidGlassChrome,
-            forceLegacyFallback: forceLegacyGlassFallback
-        ) && !accessibilityPersonalization.reduceTransparency
+            forceLegacyFallback: forceLegacyGlassFallback,
+            personalization: accessibilityPersonalization
+        )
     }
 
     var body: some View {
@@ -210,9 +211,9 @@ struct LinkHoverPreviewPane: View {
         .overlay(glassBorder)
         .shadow(
             color: .black.opacity(
-                accessibilityPersonalization.reduceTransparency
-                    ? 0
-                    : (isDarkMode ? 0.18 : 0.08)
+                glassPolicy.allowsDepth
+                    ? (isDarkMode ? 0.18 : 0.08)
+                    : 0
             ),
             radius: 14,
             y: 6
@@ -276,10 +277,10 @@ struct LinkHoverPreviewPane: View {
     @ViewBuilder
     private var glassPlane: some View {
         let shape = RoundedRectangle(cornerRadius: LinkHoverGlassMetrics.cornerRadius, style: .continuous)
-        if accessibilityPersonalization.reduceTransparency {
+        if glassPolicy.usesOpaqueBackground {
             shape
                 .fill(Color(nsColor: .windowBackgroundColor))
-        } else if #available(macOS 26, *), usesNativeGlass {
+        } else if #available(macOS 26, *), glassPolicy.usesNativeGlass {
             shape
                 .fill(.clear)
                 .glassEffect(
@@ -318,7 +319,14 @@ struct LinkHoverPreviewPane: View {
 
     private var actionRailBackground: some View {
         RoundedRectangle(cornerRadius: 10, style: .continuous)
-            .fill(Color(nsColor: .windowBackgroundColor).opacity(isDarkMode ? 0.10 : 0.052))
+            .fill(
+                Color(
+                    nsColor: glassPolicy.usesOpaqueBackground
+                        ? .controlBackgroundColor
+                        : .windowBackgroundColor
+                )
+                .opacity(glassPolicy.usesOpaqueBackground ? 1 : (isDarkMode ? 0.10 : 0.052))
+            )
             .overlay {
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
                     .strokeBorder(

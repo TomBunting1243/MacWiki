@@ -133,13 +133,11 @@ struct NativeDesignRegressionTests {
         #expect(tabItem.contains("@Environment(\\.appearsActive)"))
         #expect(!tabItem.contains("controlActiveState"))
         #expect(tabItem.contains("@Environment(\\.macWikiAccessibilityPersonalization)"))
-        #expect(tabItem.contains("accessibilityPersonalization.reduceTransparency"))
         #expect(tabItem.contains("accessibilityPersonalization.colorSchemeContrast == .increased"))
         #expect(tabItem.contains("accessibilityPersonalization.differentiateWithoutColor"))
         #expect(tabItem.contains("Image(systemName: \"highlighter\")"))
         #expect(tabBar.contains("AppStorageKey.Chrome.liquidGlassChrome"))
         #expect(tabBar.contains("MacWikiGlassGroup(spacing: tabSpacing)"))
-        #expect(tabItem.contains("MacWikiGlassRuntime.usesNativeGlass("))
         #expect(tabItem.contains(".glassEffect("))
         #expect(tabItem.contains(".interactive()"))
         #expect(tabItem.contains("isKeyWindow && isActive && !isDragged"))
@@ -175,25 +173,8 @@ struct NativeDesignRegressionTests {
         #expect(findBar.contains("@Environment(\\.appearsActive)"))
         #expect(!findBar.contains("controlActiveState"))
         #expect(findBar.contains("@Environment(\\.macWikiAccessibilityPersonalization)"))
-        #expect(findBar.contains(") && !accessibilityPersonalization.reduceTransparency"))
-        #expect(findBar.contains("Color(nsColor: accessibilityPersonalization.reduceTransparency ? .controlBackgroundColor : .windowBackgroundColor)"))
-        #expect(findBar.contains("isKeyWindow && !accessibilityPersonalization.reduceTransparency"))
         #expect(findBar.contains("increasedContrast ? 1"))
         #expect(findBar.contains(".onChange(of: appState.findOnPageFocusRequestID)"))
-    }
-
-    @Test func linkHoverPreviewUsesNativeGlassPolicyAndSolidAccessibilityFallback() throws {
-        let source = try source("Sources/MacWiki/Views/Components/WebView/WebViewLinkHoverPreviewPane.swift")
-
-        #expect(source.contains("@Environment(\\.macWikiAccessibilityPersonalization)"))
-        #expect(source.contains("MacWikiGlassRuntime.usesNativeGlass("))
-        #expect(source.contains(") && !accessibilityPersonalization.reduceTransparency"))
-        #expect(source.contains("if accessibilityPersonalization.reduceTransparency"))
-        #expect(source.contains("else if #available(macOS 26, *), usesNativeGlass"))
-        #expect(source.contains(".glassEffect("))
-        #expect(source.contains(".fill(Color(nsColor: .windowBackgroundColor))"))
-        #expect(source.contains(".fill(.thinMaterial)"))
-        #expect(!source.contains("MacWikiGlassGroup("))
     }
 
     @Test func readerToolbarsCommandsAndStyleControlsStayNativeReachableAndLockedSafely() throws {

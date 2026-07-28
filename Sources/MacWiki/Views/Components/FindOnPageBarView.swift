@@ -72,11 +72,12 @@ struct FindOnPageBarView: View {
         )
     }
 
-    private var usesNativeGlass: Bool {
-        MacWikiGlassRuntime.usesNativeGlass(
+    private var glassPolicy: MacWikiGlassRuntime.SurfacePolicy {
+        MacWikiGlassRuntime.surfacePolicy(
             isEnabled: liquidGlassChrome,
-            forceLegacyFallback: forceLegacyGlassFallback
-        ) && !accessibilityPersonalization.reduceTransparency
+            forceLegacyFallback: forceLegacyGlassFallback,
+            personalization: accessibilityPersonalization
+        )
     }
 
     private var increasedContrast: Bool {
@@ -123,7 +124,7 @@ struct FindOnPageBarView: View {
         .background(findBarBackground)
         .shadow(
             color: .black.opacity(
-                isKeyWindow && !accessibilityPersonalization.reduceTransparency
+                isKeyWindow && glassPolicy.allowsDepth
                     ? (colorScheme == .dark ? 0.16 : 0.06)
                     : 0
             ),
@@ -222,7 +223,7 @@ struct FindOnPageBarView: View {
     @ViewBuilder
     private var findBarBackground: some View {
         let shape = RoundedRectangle(cornerRadius: Metrics.cornerRadius, style: .continuous)
-        if accessibilityPersonalization.reduceTransparency {
+        if glassPolicy.usesOpaqueBackground {
             shape
                 .fill(Color(nsColor: .windowBackgroundColor))
                 .overlay {
@@ -231,7 +232,7 @@ struct FindOnPageBarView: View {
                         lineWidth: increasedContrast ? 1 : 0.6
                     )
                 }
-        } else if #available(macOS 26, *), usesNativeGlass {
+        } else if #available(macOS 26, *), glassPolicy.usesNativeGlass {
             shape
                 .fill(.clear)
                 .glassEffect(.regular, in: .rect(cornerRadius: Metrics.cornerRadius))
@@ -266,8 +267,8 @@ struct FindOnPageBarView: View {
     private var searchFieldBackground: some View {
         RoundedRectangle(cornerRadius: Metrics.fieldCornerRadius, style: .continuous)
             .fill(
-                Color(nsColor: accessibilityPersonalization.reduceTransparency ? .controlBackgroundColor : .windowBackgroundColor)
-                    .opacity(accessibilityPersonalization.reduceTransparency ? 1 : (colorScheme == .dark ? 0.12 : 0.065))
+                Color(nsColor: glassPolicy.usesOpaqueBackground ? .controlBackgroundColor : .windowBackgroundColor)
+                    .opacity(glassPolicy.usesOpaqueBackground ? 1 : (colorScheme == .dark ? 0.12 : 0.065))
             )
             .overlay {
                 RoundedRectangle(cornerRadius: Metrics.fieldCornerRadius, style: .continuous)
@@ -281,8 +282,8 @@ struct FindOnPageBarView: View {
     private var actionGroupBackground: some View {
         RoundedRectangle(cornerRadius: Metrics.groupCornerRadius, style: .continuous)
             .fill(
-                Color(nsColor: accessibilityPersonalization.reduceTransparency ? .controlBackgroundColor : .windowBackgroundColor)
-                    .opacity(accessibilityPersonalization.reduceTransparency ? 1 : (colorScheme == .dark ? 0.10 : 0.055))
+                Color(nsColor: glassPolicy.usesOpaqueBackground ? .controlBackgroundColor : .windowBackgroundColor)
+                    .opacity(glassPolicy.usesOpaqueBackground ? 1 : (colorScheme == .dark ? 0.10 : 0.055))
             )
             .overlay {
                 RoundedRectangle(cornerRadius: Metrics.groupCornerRadius, style: .continuous)

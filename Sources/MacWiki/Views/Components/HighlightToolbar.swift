@@ -35,13 +35,13 @@ struct HighlightToolbar: View {
         colorPickerView
             .padding(.horizontal, 10)
             .padding(.vertical, 8)
-            .background(toolbarBackground)
-            .shadow(
-                color: .black.opacity(
-                    accessibilityPersonalization.reduceTransparency
-                        ? 0
-                        : (colorScheme == .dark ? 0.32 : 0.16)
-                ),
+        .background(toolbarBackground)
+        .shadow(
+            color: .black.opacity(
+                glassPolicy.allowsDepth
+                    ? (colorScheme == .dark ? 0.32 : 0.16)
+                    : 0
+            ),
                 radius: 16,
                 x: 0,
                 y: 8
@@ -154,7 +154,7 @@ struct HighlightToolbar: View {
     @ViewBuilder
     private var toolbarBackground: some View {
         let shape = RoundedRectangle(cornerRadius: Metrics.cornerRadius, style: .continuous)
-        if accessibilityPersonalization.reduceTransparency {
+        if glassPolicy.usesOpaqueBackground {
             shape
                 .fill(Color(nsColor: .windowBackgroundColor))
                 .overlay {
@@ -163,7 +163,7 @@ struct HighlightToolbar: View {
                         lineWidth: increasedContrast ? 1 : 0.6
                     )
                 }
-        } else if #available(macOS 26, *), usesNativeGlass {
+        } else if #available(macOS 26, *), glassPolicy.usesNativeGlass {
             shape
                 .fill(.clear)
                 .glassEffect(.regular, in: .rect(cornerRadius: Metrics.cornerRadius))
@@ -195,11 +195,12 @@ struct HighlightToolbar: View {
         }
     }
 
-    private var usesNativeGlass: Bool {
-        MacWikiGlassRuntime.usesNativeGlass(
+    private var glassPolicy: MacWikiGlassRuntime.SurfacePolicy {
+        MacWikiGlassRuntime.surfacePolicy(
             isEnabled: liquidGlassChrome,
-            forceLegacyFallback: forceLegacyGlassFallback
-        ) && !accessibilityPersonalization.reduceTransparency
+            forceLegacyFallback: forceLegacyGlassFallback,
+            personalization: accessibilityPersonalization
+        )
     }
 
     private var increasedContrast: Bool {
@@ -210,7 +211,7 @@ struct HighlightToolbar: View {
         RoundedRectangle(cornerRadius: Metrics.groupCornerRadius, style: .continuous)
             .fill(
                 Color(
-                    nsColor: accessibilityPersonalization.reduceTransparency
+                    nsColor: glassPolicy.usesOpaqueBackground
                         ? .controlBackgroundColor
                         : (colorScheme == .dark ? .windowBackgroundColor : .controlBackgroundColor)
                 )

@@ -34,14 +34,14 @@ struct ReaderTableOfContentsOverlay: View {
 
     @ViewBuilder
     private var compactControl: some View {
-        if personalization.reduceTransparency {
+        if glassPolicy.usesOpaqueBackground {
             compactControlButton
                 .background {
                     let shape = compactShape
                     shape.fill(Color(nsColor: .controlBackgroundColor))
                         .overlay { surfaceBorder(shape: shape) }
                 }
-        } else if #available(macOS 26, *), usesNativeGlass {
+        } else if #available(macOS 26, *), glassPolicy.usesNativeGlass {
             compactControlButton
                 .glassEffect(.regular.interactive(), in: .rect(cornerRadius: Metrics.compactCornerRadius))
                 .overlay { surfaceBorder(shape: compactShape) }
@@ -73,14 +73,14 @@ struct ReaderTableOfContentsOverlay: View {
 
     @ViewBuilder
     private var expandedPanel: some View {
-        if personalization.reduceTransparency {
+        if glassPolicy.usesOpaqueBackground {
             expandedPanelContent
                 .background {
                     let shape = panelShape
                     shape.fill(Color(nsColor: .windowBackgroundColor))
                         .overlay { surfaceBorder(shape: shape) }
                 }
-        } else if #available(macOS 26, *), usesNativeGlass {
+        } else if #available(macOS 26, *), glassPolicy.usesNativeGlass {
             expandedPanelContent
                 .glassEffect(.regular, in: .rect(cornerRadius: Metrics.panelCornerRadius))
                 .overlay { surfaceBorder(shape: panelShape) }
@@ -217,11 +217,12 @@ struct ReaderTableOfContentsOverlay: View {
         )
     }
 
-    private var usesNativeGlass: Bool {
-        MacWikiGlassRuntime.usesNativeGlass(
+    private var glassPolicy: MacWikiGlassRuntime.SurfacePolicy {
+        MacWikiGlassRuntime.surfacePolicy(
             isEnabled: liquidGlassChrome,
-            forceLegacyFallback: forceLegacyGlassFallback
-        ) && !personalization.reduceTransparency
+            forceLegacyFallback: forceLegacyGlassFallback,
+            personalization: personalization
+        )
     }
 
     private var collapseSymbolName: String {

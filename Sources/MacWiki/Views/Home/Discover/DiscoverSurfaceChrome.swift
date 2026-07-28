@@ -17,8 +17,10 @@ struct DiscoverSurfacePolicy: Equatable {
         nativeGlassEnabled: Bool,
         baseBorderOpacity: Double
     ) {
-        usesOpaqueBackground = personalization.reduceTransparency
-        usesNativeGlass = nativeGlassEnabled && !personalization.reduceTransparency
+        usesOpaqueBackground =
+            personalization.reduceTransparency ||
+            personalization.colorSchemeContrast == .increased
+        usesNativeGlass = nativeGlassEnabled && !usesOpaqueBackground
 
         if personalization.colorSchemeContrast == .increased {
             borderOpacity = max(baseBorderOpacity, 0.62)
@@ -31,7 +33,7 @@ struct DiscoverSurfacePolicy: Equatable {
             borderWidth = 0.7
         }
 
-        shadowMultiplier = personalization.reduceTransparency ? 0 : 1
+        shadowMultiplier = usesOpaqueBackground ? 0 : 1
     }
 }
 
@@ -47,6 +49,7 @@ private struct DiscoverRoundedSurfaceChromeModifier: ViewModifier {
     let shadowRadius: CGFloat
     let shadowY: CGFloat
 
+    @AppStorage(AppStorageKey.Chrome.liquidGlassChrome) private var liquidGlassChrome = true
     @AppStorage(MacWikiGlassRuntime.forceLegacyFallbackKey) private var forceLegacyGlassFallback = false
     @Environment(\.macWikiAccessibilityPersonalization) private var personalization
 
@@ -55,7 +58,9 @@ private struct DiscoverRoundedSurfaceChromeModifier: ViewModifier {
         let policy = DiscoverSurfacePolicy(
             personalization: personalization,
             nativeGlassEnabled: MacWikiGlassRuntime.usesNativeGlass(
-                forceLegacyFallback: forceLegacyGlassFallback
+                isEnabled: liquidGlassChrome,
+                forceLegacyFallback: forceLegacyGlassFallback,
+                personalization: personalization
             ),
             baseBorderOpacity: baseBorderOpacity
         )
@@ -126,6 +131,7 @@ private struct DiscoverCapsuleSurfaceChromeModifier: ViewModifier {
     let material: DiscoverSurfaceMaterial
     let baseBorderOpacity: Double
 
+    @AppStorage(AppStorageKey.Chrome.liquidGlassChrome) private var liquidGlassChrome = true
     @AppStorage(MacWikiGlassRuntime.forceLegacyFallbackKey) private var forceLegacyGlassFallback = false
     @Environment(\.macWikiAccessibilityPersonalization) private var personalization
 
@@ -133,7 +139,9 @@ private struct DiscoverCapsuleSurfaceChromeModifier: ViewModifier {
         let policy = DiscoverSurfacePolicy(
             personalization: personalization,
             nativeGlassEnabled: MacWikiGlassRuntime.usesNativeGlass(
-                forceLegacyFallback: forceLegacyGlassFallback
+                isEnabled: liquidGlassChrome,
+                forceLegacyFallback: forceLegacyGlassFallback,
+                personalization: personalization
             ),
             baseBorderOpacity: baseBorderOpacity
         )
@@ -177,6 +185,7 @@ private struct DiscoverCircleSurfaceChromeModifier: ViewModifier {
     let borderColor: Color
     let baseBorderOpacity: Double
 
+    @AppStorage(AppStorageKey.Chrome.liquidGlassChrome) private var liquidGlassChrome = true
     @AppStorage(MacWikiGlassRuntime.forceLegacyFallbackKey) private var forceLegacyGlassFallback = false
     @Environment(\.macWikiAccessibilityPersonalization) private var personalization
 
@@ -184,7 +193,9 @@ private struct DiscoverCircleSurfaceChromeModifier: ViewModifier {
         let policy = DiscoverSurfacePolicy(
             personalization: personalization,
             nativeGlassEnabled: MacWikiGlassRuntime.usesNativeGlass(
-                forceLegacyFallback: forceLegacyGlassFallback
+                isEnabled: liquidGlassChrome,
+                forceLegacyFallback: forceLegacyGlassFallback,
+                personalization: personalization
             ),
             baseBorderOpacity: baseBorderOpacity
         )

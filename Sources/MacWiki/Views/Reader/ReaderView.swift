@@ -340,11 +340,12 @@ struct ArticleView: View {
         accessibilityPersonalization.colorSchemeContrast == .increased
     }
 
-    private var usesNativeReaderGlass: Bool {
-        MacWikiGlassRuntime.usesNativeGlass(
+    private var readerGlassPolicy: MacWikiGlassRuntime.SurfacePolicy {
+        MacWikiGlassRuntime.surfacePolicy(
             isEnabled: liquidGlassChrome,
-            forceLegacyFallback: forceLegacyGlassFallback
-        ) && !accessibilityPersonalization.reduceTransparency
+            forceLegacyFallback: forceLegacyGlassFallback,
+            personalization: accessibilityPersonalization
+        )
     }
 
     init(tabId: UUID, article: Article, scrollPosition: Binding<CGFloat>) {
@@ -772,9 +773,9 @@ struct ArticleView: View {
         }
         .shadow(
             color: .black.opacity(
-                accessibilityPersonalization.reduceTransparency
-                    ? 0
-                    : (colorScheme == .dark ? 0.16 : 0.06)
+                readerGlassPolicy.allowsDepth
+                    ? (colorScheme == .dark ? 0.16 : 0.06)
+                    : 0
             ),
             radius: 10,
             y: 4
@@ -854,7 +855,7 @@ struct ArticleView: View {
     @ViewBuilder
     private var markAsReadPromptBackground: some View {
         let shape = RoundedRectangle(cornerRadius: ReaderMotion.promptCornerRadius, style: .continuous)
-        if accessibilityPersonalization.reduceTransparency {
+        if readerGlassPolicy.usesOpaqueBackground {
             shape
                 .fill(Color(nsColor: .windowBackgroundColor))
                 .overlay {
@@ -863,7 +864,7 @@ struct ArticleView: View {
                         lineWidth: increasedContrast ? 1 : 0.6
                     )
                 }
-        } else if #available(macOS 26, *), usesNativeReaderGlass {
+        } else if #available(macOS 26, *), readerGlassPolicy.usesNativeGlass {
             shape
                 .fill(.clear)
                 .glassEffect(.regular, in: .rect(cornerRadius: ReaderMotion.promptCornerRadius))
@@ -907,7 +908,7 @@ struct ArticleView: View {
     @ViewBuilder
     private var markAsReadPrimaryActionBackground: some View {
         let shape = Capsule(style: .continuous)
-        if accessibilityPersonalization.reduceTransparency {
+        if readerGlassPolicy.usesOpaqueBackground {
             shape
                 .fill(Color(nsColor: .controlBackgroundColor))
                 .overlay {
@@ -916,7 +917,7 @@ struct ArticleView: View {
                         lineWidth: increasedContrast ? 1 : 0.6
                     )
                 }
-        } else if #available(macOS 26, *), usesNativeReaderGlass {
+        } else if #available(macOS 26, *), readerGlassPolicy.usesNativeGlass {
             shape
                 .fill(.clear)
                 .glassEffect(.regular.interactive(), in: .capsule)

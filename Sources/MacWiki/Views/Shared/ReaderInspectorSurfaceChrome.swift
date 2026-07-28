@@ -17,7 +17,9 @@ struct ReaderInspectorSurfacePolicy: Equatable {
         baseBorderOpacity: Double,
         baseBorderWidth: CGFloat
     ) {
-        usesOpaqueBackground = personalization.reduceTransparency
+        usesOpaqueBackground =
+            personalization.reduceTransparency ||
+            personalization.colorSchemeContrast == .increased
 
         if personalization.colorSchemeContrast == .increased {
             borderOpacity = max(baseBorderOpacity, 0.28)
@@ -30,7 +32,7 @@ struct ReaderInspectorSurfacePolicy: Equatable {
             borderWidth = baseBorderWidth
         }
 
-        shadowMultiplier = personalization.reduceTransparency ? 0 : 1
+        shadowMultiplier = usesOpaqueBackground ? 0 : 1
     }
 }
 

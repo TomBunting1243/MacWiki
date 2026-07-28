@@ -18,11 +18,12 @@ struct WikiHopOverlay: View {
         static let groupCornerRadius: CGFloat = 12
     }
 
-    private var usesNativeGlass: Bool {
-        MacWikiGlassRuntime.usesNativeGlass(
+    private var glassPolicy: MacWikiGlassRuntime.SurfacePolicy {
+        MacWikiGlassRuntime.surfacePolicy(
             isEnabled: liquidGlassChrome,
-            forceLegacyFallback: forceLegacyGlassFallback
-        ) && !accessibilityPersonalization.reduceTransparency
+            forceLegacyFallback: forceLegacyGlassFallback,
+            personalization: accessibilityPersonalization
+        )
     }
 
     private var increasedContrast: Bool {
@@ -44,18 +45,18 @@ struct WikiHopOverlay: View {
             Capsule(style: .continuous)
                 .strokeBorder(
                     Color.primary.opacity(
-                        accessibilityPersonalization.reduceTransparency
+                        glassPolicy.usesOpaqueBackground
                             ? (increasedContrast ? 0.34 : 0.14)
                             : (colorScheme == .dark ? 0.075 : 0.046) + (increasedContrast ? 0.14 : 0)
                     ),
-                    lineWidth: increasedContrast ? 1 : (accessibilityPersonalization.reduceTransparency ? 0.6 : 0.5)
+                    lineWidth: increasedContrast ? 1 : (glassPolicy.usesOpaqueBackground ? 0.6 : 0.5)
                 )
         }
         .shadow(
             color: .black.opacity(
-                accessibilityPersonalization.reduceTransparency
-                    ? 0
-                    : (colorScheme == .dark ? 0.16 : 0.06)
+                glassPolicy.allowsDepth
+                    ? (colorScheme == .dark ? 0.16 : 0.06)
+                    : 0
             ),
             radius: 10,
             y: 4
@@ -128,10 +129,10 @@ struct WikiHopOverlay: View {
     @ViewBuilder
     private var overlayBackground: some View {
         let shape = Capsule(style: .continuous)
-        if accessibilityPersonalization.reduceTransparency {
+        if glassPolicy.usesOpaqueBackground {
             shape
                 .fill(Color(nsColor: .windowBackgroundColor))
-        } else if #available(macOS 26, *), usesNativeGlass {
+        } else if #available(macOS 26, *), glassPolicy.usesNativeGlass {
             shape
                 .fill(.clear)
                 .glassEffect(.regular, in: .capsule)
@@ -150,8 +151,8 @@ struct WikiHopOverlay: View {
     private var groupBackground: some View {
         RoundedRectangle(cornerRadius: Metrics.groupCornerRadius, style: .continuous)
             .fill(
-                Color(nsColor: accessibilityPersonalization.reduceTransparency ? .controlBackgroundColor : .windowBackgroundColor)
-                    .opacity(accessibilityPersonalization.reduceTransparency ? 1 : (colorScheme == .dark ? 0.10 : 0.055))
+                Color(nsColor: glassPolicy.usesOpaqueBackground ? .controlBackgroundColor : .windowBackgroundColor)
+                    .opacity(glassPolicy.usesOpaqueBackground ? 1 : (colorScheme == .dark ? 0.10 : 0.055))
             )
             .overlay {
                 RoundedRectangle(cornerRadius: Metrics.groupCornerRadius, style: .continuous)
@@ -165,8 +166,8 @@ struct WikiHopOverlay: View {
     private var buttonBackground: some View {
         Circle()
             .fill(
-                Color(nsColor: accessibilityPersonalization.reduceTransparency ? .controlBackgroundColor : .windowBackgroundColor)
-                    .opacity(accessibilityPersonalization.reduceTransparency ? 1 : (colorScheme == .dark ? 0.10 : 0.055))
+                Color(nsColor: glassPolicy.usesOpaqueBackground ? .controlBackgroundColor : .windowBackgroundColor)
+                    .opacity(glassPolicy.usesOpaqueBackground ? 1 : (colorScheme == .dark ? 0.10 : 0.055))
             )
             .overlay {
                 Circle()

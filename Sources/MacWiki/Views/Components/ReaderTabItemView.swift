@@ -96,11 +96,12 @@ struct ReaderTabItemView: View {
         accessibilityPersonalization.colorSchemeContrast == .increased
     }
 
-    private var usesNativeGlass: Bool {
-        MacWikiGlassRuntime.usesNativeGlass(
+    private var glassPolicy: MacWikiGlassRuntime.SurfacePolicy {
+        MacWikiGlassRuntime.surfacePolicy(
             isEnabled: liquidGlassChrome,
-            forceLegacyFallback: forceLegacyGlassFallback
-        ) && !accessibilityPersonalization.reduceTransparency
+            forceLegacyFallback: forceLegacyGlassFallback,
+            personalization: accessibilityPersonalization
+        )
     }
 
     private var showsSavedMarker: Bool {
@@ -221,7 +222,7 @@ struct ReaderTabItemView: View {
                 // refraction above the text in optimized macOS 27 builds.
                 .modifier(
                     ReaderTabNativeGlassModifier(
-                        isEnabled: usesNativeGlass && !isDragged,
+                        isEnabled: glassPolicy.usesNativeGlass && !isDragged,
                         tint: nativeGlassTint,
                         cornerRadius: tabCornerRadius
                     )
@@ -242,7 +243,11 @@ struct ReaderTabItemView: View {
         // Apply visual effects for drag
         .scaleEffect(liftScale)
         .shadow(
-            color: .black.opacity(isDragged ? 0.18 : restingShadowOpacity),
+            color: .black.opacity(
+                glassPolicy.allowsDepth
+                    ? (isDragged ? 0.18 : restingShadowOpacity)
+                    : 0
+            ),
             radius: isDragged ? liftShadow : restingShadowRadius,
             y: isDragged ? 3 : restingShadowYOffset
         )
@@ -287,7 +292,7 @@ struct ReaderTabItemView: View {
         let darkMode = colorScheme == .dark
         let shape = RoundedRectangle(cornerRadius: tabCornerRadius, style: .continuous)
 
-        if accessibilityPersonalization.reduceTransparency {
+        if glassPolicy.usesOpaqueBackground {
             shape
                 .fill(Color(nsColor: .controlBackgroundColor))
                 .overlay {
@@ -308,7 +313,7 @@ struct ReaderTabItemView: View {
                     }
                 }
                 .overlay { tabBorder(shape: shape, darkMode: darkMode) }
-        } else if #available(macOS 26, *), usesNativeGlass {
+        } else if #available(macOS 26, *), glassPolicy.usesNativeGlass {
             shape
                 .fill(.clear)
                 .overlay { tabBorder(shape: shape, darkMode: darkMode) }
