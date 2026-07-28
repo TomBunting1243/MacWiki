@@ -17,7 +17,7 @@ public enum SettingsCatalogMarkdownRenderer {
             "",
             "- Source: `Sources/MacWikiSettingsCatalog/SettingsCatalog.swift`",
             "- Generator: `swift run SettingsIndexTool --output <path>`",
-            "- Guardrail: `SettingsCatalogTests` scans app source for uncataloged `@AppStorage` references.",
+            "- Guardrail: `swift run SettingsIndexTool --validate-sources Sources/MacWiki` reports uncataloged `@AppStorage` references.",
             ""
         ]
 

@@ -99,6 +99,7 @@ swift package clean
 
 echo "[2/9] Debug build"
 swift build 2>&1 | tee "$ARTIFACT_DIR/swift-build.log"
+swift run SettingsIndexTool --validate-sources Sources/MacWiki 2>&1 | tee "$ARTIFACT_DIR/settings-index-validation.log"
 
 echo "[3/9] Complete deterministic automated suite"
 MACWIKI_SKIP_NETWORK_TESTS=1 swift test 2>&1 | tee "$ARTIFACT_DIR/swift-test.log"

@@ -41,6 +41,7 @@ struct ReleaseScriptContractTests {
         #expect(preflight.contains("Internal-beta preflight requires Xcode 27"))
         #expect(preflight.contains("macwiki_release_build_args \"26.0\""))
         #expect(preflight.contains("MACWIKI_SKIP_NETWORK_TESTS=1 swift test"))
+        #expect(preflight.contains("swift run SettingsIndexTool --validate-sources Sources/MacWiki"))
         #expect(preflight.contains("BinaryMinimumOS"))
         #expect(preflight.contains("ExecutableSHA256"))
     }
