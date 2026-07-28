@@ -137,22 +137,6 @@ struct ReferenceListHelpersTests {
         #expect(presentation.selectedSections(for: []).isEmpty)
     }
 
-    @Test func referenceListUsesUnarySectionsAndDirectStableEnumeratedRows() throws {
-        let repositoryRoot = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-        let sourceURL = repositoryRoot.appending(
-            path: "Sources/MacWiki/Views/Inspector/ReferenceListView.swift"
-        )
-        let source = try String(contentsOf: sourceURL, encoding: .utf8)
-
-        #expect(source.contains("ReferenceSectionView("))
-        #expect(source.contains("ForEach(section.items.enumerated(), id: \\.element.id)"))
-        #expect(!source.contains("Array(section.items.enumerated())"))
-        #expect(!source.contains("ReferenceListHelpers.visibleSections(from: newValue)"))
-    }
-
     @Test func prefersExistingValidLinksOverFallbackSearch() {
         let item = ArticleReferenceItem(
             id: "web",

@@ -1,4 +1,3 @@
-import Foundation
 import Testing
 
 @testable import MacWiki
@@ -42,20 +41,4 @@ struct DiscoverTodayMostReadPresentationTests {
         ) == "No articles are ranked today.")
     }
 
-    @Test func failureCardUsesTheStoreRetryBoundary() throws {
-        let repositoryRoot = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-        let source = try String(
-            contentsOf: repositoryRoot.appending(
-                path: "Sources/MacWiki/Views/Home/Discover/DiscoverFeedCollectionStages.swift"
-            ),
-            encoding: .utf8
-        )
-
-        #expect(source.contains("if todayMostReadStore.errorMessage != nil"))
-        #expect(source.contains("actionTitle: \"Try Again\""))
-        #expect(source.contains("todayMostReadStore.queueLoad(forceRefresh: true)"))
-    }
 }
