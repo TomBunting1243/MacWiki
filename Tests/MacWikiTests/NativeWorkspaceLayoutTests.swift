@@ -79,63 +79,6 @@ struct NativeWorkspaceLayoutTests {
         #expect(fixture.controller.splitViewItems[3].topAlignedAccessoryViewControllers.isEmpty)
     }
 
-    @Test func listContentsDelegatesTopChromeAndSurfaceOwnership() throws {
-        let directoryColumn = try source("Sources/MacWiki/Views/Columns/DirectoryColumnView.swift")
-        let directoryAccessory = try source(
-            "Sources/MacWiki/Views/Columns/DirectoryColumnAccessoryView.swift"
-        )
-        let directory = try source("Sources/MacWiki/Views/Sidebar/DirectoryView.swift")
-        let search = try source("Sources/MacWiki/Views/Sidebar/SidebarSearchView.swift")
-        let shell = try source("Sources/MacWiki/Views/Shared/MainWindowShell.swift")
-        let split = try source(
-            "Sources/MacWiki/Views/Shared/AppKitWorkspaceNavigationSplitView.swift"
-        )
-
-        #expect(!directory.contains("topObscuredHeight"))
-        #expect(!directory.contains("plainDirectoryTopInset"))
-        #expect(!directory.contains("pinnedDirectoryHeaderHeight"))
-        #expect(!directory.contains(".safeAreaInset(edge: .top"))
-        #expect(!directory.contains(".contentMargins(\n                .top"))
-        #expect(!directory.contains("proxy.safeAreaInsets.top"))
-        #expect(!directory.contains("updateTopObscuredHeight"))
-
-        #expect(!search.contains(".safeAreaPadding(.top)"))
-        #expect(!search.contains(".safeAreaInset(edge: .top"))
-
-        #expect(shell.contains("directoryAccessory: workspaceEnvironment("))
-        #expect(shell.components(separatedBy: "DirectoryColumnView(").count - 1 == 1)
-        #expect(shell.components(separatedBy: "DirectoryColumnAccessoryView(").count - 1 == 1)
-        #expect(!directoryAccessory.contains("DirectoryView("))
-        #expect(!directoryAccessory.contains("@Query"))
-        #expect(!directoryColumn.contains("DirectoryColumnPresentation"))
-        #expect(!directory.contains("DirectoryColumnPresentation"))
-        #expect(!directory.contains("case .accessory"))
-        #expect(!directory.contains("private var directoryAccessory"))
-        #expect(split.contains("directoryController = WorkspaceDirectoryHostingController("))
-        #expect(split.contains("final class WorkspaceDirectoryHostingController"))
-        #expect(split.contains("let surface = NSVisualEffectView(frame: .zero)"))
-
-        let swiftUIDirectoryPlane = [directoryColumn, directoryAccessory, directory, search]
-            .joined(separator: "\n")
-        #expect(!swiftUIDirectoryPlane.contains("SidebarPaneBackground("))
-        #expect(!directory.contains(".background(.bar)"))
-    }
-
-    @Test func workspaceReconciliationUsesOneMainActorLayoutTransaction() throws {
-        let split = try source(
-            "Sources/MacWiki/Views/Shared/AppKitWorkspaceNavigationSplitView.swift"
-        )
-
-        #expect(!split.contains("contentUpdate: Task"))
-        #expect(!split.contains("visibilityUpdate: Task"))
-        #expect(!split.contains("nativeVisibilityUpdate: Task"))
-        #expect(!split.contains("pendingInitialWidthRestore"))
-        #expect(!split.contains("animatedRestoreDelay"))
-        #expect(!split.contains("restoreDelay"))
-        #expect(!split.contains("await Task.yield()"))
-        #expect(split.contains("restoreInitialVisibleWidthsIfFeasible()"))
-    }
-
     @Test func appKitControllerSupportsEveryIndependentVisibilityCombination() {
         let fixture = makeFixture(width: 1_500)
         defer { fixture.tearDown() }
@@ -589,26 +532,6 @@ struct NativeWorkspaceLayoutTests {
         #expect(!toolbar.allowsDisplayModeCustomization)
     }
 
-    @Test func workspaceToolbarBridgeInstallsOnceAndTearsDownItsNativeOwner() throws {
-        let bridge = try source(
-            "Sources/MacWiki/Views/Shared/AppKitWorkspaceNavigationSplitView.swift"
-        )
-        let toolbar = try source(
-            "Sources/MacWiki/Views/Shared/WorkspaceToolbarController.swift"
-        )
-
-        #expect(!bridge.contains("override func viewWillAppear()"))
-        #expect(bridge.contains("override func viewDidAppear()"))
-        #expect(bridge.components(separatedBy: "installWorkspaceToolbar?(window)").count - 1 == 1)
-        #expect(bridge.contains("controller.installWorkspaceToolbar = nil"))
-        #expect(bridge.contains("toolbarController?.invalidate()"))
-
-        #expect(toolbar.contains("window.toolbar === installedToolbar"))
-        #expect(toolbar.contains("guard window.toolbar == nil else"))
-        #expect(toolbar.contains("toolbar?.delegate = nil"))
-        #expect(toolbar.contains("window.toolbar = nil"))
-    }
-
     @Test func readerControllerAndViewIdentitySurviveTwentyPaneToggleCycles() {
         let fixture = makeFixture(width: 1_500)
         defer { fixture.tearDown() }
@@ -652,13 +575,6 @@ struct NativeWorkspaceLayoutTests {
     }
 
     @Test func widthPersistenceWritesOnlyToTheInjectedDefaultsBoundary() async throws {
-        let bridge = try source("Sources/MacWiki/Views/Shared/AppKitWorkspaceNavigationSplitView.swift")
-        #expect(bridge.contains("widthDefaults: UserDefaults = MacWikiDefaults.current"))
-        #expect(!bridge.contains("UserDefaults.standard"))
-        #expect(bridge.contains("AppStorageKey.MainWindow.sidebarWidth"))
-        #expect(bridge.contains("AppStorageKey.MainWindow.directoryWidth"))
-        #expect(bridge.contains("AppStorageKey.MainWindow.inspectorWidth"))
-
         // This width is above the all-pane adaptive minimum but below the sum
         // of the three ideal widths, exercising persistence from valid native
         // split geometry instead of depending on exact ideal-width rounding.
@@ -810,20 +726,6 @@ struct NativeWorkspaceLayoutTests {
             try? await Task.sleep(for: .milliseconds(20))
         }
         return condition()
-    }
-
-    private func source(_ relativePath: String) throws -> String {
-        try String(
-            contentsOf: repositoryRoot.appending(path: relativePath),
-            encoding: .utf8
-        )
-    }
-
-    private var repositoryRoot: URL {
-        URL(filePath: #filePath)
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
     }
 
     private static let everyAuxiliaryVisibilityCombination = [

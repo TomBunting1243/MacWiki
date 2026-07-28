@@ -1,5 +1,4 @@
 import AppKit
-import Foundation
 import Testing
 
 @testable import MacWiki
@@ -38,40 +37,29 @@ struct SettingsControlBehaviorTests {
         #expect(slider.doubleValue == 29)
     }
 
-    @Test func everyReaderAppearanceConsumerUsesTheCanonicalFontDefault() throws {
-        for path in [
-            "Sources/MacWiki/Views/Reader/ReaderView.swift",
-            "Sources/MacWiki/Views/Components/ReaderStylePopover.swift",
-            "Sources/MacWiki/Views/Components/SettingsReadingPane.swift"
-        ] {
-            let source = try repositorySource(path)
-            #expect(
-                source.contains(
-                    "@AppStorage(ReaderAppearanceStorageKey.fontPreset) private var readerFontPreset: ReaderFontPreset = ReaderAppearance.default.fontPreset"
-                ),
-                "Noncanonical reader font default in \(path)"
-            )
+    @Test func accessibleActionButtonConfigurationUsesNativeSemantics() {
+        var invocationCount = 0
+        let control = AccessibleActionButton(
+            "Delete All Data",
+            isDestructive: true,
+            isEnabled: false,
+            keyEquivalent: "d"
+        ) {
+            invocationCount += 1
         }
-    }
+        let coordinator = control.makeCoordinator()
+        let button = NSButton()
 
-    @Test func settingsUseNativeDestructiveSemanticsAndFlexiblePreviewHeight() throws {
-        let source = try repositorySource(
-            "Sources/MacWiki/Views/Components/SettingsControls.swift"
-        )
+        control.configure(button, coordinator: coordinator)
 
-        #expect(source.contains("button.hasDestructiveAction = isDestructive"))
-        #expect(source.contains(".frame(maxWidth: .infinity, minHeight: 152"))
-        #expect(!source.contains(".frame(height: 152)"))
-    }
+        #expect(button.title == "Delete All Data")
+        #expect(button.hasDestructiveAction)
+        #expect(!button.isEnabled)
+        #expect(button.keyEquivalent == "d")
+        #expect(button.accessibilityRole() == .button)
+        #expect(button.accessibilityLabel() == "Delete All Data")
 
-    private func repositorySource(_ relativePath: String) throws -> String {
-        let repositoryRoot = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-        return try String(
-            contentsOf: repositoryRoot.appending(path: relativePath),
-            encoding: .utf8
-        )
+        coordinator.performAction()
+        #expect(invocationCount == 1)
     }
 }

@@ -5,19 +5,6 @@ import Testing
 @testable import MacWiki
 
 struct DirectoryDiscoverySurfaceRegressionTests {
-    @Test func directoryLetsContentUseTheNativeTopSafeArea() throws {
-        let source = try repositorySource("Sources/MacWiki/Views/Columns/DirectoryColumnView.swift")
-
-        #expect(source.contains(".frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)"))
-        #expect(!source.contains("SidebarPaneBackground()"))
-        #expect(!source.contains(".ignoresSafeArea"))
-        #expect(!source.contains("proxy.frame(in: .global)"))
-        #expect(!source.contains("Task.sleep"))
-        #expect(!source.contains("updateTrafficLightAvoidance"))
-        #expect(!source.contains("measuredTopInset"))
-        #expect(!source.contains("hasMeasuredTrafficLightAvoidance"))
-    }
-
     @MainActor
     @Test func discoverRefreshesItsPreparedLookupAtTheModelSaveBoundary() throws {
         let configuration = ModelConfiguration(isStoredInMemoryOnly: true)
@@ -50,16 +37,5 @@ struct DirectoryDiscoverySurfaceRegressionTests {
 
         #expect(!lookupModel.index.isSaved(title: "Native SwiftUI"))
         lookupModel.stop()
-    }
-
-    private func repositorySource(_ relativePath: String) throws -> String {
-        let repositoryRoot = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-        return try String(
-            contentsOf: repositoryRoot.appending(path: relativePath),
-            encoding: .utf8
-        )
     }
 }

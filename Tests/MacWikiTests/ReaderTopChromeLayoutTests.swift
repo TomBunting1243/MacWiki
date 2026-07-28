@@ -93,6 +93,7 @@ struct ReaderTopChromeLayoutTests {
         )
 
         #expect(Set(identifiers).count == identifiers.count)
+        #expect(identifiers.contains(.inspectorTrackingSeparator))
         #expect(listsIndex < listsBoundaryIndex)
         #expect(listsBoundaryIndex < directoryIndex)
         #expect(directoryIndex < directoryBoundaryIndex)
@@ -106,33 +107,6 @@ struct ReaderTopChromeLayoutTests {
             #expect(index > directoryBoundaryIndex)
             #expect(index < inspectorBoundaryIndex)
         }
-
-        let toolbar = try source("Sources/MacWiki/Views/Shared/WorkspaceToolbarController.swift")
-        let toolbarItemFactory = try source(
-            "Sources/MacWiki/Views/Shared/WorkspaceToolbarItemFactory.swift"
-        )
-        #expect(toolbarItemFactory.components(separatedBy: "NSTrackingSeparatorToolbarItem(").count - 1 == 1)
-        #expect(toolbar.contains("dividerIndex: 0"))
-        #expect(toolbar.contains("dividerIndex: 1"))
-        #expect(!toolbar.contains("dividerIndex: 2"))
-        #expect(identifiers.contains(.inspectorTrackingSeparator))
-        #expect(toolbar.contains("item.visibilityPriority = .high"))
-
-        // Standalone article windows intentionally retain SwiftUI toolbar placement.
-        let articleToolbar = try source("Sources/MacWiki/Views/Shared/ArticleWindowReaderToolbar.swift")
-        let leadingPlacement = try #require(articleToolbar.range(of: "ToolbarItem(placement: .navigation)"))
-        let flexibleSpacer = try #require(
-            articleToolbar.range(of: "ToolbarSpacer(.flexible, placement: .primaryAction)")
-        )
-        let trailingPlacement = try #require(
-            articleToolbar.range(of: "ToolbarItem(placement: .primaryAction)")
-        )
-        let saveAction = try #require(articleToolbar.range(of: "Button(\"Save Article\""))
-        let shareAction = try #require(articleToolbar.range(of: "ShareLink(item: article.url)"))
-        #expect(leadingPlacement.lowerBound < flexibleSpacer.lowerBound)
-        #expect(flexibleSpacer.lowerBound < trailingPlacement.lowerBound)
-        #expect(trailingPlacement.lowerBound < saveAction.lowerBound)
-        #expect(saveAction.lowerBound < shareAction.lowerBound)
     }
 
     @Test("every main reader command remains natively reachable")

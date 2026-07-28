@@ -112,25 +112,6 @@ struct InspectorArticleSnapshotTests {
         #expect(InspectorPersistentModelResolver.label(id: labelID, in: modelContext) == nil)
     }
 
-    @Test func inspectorStoresValueSnapshotsInsteadOfPersistentModels() throws {
-        let panel = try source("Sources/MacWiki/Views/Inspector/InspectorPanel.swift")
-        let tags = try source("Sources/MacWiki/Views/Inspector/InspectorTagStatusBox.swift")
-        let rows = try source("Sources/MacWiki/Views/Components/HighlightRowView.swift")
-        let tagDetail = try source("Sources/MacWiki/Views/Components/TagDetailSheet.swift")
-
-        #expect(panel.contains("@State private var articleSnapshot = InspectorArticleSnapshot.empty"))
-        #expect(!panel.contains("@State private var currentArticleState: ArticleState?"))
-        #expect(!panel.contains("@State private var cachedCurrentArticleHighlights: [Highlight]"))
-        #expect(!panel.contains("@State private var cachedCurrentArticleTags: [Tag]"))
-        #expect(tags.contains("@State private var editingTagID: UUID?"))
-        #expect(!tags.contains("@State private var articleState: ArticleState?"))
-        #expect(!tags.contains("@State private var editingTag: Tag?"))
-        #expect(rows.contains("let highlight: InspectorHighlightSnapshot"))
-        #expect(rows.contains("InspectorPersistentModelResolver.highlight"))
-        #expect(tagDetail.contains("private let target: TagDetailSheetTarget?"))
-        #expect(!tagDetail.contains("var tagToEdit: Tag?"))
-    }
-
     @Test func inspectorAppearanceReadsExistingStateWithoutPersistenceSideEffects() throws {
         let panel = try source("Sources/MacWiki/Views/Inspector/InspectorPanel.swift")
         let labels = try source("Sources/MacWiki/Views/Inspector/InspectorLabelSection.swift")

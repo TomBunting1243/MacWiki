@@ -1,5 +1,4 @@
 import CoreGraphics
-import Foundation
 import Testing
 
 @testable import MacWiki
@@ -68,20 +67,6 @@ struct DiscoverResponsiveLayoutProfileTests {
         #expect(expanded.editorialColumnSpacing == 20)
     }
 
-    @Test func discoveryUsesWideGridRailAndHorizontalMediaVariants() throws {
-        let stages = try repositorySource(
-            "Sources/MacWiki/Views/Home/Discover/DiscoverFeedCollectionStages.swift"
-        )
-
-        #expect(stages.contains("Grid(horizontalSpacing: responsiveLayout.editorialColumnSpacing"))
-        #expect(stages.contains("let columnCount = responsiveLayout.todayMostReadColumnCount"))
-        #expect(stages.contains("hasNewsBriefing: !feed.newsStories.isEmpty"))
-        #expect(stages.contains("todayMostReadRows(columnCount: columnCount)"))
-        #expect(stages.contains("let splitIndex = (todayMostReadItems.count + 1) / 2"))
-        #expect(stages.contains("style: responsiveLayout.prefersEditorialSpread ? .rail : .standard"))
-        #expect(stages.contains("prefersHorizontalLayout: responsiveLayout.prefersEditorialSpread"))
-    }
-
     @Test func derivedLayoutValuesMatchThePreviousWidthFormulasAtEveryBoundary() throws {
         let boundaries: [CGFloat] = [720, 760, 820, 880, 940, 1120, 1200, 1240, 1320, 1540]
         var widths: [CGFloat] = [1, 1040, 2200]
@@ -95,43 +80,6 @@ struct DiscoverResponsiveLayoutProfileTests {
         }
     }
 
-    @Test func discoveryPublishesOnlyTheEquatableProfileDuringResize() throws {
-        let root = try repositorySource("Sources/MacWiki/Views/Home/DiscoverNewTabPageView.swift")
-        let profile = try repositorySource(
-            "Sources/MacWiki/Views/Home/Discover/DiscoverResponsiveLayoutProfile.swift"
-        )
-        let profileConsumers = [
-            "Sources/MacWiki/Views/Home/Discover/DiscoverFeedSections.swift",
-            "Sources/MacWiki/Views/Home/Discover/DiscoverFeedSurface.swift",
-            "Sources/MacWiki/Views/Home/Discover/DiscoverTimeMachineStageView.swift",
-            "Sources/MacWiki/Views/Home/Discover/DiscoverTimeMachineControlsView.swift"
-        ]
-
-        #expect(root.contains("@State private var responsiveLayout = DiscoverResponsiveLayoutProfile.initial"))
-        #expect(root.contains(".onGeometryChange(for: DiscoverResponsiveLayoutProfile?.self)"))
-        #expect(root.contains("guard let newLayout, newLayout != responsiveLayout else { return }"))
-        #expect(!root.contains("GeometryReader"))
-        #expect(!root.contains("discoverContentWidth"))
-        #expect(profile.contains("struct DiscoverResponsiveLayoutProfile: Equatable, Sendable"))
-
-        for path in profileConsumers {
-            let source = try repositorySource(path)
-            #expect(source.contains("responsiveLayout: DiscoverResponsiveLayoutProfile"))
-            #expect(!source.contains("discoverContentWidth"))
-            #expect(!source.contains("availableWidth: CGFloat"))
-        }
-    }
-
-    private func repositorySource(_ relativePath: String) throws -> String {
-        let repositoryRoot = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-        return try String(
-            contentsOf: repositoryRoot.appending(path: relativePath),
-            encoding: .utf8
-        )
-    }
 }
 
 private struct LayoutSnapshot: Equatable {

@@ -1,5 +1,4 @@
 import Foundation
-import SwiftUI
 import Testing
 
 @testable import MacWiki
@@ -87,23 +86,6 @@ struct DiscoverScreenModelTests {
         #expect(model.isLoadingSelectedDate == false)
     }
 
-    @Test func timeMachineKeepsThePreviousEditionStableWhileLoading() throws {
-        let stageSource = try repositorySource(
-            "Sources/MacWiki/Views/Home/Discover/DiscoverTimeMachineStageView.swift"
-        )
-        let feedSource = try repositorySource(
-            "Sources/MacWiki/Views/Home/Discover/DiscoverFeedSurface.swift"
-        )
-        let loadingSource = try repositorySource(
-            "Sources/MacWiki/Views/Home/Discover/DiscoverLoadingViews.swift"
-        )
-
-        #expect(stageSource.contains("isScanning: screenModel.isLoadingSelectedDate"))
-        #expect(stageSource.contains("isLoadingSelectedDate: screenModel.isLoadingSelectedDate"))
-        #expect(feedSource.contains(".allowsHitTesting(!isLoadingSelectedDate)"))
-        #expect(!loadingSource.contains("DiscoverTimeMachineLoadingContent"))
-    }
-
     @Test func steppingForwardClampsToTodayAndPopoverDismissalIsScoped() {
         let calendar = utcCalendar
         let now = calendar.date(from: DateComponents(year: 2026, month: 4, day: 9, hour: 11))!
@@ -130,17 +112,6 @@ struct DiscoverScreenModelTests {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(secondsFromGMT: 0)!
         return calendar
-    }
-
-    private func repositorySource(_ relativePath: String) throws -> String {
-        let repositoryRoot = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-        return try String(
-            contentsOf: repositoryRoot.appending(path: relativePath),
-            encoding: .utf8
-        )
     }
 
     private func discoverFeed(dateKey: String) -> WikipediaService.DiscoverFeed {

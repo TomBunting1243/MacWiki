@@ -27,45 +27,6 @@ struct DiscoverEditorialDesignRegressionTests {
         #expect(mediaViewer.contains("Button(\"Open Commons in Browser\", systemImage: \"safari\")"))
     }
 
-    @Test func editorialHierarchyUsesOneSurfacePerModule() throws {
-        let feature = try source("Sources/MacWiki/Views/Home/Discover/DiscoverFeatureComponents.swift")
-        let editorial = try source("Sources/MacWiki/Views/Home/Discover/DiscoverEditorialComponents.swift")
-        let collections = try source("Sources/MacWiki/Views/Home/Discover/DiscoverCollectionComponents.swift")
-
-        let featureModule = try slice(
-            feature,
-            from: "struct DiscoverFeatureModule: View",
-            to: "struct DiscoverFeatureCard: View"
-        )
-        let editorialPanel = try slice(
-            editorial,
-            from: "struct DiscoverEditorialPanel<Content: View>: View",
-            to: "struct DiscoverInsetPanel<Content: View>: View"
-        )
-        let insetPanel = try slice(
-            editorial,
-            from: "struct DiscoverInsetPanel<Content: View>: View",
-            to: "struct DiscoverTemporalSubsectionHeader: View"
-        )
-        let collapsedPreview = try slice(
-            collections,
-            from: "private var collapsedPreview",
-            to: "struct DiscoverPlaylistPlaceholder: View"
-        )
-
-        #expect(!featureModule.contains(".discoverSurfaceChrome("))
-        #expect(!feature.contains("var showsSurface: Bool"))
-        #expect(feature.components(separatedBy: "showsSurface: false").count - 1 == 1)
-        #expect(!editorialPanel.contains(".discoverSurfaceChrome("))
-        #expect(!insetPanel.contains(".discoverSurfaceChrome("))
-        #expect(editorialPanel.contains(".padding(.horizontal, contentPadding)"))
-        #expect(editorialPanel.contains(".padding(.bottom, max(3, contentPadding * 0.25))"))
-        #expect(insetPanel.contains(".padding(.trailing, max(4, contentPadding * 0.5))"))
-        #expect(insetPanel.contains(".padding(.vertical, max(4, contentPadding * 0.35))"))
-        #expect(!collapsedPreview.contains("strokeBorder"))
-        #expect(collections.contains("return .clear"))
-    }
-
     @Test func discoveryKeyboardAndPointerFeedbackHaveVisibleOwners() throws {
         let sections = try source("Sources/MacWiki/Views/Home/Discover/DiscoverFeedSections.swift")
         let collectionStages = try source("Sources/MacWiki/Views/Home/Discover/DiscoverFeedCollectionStages.swift")

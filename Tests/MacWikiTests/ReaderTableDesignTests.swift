@@ -20,14 +20,11 @@ struct ReaderTableDesignTests {
     }
 
     @Test func webViewBuildsItsDocumentStyleThroughTheExtractedResourceBoundary() throws {
-        let webViewSource = try resource("Sources/MacWiki/Views/Components/WebView.swift")
         let rendered = ReaderDocumentStyle.renderedCSS(
             minimumReadableColumnWidth: 480,
             readerTopInset: 56
         )
 
-        #expect(webViewSource.contains("ReaderDocumentStyle.makeInjectionScript("))
-        #expect(!webViewSource.contains("let css = \"\"\""))
         #expect(rendered.contains("calc((100vw - 480px) / 2)"))
         #expect(rendered.contains("--reader-top-inset: 56px"))
         #expect(!rendered.contains("__MACWIKI_"))

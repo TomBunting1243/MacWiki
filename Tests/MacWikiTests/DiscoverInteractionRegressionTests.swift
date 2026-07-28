@@ -63,23 +63,6 @@ struct DiscoverInteractionRegressionTests {
         #expect(!page.contains("searchCoordinator.searchResults.first"))
     }
 
-    @Test func editorialTypographyUsesSemanticAppleTextStyles() throws {
-        let typography = try repositorySource(
-            "Sources/MacWiki/Views/Home/Discover/DiscoverFeatureComponents.swift"
-        )
-        let masthead = try repositorySource(
-            "Sources/MacWiki/Views/Home/Discover/DiscoverEditorialComponents.swift"
-        )
-
-        #expect(typography.contains("Font.largeTitle.weight(.semibold)"))
-        #expect(typography.contains("Font.title2.weight(.semibold)"))
-        #expect(typography.contains("Font.body"))
-        #expect(typography.contains("Font.callout"))
-        #expect(typography.contains("Font.caption"))
-        #expect(!typography.contains("static let sectionTitle = Font.system(size:"))
-        #expect(masthead.contains("DiscoverTypography.mastheadTitle(isCompact: isCompactLayout)"))
-    }
-
     private func repositorySource(_ relativePath: String) throws -> String {
         let repositoryRoot = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()

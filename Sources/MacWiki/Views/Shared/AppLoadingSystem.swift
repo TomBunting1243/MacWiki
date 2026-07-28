@@ -15,6 +15,23 @@ enum AppLoadingMotion {
     }
 }
 
+struct AppLoadingSurfacePolicy: Equatable {
+    let usesOpaqueBackground: Bool
+    let statusBorderWidth: CGFloat
+    let surfaceBorderWidth: CGFloat
+
+    init(personalization: MacWikiAccessibilityPersonalization) {
+        usesOpaqueBackground = personalization.reduceTransparency
+        if personalization.colorSchemeContrast == .increased {
+            statusBorderWidth = 1.2
+            surfaceBorderWidth = 1.4
+        } else {
+            statusBorderWidth = 0.8
+            surfaceBorderWidth = 0.9
+        }
+    }
+}
+
 struct AppLoadingStatusCapsule: View {
     let title: String
     var detail: String? = nil
@@ -23,6 +40,10 @@ struct AppLoadingStatusCapsule: View {
 
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.macWikiAccessibilityPersonalization) private var accessibilityPersonalization
+
+    private var surfacePolicy: AppLoadingSurfacePolicy {
+        AppLoadingSurfacePolicy(personalization: accessibilityPersonalization)
+    }
 
     var body: some View {
         ViewThatFits {
@@ -53,7 +74,7 @@ struct AppLoadingStatusCapsule: View {
         .padding(.horizontal, 10)
         .padding(.vertical, 7)
         .background {
-            if accessibilityPersonalization.reduceTransparency {
+            if surfacePolicy.usesOpaqueBackground {
                 Capsule(style: .continuous)
                     .fill(Color(nsColor: .controlBackgroundColor))
             } else {
@@ -65,7 +86,7 @@ struct AppLoadingStatusCapsule: View {
             Capsule(style: .continuous)
                 .strokeBorder(
                     tone.strokeColor(for: colorScheme).opacity(0.72),
-                    lineWidth: accessibilityPersonalization.colorSchemeContrast == .increased ? 1.2 : 0.8
+                    lineWidth: surfacePolicy.statusBorderWidth
                 )
         }
         .accessibilityElement(children: .ignore)
@@ -240,6 +261,10 @@ private struct AppLoadingSurface<Content: View>: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.macWikiAccessibilityPersonalization) private var accessibilityPersonalization
 
+    private var surfacePolicy: AppLoadingSurfacePolicy {
+        AppLoadingSurfacePolicy(personalization: accessibilityPersonalization)
+    }
+
     init(
         tone: AppLoadingTone,
         cornerRadius: CGFloat = 16,
@@ -254,7 +279,7 @@ private struct AppLoadingSurface<Content: View>: View {
         content
             .padding(14)
             .background {
-                if accessibilityPersonalization.reduceTransparency {
+                if surfacePolicy.usesOpaqueBackground {
                     RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                         .fill(Color(nsColor: .controlBackgroundColor))
                 } else {
@@ -270,7 +295,7 @@ private struct AppLoadingSurface<Content: View>: View {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                     .strokeBorder(
                         tone.strokeColor(for: colorScheme),
-                        lineWidth: accessibilityPersonalization.colorSchemeContrast == .increased ? 1.4 : 0.9
+                        lineWidth: surfacePolicy.surfaceBorderWidth
                     )
             }
     }

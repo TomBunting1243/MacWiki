@@ -1,45 +1,70 @@
-import Foundation
+import AppKit
+import SwiftUI
 import Testing
 
+@testable import MacWiki
+
+@MainActor
 struct AppLoadingSystemTests {
-    @Test func loadingPresentationUsesStaticStructureAndNativeActivity() throws {
-        let loadingSource = try source("Sources/MacWiki/Views/Shared/AppLoadingSystem.swift")
-        let styleSource = try source("Sources/MacWiki/Views/Shared/AppLoadingStyle.swift")
+    @Test func accessibilityPolicySelectsOpaqueBackgroundsAndStrongerBorders() {
+        let standard = AppLoadingSurfacePolicy(personalization: .standard)
+        #expect(!standard.usesOpaqueBackground)
+        #expect(standard.statusBorderWidth == 0.8)
+        #expect(standard.surfaceBorderWidth == 0.9)
 
-        #expect(loadingSource.contains("ProgressView()"))
-        // ProgressView already resolves the native control accent through its
-        // NSAppearance. Feeding Color.accentColor back through `.tint` creates
-        // a recursive appearance dependency on current macOS SDKs.
-        #expect(!loadingSource.contains(".tint("))
-        #expect(!loadingSource.contains("TimelineView"))
-        #expect(!loadingSource.contains("AppLoadingBeacon"))
-        #expect(!loadingSource.contains("AppLoadingScanlineOverlay"))
-        #expect(!loadingSource.contains("shimmerDuration"))
-        #expect(!styleSource.contains("case retro"))
-        #expect(!styleSource.contains("scanlineOpacity"))
-        #expect(loadingSource.contains("accessibilityLabel: \"Loading "))
-        #expect(loadingSource.contains(".accessibilityHidden(true)"))
-    }
-
-    @Test func loadingChromeHonorsTransparencyAndContrastPersonalization() throws {
-        let loadingSource = try source("Sources/MacWiki/Views/Shared/AppLoadingSystem.swift")
-
-        #expect(loadingSource.contains("accessibilityPersonalization.reduceTransparency"))
-        #expect(loadingSource.contains("Color(nsColor: .controlBackgroundColor)"))
-        #expect(loadingSource.contains("accessibilityPersonalization.colorSchemeContrast == .increased"))
-    }
-
-    private func source(_ relativePath: String) throws -> String {
-        try String(
-            contentsOf: repositoryRoot().appendingPathComponent(relativePath),
-            encoding: .utf8
+        let reduceTransparency = AppLoadingSurfacePolicy(
+            personalization: MacWikiAccessibilityPersonalization(
+                reduceMotion: false,
+                reduceTransparency: true,
+                differentiateWithoutColor: false,
+                colorSchemeContrast: .standard
+            )
         )
+        #expect(reduceTransparency.usesOpaqueBackground)
+        #expect(reduceTransparency.statusBorderWidth == 0.8)
+        #expect(reduceTransparency.surfaceBorderWidth == 0.9)
+
+        let increasedContrast = AppLoadingSurfacePolicy(
+            personalization: MacWikiAccessibilityPersonalization(
+                reduceMotion: false,
+                reduceTransparency: false,
+                differentiateWithoutColor: false,
+                colorSchemeContrast: .increased
+            )
+        )
+        #expect(!increasedContrast.usesOpaqueBackground)
+        #expect(increasedContrast.statusBorderWidth == 1.2)
+        #expect(increasedContrast.surfaceBorderWidth == 1.4)
     }
 
-    private func repositoryRoot() -> URL {
-        URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
+    @Test func activityMarkRendersANativeProgressIndicator() throws {
+        let activityMark = AppLoadingActivityMark(
+            accessibilityLabel: "Loading Search Results",
+            compact: false
+        )
+
+        let hostingView = NSHostingView(rootView: activityMark)
+        hostingView.frame = CGRect(x: 0, y: 0, width: 80, height: 48)
+        hostingView.layoutSubtreeIfNeeded()
+
+        let indicator = try #require(
+            firstDescendant(of: NSProgressIndicator.self, in: hostingView)
+        )
+        #expect(indicator.isIndeterminate)
+    }
+
+    private func firstDescendant<ViewType: NSView>(
+        of type: ViewType.Type,
+        in root: NSView
+    ) -> ViewType? {
+        if let match = root as? ViewType {
+            return match
+        }
+        for subview in root.subviews {
+            if let match = firstDescendant(of: type, in: subview) {
+                return match
+            }
+        }
+        return nil
     }
 }

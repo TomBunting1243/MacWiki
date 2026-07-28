@@ -147,7 +147,7 @@ struct AccessibleActionButton: NSViewRepresentable {
         configure(button, coordinator: context.coordinator)
     }
 
-    private func configure(_ button: NSButton, coordinator: Coordinator) {
+    func configure(_ button: NSButton, coordinator: Coordinator) {
         coordinator.action = action
         button.title = title
         button.isEnabled = isEnabled

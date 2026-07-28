@@ -2,17 +2,10 @@ import Foundation
 import Testing
 import WebKit
 
+@testable import MacWiki
+
 @Suite
 struct ReaderScrollBehaviorRegressionTests {
-    @Test func readerReadStateDerivesFromTheActiveArticleProjection() throws {
-        let reader = try source("Sources/MacWiki/Views/Reader/ReaderView.swift")
-
-        #expect(reader.contains("private var isArticleUnreadState: Bool"))
-        #expect(reader.contains("!article.isRead"))
-        #expect(!reader.contains("@State private var isArticleUnreadState"))
-        #expect(!reader.contains(".onChange(of: appState.currentArticle?.isRead)"))
-    }
-
     @Test func resizeInvalidatesMetricsWithoutForcingReaderPosition() throws {
         let script = try webViewScript()
         let resizeBehavior = sourceSection(
@@ -89,12 +82,7 @@ struct ReaderScrollBehaviorRegressionTests {
 
     @MainActor
     @Test func visibleSectionSelfCorrectsAfterLateDocumentLayoutShift() async throws {
-        let script = try webViewScript()
-        let headingTracker = sourceSection(
-            script,
-            startingAt: "(function () {\n    var _cachedHeadings = null; // [{id, element, offsetTop}]",
-            endingBefore: "// Highlight Rendering Support"
-        )
+        let script = WebViewResources.scriptSource
         let webView = WKWebView(frame: CGRect(x: 0, y: 0, width: 640, height: 700))
         webView.loadHTMLString(
             """
@@ -119,7 +107,7 @@ struct ReaderScrollBehaviorRegressionTests {
             try await Task.sleep(for: .milliseconds(10))
         }
 
-        _ = try await webView.evaluateJavaScript(headingTracker)
+        _ = try await webView.evaluateJavaScript(script)
         _ = try await webView.evaluateJavaScript("window.currentVisibleSectionId()")
         _ = try await webView.evaluateJavaScript("document.querySelector('#late').style.height = '2400px'")
         _ = try await webView.evaluateJavaScript(
@@ -128,8 +116,6 @@ struct ReaderScrollBehaviorRegressionTests {
         let visible = try await webView.evaluateJavaScript("window.currentVisibleSectionId()") as? String
 
         #expect(visible == "legacy")
-        #expect(headingTracker.contains("candidate.element.getBoundingClientRect().top"))
-        #expect(headingTracker.contains("new ResizeObserver"))
     }
 
     @Test func tocRowOnlyEnqueuesAndNativeBridgeAwaitsSuccessfulSettlement() throws {

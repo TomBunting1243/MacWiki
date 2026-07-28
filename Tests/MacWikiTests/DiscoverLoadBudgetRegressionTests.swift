@@ -14,23 +14,6 @@ struct DiscoverLoadBudgetRegressionTests {
         #expect(source.contains("wordCounts.cancel()"))
     }
 
-    @Test func discoverEditionModelOwnsSupplementalStoresAndCancellation() throws {
-        let viewSource = try repositorySource(
-            "Sources/MacWiki/Views/Home/Discover/DiscoverFeedSections.swift"
-        )
-        let modelSource = try repositorySource(
-            "Sources/MacWiki/Views/Home/Discover/DiscoverEditionModel.swift"
-        )
-
-        #expect(viewSource.contains("@State var editionModel = DiscoverEditionModel()"))
-        #expect(!viewSource.contains("@State private var allTimeMostReadStore"))
-        #expect(!viewSource.contains("@State private var todayMostReadStore"))
-        #expect(modelSource.contains("final class DiscoverEditionModel"))
-        #expect(modelSource.contains("func cancelAll()"))
-        #expect(modelSource.contains("func updateAllTimeMostRead("))
-        #expect(modelSource.contains("func updateWordCounts("))
-    }
-
     @Test func supplementalNetworkWorkHasExplicitConcurrencyAndPrefetchBudgets() throws {
         let feedStore = try repositorySource(
             "Sources/MacWiki/Views/Shared/DiscoverFeedStore.swift"

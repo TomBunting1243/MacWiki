@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 import Testing
 
 @testable import MacWiki
@@ -16,13 +17,69 @@ struct ReaderImageLoadingPolicyTests {
         #expect(script.contains("window.requestIdleCallback(runChunk"))
     }
 
+    @MainActor
     @Test func initialDocumentHintsOnlyPrioritizeTheFirstThreeImages() throws {
-        let source = try source("Sources/MacWiki/Views/Components/WebView.swift")
+        let html = """
+        <html><body>
+          <img id="first" src="1.jpg">
+          <img id="second" src="2.jpg" loading='lazy'>
+          <img id="third" src="3.jpg" decoding="sync" fetchpriority="low">
+          <img id="fourth" src="4.jpg">
+          <img id="fifth" src="5.jpg" loading="eager" decoding="auto" fetchpriority="high">
+        </body></html>
+        """
+        let coordinator = WebView.Coordinator(
+            tabID: UUID(),
+            onLinkTapped: nil,
+            onOpenArticleInNewWindow: nil,
+            scrollPosition: .constant(0),
+            onScrollProgress: nil,
+            fallbackScrollProgress: nil,
+            appState: nil,
+            modelContext: nil,
+            onTextSelected: nil,
+            onSelectionCleared: nil,
+            highlights: [],
+            articleTitle: "Images",
+            contentRevision: 0,
+            readerAppearance: .default,
+            readerTopInset: 56,
+            preferImmediateReveal: false,
+            onTableOfContentsUpdate: nil,
+            onReferencesUpdate: nil,
+            onVisibleSectionChange: nil,
+            onContentReveal: nil,
+            onLinkHoverPreviewChange: nil,
+            linkPreviewImmediateModifier: .default,
+            nativeHighlightingMenuEnabled: false
+        )
 
-        #expect(source.contains("private let eagerImageCountForInitialLoad = 3"))
-        #expect(source.contains("let desiredLoadingValue = shouldBeEager ? \"eager\" : \"lazy\""))
-        #expect(source.contains("let desiredFetchPriority = shouldBeEager ? \"high\" : \"auto\""))
-        #expect(source.contains("insertHTMLAttribute(name: \"decoding\", value: \"async\""))
+        let prepared = coordinator.prepareHTMLForInitialLoad(
+            html,
+            articleTitle: "Images",
+            htmlSignature: ReaderDocumentRevision.digest(for: html)
+        )
+        let first = try imageTag(withID: "first", in: prepared)
+        let second = try imageTag(withID: "second", in: prepared)
+        let third = try imageTag(withID: "third", in: prepared)
+        let fourth = try imageTag(withID: "fourth", in: prepared)
+        let fifth = try imageTag(withID: "fifth", in: prepared)
+
+        #expect(first.contains(#"loading="eager""#))
+        #expect(first.contains(#"decoding="async""#))
+        #expect(first.contains(#"fetchpriority="high""#))
+        #expect(second.contains("loading='lazy'"))
+        #expect(second.contains(#"decoding="async""#))
+        #expect(second.contains(#"fetchpriority="high""#))
+        #expect(third.contains(#"loading="eager""#))
+        #expect(third.contains(#"decoding="sync""#))
+        #expect(third.contains(#"fetchpriority="low""#))
+        #expect(fourth.contains(#"loading="lazy""#))
+        #expect(fourth.contains(#"decoding="async""#))
+        #expect(fourth.contains(#"fetchpriority="auto""#))
+        #expect(fifth.contains(#"loading="eager""#))
+        #expect(fifth.contains(#"decoding="auto""#))
+        #expect(fifth.contains(#"fetchpriority="high""#))
     }
 
     @Test func unknownDimensionImagesNeverReceiveSyntheticSkeletons() throws {
@@ -36,6 +93,18 @@ struct ReaderImageLoadingPolicyTests {
         #expect(followingSource.contains("return false;"))
         #expect(script.contains("if (!shouldUseImageSkeleton(image)) return;"))
         #expect(!stylesheet.contains("data-macwiki-image-skeleton=\"0\""))
+    }
+
+    private func imageTag(withID id: String, in html: String) throws -> String {
+        let escapedID = NSRegularExpression.escapedPattern(for: id)
+        let regex = try NSRegularExpression(
+            pattern: #"<img\b[^>]*\bid\s*=\s*(["'])"# + escapedID + #"\1[^>]*>"#,
+            options: [.caseInsensitive]
+        )
+        let range = NSRange(html.startIndex..<html.endIndex, in: html)
+        let match = try #require(regex.firstMatch(in: html, range: range))
+        let swiftRange = try #require(Range(match.range, in: html))
+        return String(html[swiftRange])
     }
 
     private func source(_ relativePath: String) throws -> String {
