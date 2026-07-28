@@ -280,31 +280,18 @@ extension WebView.Coordinator {
     @discardableResult
     func createHighlight(from selection: TextSelectionData, color: HighlightColor, note: String?) -> UUID? {
         guard let modelContext else { return nil }
-
-        let highlight = Highlight(
-            text: selection.text,
+        guard let highlight = HighlightPersistence.create(
+            from: selection,
             articleTitle: articleTitle,
-            elementPath: selection.elementPath,
-            startOffset: selection.startOffset,
-            length: selection.length,
-            contextBefore: selection.contextBefore,
-            contextAfter: selection.contextAfter,
-            sectionTitle: selection.sectionTitle,
-            color: color
+            color: color,
+            note: note,
+            in: modelContext
+        ) else { return nil }
+
+        appState?.pendingImmediateHighlight = AppState.ImmediateHighlightRequest(
+            id: highlight.id,
+            cssColor: color.cssColor
         )
-        highlight.note = note
-        modelContext.insert(highlight)
-
-        do {
-            try modelContext.save()
-            appState?.pendingImmediateHighlight = AppState.ImmediateHighlightRequest(
-                id: highlight.id,
-                cssColor: color.cssColor
-            )
-        } catch {
-            return nil
-        }
-
         appState?.currentTextSelection = nil
         return highlight.id
     }

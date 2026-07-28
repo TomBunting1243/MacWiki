@@ -103,17 +103,32 @@ extension WebView.Coordinator {
     ) {
         appState?.isHighlightRehydrateInProgress = false
         appState?.pendingHighlightRehydrate = nil
+        guard success,
+              let target = highlights.first(where: { $0.id == pending.id }),
+              let modelContext else {
+            publishHighlightRehydrateResult(pending, success: false, timestamp: timestamp)
+            return
+        }
+
+        target.isStale = false
+        target.updatedAt = timestamp
+        guard modelContext.saveReportingFailure(operation: "restore the highlight") else {
+            publishHighlightRehydrateResult(pending, success: false, timestamp: timestamp)
+            return
+        }
+        publishHighlightRehydrateResult(pending, success: true, timestamp: timestamp)
+    }
+
+    private func publishHighlightRehydrateResult(
+        _ pending: AppState.HighlightRehydrateRequest,
+        success: Bool,
+        timestamp: Date
+    ) {
         appState?.lastHighlightRehydrateResult = AppState.HighlightRehydrateResult(
             id: pending.id,
             success: success,
             timestamp: timestamp
         )
-
-        guard success else { return }
-        guard let target = highlights.first(where: { $0.id == pending.id }) else { return }
-        target.isStale = false
-        target.updatedAt = timestamp
-        try? modelContext?.save()
     }
 
     func handleTextSelection(_ data: [String: Any]) {

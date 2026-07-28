@@ -121,6 +121,58 @@ struct WebViewHighlightRehydrateTests {
         #expect(highlight.updatedAt == originalUpdatedAt)
     }
 
+    @Test func retrySaveFailureRollsBackAndPublishesFailure() throws {
+        let highlightID = UUID()
+        let originalTimestamp = Date(timeIntervalSince1970: 1_700_000_000)
+        let fixture = try makeReadOnlyLibraryContext(
+            storeName: "WebViewHighlightRehydrateTests"
+        ) { context in
+            let highlight = Highlight(
+                text: "found but not saved",
+                articleTitle: "Rehydration",
+                startOffset: 4,
+                length: 19
+            )
+            highlight.id = highlightID
+            highlight.isStale = true
+            highlight.updatedAt = originalTimestamp
+            context.insert(highlight)
+        }
+        defer {
+            try? FileManager.default.removeItem(at: fixture.directoryURL)
+            PersistenceIssueCenter.shared.dismiss()
+        }
+        PersistenceIssueCenter.shared.dismiss()
+
+        let descriptor = FetchDescriptor<Highlight>(
+            predicate: #Predicate { $0.id == highlightID }
+        )
+        let highlight = try #require(fixture.context.fetch(descriptor).first)
+        let appState = AppState(persistenceMode: .ephemeral)
+        let pending = AppState.HighlightRehydrateRequest(highlight: highlight)
+        appState.pendingHighlightRehydrate = pending
+        appState.isHighlightRehydrateInProgress = true
+        let coordinator = makeCoordinator(
+            highlights: [highlight],
+            modelContext: fixture.context,
+            appState: appState
+        )
+        let attemptedTimestamp = originalTimestamp.addingTimeInterval(60)
+
+        coordinator.completePendingHighlightRehydrate(
+            pending,
+            success: true,
+            timestamp: attemptedTimestamp
+        )
+
+        #expect(appState.pendingHighlightRehydrate == nil)
+        #expect(appState.isHighlightRehydrateInProgress == false)
+        #expect(appState.lastHighlightRehydrateResult?.success == false)
+        #expect(highlight.isStale)
+        #expect(highlight.updatedAt == originalTimestamp)
+        #expect(PersistenceIssueCenter.shared.activeIssue?.operation == "restore the highlight")
+    }
+
     private func makeCoordinator(
         highlights: [Highlight],
         modelContext: ModelContext,

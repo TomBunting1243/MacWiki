@@ -1,8 +1,5 @@
-import OSLog
 import SwiftUI
 import SwiftData
-
-private let highlightToolbarLogger = Logger(subsystem: "com.macwiki", category: "highlights")
 
 /// Floating toolbar that appears when text is selected in the article
 struct HighlightToolbar: View {
@@ -295,40 +292,31 @@ struct HighlightToolbar: View {
     }
 
     private func createHighlight(color: HighlightColor, openNoteEditor: Bool = false) {
-        let highlight = Highlight(
-            text: selectionData.text,
+        guard let highlight = HighlightPersistence.create(
+            from: selectionData,
             articleTitle: articleTitle,
-            elementPath: selectionData.elementPath,
-            startOffset: selectionData.startOffset,
-            length: selectionData.length,
-            contextBefore: selectionData.contextBefore,
-            contextAfter: selectionData.contextAfter,
-            sectionTitle: selectionData.sectionTitle,
-            color: color
+            color: color,
+            note: nil,
+            in: modelContext
+        ) else {
+            onDismiss()
+            return
+        }
+
+        // Publish the WebView update only after the model is durably saved.
+        appState.pendingImmediateHighlight = AppState.ImmediateHighlightRequest(
+            id: highlight.id,
+            cssColor: color.cssColor
         )
-
-        modelContext.insert(highlight)
-
-        do {
-            try modelContext.save()
-            // Signal WebView to immediately highlight current selection
-            appState.pendingImmediateHighlight = AppState.ImmediateHighlightRequest(
-                id: highlight.id,
-                cssColor: color.cssColor
+        if openNoteEditor {
+            appState.selectedHighlightId = highlight.id.uuidString
+            appState.highlightTagFilterId = nil
+            appState.inspectorMode = .notes
+            appState.inspectorVisible = true
+            appState.pendingHighlightNoteEditorRequest = AppState.HighlightNoteEditorRequest(
+                requestID: UUID(),
+                highlightID: highlight.id
             )
-            if openNoteEditor {
-                appState.selectedHighlightId = highlight.id.uuidString
-                appState.highlightTagFilterId = nil
-                appState.inspectorMode = .notes
-                appState.inspectorVisible = true
-                appState.pendingHighlightNoteEditorRequest = AppState.HighlightNoteEditorRequest(
-                    requestID: UUID(),
-                    highlightID: highlight.id
-                )
-            }
-        } catch {
-            // Keep this silent in UI; save failures are non-fatal for interaction flow.
-            highlightToolbarLogger.error("Failed to save highlight: \(error.localizedDescription, privacy: .public)")
         }
 
         onDismiss()

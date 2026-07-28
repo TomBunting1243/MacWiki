@@ -245,7 +245,7 @@ struct SettingsAdvancedPane: View {
                 },
                 resetPersistedData: {
                     try await MainActor.run {
-                        try deleteAllPersistedModels()
+                        try LibraryResetService.deleteAll(in: modelContext)
                         resetUserDefaultsDomain()
                         performanceMetrics.clear()
                         appState.resetForFactoryDefaults()
@@ -258,31 +258,6 @@ struct SettingsAdvancedPane: View {
                 isCacheActionRunning = false
                 cacheStatusMessage = result.statusMessage
             }
-        }
-    }
-
-    private func deleteAllPersistedModels() throws {
-        do {
-            try deleteAllModels(of: ArticleNote.self)
-            try deleteAllModels(of: Highlight.self)
-            try deleteAllModels(of: ArticleState.self)
-            try deleteAllModels(of: SavedArticle.self)
-            try deleteAllModels(of: ReadingList.self)
-            try deleteAllModels(of: Area.self)
-            try deleteAllModels(of: Label.self)
-            try deleteAllModels(of: Tag.self)
-            try modelContext.save()
-        } catch {
-            modelContext.rollback()
-            throw error
-        }
-    }
-
-    private func deleteAllModels<ModelType: PersistentModel>(of type: ModelType.Type) throws {
-        let descriptor = FetchDescriptor<ModelType>()
-        let models = try modelContext.fetch(descriptor)
-        for model in models {
-            modelContext.delete(model)
         }
     }
 
