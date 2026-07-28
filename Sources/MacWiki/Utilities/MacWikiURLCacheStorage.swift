@@ -29,6 +29,23 @@ enum MacWikiURLCacheStorage {
         )
     }
 
+    /// Installs the app's configured cache and reports whether its dedicated
+    /// on-disk directory was available. A missing directory is non-fatal:
+    /// `URLCache` then uses the platform's default storage location.
+    @discardableResult
+    static func installSystemCache() -> Bool {
+        installSharedCache(makeSystemCache())
+    }
+
+    @discardableResult
+    static func installSharedCache(
+        _ configuredCache: ConfiguredCache,
+        installer: (URLCache) -> Void = { URLCache.shared = $0 }
+    ) -> Bool {
+        installer(configuredCache.cache)
+        return configuredCache.storageDirectoryURL != nil
+    }
+
     private static func systemDirectoryURL(fileManager: FileManager) -> URL? {
         guard let cachesDirectory = fileManager
             .urls(for: .cachesDirectory, in: .userDomainMask)
