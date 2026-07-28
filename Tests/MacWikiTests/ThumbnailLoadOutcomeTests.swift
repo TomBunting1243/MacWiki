@@ -1,4 +1,3 @@
-import Foundation
 import Testing
 
 @testable import MacWiki
@@ -32,22 +31,27 @@ struct ThumbnailLoadOutcomeTests {
         #expect(value == 42)
     }
 
-    @Test func thumbnailViewPublishesOnlyForTheCurrentRequest() throws {
-        let source = try String(
-            contentsOf: repositoryRoot().appendingPathComponent(
-                "Sources/MacWiki/Views/Shared/CachedThumbnailImage.swift"
-            ),
-            encoding: .utf8
-        )
+    @Test func currentRequestCompletionCanPublish() {
+        let policy = ThumbnailLoadPublicationPolicy(activeRequest: "current")
 
-        #expect(source.contains("@State private var activeLoadRequest: LoadRequest?"))
-        #expect(source.contains("guard activeLoadRequest == request, !Task.isCancelled else { return }"))
+        #expect(policy.permitsPublication(for: "current", isCancelled: false))
     }
 
-    private func repositoryRoot() -> URL {
-        URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
+    @Test func staleRequestCompletionCannotPublish() {
+        let policy = ThumbnailLoadPublicationPolicy(activeRequest: "current")
+
+        #expect(!policy.permitsPublication(for: "stale", isCancelled: false))
+    }
+
+    @Test func cancelledRequestCompletionCannotPublish() {
+        let policy = ThumbnailLoadPublicationPolicy(activeRequest: "current")
+
+        #expect(!policy.permitsPublication(for: "current", isCancelled: true))
+    }
+
+    @Test func completionWithoutAnActiveRequestCannotPublish() {
+        let policy = ThumbnailLoadPublicationPolicy<String>(activeRequest: nil)
+
+        #expect(!policy.permitsPublication(for: "current", isCancelled: false))
     }
 }

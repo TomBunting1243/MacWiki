@@ -91,21 +91,15 @@ struct MacWikiApp: App {
     private static func configureGlobalURLCache() {
         // Discover/search surfaces are thumbnail-heavy and rely on `AsyncImage`, which uses `URLCache`.
         // A larger shared cache avoids repeated downloads when opening new tabs during research bursts.
-        let memoryCapacity = 48 * 1024 * 1024
-        let diskCapacity = 240 * 1024 * 1024
-        let directory = MacWikiURLCacheStorage.systemDirectoryURL()
+        let configuredCache = MacWikiURLCacheStorage.makeSystemCache()
 
-        if directory == nil {
+        if configuredCache.storageDirectoryURL == nil {
             appBootstrapLogger.error(
                 "Unable to create MacWiki URL cache directory; using the system default cache location"
             )
         }
 
-        URLCache.shared = URLCache(
-            memoryCapacity: memoryCapacity,
-            diskCapacity: diskCapacity,
-            directory: directory
-        )
+        URLCache.shared = configuredCache.cache
     }
 
     private static func sanitizePersistedWindowAndSplitViewState() {

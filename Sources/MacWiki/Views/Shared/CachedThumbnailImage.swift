@@ -17,6 +17,14 @@ enum ThumbnailLoadOutcome<Value> {
     }
 }
 
+struct ThumbnailLoadPublicationPolicy<Request: Equatable> {
+    let activeRequest: Request?
+
+    func permitsPublication(for request: Request, isCancelled: Bool) -> Bool {
+        activeRequest == request && !isCancelled
+    }
+}
+
 struct CachedThumbnailImage<Content: View, Placeholder: View, Failure: View>: View {
     private struct LoadRequest: Hashable {
         let url: URL?
@@ -85,6 +93,11 @@ struct CachedThumbnailImage<Content: View, Placeholder: View, Failure: View>: Vi
         return max(1, Int(ceil(maxDimension * max(displayScale, 1))))
     }
 
+    private func canPublish(for request: LoadRequest) -> Bool {
+        ThumbnailLoadPublicationPolicy(activeRequest: activeLoadRequest)
+            .permitsPublication(for: request, isCancelled: Task.isCancelled)
+    }
+
     private func loadCurrentURL() async {
         let request = loadRequest
         guard !Task.isCancelled else { return }
@@ -96,7 +109,7 @@ struct CachedThumbnailImage<Content: View, Placeholder: View, Failure: View>: Vi
 
         guard let url else {
             await MainActor.run {
-                guard activeLoadRequest == request, !Task.isCancelled else { return }
+                guard canPublish(for: request) else { return }
                 phase = .failure
             }
             return
@@ -106,14 +119,14 @@ struct CachedThumbnailImage<Content: View, Placeholder: View, Failure: View>: Vi
         if let cachedImage = await MainActor.run(body: { DecodedThumbnailImageCache.shared.image(for: cacheKey) }) {
             guard !Task.isCancelled else { return }
             await MainActor.run {
-                guard activeLoadRequest == request, !Task.isCancelled else { return }
+                guard canPublish(for: request) else { return }
                 phase = .success(Image(nsImage: cachedImage))
             }
             return
         }
 
         await MainActor.run {
-            guard activeLoadRequest == request, !Task.isCancelled else { return }
+            guard canPublish(for: request) else { return }
             phase = .loading
         }
 
@@ -128,7 +141,7 @@ struct CachedThumbnailImage<Content: View, Placeholder: View, Failure: View>: Vi
             return
         case .failure:
             await MainActor.run {
-                guard activeLoadRequest == request, !Task.isCancelled else { return }
+                guard canPublish(for: request) else { return }
                 phase = .failure
             }
             return
@@ -143,7 +156,7 @@ struct CachedThumbnailImage<Content: View, Placeholder: View, Failure: View>: Vi
         guard let decodedImageBox, !Task.isCancelled else {
             if !Task.isCancelled {
                 await MainActor.run {
-                    guard activeLoadRequest == request, !Task.isCancelled else { return }
+                    guard canPublish(for: request) else { return }
                     phase = .failure
                 }
             }
@@ -151,7 +164,7 @@ struct CachedThumbnailImage<Content: View, Placeholder: View, Failure: View>: Vi
         }
 
         await MainActor.run {
-            guard activeLoadRequest == request, !Task.isCancelled else { return }
+            guard canPublish(for: request) else { return }
             let decodedImage = NSImage(
                 cgImage: decodedImageBox.cgImage,
                 size: NSSize(
