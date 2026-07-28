@@ -140,82 +140,58 @@ struct DirectoryView: View {
         return supplementalSortMode == .articleLength
     }
 
-    private var visibleSnapshotFingerprint: Int {
-        var hasher = Hasher()
-        hasher.combine(articleIndexesFingerprint)
-        hasher.combine(rootSelection.rawValue)
-        hasher.combine(recentsScope.rawValue)
-        hasher.combine(selectedList?.id)
-        hasher.combine(selectedLabel?.id)
-        hasher.combine(selectedTag?.id)
-        hasher.combine(localLabelFilter?.id)
-        hasher.combine(localTagFilter?.id)
-        hasher.combine(supplementalReadFilter == .unread)
-        hasher.combine(supplementalSortMode.rawValue)
-        for id in labels.map(\.id).sorted(by: { $0.uuidString < $1.uuidString }) {
-            hasher.combine(id)
-        }
-        for id in tags.map(\.id).sorted(by: { $0.uuidString < $1.uuidString }) {
-            hasher.combine(id)
-        }
-
-        if let list = selectedList {
-            hasher.combine(list.filterMode.rawValue)
-            hasher.combine(list.sortMode.rawValue)
-            hasher.combine(list.articles.count)
-            for article in list.articles {
-                hasher.combine(article.id)
-                hasher.combine(article.manualOrder)
-            }
-        } else if let label = selectedLabel {
-            hasher.combine(label.id)
-            let labeledIDs = savedArticles
-                .filter { $0.labelId == label.id }
-                .map(\.id)
-                .sorted { $0.uuidString < $1.uuidString }
-            hasher.combine(labeledIDs.count)
-            for id in labeledIDs {
-                hasher.combine(id)
-            }
-        } else if let tag = selectedTag {
-            let tagTitles = DirectorySnapshotBuilder.taggedArticleTitles(
-                for: tag,
-                articleStates: articleStates,
-                highlights: highlights
-            )
-            hasher.combine(tag.id)
-            hasher.combine(tagTitles.count)
-            for title in tagTitles {
-                hasher.combine(ReadStateSync.normalizedTitle(title))
-            }
-        } else if recentsScope == .currentTab,
-                  let activeId = appState.activeTabId,
-                  let tab = appState.openTabs.first(where: { $0.id == activeId }) {
-            hasher.combine(activeId)
-            hasher.combine(tab.currentIndex)
-            hasher.combine(tab.history.count)
-            for item in tab.history {
-                hasher.combine(item.id)
-                hasher.combine(item.article.title)
-                hasher.combine(item.article.isRead)
+    /// Invalidation inputs for the visible snapshot. The hashing itself lives in
+    /// `DirectoryFingerprint` so it can be tested without standing up a view.
+    private var visibleFingerprintInputs: DirectoryFingerprint.VisibleInputs {
+        let activeTab: ArticleTab?
+        if selectedList == nil,
+           selectedLabel == nil,
+           selectedTag == nil,
+           recentsScope == .currentTab {
+            activeTab = appState.activeTabId.flatMap { activeID in
+                appState.openTabs.first(where: { $0.id == activeID })
             }
         } else {
-            hasher.combine(appState.recentArticles.count)
-            for article in appState.recentArticles {
-                hasher.combine(article.id)
-                hasher.combine(article.title)
-                hasher.combine(article.isRead)
-            }
+            activeTab = nil
         }
+        let usesGlobalRecents =
+            selectedList == nil &&
+            selectedLabel == nil &&
+            selectedTag == nil &&
+            activeTab == nil
 
-        if shouldTrackHydratedWordCountsInVisibleSnapshot {
-            for title in visibleSnapshotCandidateTitles {
-                hasher.combine(ReadStateSync.normalizedTitle(title))
-                hasher.combine(metadataHydrator.snapshot(for: title)?.wordCount)
-            }
-        }
+        return DirectoryFingerprint.VisibleInputs(
+            articleIndexesFingerprint: articleIndexesFingerprint,
+            rootSelection: rootSelection,
+            recentsScope: recentsScope,
+            selectedList: selectedList,
+            selectedLabel: selectedLabel,
+            selectedTag: selectedTag,
+            localLabelFilter: localLabelFilter,
+            localTagFilter: localTagFilter,
+            supplementalReadFilter: supplementalReadFilter,
+            supplementalSortMode: supplementalSortMode,
+            availableLabelIDs: labels.map(\.id),
+            availableTagIDs: tags.map(\.id),
+            savedArticles: savedArticles,
+            articleStates: articleStates,
+            highlights: highlights,
+            // An active ID with no matching tab must fall through to global recents.
+            activeTabID: activeTab?.id,
+            activeTabHistory: activeTab?.history ?? [],
+            activeTabCurrentIndex: activeTab?.currentIndex,
+            // Avoid observing unrelated global-recents mutations while another scope owns
+            // the directory. Observation itself can invalidate the view before hashing runs.
+            recentArticles: usesGlobalRecents ? appState.recentArticles : [],
+            wordCountSensitiveTitles: shouldTrackHydratedWordCountsInVisibleSnapshot
+                ? visibleSnapshotCandidateTitles
+                : [],
+            hydratedWordCount: { metadataHydrator.snapshot(for: $0)?.wordCount }
+        )
+    }
 
-        return hasher.finalize()
+    private var visibleSnapshotFingerprint: Int {
+        DirectoryFingerprint.visible(visibleFingerprintInputs)
     }
 
     private var accessoryCollectionsFingerprint: Int {
