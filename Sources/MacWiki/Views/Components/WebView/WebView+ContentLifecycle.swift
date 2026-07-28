@@ -119,6 +119,8 @@ extension WebView.Coordinator {
     }
 
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+        contentRevealPublisher.cancel()
+        hasReportedContentReveal = false
         webContentTerminationCount += 1
         guard webContentTerminationCount <= 2 else {
             let error = NSError(
@@ -173,6 +175,7 @@ extension WebView.Coordinator {
     }
 
     private func finishContentLoadFailure(on webView: WKWebView, error: Error, shouldReport: Bool) {
+        contentRevealPublisher.cancel()
         isContentLoadInFlight = false
         expectedNavigationToken = nil
         cancelScriptedScrollRestore(on: webView)
@@ -287,13 +290,36 @@ extension WebView.Coordinator {
     func notifyContentRevealIfNeeded() {
         guard !hasReportedContentReveal else { return }
         hasReportedContentReveal = true
-        onContentReveal?()
-        if !pendingPostRevealTasks.isEmpty {
-            let tasks = pendingPostRevealTasks
-            pendingPostRevealTasks.removeAll(keepingCapacity: false)
-            for task in tasks {
-                task()
-            }
+        // WebKit navigation callbacks arrive outside SwiftUI's representable update.
+        // Publish immediately so a new document does not pay an unnecessary run-loop hop.
+        publishContentReveal(deferred: false)
+        drainPendingPostRevealTasks()
+    }
+
+    /// Publishes Reader reveal state without re-entering a SwiftUI view update.
+    ///
+    /// Reused WebViews attach from `makeNSView`, so that path requests a deferred publication.
+    /// The scheduler coalesces repeated requests and re-reads the current callback when it fires,
+    /// avoiding a callback captured from a superseded representable value.
+    func publishContentReveal(deferred: Bool) {
+        guard deferred else {
+            onContentReveal?()
+            return
+        }
+
+        contentRevealPublisher.schedule { [weak self] in
+            guard let self else { return }
+            self.onContentReveal?()
+            self.drainPendingPostRevealTasks()
+        }
+    }
+
+    func drainPendingPostRevealTasks() {
+        guard !pendingPostRevealTasks.isEmpty else { return }
+        let tasks = pendingPostRevealTasks
+        pendingPostRevealTasks.removeAll(keepingCapacity: false)
+        for task in tasks {
+            task()
         }
     }
 
@@ -320,6 +346,7 @@ extension WebView.Coordinator {
         highVelocityUserScrollUntil = 0
         hasReportedContentReveal = false
         contentLoadFailed = false
+        contentRevealPublisher.cancel()
         pendingPostRevealTasks.removeAll(keepingCapacity: false)
         beginInspectorProjectionReplacement()
     }

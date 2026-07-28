@@ -741,6 +741,9 @@ struct WebView: NSViewRepresentable {
         var webContentTerminationCount = 0
         var contentLoadFailed = false
         var hasReportedContentReveal = false
+        /// Coalesces reused-document reveal publication onto a later main-actor turn.
+        /// The zero delay leaves the current SwiftUI update without adding visible latency.
+        let contentRevealPublisher = DebouncedActionScheduler(delay: .zero)
         var pendingPostRevealTasks: [() -> Void] = []
         var lastSaveRequestTimestamp: TimeInterval = 0
         var lastScrollPositionPublishTimestamp: TimeInterval = 0
@@ -858,7 +861,9 @@ struct WebView: NSViewRepresentable {
                 webView.alphaValue = 1
             }
             hasReportedContentReveal = true
-            onContentReveal?()
+            // `attachReusedWebView` runs from `makeNSView`, while SwiftUI is updating the
+            // representable. Defer the state-publishing callback until that update completes.
+            publishContentReveal(deferred: true)
         }
 
         func applyHighlights(to webView: WKWebView) {
@@ -1002,6 +1007,7 @@ struct WebView: NSViewRepresentable {
             tableOfContentsScrollRequestTracker.invalidate()
             findRequestTimeoutWorkItem?.cancel()
             findRequestTimeoutWorkItem = nil
+            contentRevealPublisher.cancel()
             dismissLinkHoverPreview(immediate: true)
         }
 
