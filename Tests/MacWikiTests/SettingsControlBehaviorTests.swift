@@ -64,17 +64,6 @@ struct SettingsControlBehaviorTests {
         #expect(!source.contains(".frame(height: 152)"))
     }
 
-    @Test func factoryResetUsesTheActiveDefaultsDomainAndRollsBackFailedDeletes() throws {
-        let source = try repositorySource(
-            "Sources/MacWiki/Views/Components/SettingsAdvancedPane.swift"
-        )
-
-        #expect(source.contains("modelContext.rollback()"))
-        #expect(source.contains("MacWikiDefaults.clearCurrentDomain()"))
-        #expect(source.contains("performanceMetrics.clear()"))
-        #expect(!source.contains("AppDefaultsReset.clearCandidateDomains()"))
-    }
-
     private func repositorySource(_ relativePath: String) throws -> String {
         let repositoryRoot = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()

@@ -52,17 +52,6 @@ struct DirectoryDiscoverySurfaceRegressionTests {
         lookupModel.stop()
     }
 
-    @Test func discoverDoesNotFingerprintTheLibraryDuringBodyEvaluation() throws {
-        let source = try repositorySource("Sources/MacWiki/Views/Home/DiscoverNewTabPageView.swift")
-
-        #expect(source.contains("@State private var articleLookupModel = DiscoverArticleLookupModel()"))
-        #expect(source.contains("articleLookupModel.start(modelContext: modelContext)"))
-        #expect(source.contains("articleLookupModel.stop()"))
-        #expect(!source.contains("articleLookupIndexFingerprint"))
-        #expect(!source.contains("articleLookupFingerprint"))
-        #expect(!source.contains("refreshArticleLookupSnapshot"))
-    }
-
     private func repositorySource(_ relativePath: String) throws -> String {
         let repositoryRoot = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()

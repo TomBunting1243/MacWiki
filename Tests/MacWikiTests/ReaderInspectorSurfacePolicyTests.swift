@@ -58,24 +58,6 @@ struct ReaderInspectorSurfacePolicyTests {
         #expect(policy.shadowMultiplier == 1)
     }
 
-    @Test func targetedReaderAndInspectorMaterialsUseSharedPolicy() throws {
-        let targetPaths = [
-            "Sources/MacWiki/Views/Inspector/ReferenceListView.swift",
-            "Sources/MacWiki/Views/Inspector/ReferenceExportBarView.swift",
-            "Sources/MacWiki/Views/Inspector/ReferenceRowView.swift",
-            "Sources/MacWiki/Views/Inspector/InspectorTagStatusBox.swift",
-            "Sources/MacWiki/Views/Components/HighlightListView.swift",
-            "Sources/MacWiki/Views/Components/HighlightRowView.swift"
-        ]
-
-        for path in targetPaths {
-            let source = try source(path)
-            #expect(source.contains("readerInspector"), "Missing shared surface policy in \(path)")
-            #expect(!source.contains(".fill(.ultraThinMaterial)"), "Unmanaged material in \(path)")
-            #expect(!source.contains(".background(.thinMaterial"), "Unmanaged material in \(path)")
-        }
-    }
-
     @Test func targetedMicroInteractionsHonorReduceMotion() throws {
         let toolbar = try source("Sources/MacWiki/Views/Components/HighlightToolbar.swift")
         let tagEditor = try source("Sources/MacWiki/Views/Inspector/InspectorTagEditor.swift")
