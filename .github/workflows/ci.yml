@@ -26,7 +26,17 @@ jobs:
       - name: Build (Debug)
         run: swift build
 
-      - name: Test
+      # Deterministic gate: exclude tests that make real Wikipedia requests so a rate limit or
+      # network outage cannot mask whether MacWiki's own behavior is sound.
+      - name: Test (no network)
+        run: swift test
+        env:
+          MACWIKI_SKIP_NETWORK_TESTS: "1"
+
+      # Advisory integration pass against Wikipedia's live API. Upstream availability and response
+      # changes remain visible without blocking an otherwise healthy build.
+      - name: Test (live Wikipedia integration)
+        continue-on-error: true
         run: swift test
 
       - name: Maintainability Check (Advisory)

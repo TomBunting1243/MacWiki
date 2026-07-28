@@ -12,6 +12,7 @@ private actor ScriptedWikipediaTransport {
 
     private var steps: [Step]
     private let cancelsDuringSleep: Bool
+    private(set) var requests: [URLRequest] = []
     private(set) var requestCount = 0
     private(set) var sleepCount = 0
 
@@ -21,6 +22,7 @@ private actor ScriptedWikipediaTransport {
     }
 
     func load(_ request: URLRequest) throws -> (Data, URLResponse) {
+        requests.append(request)
         requestCount += 1
         guard !steps.isEmpty else { throw URLError(.badServerResponse) }
 
@@ -53,6 +55,10 @@ private actor ScriptedWikipediaTransport {
     func counts() -> (requests: Int, sleeps: Int) {
         (requestCount, sleepCount)
     }
+
+    func recordedRequests() -> [URLRequest] {
+        requests
+    }
 }
 
 /// Tests for WikipediaService. Transport-policy tests use deterministic scripted
@@ -72,13 +78,33 @@ struct WikipediaServiceTests {
     
     let service = WikipediaService()
 
+    private func fastArticleService(
+        cacheDirectoryURL: URL,
+        responseCount: Int = 1
+    ) -> WikipediaService {
+        let html = Data(
+            "<html><body><article>Deterministic cached article body.</article></body></html>".utf8
+        )
+        let transport = ScriptedWikipediaTransport(
+            steps: Array(
+                repeating: .response(statusCode: 200, data: html),
+                count: responseCount
+            )
+        )
+        return WikipediaService(
+            cacheDirectoryURL: cacheDirectoryURL,
+            requestLoader: { try await transport.load($0) },
+            retrySleeper: { try await transport.sleep($0) }
+        )
+    }
+
     private var utcCalendar: Calendar {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(secondsFromGMT: 0)!
         return calendar
     }
     
-    @Test func searchReturnsResults() async throws {
+    @Test(requiresLiveWikipedia) func searchReturnsResults() async throws {
         let results = try await service.search("Swift programming")
         
         #expect(!results.isEmpty, "Search should return results")
@@ -134,6 +160,101 @@ struct WikipediaServiceTests {
         #expect(try await timeoutService.performRequest(url: url) == expected)
         #expect(await serverTransport.counts().requests == 2)
         #expect(await timeoutTransport.counts().requests == 2)
+    }
+
+    @Test func requestIncludesWikipediaHeaders() async throws {
+        let transport = ScriptedWikipediaTransport(steps: [
+            .response(statusCode: 200, data: Data("{}".utf8))
+        ])
+        let isolated = WikipediaService(
+            requestLoader: { try await transport.load($0) },
+            retrySleeper: { try await transport.sleep($0) }
+        )
+
+        _ = try await isolated.performRequest(url: URL(string: "https://example.test/article")!)
+
+        let request = try #require(await transport.recordedRequests().first)
+        let userAgent = request.value(forHTTPHeaderField: "User-Agent")
+        #expect(userAgent?.hasPrefix("MacWiki/") == true)
+        #expect(userAgent?.contains("(https://github.com/tombunting/MacWiki)") == true)
+        #expect(request.value(forHTTPHeaderField: "Accept") == "application/json")
+    }
+
+    @Test func requestDoesNotRetryClientFailure() async {
+        let transport = ScriptedWikipediaTransport(steps: [
+            .response(statusCode: 404, data: Data()),
+            .response(statusCode: 200, data: Data("unexpected".utf8))
+        ])
+        let isolated = WikipediaService(
+            requestLoader: { try await transport.load($0) },
+            retrySleeper: { try await transport.sleep($0) }
+        )
+
+        do {
+            _ = try await isolated.performRequest(url: URL(string: "https://example.test/missing")!)
+            Issue.record("Expected a network error for HTTP 404")
+        } catch let error as WikipediaService.WikipediaError {
+            guard case .networkError(let underlyingError) = error else {
+                Issue.record("Expected a network error for HTTP 404, received \(error)")
+                return
+            }
+            let nsError = underlyingError as NSError
+            #expect(nsError.domain == "WikipediaService")
+            #expect(nsError.code == 404)
+        } catch {
+            Issue.record("Expected WikipediaError, received \(error)")
+        }
+
+        let counts = await transport.counts()
+        #expect(counts.requests == 1)
+        #expect(counts.sleeps == 0)
+    }
+
+    @Test func requestDoesNotRetryWhileOffline() async {
+        let transport = ScriptedWikipediaTransport(steps: [
+            .urlError(.notConnectedToInternet),
+            .response(statusCode: 200, data: Data("unexpected".utf8))
+        ])
+        let isolated = WikipediaService(
+            requestLoader: { try await transport.load($0) },
+            retrySleeper: { try await transport.sleep($0) }
+        )
+
+        do {
+            _ = try await isolated.performRequest(url: URL(string: "https://example.test/article")!)
+            Issue.record("Expected an offline network error")
+        } catch let error as WikipediaService.WikipediaError {
+            guard case .networkError(let underlyingError) = error else {
+                Issue.record("Expected an offline network error, received \(error)")
+                return
+            }
+            #expect((underlyingError as? URLError)?.code == .notConnectedToInternet)
+        } catch {
+            Issue.record("Expected WikipediaError, received \(error)")
+        }
+
+        let counts = await transport.counts()
+        #expect(counts.requests == 1)
+        #expect(counts.sleeps == 0)
+    }
+
+    @Test func requestUsesLongerTimeoutOnRetry() async throws {
+        let transport = ScriptedWikipediaTransport(steps: [
+            .urlError(.timedOut),
+            .response(statusCode: 200, data: Data("recovered".utf8))
+        ])
+        let isolated = WikipediaService(
+            requestLoader: { try await transport.load($0) },
+            retrySleeper: { try await transport.sleep($0) }
+        )
+
+        _ = try await isolated.performRequest(url: URL(string: "https://example.test/article")!)
+
+        let requests = await transport.recordedRequests()
+        #expect(requests.count == 2)
+        #expect(requests.first?.timeoutInterval == 12)
+        #expect(requests.last?.timeoutInterval == 18)
+        #expect(await transport.counts().sleeps == 1)
     }
 
     @Test func requestPreservesCancellationFromTransport() async {
@@ -210,40 +331,63 @@ struct WikipediaServiceTests {
         )
     }
     
-    @Test func fetchArticleReturnsHTML() async throws {
+    @Test(requiresLiveWikipedia) func fetchArticleReturnsHTML() async throws {
         let content = try await service.fetchArticle("Swift (programming language)")
         
         #expect(!content.html.isEmpty, "Article should have HTML content")
         #expect(content.html.contains("html"), "Content should be valid HTML")
     }
     
-    @Test func fetchSummaryReturnsData() async throws {
+    @Test(requiresLiveWikipedia) func fetchSummaryReturnsData() async throws {
         let summary = try await service.fetchSummary("Swift (programming language)")
         
         #expect(!summary.title.isEmpty, "Summary should have a title")
         #expect(summary.extract != nil, "Summary should have an extract")
     }
 
-    @Test func fetchPageMetadataReturnsReasonableWordCount() async throws {
+    @Test(requiresLiveWikipedia) func fetchPageMetadataReturnsReasonableWordCount() async throws {
         let metadata = try await service.fetchPageMetadata("Swift (programming language)")
 
         #expect(metadata.wordCount > 3_000, "Word count should reflect full article content")
     }
 
-    @Test func fetchPageMetadataResolvesRedirectTitles() async throws {
+    @Test(requiresLiveWikipedia) func fetchPageMetadataResolvesRedirectTitles() async throws {
         let metadata = try await service.fetchPageMetadata("Nintendo Wii")
 
         #expect(metadata.wordCount > 5_000, "Redirected titles should still return a full-article word count")
     }
     
     @Test func searchResultsCached() async throws {
-        // First search
-        let results1 = try await service.search("Apple Inc")
-        
-        // Second search with same query should use cache
-        let results2 = try await service.search("Apple Inc")
-        
-        #expect(results1.count == results2.count, "Cached results should match")
+        let payload = Data(
+            """
+            {
+              "query": {
+                "pages": {
+                  "42": {
+                    "pageid": 42,
+                    "title": "Apple Inc.",
+                    "description": "American technology company",
+                    "index": 1
+                  }
+                }
+              }
+            }
+            """.utf8
+        )
+        let transport = ScriptedWikipediaTransport(steps: [
+            .response(statusCode: 200, data: payload)
+        ])
+        let isolated = WikipediaService(
+            requestLoader: { try await transport.load($0) },
+            retrySleeper: { try await transport.sleep($0) }
+        )
+
+        let first = try await isolated.search("Apple Inc")
+        let cached = try await isolated.search("Apple Inc")
+
+        #expect(first == cached)
+        #expect(first.map(\.title) == ["Apple Inc."])
+        #expect(await transport.counts().requests == 1)
     }
 
     @Test func articleCacheMetricsPopulate() async throws {
@@ -251,7 +395,7 @@ struct WikipediaServiceTests {
             .appendingPathComponent("MacWikiTests-\(UUID().uuidString)", isDirectory: true)
         defer { try? FileManager.default.removeItem(at: tempRoot) }
 
-        let isolated = WikipediaService(cacheDirectoryURL: tempRoot)
+        let isolated = fastArticleService(cacheDirectoryURL: tempRoot)
         _ = try await isolated.fetchArticleFast("Swift (programming language)")
 
         let metrics = await isolated.cacheMetrics()
@@ -265,7 +409,7 @@ struct WikipediaServiceTests {
             .appendingPathComponent("MacWikiTests-\(UUID().uuidString)", isDirectory: true)
         defer { try? FileManager.default.removeItem(at: tempRoot) }
 
-        let isolated = WikipediaService(cacheDirectoryURL: tempRoot)
+        let isolated = fastArticleService(cacheDirectoryURL: tempRoot)
         let title = "Swift (programming language)"
         _ = try await isolated.fetchArticleFast(title)
 
@@ -298,7 +442,7 @@ struct WikipediaServiceTests {
             .appendingPathComponent("MacWikiTests-\(UUID().uuidString)", isDirectory: true)
         defer { try? FileManager.default.removeItem(at: tempRoot) }
 
-        let isolated = WikipediaService(cacheDirectoryURL: tempRoot)
+        let isolated = fastArticleService(cacheDirectoryURL: tempRoot, responseCount: 2)
         let pinnedTitle = "Swift (programming language)"
         let temporaryTitle = "Apple Inc."
 
@@ -317,7 +461,7 @@ struct WikipediaServiceTests {
             .appendingPathComponent("MacWikiTests-\(UUID().uuidString)", isDirectory: true)
         defer { try? FileManager.default.removeItem(at: tempRoot) }
 
-        let isolated = WikipediaService(cacheDirectoryURL: tempRoot)
+        let isolated = fastArticleService(cacheDirectoryURL: tempRoot)
         let title = "Swift (programming language)"
         _ = try await isolated.fetchArticleFast(title)
         await isolated.replacePinnedArticleTitles([title])
@@ -333,7 +477,7 @@ struct WikipediaServiceTests {
             .appendingPathComponent("MacWikiTests-\(UUID().uuidString)", isDirectory: true)
         defer { try? FileManager.default.removeItem(at: tempRoot) }
 
-        let isolated = WikipediaService(cacheDirectoryURL: tempRoot)
+        let isolated = fastArticleService(cacheDirectoryURL: tempRoot)
         _ = try await isolated.fetchArticleFast("Swift (programming language)")
 
         await isolated.clearInMemoryArticleCache()
