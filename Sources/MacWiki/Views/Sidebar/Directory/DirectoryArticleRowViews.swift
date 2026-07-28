@@ -10,7 +10,14 @@ enum ArticleListSelectionPresentation {
         isCommandPressed: Bool,
         isShiftPressed: Bool
     ) -> Bool {
-        self != .native || (!isCommandPressed && !isShiftPressed)
+        SavedArticleSelectionPlanner.primaryTapRouting(
+            presentation: self,
+            modifiers: .init(
+                isCommandPressed: isCommandPressed,
+                isShiftPressed: isShiftPressed,
+                isOptionPressed: false
+            )
+        ) == .performPrimaryAction
     }
 }
 
@@ -37,7 +44,7 @@ struct ArticleListItem<Content: View>: View {
 
     private var rowFill: Color {
         let isKeyWindow = appearsActive
-        if selectionPresentation == .custom, isSelected {
+        if selectionPresentation.drawsCustomSelectionChrome(isSelected: isSelected) {
             return Color(nsColor: .controlBackgroundColor)
                 .opacity(colorScheme == .dark ? (isKeyWindow ? 0.24 : 0.18) : (isKeyWindow ? 0.50 : 0.40))
         }
@@ -54,7 +61,7 @@ struct ArticleListItem<Content: View>: View {
 
     private var rowStroke: Color {
         let isKeyWindow = appearsActive
-        if selectionPresentation == .custom, isSelected {
+        if selectionPresentation.drawsCustomSelectionChrome(isSelected: isSelected) {
             return Color.accentColor.opacity(colorScheme == .dark ? (isKeyWindow ? 0.15 : 0.11) : (isKeyWindow ? 0.12 : 0.09))
         }
         if isCurrent {

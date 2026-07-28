@@ -4,227 +4,221 @@ import Testing
 @testable import MacWiki
 
 struct NativeArticleListSelectionTests {
-    @Test("native selection is scoped to selected reading-list content")
-    func nativeSelectionIsScopedToSelectedReadingListContent() throws {
-        let directory = try repositorySource(
-            "Sources/MacWiki/Views/Sidebar/DirectoryView.swift"
-        )
-        let scrollSurface = try sourceSection(
-            in: directory,
-            from: "private var directoryScrollSurface",
-            to: "private static let discoverFeedDateFormatter"
-        )
-        let compactSurface = compacted(scrollSurface)
-        let compactDirectory = compacted(directory)
+    private let first = UUID(uuid: (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1))
+    private let second = UUID(uuid: (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2))
+    private let third = UUID(uuid: (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3))
+    private let fourth = UUID(uuid: (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4))
+    private let missing = UUID(uuid: (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 99))
 
-        #expect(occurrenceCount(of: "List(selection:", in: compactDirectory) == 1)
-        #expect(occurrenceCount(of: "List(selection:", in: compactSurface) == 1)
+    @Test("selection scope chooses native multi-selection only for a selected reading list")
+    func selectionScopeOwnsListAndRowPresentation() {
+        let selectedList = SavedArticleSelectionPlanner.Scope.selectedReadingList
+        #expect(selectedList.usesNativeListSelection)
+        #expect(selectedList.allowsRangeSelection)
+        #expect(selectedList.rowPresentation == .native)
 
-        let selectedListBranch = try requiredRange(
-            of: "elseifselectedList!=nil{",
-            in: compactSurface
-        )
-        let nativeList = try requiredRange(
-            of: "List(selection:Binding(",
-            in: compactSurface,
-            after: selectedListBranch.upperBound
-        )
-        let selectionGetter = try requiredRange(
-            of: "get:{columnState.selectedSavedArticleIDs}",
-            in: compactSurface,
-            after: nativeList.upperBound
-        )
-        let selectionSetter = try requiredRange(
-            of: "set:{columnState.selectedSavedArticleIDs=$0}",
-            in: compactSurface,
-            after: selectionGetter.upperBound
-        )
-        let defaultList = try requiredRange(
-            of: "else{List{",
-            in: compactSurface,
-            after: selectionSetter.upperBound
-        )
-
-        #expect(selectedListBranch.lowerBound < nativeList.lowerBound)
-        #expect(nativeList.lowerBound < selectionGetter.lowerBound)
-        #expect(selectionGetter.lowerBound < selectionSetter.lowerBound)
-        #expect(selectionSetter.lowerBound < defaultList.lowerBound)
+        let otherContent = SavedArticleSelectionPlanner.Scope.otherDirectoryContent
+        #expect(!otherContent.usesNativeListSelection)
+        #expect(!otherContent.allowsRangeSelection)
+        #expect(otherContent.rowPresentation == .custom)
     }
 
-    @Test("selected reading-list rows use native presentation and stable UUID tags")
-    func selectedListRowsUseNativePresentationAndStableUUIDTags() throws {
-        let directory = try repositorySource(
-            "Sources/MacWiki/Views/Sidebar/DirectoryView.swift"
-        )
-        let selectedListSection = compacted(try sourceSection(
-            in: directory,
-            from: "private func selectedListSection",
-            to: "// MARK: - Directory Commands"
-        ))
-        let readingListModels = compacted(try repositorySource(
-            "Sources/MacWiki/Models/ReadingList.swift"
-        ))
+    @Test("all modifier combinations route native and custom row taps correctly", arguments: Array(UInt8(0)...UInt8(7)))
+    func modifierRouting(rawModifiers: UInt8) {
+        let modifiers = SavedArticleSelectionPlanner.Modifiers(rawValue: rawModifiers)
+        let hasNativeSelectionModifier = modifiers.contains(.command) || modifiers.contains(.shift)
+        let expectedNativeRouting: SavedArticleSelectionPlanner.PrimaryTapRouting =
+            hasNativeSelectionModifier ? .deferToNativeListSelection : .performPrimaryAction
 
-        #expect(selectedListSection.contains("SavedArticleRow("))
-        #expect(selectedListSection.contains(
-            "isSelected:selectedSavedArticleIDs.contains(savedArticle.id)"
-        ))
-        #expect(selectedListSection.contains("selectionPresentation:.native"))
-        #expect(selectedListSection.contains(").tag(savedArticle.id)"))
-
-        #expect(readingListModels.contains("finalclassSavedArticle{varid:UUID"))
-        #expect(readingListModels.contains("self.id=UUID()"))
+        #expect(SavedArticleSelectionPlanner.primaryTapRouting(
+            presentation: .native,
+            modifiers: modifiers
+        ) == expectedNativeRouting)
+        #expect(SavedArticleSelectionPlanner.primaryTapRouting(
+            presentation: .custom,
+            modifiers: modifiers
+        ) == .performPrimaryAction)
     }
 
-    @Test("normal activation keeps the tapped article selected before opening")
-    func normalActivationKeepsTappedArticleSelectedBeforeOpening() throws {
-        let directory = try repositorySource(
-            "Sources/MacWiki/Views/Sidebar/DirectoryView.swift"
-        )
-        let activation = compacted(try sourceSection(
-            in: directory,
-            from: "private func handleSavedArticlePrimaryAction",
-            to: "private func openArticleFromPrimaryClick"
-        ))
-
-        let selectedAssignment = try requiredRange(
-            of: "selectedSavedArticleIDs=[savedArticle.id]",
-            in: activation
-        )
-        let anchorAssignment = try requiredRange(
-            of: "selectionAnchorSavedArticleID=savedArticle.id",
-            in: activation,
-            after: selectedAssignment.upperBound
-        )
-        let openCall = try requiredRange(
-            of: "openArticleFromPrimaryClick(article,inNewTab:SystemBridge.isCommandPressed)",
-            in: activation,
-            after: anchorAssignment.upperBound
+    @Test("all modifier combinations preserve selected-list primary-action behavior", arguments: Array(UInt8(0)...UInt8(7)))
+    func selectedListPrimaryAction(rawModifiers: UInt8) {
+        let modifiers = SavedArticleSelectionPlanner.Modifiers(rawValue: rawModifiers)
+        let plan = SavedArticleSelectionPlanner.planPrimaryAction(
+            tappedID: third,
+            orderedVisibleIDs: [first, second, third, fourth],
+            currentAnchorID: first,
+            scope: .selectedReadingList,
+            modifiers: modifiers
         )
 
-        #expect(selectedAssignment.lowerBound < anchorAssignment.lowerBound)
-        #expect(anchorAssignment.lowerBound < openCall.lowerBound)
-        #expect(!activation.contains("clearSavedArticleSelection()"))
-    }
-
-    @Test("native row presentation suppresses only custom selected chrome")
-    func nativePresentationSuppressesCustomSelectedChromeWithoutChangingControls() throws {
-        let rowSource = try repositorySource(
-            "Sources/MacWiki/Views/Sidebar/Directory/DirectoryArticleRowViews.swift"
-        )
-        let articleListItem = compacted(try sourceSection(
-            in: rowSource,
-            from: "enum ArticleListSelectionPresentation",
-            to: "struct ArticleRow: View"
-        ))
-        let rowFill = compacted(try sourceSection(
-            in: rowSource,
-            from: "private var rowFill",
-            to: "private var rowStroke"
-        ))
-        let rowStroke = compacted(try sourceSection(
-            in: rowSource,
-            from: "private var rowStroke",
-            to: "init("
-        ))
-
-        #expect(articleListItem.contains("casecustom"))
-        #expect(articleListItem.contains("casenative"))
-        #expect(articleListItem.contains(
-            "selectionPresentation:ArticleListSelectionPresentation=.custom"
-        ))
-        #expect(rowFill.contains("ifselectionPresentation==.custom,isSelected{"))
-        #expect(rowStroke.contains("ifselectionPresentation==.custom,isSelected{"))
-
-        #expect(articleListItem.contains("iflettoggle=onToggleRead{"))
-        #expect(articleListItem.contains("Button(action:toggle)"))
-        #expect(articleListItem.contains(".buttonStyle(.plain)"))
-        #expect(articleListItem.contains(".contentShape(Rectangle())"))
-        #expect(articleListItem.contains(".onTapGesture{"))
-        #expect(articleListItem.contains("selectionPresentation.handlesPrimaryTap("))
-        #expect(articleListItem.contains("onToggleRead:onToggleRead"))
-    }
-
-    @Test("search and default saved rows retain custom selection presentation")
-    func searchAndDefaultRowsRetainCustomSelectionPresentation() throws {
-        let articleRows = compacted(try repositorySource(
-            "Sources/MacWiki/Views/Sidebar/Directory/DirectoryArticleRowViews.swift"
-        ))
-        let savedRow = compacted(try repositorySource(
-            "Sources/MacWiki/Views/Sidebar/Directory/SavedArticleRow.swift"
-        ))
-        let searchRow = compacted(try repositorySource(
-            "Sources/MacWiki/Views/Sidebar/Search/SidebarSearchResultRowView.swift"
-        ))
-
-        #expect(articleRows.contains(
-            "selectionPresentation:ArticleListSelectionPresentation=.custom"
-        ))
-        #expect(savedRow.contains(
-            "varselectionPresentation:ArticleListSelectionPresentation=.custom"
-        ))
-        #expect(savedRow.contains("selectionPresentation:selectionPresentation"))
-
-        #expect(searchRow.contains("isSelected:isSelected"))
-        #expect(!searchRow.contains("selectionPresentation:.native"))
-    }
-
-    private func repositorySource(_ relativePath: String) throws -> String {
-        let repositoryRoot = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-        return try String(
-            contentsOf: repositoryRoot.appending(path: relativePath),
-            encoding: .utf8
-        )
-    }
-
-    private func sourceSection(
-        in source: String,
-        from startMarker: String,
-        to endMarker: String
-    ) throws -> String {
-        guard let start = source.range(of: startMarker) else {
-            throw SourceContractError.missingMarker(startMarker)
+        if modifiers.contains(.shift) {
+            #expect(plan.selectionUpdate == .init(
+                selectedIDs: [first, second, third],
+                anchorID: first
+            ))
+            #expect(plan.articleAction == .none)
+        } else {
+            #expect(plan.selectionUpdate == .init(
+                selectedIDs: [third],
+                anchorID: third
+            ))
+            let expectedAction: SavedArticleSelectionPlanner.ArticleAction = modifiers.contains(.option)
+                ? .presentSavePrompt
+                : .open(inNewTab: modifiers.contains(.command))
+            #expect(plan.articleAction == expectedAction)
         }
-        guard let end = source.range(
-            of: endMarker,
-            range: start.upperBound..<source.endIndex
-        ) else {
-            throw SourceContractError.missingMarker(endMarker)
-        }
-        return String(source[start.lowerBound..<end.lowerBound])
     }
 
-    private func requiredRange(
-        of needle: String,
-        in source: String,
-        after lowerBound: String.Index? = nil
-    ) throws -> Range<String.Index> {
-        let searchStart = lowerBound ?? source.startIndex
-        guard let range = source.range(
-            of: needle,
-            range: searchStart..<source.endIndex
-        ) else {
-            throw SourceContractError.missingMarker(needle)
-        }
-        return range
-    }
-
-    private func compacted(_ source: String) -> String {
-        source.replacingOccurrences(
-            of: #"\s+"#,
-            with: "",
-            options: .regularExpression
+    @Test("other directory content never turns Shift into range selection", arguments: Array(UInt8(0)...UInt8(7)))
+    func otherContentPrimaryAction(rawModifiers: UInt8) {
+        let modifiers = SavedArticleSelectionPlanner.Modifiers(rawValue: rawModifiers)
+        let plan = SavedArticleSelectionPlanner.planPrimaryAction(
+            tappedID: third,
+            orderedVisibleIDs: [first, second, third, fourth],
+            currentAnchorID: first,
+            scope: .otherDirectoryContent,
+            modifiers: modifiers
         )
+
+        #expect(plan.selectionUpdate == .init(
+            selectedIDs: [third],
+            anchorID: third
+        ))
+        let expectedAction: SavedArticleSelectionPlanner.ArticleAction = modifiers.contains(.option)
+            ? .presentSavePrompt
+            : .open(inNewTab: modifiers.contains(.command))
+        #expect(plan.articleAction == expectedAction)
     }
 
-    private func occurrenceCount(of needle: String, in source: String) -> Int {
-        source.components(separatedBy: needle).count - 1
-    }
-}
+    @Test("Shift selects an inclusive range in either direction while retaining its anchor")
+    func shiftRangeSelection() {
+        let orderedIDs = [first, second, third, fourth]
 
-private enum SourceContractError: Error {
-    case missingMarker(String)
+        let forward = SavedArticleSelectionPlanner.planPrimaryAction(
+            tappedID: fourth,
+            orderedVisibleIDs: orderedIDs,
+            currentAnchorID: second,
+            scope: .selectedReadingList,
+            modifiers: [.shift]
+        )
+        #expect(forward.selectionUpdate == .init(
+            selectedIDs: [second, third, fourth],
+            anchorID: second
+        ))
+        #expect(forward.articleAction == .none)
+
+        let reverse = SavedArticleSelectionPlanner.planPrimaryAction(
+            tappedID: second,
+            orderedVisibleIDs: orderedIDs,
+            currentAnchorID: fourth,
+            scope: .selectedReadingList,
+            modifiers: [.shift]
+        )
+        #expect(reverse.selectionUpdate == .init(
+            selectedIDs: [second, third, fourth],
+            anchorID: fourth
+        ))
+        #expect(reverse.articleAction == .none)
+    }
+
+    @Test("Shift starts a new one-row range when the anchor is empty or missing")
+    func shiftRepairsEmptyOrMissingAnchor() {
+        let orderedIDs = [first, second, third, fourth]
+        let expected = SavedArticleSelectionPlanner.SelectionState(
+            selectedIDs: [third],
+            anchorID: third
+        )
+
+        let emptyAnchor = SavedArticleSelectionPlanner.planPrimaryAction(
+            tappedID: third,
+            orderedVisibleIDs: orderedIDs,
+            currentAnchorID: nil,
+            scope: .selectedReadingList,
+            modifiers: [.shift]
+        )
+        #expect(emptyAnchor.selectionUpdate == expected)
+        #expect(emptyAnchor.articleAction == .none)
+
+        let missingAnchor = SavedArticleSelectionPlanner.planPrimaryAction(
+            tappedID: third,
+            orderedVisibleIDs: orderedIDs,
+            currentAnchorID: missing,
+            scope: .selectedReadingList,
+            modifiers: [.shift]
+        )
+        #expect(missingAnchor.selectionUpdate == expected)
+        #expect(missingAnchor.articleAction == .none)
+    }
+
+    @Test("Shift preserves state and does not open when the tapped row is absent")
+    func shiftWithMissingTappedRow() {
+        let missingFromVisibleRows = SavedArticleSelectionPlanner.planPrimaryAction(
+            tappedID: missing,
+            orderedVisibleIDs: [first, second],
+            currentAnchorID: first,
+            scope: .selectedReadingList,
+            modifiers: [.shift]
+        )
+        #expect(missingFromVisibleRows.selectionUpdate == nil)
+        #expect(missingFromVisibleRows.articleAction == .none)
+
+        let emptyRows = SavedArticleSelectionPlanner.planPrimaryAction(
+            tappedID: missing,
+            orderedVisibleIDs: [],
+            currentAnchorID: nil,
+            scope: .selectedReadingList,
+            modifiers: [.shift, .command, .option]
+        )
+        #expect(emptyRows.selectionUpdate == nil)
+        #expect(emptyRows.articleAction == .none)
+    }
+
+    @Test("anchor reconciliation follows native command-toggle selection changes")
+    func anchorReconciliation() {
+        let orderedIDs = [first, second, third, fourth]
+
+        #expect(SavedArticleSelectionPlanner.anchorUpdate(
+            currentAnchorID: second,
+            selectedIDs: [second, fourth],
+            orderedVisibleIDs: orderedIDs
+        ) == .preserve)
+        #expect(SavedArticleSelectionPlanner.anchorUpdate(
+            currentAnchorID: second,
+            selectedIDs: [first, third],
+            orderedVisibleIDs: orderedIDs
+        ) == .set(first))
+        #expect(SavedArticleSelectionPlanner.anchorUpdate(
+            currentAnchorID: nil,
+            selectedIDs: [third, fourth],
+            orderedVisibleIDs: orderedIDs
+        ) == .set(third))
+        #expect(SavedArticleSelectionPlanner.anchorUpdate(
+            currentAnchorID: first,
+            selectedIDs: [],
+            orderedVisibleIDs: orderedIDs
+        ) == .set(nil))
+        #expect(SavedArticleSelectionPlanner.anchorUpdate(
+            currentAnchorID: nil,
+            selectedIDs: [missing],
+            orderedVisibleIDs: orderedIDs
+        ) == .set(nil))
+    }
+
+    @Test("custom selection chrome is drawn only for selected custom rows")
+    func customSelectionChromePolicy() {
+        #expect(ArticleListSelectionPresentation.custom.drawsCustomSelectionChrome(isSelected: true))
+        #expect(!ArticleListSelectionPresentation.custom.drawsCustomSelectionChrome(isSelected: false))
+        #expect(!ArticleListSelectionPresentation.native.drawsCustomSelectionChrome(isSelected: true))
+        #expect(!ArticleListSelectionPresentation.native.drawsCustomSelectionChrome(isSelected: false))
+    }
+
+    @Test("saved article identifiers remain stable and distinct selection identities")
+    func savedArticleIdentity() {
+        let article = SavedArticle(title: "Ada Lovelace")
+        let originalID = article.id
+        article.title = "Augusta Ada King"
+
+        #expect(article.id == originalID)
+        #expect(SavedArticle(title: "Grace Hopper").id != originalID)
+    }
 }

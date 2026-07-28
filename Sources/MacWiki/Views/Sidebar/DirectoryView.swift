@@ -626,15 +626,16 @@ struct DirectoryView: View {
     }
 
     private func reconcileSelectionAnchor(with selectedIDs: Set<UUID>) {
-        guard !selectedIDs.isEmpty else {
-            selectionAnchorSavedArticleID = nil
+        let update = SavedArticleSelectionPlanner.anchorUpdate(
+            currentAnchorID: selectionAnchorSavedArticleID,
+            selectedIDs: selectedIDs,
+            orderedVisibleIDs: orderedVisibleSavedArticleIDs
+        )
+        switch update {
+        case .preserve:
             return
-        }
-        if let anchor = selectionAnchorSavedArticleID, selectedIDs.contains(anchor) {
-            return
-        }
-        selectionAnchorSavedArticleID = orderedVisibleSavedArticleIDs.first {
-            selectedIDs.contains($0)
+        case .set(let anchorID):
+            selectionAnchorSavedArticleID = anchorID
         }
     }
 
@@ -683,7 +684,7 @@ struct DirectoryView: View {
                 }
             }
             .scrollIndicators(.visible)
-        } else if selectedList != nil {
+        } else if savedArticleSelectionScope.usesNativeListSelection {
             List(selection: Binding(
                 get: { columnState.selectedSavedArticleIDs },
                 set: { columnState.selectedSavedArticleIDs = $0 }
@@ -823,7 +824,7 @@ struct DirectoryView: View {
                             localTagFilter = (localTagFilter?.id == tag.id) ? nil : tag
                         },
                         isSelected: selectedSavedArticleIDs.contains(savedArticle.id),
-                        selectionPresentation: .native,
+                        selectionPresentation: savedArticleSelectionScope.rowPresentation,
                         onOpenArticle: { _ in
                             handleSavedArticlePrimaryAction(savedArticle)
                         },
@@ -928,8 +929,8 @@ struct DirectoryView: View {
         directoryVisibleSnapshot.visibleTitles
     }
 
-    private var canMultiSelectSavedArticles: Bool {
-        selectedList != nil
+    private var savedArticleSelectionScope: SavedArticleSelectionPlanner.Scope {
+        selectedList == nil ? .otherDirectoryContent : .selectedReadingList
     }
 
     private var selectedSavedArticleCount: Int {
@@ -966,14 +967,32 @@ struct DirectoryView: View {
             wordCount: savedArticle.wordCount
         )
 
-        if canMultiSelectSavedArticles && SystemBridge.isShiftPressed {
-            updateRangeSelection(with: savedArticle.id)
-            return
+        let modifiers = SavedArticleSelectionPlanner.Modifiers(
+            isCommandPressed: SystemBridge.isCommandPressed,
+            isShiftPressed: SystemBridge.isShiftPressed,
+            isOptionPressed: SystemBridge.isOptionPressed
+        )
+        let plan = SavedArticleSelectionPlanner.planPrimaryAction(
+            tappedID: savedArticle.id,
+            orderedVisibleIDs: orderedVisibleSavedArticleIDs,
+            currentAnchorID: selectionAnchorSavedArticleID,
+            scope: savedArticleSelectionScope,
+            modifiers: modifiers
+        )
+
+        if let selectionUpdate = plan.selectionUpdate {
+            selectedSavedArticleIDs = selectionUpdate.selectedIDs
+            selectionAnchorSavedArticleID = selectionUpdate.anchorID
         }
 
-        selectedSavedArticleIDs = [savedArticle.id]
-        selectionAnchorSavedArticleID = savedArticle.id
-        openArticleFromPrimaryClick(article, inNewTab: SystemBridge.isCommandPressed)
+        switch plan.articleAction {
+        case .none:
+            return
+        case .open(let inNewTab):
+            appState.openArticle(article, inNewTab: inNewTab)
+        case .presentSavePrompt:
+            appState.presentOptionClickSavePrompt(for: article)
+        }
     }
 
     private func openArticleFromPrimaryClick(_ article: Article, inNewTab: Bool) {
@@ -982,28 +1001,6 @@ struct DirectoryView: View {
             return
         }
         appState.openArticle(article, inNewTab: inNewTab)
-    }
-
-    private func updateRangeSelection(with tappedID: UUID) {
-        let orderedIDs = orderedVisibleSavedArticleIDs
-        guard let tappedIndex = orderedIDs.firstIndex(of: tappedID) else { return }
-
-        if selectionAnchorSavedArticleID == nil {
-            selectionAnchorSavedArticleID = tappedID
-        }
-
-        guard
-            let anchorID = selectionAnchorSavedArticleID,
-            let anchorIndex = orderedIDs.firstIndex(of: anchorID)
-        else {
-            selectedSavedArticleIDs = [tappedID]
-            selectionAnchorSavedArticleID = tappedID
-            return
-        }
-
-        let lowerBound = min(anchorIndex, tappedIndex)
-        let upperBound = max(anchorIndex, tappedIndex)
-        selectedSavedArticleIDs = Set(orderedIDs[lowerBound...upperBound])
     }
 
     private func batchMarkVisibleArticles(asRead: Bool) {
