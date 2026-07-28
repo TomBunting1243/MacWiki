@@ -100,8 +100,8 @@ swift package clean
 echo "[2/9] Debug build"
 swift build 2>&1 | tee "$ARTIFACT_DIR/swift-build.log"
 
-echo "[3/9] Complete automated suite"
-swift test 2>&1 | tee "$ARTIFACT_DIR/swift-test.log"
+echo "[3/9] Complete deterministic automated suite"
+MACWIKI_SKIP_NETWORK_TESTS=1 swift test 2>&1 | tee "$ARTIFACT_DIR/swift-test.log"
 
 echo "[4/9] Release build"
 swift build -c release "${MACWIKI_RELEASE_BUILD_ARGS[@]}" 2>&1 | tee "$ARTIFACT_DIR/swift-build-release.log"
