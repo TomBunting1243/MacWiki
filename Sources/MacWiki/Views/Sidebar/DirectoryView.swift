@@ -29,9 +29,8 @@ struct DirectoryView: View {
 
     @State private var discoverTrendPulseStore = DiscoverTrendPulseStore()
     @State private var metadataHydrator = ArticleMetadataHydrator()
-    @State private var saveScheduler = DebouncedActionScheduler()
+    @State private var columnCoordinator = DirectoryColumnCoordinator()
     @State private var pageViewsPresentation = SidebarPageViewsPresentationState()
-    @State private var discoverDateLoadTask: Task<Void, Never>?
     @State private var discoverPulseRefreshGeneration = 0
 
     private let wikipediaService = WikipediaService.shared
@@ -455,14 +454,7 @@ struct DirectoryView: View {
     }
 
     private func requestModelContextSave() {
-        saveScheduler.schedule { [modelContext] in
-            guard modelContext.hasChanges else { return }
-            modelContext.saveReportingFailure(operation: #function)
-        }
-    }
-
-    private func flushScheduledModelContextSave() {
-        saveScheduler.flush { [modelContext] in
+        columnCoordinator.scheduleSave { [modelContext] in
             guard modelContext.hasChanges else { return }
             modelContext.saveReportingFailure(operation: #function)
         }
@@ -556,10 +548,10 @@ struct DirectoryView: View {
         directoryContentRoot
         .task(id: snapshotRefreshIdentity) {
             guard !isSidebarSearchPresented else { return }
-            await Task.yield()
-            guard !Task.isCancelled else { return }
-            refreshArticleIndexesSnapshot()
-            refreshVisibleSnapshot()
+            await columnCoordinator.refreshSnapshots(
+                refreshArticleIndexes: refreshArticleIndexesSnapshot,
+                refreshVisibleSnapshot: refreshVisibleSnapshot
+            )
         }
         .task(id: accessoryCollectionsFingerprint) {
             columnState.availableLists = allLists
@@ -571,10 +563,7 @@ struct DirectoryView: View {
     private var directoryContentSelectionLifecycle: some View {
         directoryContentSnapshots
         .onChange(of: selectionResetKey) {
-            columnState.visibleSnapshotScopeKey = nil
-            localLabelFilter = nil
-            localTagFilter = nil
-            clearSavedArticleSelection()
+            columnCoordinator.resetSelectionScope(in: columnState)
         }
         .onChange(of: selectedList?.id) { _, _ in
             if selectedList == nil {
@@ -603,18 +592,22 @@ struct DirectoryView: View {
             queueDiscoverLoadDebounced()
         }
         .onChange(of: rootSelection) { _, newValue in
-            pageViewsPresentation.dismissAll()
-            if newValue != .discover {
-                discoverDateLoadTask?.cancel()
-                discoverTrendPulseStore.cancel()
-            }
+            columnCoordinator.handleRootSelectionChange(
+                isDiscoverSelected: newValue == .discover,
+                dismissPageViews: { pageViewsPresentation.dismissAll() },
+                cancelTrendLoad: { discoverTrendPulseStore.cancel() }
+            )
         }
         .onDisappear {
-            flushScheduledModelContextSave()
-            pageViewsPresentation.dismissAll()
-            discoverDateLoadTask?.cancel()
-            discoverTrendPulseStore.cancel()
-            metadataHydrator.cancel()
+            columnCoordinator.handleDisappear(
+                flushSave: { [modelContext] in
+                    guard modelContext.hasChanges else { return }
+                    modelContext.saveReportingFailure(operation: #function)
+                },
+                dismissPageViews: { pageViewsPresentation.dismissAll() },
+                cancelTrendLoad: { discoverTrendPulseStore.cancel() },
+                cancelMetadataHydration: { metadataHydrator.cancel() }
+            )
         }
     }
 
@@ -841,7 +834,7 @@ struct DirectoryView: View {
 
         switch request.command {
         case .refreshDiscover:
-            queueDiscoverLoadDebounced(forceRefresh: true, delayNanoseconds: 0)
+            queueDiscoverLoadDebounced(forceRefresh: true, delay: .zero)
         case .markSearchVisible(let asRead):
             markVisibleSearchRows(asRead: asRead)
         case .saveSearchVisible(let listID):
@@ -940,8 +933,7 @@ struct DirectoryView: View {
     }
 
     private func clearSavedArticleSelection() {
-        selectedSavedArticleIDs = []
-        selectionAnchorSavedArticleID = nil
+        columnCoordinator.clearSavedArticleSelection(in: columnState)
     }
 
     private func handleSavedArticlePrimaryAction(_ savedArticle: SavedArticle) {
@@ -1157,20 +1149,17 @@ struct DirectoryView: View {
 extension DirectoryView {
     private func queueDiscoverLoadDebounced(
         forceRefresh: Bool = false,
-        delayNanoseconds: UInt64 = 170_000_000
+        delay: Duration = DirectoryColumnCoordinator.defaultDiscoverLoadDelay
     ) {
-        discoverDateLoadTask?.cancel()
-        if forceRefresh {
-            discoverPulseRefreshGeneration &+= 1
-        }
-        let targetReferenceDate = discoverReferenceDate
-        discoverDateLoadTask = Task { @MainActor in
-            if !forceRefresh, delayNanoseconds > 0 {
-                try? await Task.sleep(nanoseconds: delayNanoseconds)
-                guard !Task.isCancelled else { return }
+        columnCoordinator.queueDiscoverLoad(
+            referenceDate: discoverReferenceDate,
+            forceRefresh: forceRefresh,
+            delay: delay,
+            onForceRefresh: { discoverPulseRefreshGeneration &+= 1 },
+            queueLoad: { referenceDate, forceRefresh in
+                discoverFeedStore.queueLoad(referenceDate: referenceDate, forceRefresh: forceRefresh)
             }
-            discoverFeedStore.queueLoad(referenceDate: targetReferenceDate, forceRefresh: forceRefresh)
-        }
+        )
     }
 
     @ViewBuilder
@@ -1212,7 +1201,7 @@ extension DirectoryView {
                         editionDateLabel: feed.dateLabel,
                         errorMessage: discoverError,
                         onRetry: {
-                            queueDiscoverLoadDebounced(forceRefresh: true, delayNanoseconds: 0)
+                            queueDiscoverLoadDebounced(forceRefresh: true, delay: .zero)
                         }
                     )
                     .padding(.vertical, 4)
