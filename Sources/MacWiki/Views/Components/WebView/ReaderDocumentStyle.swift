@@ -108,7 +108,7 @@ enum WebViewJavaScript {
 }
 
 enum WebViewResourceLoader {
-    private static let logger = Logger(subsystem: "MacWiki", category: "WebViewResources")
+    private static let logger = Logger(subsystem: "com.macwiki", category: "webview-resources")
 
     static func source(named name: String, withExtension fileExtension: String) -> String {
         guard let url = resolvedURL(named: name, withExtension: fileExtension),
