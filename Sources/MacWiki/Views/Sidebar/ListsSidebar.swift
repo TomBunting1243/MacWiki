@@ -29,6 +29,11 @@ enum SidebarSelectionID: Hashable {
 
 /// Lists sidebar with reading lists management
 struct ListsSidebar: View {
+    private struct BindingSelectionIdentity: Equatable {
+        let external: ListsSidebarExternalSelection
+        let selectedAreaIDs: [UUID]
+    }
+
     @Environment(AppState.self) private var appState
     @Environment(\.modelContext) private var modelContext
     @Environment(\.macWikiAccessibilityPersonalization.reduceMotion) private var reduceMotion
@@ -45,8 +50,7 @@ struct ListsSidebar: View {
     let sidebarSearchModel: SidebarSearchSurfaceModel
     @State private var showNewListSheet = false
     @State private var showNewAreaSheet = false
-    @State private var sidebarSelectionSet: Set<SidebarSelectionID> = []
-    @State private var selectedAreaIDs: Set<UUID> = []
+    @State private var selectionCoordinator = ListsSidebarSelectionCoordinator()
     @State private var collectionsSnapshot: ListsSidebarSnapshot?
     @AppStorage(AppStorageKey.ListsSidebar.sortOrder) private var sortOrder: ListSortOrder = .updatedDate
 
@@ -80,34 +84,50 @@ struct ListsSidebar: View {
         editingAreaName.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    private var resolvedSelectionSet: Set<SidebarSelectionID> {
-        if appState.showSearch {
-            return [.search]
-        }
-        if let listId = selectedList?.id {
-            return [.list(listId)]
-        }
-        if let labelId = selectedLabel?.id {
-            return [.label(labelId)]
-        }
-        if let tagId = selectedTag?.id {
-            return [.tag(tagId)]
-        }
-        if !selectedAreaIDs.isEmpty {
-            return Set(selectedAreaIDs.map(SidebarSelectionID.area))
-        }
-        if rootSelection == .wikiHop && !isWikiHopAvailable {
-            return [.root(.recents)]
-        }
-        return [.root(rootSelection)]
+    private var sidebarSelectionSet: Set<SidebarSelectionID> {
+        get { selectionCoordinator.selectionSet }
+        nonmutating set { selectionCoordinator.selectionSet = newValue }
+    }
+
+    private var sidebarSelectionBinding: Binding<Set<SidebarSelectionID>> {
+        Binding(
+            get: { selectionCoordinator.selectionSet },
+            set: { selectionCoordinator.selectionSet = $0 }
+        )
+    }
+
+    private var selectedAreaIDs: Set<UUID> {
+        get { selectionCoordinator.selectedAreaIDs }
+        nonmutating set { selectionCoordinator.selectedAreaIDs = newValue }
+    }
+
+    private var selectedAreaIDsBinding: Binding<Set<UUID>> {
+        Binding(
+            get: { selectionCoordinator.selectedAreaIDs },
+            set: { selectionCoordinator.selectedAreaIDs = $0 }
+        )
     }
 
     private var isWikiHopAvailable: Bool {
         isWikiHopPostV1Enabled && isWikiHopEnabled
     }
 
-    private var selectedAreaIDsKey: [UUID] {
-        selectedAreaIDs.sorted(by: { $0.uuidString < $1.uuidString })
+    private var externalSelection: ListsSidebarExternalSelection {
+        ListsSidebarExternalSelection(
+            isSearchPresented: appState.showSearch,
+            selectedListID: selectedList?.id,
+            selectedLabelID: selectedLabel?.id,
+            selectedTagID: selectedTag?.id,
+            rootSelection: rootSelection,
+            isWikiHopAvailable: isWikiHopAvailable
+        )
+    }
+
+    private var bindingSelectionIdentity: BindingSelectionIdentity {
+        BindingSelectionIdentity(
+            external: externalSelection,
+            selectedAreaIDs: selectedAreaIDs.sorted { $0.uuidString < $1.uuidString }
+        )
     }
 
     private var sidebarSections: [ListsSidebarTreeSection] {
@@ -326,38 +346,16 @@ struct ListsSidebar: View {
 
     private var sidebarWithBindingSelectionSync: some View {
         sidebarWithCollectionSnapshotSync
-            .onChange(of: selectedList?.id) { _, _ in
-                syncSelectionFromBindings()
-            }
-            .onChange(of: selectedLabel?.id) { _, _ in
-                syncSelectionFromBindings()
-            }
-            .onChange(of: selectedTag?.id) { _, _ in
-                syncSelectionFromBindings()
-            }
-            .onChange(of: rootSelection) { _, _ in
-                syncSelectionFromBindings()
-            }
-            .onChange(of: appState.showSearch) { _, _ in
-                syncSelectionFromBindings()
-            }
-            .onChange(of: selectedAreaIDsKey) { _, _ in
+            .onChange(of: bindingSelectionIdentity) { _, _ in
+                enforceWikiHopSelectionGuard()
                 syncSelectionFromBindings()
             }
     }
 
     private var sidebarWithSelectionSync: some View {
         sidebarWithBindingSelectionSync
-            .onChange(of: isWikiHopEnabled) { _, _ in
-                enforceWikiHopSelectionGuard()
-                syncSelectionFromBindings()
-            }
-            .onChange(of: isWikiHopPostV1Enabled) { _, _ in
-                enforceWikiHopSelectionGuard()
-                syncSelectionFromBindings()
-            }
             .onChange(of: areas.map(\.id)) { _, currentAreaIDs in
-                selectedAreaIDs.formIntersection(Set(currentAreaIDs))
+                selectionCoordinator.retainAreaIDs(Set(currentAreaIDs))
             }
             .onChange(of: sidebarSelectionSet) { oldValue, newValue in
                 handleSidebarSelectionChange(from: oldValue, to: newValue)
@@ -389,7 +387,7 @@ struct ListsSidebar: View {
     }
 
     private var sidebarList: some View {
-        List(selection: $sidebarSelectionSet) {
+        List(selection: sidebarSelectionBinding) {
             ForEach(sidebarSections) { section in
                 sidebarSectionView(section)
             }
@@ -643,7 +641,7 @@ struct ListsSidebar: View {
                 childAreas: childAreas(of: area),
                 totalListCount: resolvedCollectionsSnapshot.totalListCount(in: area),
                 parentAreaByID: resolvedCollectionsSnapshot.parentAreaByID,
-                selectedAreaIDs: $selectedAreaIDs,
+                selectedAreaIDs: selectedAreaIDsBinding,
                 listRow: listRow,
                 listsInArea: listsInArea,
                 childAreasOf: childAreas,
@@ -799,21 +797,13 @@ struct ListsSidebar: View {
     }
 
     private func syncSelectionFromBindings() {
-        let resolved = resolvedSelectionSet
-        guard sidebarSelectionSet != resolved else { return }
-        sidebarSelectionSet = resolved
+        selectionCoordinator.sync(from: externalSelection)
     }
 
     private func selectSidebarSelection(_ selection: SidebarSelectionID) {
-        let previousSelectionSet = sidebarSelectionSet
-        let newSelectionSet: Set<SidebarSelectionID> = [selection]
-
-        if previousSelectionSet == newSelectionSet {
-            applySelection(selection)
-            return
+        if let selectionToApply = selectionCoordinator.select(selection) {
+            applySelection(selectionToApply)
         }
-
-        sidebarSelectionSet = newSelectionSet
     }
 
     private func setRecentsSelection() {
@@ -821,94 +811,24 @@ struct ListsSidebar: View {
         selectedList = nil
         selectedLabel = nil
         selectedTag = nil
-        selectedAreaIDs.removeAll()
         rootSelection = .recents
-        let fallback: Set<SidebarSelectionID> = [.root(.recents)]
-        if sidebarSelectionSet != fallback {
-            sidebarSelectionSet = fallback
-        }
+        selectionCoordinator.setRecentsSelection()
     }
 
     private func handleSidebarSelectionChange(
         from oldValue: Set<SidebarSelectionID>,
         to newValue: Set<SidebarSelectionID>
     ) {
-        guard !newValue.isEmpty else {
+        switch selectionCoordinator.reconcileSelectionChange(from: oldValue, to: newValue) {
+        case .restoreExternalSelection:
             syncSelectionFromBindings()
-            return
-        }
-
-        let addedSelections = newValue.subtracting(oldValue)
-        let nonAreaSelections = newValue.filter {
-            if case .area = $0 { return false }
-            return true
-        }
-
-        if let selection = preferredSelection(in: Set(nonAreaSelections), preferring: addedSelections) {
-            selectedAreaIDs.removeAll()
+        case .apply(let selection):
             applySelection(selection)
-            let canonical: Set<SidebarSelectionID> = [selection]
-            if sidebarSelectionSet != canonical {
-                sidebarSelectionSet = canonical
-            }
-            return
-        }
-
-        let areaIDs = Set(newValue.compactMap { selection -> UUID? in
-            if case .area(let areaID) = selection {
-                return areaID
-            }
-            return nil
-        })
-
-        guard !areaIDs.isEmpty else {
-            syncSelectionFromBindings()
-            return
-        }
-
-        appState.showSearch = false
-        selectedList = nil
-        selectedLabel = nil
-        selectedTag = nil
-        selectedAreaIDs = areaIDs
-
-        let canonical = Set(areaIDs.map(SidebarSelectionID.area))
-        if sidebarSelectionSet != canonical {
-            sidebarSelectionSet = canonical
-        }
-    }
-
-    private func preferredSelection(
-        in selections: Set<SidebarSelectionID>,
-        preferring addedSelections: Set<SidebarSelectionID>
-    ) -> SidebarSelectionID? {
-        let preferredSelections = addedSelections
-            .intersection(selections)
-            .sorted(by: compareSidebarSelections(_:_:))
-        if let preferred = preferredSelections.first {
-            return preferred
-        }
-        return selections.sorted(by: compareSidebarSelections(_:_:)).first
-    }
-
-    private func compareSidebarSelections(_ lhs: SidebarSelectionID, _ rhs: SidebarSelectionID) -> Bool {
-        sidebarSelectionSortKey(lhs) < sidebarSelectionSortKey(rhs)
-    }
-
-    private func sidebarSelectionSortKey(_ selection: SidebarSelectionID) -> String {
-        switch selection {
-        case .search:
-            return "0-search"
-        case .root(let root):
-            return "1-root-\(rootTitle(for: root))"
-        case .list(let id):
-            return "2-list-\(id.uuidString)"
-        case .label(let id):
-            return "3-label-\(id.uuidString)"
-        case .tag(let id):
-            return "4-tag-\(id.uuidString)"
-        case .area(let id):
-            return "5-area-\(id.uuidString)"
+        case .selectAreas:
+            appState.showSearch = false
+            selectedList = nil
+            selectedLabel = nil
+            selectedTag = nil
         }
     }
 
