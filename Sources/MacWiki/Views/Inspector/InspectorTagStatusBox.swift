@@ -94,6 +94,17 @@ struct InspectorTagStatusBox: View {
                                 }
                             }
                         }
+                        .accessibilityHint(
+                            tagMarkedForRemoval == tag.id
+                                ? "Activate again to remove this tag from the article."
+                                : "Activate to mark this tag for removal."
+                        )
+                        .accessibilityAction(named: "Remove Tag") {
+                            withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.25)) {
+                                removeTag(id: tag.id)
+                                tagMarkedForRemoval = nil
+                            }
+                        }
                         .contextMenu {
                             Button {
                                 editingTagID = tag.id

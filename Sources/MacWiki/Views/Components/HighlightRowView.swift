@@ -8,7 +8,7 @@ struct HighlightRowView: View {
     @Environment(AppState.self) private var appState
     @Environment(\.modelContext) private var modelContext
     @Environment(\.colorScheme) private var colorScheme
-    @Environment(\.macWikiAccessibilityPersonalization.reduceMotion) private var reduceMotion
+    @Environment(\.macWikiAccessibilityPersonalization) private var accessibilityPersonalization
     @State private var isEditing = false
     @State private var editedNote = ""
     @State private var isHovered = false
@@ -26,6 +26,10 @@ struct HighlightRowView: View {
             return "Select this highlight while editing."
         }
         return isExpanded ? "Collapse this highlight." : "Expand this highlight."
+    }
+
+    private var reduceMotion: Bool {
+        accessibilityPersonalization.reduceMotion
     }
 
     var body: some View {
@@ -84,6 +88,7 @@ struct HighlightRowView: View {
                 rowSummary
             }
             .buttonStyle(.plain)
+            .accessibilityValue("\(highlight.color.rawValue) highlight")
             .accessibilityHint(rowActivationHint)
 
             if isEditing {
@@ -163,6 +168,14 @@ struct HighlightRowView: View {
                 .padding(.horizontal, 6)
                 .padding(.vertical, 2)
                 .background(Color.gray.opacity(colorScheme == .dark ? 0.16 : 0.12), in: Capsule())
+
+            if accessibilityPersonalization.differentiateWithoutColor {
+                SwiftUI.Label(highlight.color.rawValue, systemImage: highlight.color.iconName)
+                    .font(MacWikiTypography.compactRowMetadata)
+                    .foregroundStyle(.secondary)
+                    .labelStyle(.titleAndIcon)
+                    .lineLimit(1)
+            }
 
             Spacer(minLength: 4)
 

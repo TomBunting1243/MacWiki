@@ -158,7 +158,12 @@ enum HighlightColor: String, CaseIterable, Codable {
 
     /// SF Symbol for color picker
     var iconName: String {
-        "circle.fill"
+        switch self {
+        case .yellow: return "circle.fill"
+        case .blue: return "square.fill"
+        case .pink: return "diamond.fill"
+        case .orange: return "triangle.fill"
+        }
     }
 }
 

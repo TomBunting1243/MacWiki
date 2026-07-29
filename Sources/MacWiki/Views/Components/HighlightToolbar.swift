@@ -75,6 +75,12 @@ struct HighlightToolbar: View {
                                     y: 1
                                 )
 
+                            if accessibilityPersonalization.differentiateWithoutColor {
+                                Image(systemName: color.iconName)
+                                    .font(.system(size: 6.5, weight: .black))
+                                    .foregroundStyle(Color.black.opacity(0.62))
+                            }
+
                             Circle()
                                 .strokeBorder(Color.white.opacity(0.9), lineWidth: selectedColor == color ? 1.25 : 0)
                                 .frame(width: Metrics.colorSwatchSize + 2, height: Metrics.colorSwatchSize + 2)

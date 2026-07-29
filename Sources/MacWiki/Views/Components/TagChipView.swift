@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct TagChipView: View {
+    @Environment(\.macWikiAccessibilityPersonalization.differentiateWithoutColor) private var differentiateWithoutColor
+
     let title: String
     var isSelected: Bool = false
     var isMarkedForRemoval: Bool = false
@@ -31,6 +33,9 @@ struct TagChipView: View {
                 Image(systemName: isMarkedForRemoval ? "xmark" : "number")
                     .font(.system(size: 9, weight: .semibold))
                     .contentTransition(.symbolEffect(.replace.downUp))
+            } else if isSelected && differentiateWithoutColor {
+                Image(systemName: "checkmark")
+                    .font(.system(size: 8, weight: .bold))
             }
             Text(title)
                 .font(MacWikiTypography.metadataLabel)
@@ -61,5 +66,10 @@ struct TagChipView: View {
                     lineWidth: 0.8
                 )
         }
+        .accessibilityValue(
+            isMarkedForRemoval
+                ? "Marked for removal"
+                : (isSelected ? "Selected" : "")
+        )
     }
 }
