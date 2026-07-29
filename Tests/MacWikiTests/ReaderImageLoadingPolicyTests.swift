@@ -78,21 +78,23 @@ struct ReaderImageLoadingPolicyTests {
             </body></html>
             """,
             capturesIdleWork: true,
-            beforeReaderScript: """
+            documentStartScript: """
             window.__macwikiFetchHintMutations = [];
-            window.__macwikiFetchHintObserver = new MutationObserver(function (records) {
-              records.forEach(function (record) {
-                window.__macwikiFetchHintMutations.push({
-                  id: record.target.id,
-                  attribute: record.attributeName
+            document.addEventListener('DOMContentLoaded', function () {
+              window.__macwikiFetchHintObserver = new MutationObserver(function (records) {
+                records.forEach(function (record) {
+                  window.__macwikiFetchHintMutations.push({
+                    id: record.target.id,
+                    attribute: record.attributeName
+                  });
                 });
               });
-            });
-            window.__macwikiFetchHintObserver.observe(document.body, {
-              attributes: true,
-              subtree: true,
-              attributeFilter: ['loading', 'fetchpriority']
-            });
+              window.__macwikiFetchHintObserver.observe(document.body, {
+                attributes: true,
+                subtree: true,
+                attributeFilter: ['loading', 'fetchpriority']
+              });
+            }, { once: true });
             """
         )
 
@@ -245,7 +247,7 @@ struct ReaderImageLoadingPolicyTests {
     private func makeFixture(
         html: String,
         capturesIdleWork: Bool = false,
-        beforeReaderScript: String? = nil
+        documentStartScript: String? = nil
     ) async throws -> ReaderWebKitHarness {
         let fixtureID = UUID().uuidString
         let fixtureMarker = """
@@ -258,10 +260,18 @@ struct ReaderImageLoadingPolicyTests {
             with: fixtureMarker + "</body>",
             options: [.caseInsensitive]
         )
+        var documentStartScripts: [String] = []
+        if capturesIdleWork {
+            documentStartScripts.append(Self.idleCallbackCaptureScript)
+        }
+        if let documentStartScript {
+            documentStartScripts.append(documentStartScript)
+        }
         let fixture = ReaderWebKitHarness(
             size: CGSize(width: 640, height: 700),
+            documentStartScripts: documentStartScripts,
             injectReaderStyle: false,
-            injectWebViewScript: false
+            injectWebViewScript: true
         )
         try await fixture.loadHTML(markedHTML)
         try await fixture.waitUntil(
@@ -271,23 +281,6 @@ struct ReaderImageLoadingPolicyTests {
             """,
             attempts: 200
         )
-        if capturesIdleWork {
-            _ = try await fixture.webView.evaluateJavaScript(
-                """
-                window.__macwikiIdleCallbacks = [];
-                window.requestIdleCallback = function (callback, options) {
-                  window.__macwikiIdleCallbacks.push({ callback: callback, options: options || {} });
-                  return window.__macwikiIdleCallbacks.length;
-                };
-                window.cancelIdleCallback = function () {};
-                true;
-                """
-            )
-        }
-        if let beforeReaderScript {
-            _ = try await fixture.webView.evaluateJavaScript(beforeReaderScript + "\ntrue;")
-        }
-        _ = try await fixture.webView.evaluateJavaScript(WebViewResources.scriptSource)
         return fixture
     }
 
@@ -313,4 +306,13 @@ struct ReaderImageLoadingPolicyTests {
 
         Issue.record("Reader image preparation did not exhaust its idle work")
     }
+
+    private static let idleCallbackCaptureScript = """
+    window.__macwikiIdleCallbacks = [];
+    window.requestIdleCallback = function (callback, options) {
+      window.__macwikiIdleCallbacks.push({ callback: callback, options: options || {} });
+      return window.__macwikiIdleCallbacks.length;
+    };
+    window.cancelIdleCallback = function () {};
+    """
 }
