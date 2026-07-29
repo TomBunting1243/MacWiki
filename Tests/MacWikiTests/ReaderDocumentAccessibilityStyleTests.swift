@@ -76,34 +76,49 @@ struct ReaderDocumentAccessibilityStyleTests {
         })
     }
 
-    @Test func differentiateWithoutColorAddsAnUnderlineToRenderedHighlights() async throws {
+    @Test func differentiateWithoutColorGivesEveryRenderedHighlightADistinctPattern() async throws {
         let harness = ReaderWebKitHarness(injectWebViewScript: true)
         try await harness.loadHTML(
             """
             <html><body>
-              <p><mark id="highlight" class="macwiki-highlight">Readable highlight</mark></p>
+              <p>
+                <mark id="highlight-yellow" class="macwiki-highlight" data-highlight-color="yellow">Yellow</mark>
+                <mark id="highlight-blue" class="macwiki-highlight" data-highlight-color="blue">Blue</mark>
+                <mark id="highlight-pink" class="macwiki-highlight" data-highlight-color="pink">Pink</mark>
+                <mark id="highlight-orange" class="macwiki-highlight" data-highlight-color="orange">Orange</mark>
+              </p>
             </body></html>
             """
         )
         try await harness.waitUntil(
-            "window.getComputedStyle(document.querySelector('#highlight')).cursor === 'pointer'"
+            "window.getComputedStyle(document.querySelector('#highlight-yellow')).cursor === 'pointer'"
         )
 
-        let initialDecoration = try await highlightDecoration(in: harness)
+        let initialDecorations = try await fallbackHighlightDecorations(in: harness)
         _ = try await harness.evaluateBool(
             ReaderDocumentAccessibilityStyle.updateScript(
                 reduceTransparency: false,
                 differentiateWithoutColor: true
             )
         )
-        let accessibleDecoration = try await highlightDecoration(in: harness)
-        let customHighlightDecoration = try await harness.evaluateString(
-            Self.customHighlightDecorationScript
+        let accessibleDecorations = try await fallbackHighlightDecorations(in: harness)
+        let customHighlightDecorations = try await harness.evaluateStrings(
+            Self.customHighlightDecorationsScript
         )
 
-        #expect(initialDecoration == "none")
-        #expect(accessibleDecoration.contains("underline"))
-        #expect(customHighlightDecoration.contains("underline"))
+        #expect(initialDecorations.allSatisfy { $0 == "none|solid" })
+        #expect(accessibleDecorations == [
+            "underline|solid",
+            "underline|double",
+            "underline|dashed",
+            "underline|wavy"
+        ])
+        #expect(customHighlightDecorations == [
+            "underline|solid",
+            "underline|double",
+            "underline|dashed",
+            "underline|wavy"
+        ])
     }
 
     private func rootHasClass(
@@ -129,9 +144,14 @@ struct ReaderDocumentAccessibilityStyleTests {
         )
     }
 
-    private func highlightDecoration(in harness: ReaderWebKitHarness) async throws -> String {
-        try await harness.evaluateString(
-            "window.getComputedStyle(document.querySelector('#highlight')).textDecorationLine"
+    private func fallbackHighlightDecorations(in harness: ReaderWebKitHarness) async throws -> [String] {
+        try await harness.evaluateStrings(
+            """
+            ['yellow', 'blue', 'pink', 'orange'].map(function (color) {
+                const style = window.getComputedStyle(document.querySelector('#highlight-' + color));
+                return style.textDecorationLine + '|' + style.textDecorationStyle;
+            });
+            """
         )
     }
 
@@ -155,21 +175,23 @@ struct ReaderDocumentAccessibilityStyleTests {
     })();
     """
 
-    private static let customHighlightDecorationScript = """
+    private static let customHighlightDecorationsScript = """
     (function () {
-        const target = document.querySelector('#highlight');
-        if (!target || !target.firstChild || !window.CSS || !CSS.highlights ||
+        const colors = ['yellow', 'blue', 'pink', 'orange'];
+        if (!window.CSS || !CSS.highlights ||
             typeof Highlight !== 'function') {
-            return '';
+            return [];
         }
 
-        const range = new Range();
-        range.selectNodeContents(target);
-        CSS.highlights.set('macwiki-yellow', new Highlight(range));
-        return window.getComputedStyle(
-            target,
-            '::highlight(macwiki-yellow)'
-        ).textDecorationLine || '';
+        return colors.map(function (color) {
+            const target = document.querySelector('#highlight-' + color);
+            const range = new Range();
+            range.selectNodeContents(target);
+            const name = 'macwiki-' + color;
+            CSS.highlights.set(name, new Highlight(range));
+            const style = window.getComputedStyle(target, '::highlight(' + name + ')');
+            return style.textDecorationLine + '|' + style.textDecorationStyle;
+        });
     })();
     """
 }

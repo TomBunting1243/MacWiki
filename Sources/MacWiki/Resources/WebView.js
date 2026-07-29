@@ -2526,6 +2526,18 @@ window._macwikiTagReferenceSections();
             text-decoration-thickness: 0.12em;
             text-underline-offset: 0.14em;
         }
+        html.macwiki-differentiate-without-color ::highlight(macwiki-yellow) {
+            text-decoration-style: solid;
+        }
+        html.macwiki-differentiate-without-color ::highlight(macwiki-blue) {
+            text-decoration-style: double;
+        }
+        html.macwiki-differentiate-without-color ::highlight(macwiki-pink) {
+            text-decoration-style: dashed;
+        }
+        html.macwiki-differentiate-without-color ::highlight(macwiki-orange) {
+            text-decoration-style: wavy;
+        }
 
         /* Fallback for older browsers using mark elements */
         .macwiki-highlight {
@@ -2547,6 +2559,18 @@ window._macwikiTagReferenceSections();
             text-decoration-line: underline;
             text-decoration-thickness: 0.12em;
             text-underline-offset: 0.14em;
+        }
+        html.macwiki-differentiate-without-color .macwiki-highlight[data-highlight-color="yellow"] {
+            text-decoration-style: solid;
+        }
+        html.macwiki-differentiate-without-color .macwiki-highlight[data-highlight-color="blue"] {
+            text-decoration-style: double;
+        }
+        html.macwiki-differentiate-without-color .macwiki-highlight[data-highlight-color="pink"] {
+            text-decoration-style: dashed;
+        }
+        html.macwiki-differentiate-without-color .macwiki-highlight[data-highlight-color="orange"] {
+            text-decoration-style: wavy;
         }
         @media (prefers-color-scheme: dark) {
             .macwiki-highlight:hover {
@@ -2618,6 +2642,7 @@ function highlightWithMarks(id, range, color) {
         var mark = document.createElement('mark');
         mark.className = 'macwiki-highlight';
         mark.setAttribute('data-highlight-id', id);
+        mark.setAttribute('data-highlight-color', getHighlightName(color).replace('macwiki-', ''));
         mark.style.backgroundColor = color;
 
         mark.addEventListener('click', function (e) {
@@ -2634,6 +2659,7 @@ function highlightWithMarks(id, range, color) {
             var mark = document.createElement('mark');
             mark.className = 'macwiki-highlight';
             mark.setAttribute('data-highlight-id', id);
+            mark.setAttribute('data-highlight-color', getHighlightName(color).replace('macwiki-', ''));
             mark.style.backgroundColor = color;
             mark.appendChild(contents);
 
@@ -3122,6 +3148,7 @@ window.updateHighlightColor = function (id, newColor) {
     var el = document.querySelector('[data-highlight-id="' + id + '"]');
     if (el) {
         el.style.backgroundColor = newColor;
+        el.setAttribute('data-highlight-color', getHighlightName(newColor).replace('macwiki-', ''));
         return true;
     }
     return false;
