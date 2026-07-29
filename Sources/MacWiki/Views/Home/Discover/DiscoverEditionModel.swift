@@ -16,65 +16,75 @@ final class DiscoverEditionModel {
     let featuredSummary = DiscoverFeaturedSummaryStore()
     let visualContext = DiscoverVisualContextStore()
 
-    func updateTodayMostRead(isExpanded: Bool, forceRefresh: Bool) {
-        guard isExpanded else {
+    func updateTodayMostRead(_ plan: DiscoverTodayMostReadLoadPlan) {
+        guard plan.work == .load else {
             todayMostRead.cancel()
             return
         }
-        todayMostRead.queueLoad(forceRefresh: forceRefresh)
+        todayMostRead.queueLoad(forceRefresh: plan.forceRefresh)
     }
 
-    func updateAllTimeMostRead(
-        showsMostRead: Bool,
-        showsLongestReads: Bool,
-        limit: Int
-    ) {
-        guard showsMostRead || showsLongestReads else {
+    func performTodayMostReadFailureAction(_ plan: DiscoverTodayMostReadFailureActionPlan) {
+        todayMostRead.queueLoad(forceRefresh: plan.forceRefresh)
+    }
+
+    func updateAllTimeMostRead(_ plan: DiscoverAllTimeMostReadLoadPlan) {
+        guard plan.work == .load else {
             allTimeMostRead.cancel()
             return
         }
-        allTimeMostRead.queueLoad(limit: limit)
+        allTimeMostRead.queueLoad(
+            limit: plan.requestedLimit,
+            forceRefresh: plan.forceRefresh
+        )
     }
 
     func updateTodayTrendPulse(
-        isExpanded: Bool,
+        _ plan: DiscoverTrendPulseLoadPlan,
         results: [WikipediaService.SearchResult],
         referenceDate: Date
     ) {
-        guard isExpanded else {
+        guard plan.work == .load else {
             todayTrendPulse.cancel()
             return
         }
-        todayTrendPulse.queueLoad(results: results, referenceDate: referenceDate)
+        todayTrendPulse.queueLoad(
+            results: results,
+            referenceDate: referenceDate,
+            refreshGeneration: plan.refreshGeneration
+        )
     }
 
     func updateMostReadTrendPulse(
-        isExpanded: Bool,
+        _ plan: DiscoverTrendPulseLoadPlan,
         results: [WikipediaService.SearchResult],
         referenceDate: Date
     ) {
-        guard isExpanded else {
+        guard plan.work == .load else {
             mostReadTrendPulse.cancel()
             return
         }
-        mostReadTrendPulse.queueLoad(results: results, referenceDate: referenceDate)
+        mostReadTrendPulse.queueLoad(
+            results: results,
+            referenceDate: referenceDate,
+            refreshGeneration: plan.refreshGeneration
+        )
     }
 
     func updateWordCounts(
-        isExpanded: Bool,
-        results: [WikipediaService.SearchResult],
-        retryFailed: Bool = false
+        _ plan: DiscoverWordCountLoadPlan,
+        results: [WikipediaService.SearchResult]
     ) {
-        guard isExpanded else {
+        guard plan.work == .load else {
             wordCounts.cancel()
             return
         }
-        wordCounts.queueLoad(results: results, retryFailed: retryFailed)
+        wordCounts.queueLoad(results: results, retryFailed: plan.retriesFailedLoads)
     }
 
-    func updateFeaturedArticle(title: String?) {
-        featuredSummary.queueLoad(featuredTitle: title)
-        visualContext.queueLoad(featuredTitle: title)
+    func updateFeaturedArticle(_ plan: DiscoverFeaturedArticleLoadPlan) {
+        featuredSummary.queueLoad(featuredTitle: plan.title)
+        visualContext.queueLoad(featuredTitle: plan.title)
     }
 
     func cancelAll() {

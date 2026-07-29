@@ -65,42 +65,34 @@ struct DiscoverFeedSections: View {
                 DiscoverCollectionsKeyboardCoordinator.deactivated(currentCollectionsKeyboardState())
             )
         }
-        .task(id: todayMostReadLoadKey) {
-            editionModel.updateTodayMostRead(
-                isExpanded: isTodayMostReadExpanded,
-                forceRefresh: refreshGeneration > 0
-            )
+        .task(id: todayMostReadLoadPlan) {
+            editionModel.updateTodayMostRead(todayMostReadLoadPlan)
         }
-        .task(id: allTimeMostReadLoadKey) {
-            editionModel.updateAllTimeMostRead(
-                showsMostRead: isMostReadCollectionExpanded,
-                showsLongestReads: isLongestReadsCollectionExpanded,
-                limit: allTimeMostReadLoadLimit
-            )
+        .task(id: allTimeMostReadLoadPlan) {
+            editionModel.updateAllTimeMostRead(allTimeMostReadLoadPlan)
         }
-        .task(id: todayTrendPulseLoadKey) {
+        .task(id: todayTrendPulseLoadPlan) {
             editionModel.updateTodayTrendPulse(
-                isExpanded: isTodayMostReadExpanded,
+                todayTrendPulseLoadPlan,
                 results: todayMostReadItems,
                 referenceDate: mostReadPulseReferenceDate
             )
         }
-        .task(id: trendPulseLoadKey) {
+        .task(id: trendPulseLoadPlan) {
             editionModel.updateMostReadTrendPulse(
-                isExpanded: isMostReadCollectionExpanded,
+                trendPulseLoadPlan,
                 results: trendPulseItems,
                 referenceDate: mostReadPulseReferenceDate
             )
         }
-        .task(id: wordCountLoadKey) {
+        .task(id: wordCountLoadPlan) {
             editionModel.updateWordCounts(
-                isExpanded: isLongestReadsCollectionExpanded,
-                results: longestReadCandidates,
-                retryFailed: refreshGeneration > 0
+                wordCountLoadPlan,
+                results: longestReadCandidates
             )
         }
-        .task(id: featuredArticleLoadKey) {
-            editionModel.updateFeaturedArticle(title: featuredArticleTitle)
+        .task(id: featuredArticleLoadPlan) {
+            editionModel.updateFeaturedArticle(featuredArticleLoadPlan)
         }
         .onDisappear {
             editionModel.cancelAll()

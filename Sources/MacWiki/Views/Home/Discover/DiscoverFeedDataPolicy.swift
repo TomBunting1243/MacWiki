@@ -2,6 +2,18 @@ import Foundation
 import SwiftUI
 
 enum DiscoverTodayMostReadPresentation {
+    static var failureAction: DiscoverTodayMostReadFailureActionPlan {
+        DiscoverTodayMostReadFailureActionPlan(
+            kind: .tryAgain,
+            title: LocalizedStringResource(
+                "Try Again",
+                bundle: #bundle,
+                comment: "Button that retries loading today's most-read ranking."
+            ),
+            forceRefresh: true
+        )
+    }
+
     static func metadata(isLoading: Bool, hasFailure: Bool, itemCount: Int) -> String {
         if isLoading { return "Refreshing" }
         if hasFailure { return "Unavailable" }
@@ -143,35 +155,39 @@ extension DiscoverFeedSections {
         return items
     }
 
-    var allTimeMostReadLoadKey: String {
-        "refresh:\(refreshGeneration)|\(allTimeMostReadLoadLimit)|most-read:\(isMostReadCollectionExpanded)|longest:\(isLongestReadsCollectionExpanded)"
-    }
-
-    var todayMostReadLoadKey: String {
-        "today-most-read:\(refreshGeneration)|expanded:\(isTodayMostReadExpanded)"
-    }
-
-    var todayTrendPulseLoadKey: Int {
-        titleFingerprint(
-            todayMostReadItems.map(\.title),
-            seeds: [
-                AnyHashable(feed.dateKey),
-                AnyHashable("today-most-read-pulse"),
-                AnyHashable(refreshGeneration),
-                AnyHashable(isTodayMostReadExpanded)
-            ]
+    var allTimeMostReadLoadPlan: DiscoverAllTimeMostReadLoadPlan {
+        DiscoverAllTimeMostReadLoadPlan(
+            showsMostRead: isMostReadCollectionExpanded,
+            showsLongestReads: isLongestReadsCollectionExpanded,
+            requestedLimit: allTimeMostReadLoadLimit,
+            refreshGeneration: refreshGeneration
         )
     }
 
-    var trendPulseLoadKey: Int {
-        titleFingerprint(
-            trendPulseItems.map(\.title),
-            seeds: [
-                AnyHashable(feed.dateKey),
-                AnyHashable("playlist-most-read-pulse"),
-                AnyHashable(refreshGeneration),
-                AnyHashable(isMostReadCollectionExpanded)
-            ]
+    var todayMostReadLoadPlan: DiscoverTodayMostReadLoadPlan {
+        DiscoverTodayMostReadLoadPlan(
+            isExpanded: isTodayMostReadExpanded,
+            refreshGeneration: refreshGeneration
+        )
+    }
+
+    var todayTrendPulseLoadPlan: DiscoverTrendPulseLoadPlan {
+        DiscoverTrendPulseLoadPlan(
+            scope: .todayMostRead,
+            isExpanded: isTodayMostReadExpanded,
+            feedDateKey: feed.dateKey,
+            titleFingerprint: titleFingerprint(todayMostReadItems.map(\.title)),
+            refreshGeneration: refreshGeneration
+        )
+    }
+
+    var trendPulseLoadPlan: DiscoverTrendPulseLoadPlan {
+        DiscoverTrendPulseLoadPlan(
+            scope: .allTimeMostRead,
+            isExpanded: isMostReadCollectionExpanded,
+            feedDateKey: feed.dateKey,
+            titleFingerprint: titleFingerprint(trendPulseItems.map(\.title)),
+            refreshGeneration: refreshGeneration
         )
     }
 
@@ -179,8 +195,11 @@ extension DiscoverFeedSections {
         feed.featuredArticle?.title
     }
 
-    var featuredArticleLoadKey: String {
-        "refresh:\(refreshGeneration)|title:\(featuredArticleTitle ?? "")"
+    var featuredArticleLoadPlan: DiscoverFeaturedArticleLoadPlan {
+        DiscoverFeaturedArticleLoadPlan(
+            title: featuredArticleTitle,
+            refreshGeneration: refreshGeneration
+        )
     }
 
     var featuredTeaserText: String? {
@@ -293,14 +312,11 @@ extension DiscoverFeedSections {
         Array(allTimeMostReadStore.entries.prefix(allTimeMostReadLoadLimit).map(\.result))
     }
 
-    var wordCountLoadKey: Int {
-        titleFingerprint(
-            longestReadCandidates.map(\.title),
-            seeds: [
-                AnyHashable("longest-word-count"),
-                AnyHashable(refreshGeneration),
-                AnyHashable(isLongestReadsCollectionExpanded)
-            ]
+    var wordCountLoadPlan: DiscoverWordCountLoadPlan {
+        DiscoverWordCountLoadPlan(
+            isExpanded: isLongestReadsCollectionExpanded,
+            titleFingerprint: titleFingerprint(longestReadCandidates.map(\.title)),
+            refreshGeneration: refreshGeneration
         )
     }
 

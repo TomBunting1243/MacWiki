@@ -1,6 +1,21 @@
 import Foundation
 import Observation
 
+struct DiscoverTrendPulseLoadBudget: Equatable, Sendable {
+    static let standard = DiscoverTrendPulseLoadBudget(
+        concurrentRequestLimit: 4,
+        automaticRetryLimit: 8
+    )
+
+    let concurrentRequestLimit: Int
+    let automaticRetryLimit: Int
+
+    init(concurrentRequestLimit: Int, automaticRetryLimit: Int) {
+        self.concurrentRequestLimit = max(1, concurrentRequestLimit)
+        self.automaticRetryLimit = max(0, automaticRetryLimit)
+    }
+}
+
 /// Loads and caches trend pulse data for the bounded set of visible Discover article rows.
 @Observable @MainActor
 final class DiscoverTrendPulseStore {
@@ -32,14 +47,12 @@ final class DiscoverTrendPulseStore {
     private var loadTask: Task<Void, Never>?
     @ObservationIgnored private let trendPulseLoader: TrendPulseLoader
     @ObservationIgnored private let retrySleeper: RetrySleeper
-    @ObservationIgnored private let batchSize: Int
-    @ObservationIgnored private let automaticRetryLimit: Int
+    @ObservationIgnored private let loadBudget: DiscoverTrendPulseLoadBudget
     @ObservationIgnored private let automaticRetryDelay: Duration
     @ObservationIgnored private(set) var batchPublicationCountForCurrentRequest = 0
 
     init(
-        batchSize: Int = 4,
-        automaticRetryLimit: Int = 8,
+        loadBudget: DiscoverTrendPulseLoadBudget = .standard,
         automaticRetryDelay: Duration = .milliseconds(450),
         retrySleeper: @escaping RetrySleeper = { duration in
             try await Task.sleep(for: duration)
@@ -51,8 +64,7 @@ final class DiscoverTrendPulseStore {
             )
         }
     ) {
-        self.batchSize = max(1, batchSize)
-        self.automaticRetryLimit = max(0, automaticRetryLimit)
+        self.loadBudget = loadBudget
         self.automaticRetryDelay = automaticRetryDelay
         self.retrySleeper = retrySleeper
         self.trendPulseLoader = trendPulseLoader
@@ -159,7 +171,7 @@ final class DiscoverTrendPulseStore {
             return
         }
 
-        let retryTargets = Array(retryableFailures.prefix(automaticRetryLimit))
+        let retryTargets = Array(retryableFailures.prefix(loadBudget.automaticRetryLimit))
         if !retryTargets.isEmpty {
             do {
                 try await retrySleeper(automaticRetryDelay)
@@ -197,7 +209,7 @@ final class DiscoverTrendPulseStore {
                 return nil
             }
 
-            let batchEnd = min(batchStart + batchSize, targets.count)
+            let batchEnd = min(batchStart + loadBudget.concurrentRequestLimit, targets.count)
             let batch = Array(targets[batchStart..<batchEnd])
             let results = await loadBatch(batch, referenceDate: referenceDate)
 

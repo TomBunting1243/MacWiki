@@ -7,8 +7,9 @@ import Testing
 struct DiscoverTrendPulseStoreTests {
     @Test func queueLoadBoundsConcurrentPulseRequests() async {
         let recorder = TrendPulseConcurrencyRecorder()
+        let loadBudget = DiscoverTrendPulseLoadBudget.standard
         let store = DiscoverTrendPulseStore(
-            batchSize: 4,
+            loadBudget: loadBudget,
             trendPulseLoader: { title, referenceDate in
                 await recorder.begin(title)
                 try await Task.sleep(for: .milliseconds(12))
@@ -35,16 +36,21 @@ struct DiscoverTrendPulseStoreTests {
         await waitUntilIdle(store)
 
         #expect(await recorder.requestCount() == results.count)
-        #expect(await recorder.peakConcurrency() <= 4)
+        #expect(await recorder.peakConcurrency() <= loadBudget.concurrentRequestLimit)
         #expect(results.allSatisfy { store.pulse(for: $0.title) != nil })
-        #expect(store.batchPublicationCountForCurrentRequest == 4)
+        let expectedBatchCount = (
+            results.count + loadBudget.concurrentRequestLimit - 1
+        ) / loadBudget.concurrentRequestLimit
+        #expect(store.batchPublicationCountForCurrentRequest == expectedBatchCount)
     }
 
     @Test func transientFailureRetriesOnceAndPublishesRecoveredPulse() async {
         let recorder = TrendPulseAttemptRecorder(failuresBeforeSuccess: 1)
         let store = DiscoverTrendPulseStore(
-            batchSize: 1,
-            automaticRetryLimit: 1,
+            loadBudget: DiscoverTrendPulseLoadBudget(
+                concurrentRequestLimit: 1,
+                automaticRetryLimit: 1
+            ),
             retrySleeper: { _ in },
             trendPulseLoader: { title, referenceDate in
                 try await recorder.load(title: title, referenceDate: referenceDate)
@@ -66,8 +72,10 @@ struct DiscoverTrendPulseStoreTests {
             failure: WikipediaService.WikipediaError.noResults
         )
         let store = DiscoverTrendPulseStore(
-            batchSize: 1,
-            automaticRetryLimit: 1,
+            loadBudget: DiscoverTrendPulseLoadBudget(
+                concurrentRequestLimit: 1,
+                automaticRetryLimit: 1
+            ),
             retrySleeper: { _ in },
             trendPulseLoader: { title, referenceDate in
                 try await recorder.load(title: title, referenceDate: referenceDate)
@@ -83,10 +91,41 @@ struct DiscoverTrendPulseStoreTests {
         #expect(store.failedTitleKeys.contains(titleMatchKey(result.title)))
     }
 
+    @Test func typedAutomaticRetryBudgetCapsRetriedTargets() async {
+        let recorder = TrendPulseAttemptRecorder(failuresBeforeSuccess: .max)
+        let loadBudget = DiscoverTrendPulseLoadBudget(
+            concurrentRequestLimit: 3,
+            automaticRetryLimit: 1
+        )
+        let store = DiscoverTrendPulseStore(
+            loadBudget: loadBudget,
+            retrySleeper: { _ in },
+            trendPulseLoader: { title, referenceDate in
+                try await recorder.load(title: title, referenceDate: referenceDate)
+            }
+        )
+        let results = [
+            searchResult("First unavailable article"),
+            searchResult("Second unavailable article"),
+            searchResult("Third unavailable article")
+        ]
+
+        store.queueLoad(results: results, referenceDate: referenceDate)
+        await waitUntilIdle(store)
+
+        #expect(
+            await recorder.attemptCount()
+                == results.count + loadBudget.automaticRetryLimit
+        )
+    }
+
     @Test func explicitRefreshReloadsUnchangedTargets() async {
         let recorder = TrendPulseAttemptRecorder()
         let store = DiscoverTrendPulseStore(
-            batchSize: 1,
+            loadBudget: DiscoverTrendPulseLoadBudget(
+                concurrentRequestLimit: 1,
+                automaticRetryLimit: 8
+            ),
             retrySleeper: { _ in },
             trendPulseLoader: { title, referenceDate in
                 try await recorder.load(title: title, referenceDate: referenceDate)
@@ -113,8 +152,10 @@ struct DiscoverTrendPulseStoreTests {
 
     @Test func successfulPopoverLoadCanRepairFailedRowState() async throws {
         let store = DiscoverTrendPulseStore(
-            batchSize: 1,
-            automaticRetryLimit: 0,
+            loadBudget: DiscoverTrendPulseLoadBudget(
+                concurrentRequestLimit: 1,
+                automaticRetryLimit: 0
+            ),
             retrySleeper: { _ in },
             trendPulseLoader: { _, _ in
                 throw WikipediaService.WikipediaError.noResults

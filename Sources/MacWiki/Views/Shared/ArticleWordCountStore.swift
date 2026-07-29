@@ -1,6 +1,16 @@
 import Foundation
 import Observation
 
+struct ArticleWordCountLoadBudget: Equatable, Sendable {
+    static let standard = ArticleWordCountLoadBudget(concurrentRequestLimit: 6)
+
+    let concurrentRequestLimit: Int
+
+    init(concurrentRequestLimit: Int) {
+        self.concurrentRequestLimit = max(1, concurrentRequestLimit)
+    }
+}
+
 /// Loads and caches word-count metadata for search and discover surfaces.
 @Observable @MainActor
 final class ArticleWordCountStore {
@@ -18,14 +28,14 @@ final class ArticleWordCountStore {
     @ObservationIgnored private var attemptedTitleKeys = Set<String>()
     @ObservationIgnored private var loadGeneration = 0
     @ObservationIgnored private let pageMetadataLoader: PageMetadataLoader
-    @ObservationIgnored private let batchSize: Int
+    @ObservationIgnored private let loadBudget: ArticleWordCountLoadBudget
 
     init(
         pageMetadataLoader: @escaping PageMetadataLoader = { try await WikipediaService.shared.fetchPageMetadata($0) },
-        batchSize: Int = 6
+        loadBudget: ArticleWordCountLoadBudget = .standard
     ) {
         self.pageMetadataLoader = pageMetadataLoader
-        self.batchSize = max(1, batchSize)
+        self.loadBudget = loadBudget
     }
 
     func queueLoad(
@@ -103,7 +113,7 @@ final class ArticleWordCountStore {
         var batchStart = 0
         while batchStart < targets.count {
             guard !Task.isCancelled, generation == loadGeneration else { return }
-            let batchEnd = min(batchStart + batchSize, targets.count)
+            let batchEnd = min(batchStart + loadBudget.concurrentRequestLimit, targets.count)
             let batch = Array(targets[batchStart..<batchEnd])
 
             await withTaskGroup(of: (String, Int?).self) { group in

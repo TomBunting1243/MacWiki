@@ -146,14 +146,15 @@ extension DiscoverFeedSections {
         ) {
             if todayMostReadItems.isEmpty {
                 if todayMostReadStore.errorMessage != nil {
+                    let failureAction = DiscoverTodayMostReadPresentation.failureAction
                     DiscoverPlaylistPlaceholder(
                         text: DiscoverTodayMostReadPresentation.placeholder(
                             isLoading: false,
                             hasFailure: true
                         ),
-                        actionTitle: "Try Again"
+                        actionTitle: String(localized: failureAction.title)
                     ) {
-                        todayMostReadStore.queueLoad(forceRefresh: true)
+                        editionModel.performTodayMostReadFailureAction(failureAction)
                     }
                 } else {
                     DiscoverPlaylistPlaceholder(

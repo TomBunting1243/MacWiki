@@ -1,6 +1,57 @@
 import Foundation
 import Observation
 
+struct DiscoverFeedThumbnailPrefetchBudget: Equatable, Sendable {
+    static let initialViewport = DiscoverFeedThumbnailPrefetchBudget(
+        maximumURLCount: 10,
+        inTheNewsLimit: 4,
+        trendingLimit: 4
+    )
+
+    let maximumURLCount: Int
+    let inTheNewsLimit: Int
+    let trendingLimit: Int
+
+    init(maximumURLCount: Int, inTheNewsLimit: Int, trendingLimit: Int) {
+        self.maximumURLCount = max(0, maximumURLCount)
+        self.inTheNewsLimit = max(0, inTheNewsLimit)
+        self.trendingLimit = max(0, trendingLimit)
+    }
+}
+
+struct DiscoverFeedThumbnailPrefetchPlan: Equatable, Sendable {
+    let urls: [URL]
+
+    init(
+        heroURL: URL?,
+        featuredImageURL: URL?,
+        inTheNewsURLs: [URL?],
+        trendingURLs: [URL?],
+        budget: DiscoverFeedThumbnailPrefetchBudget
+    ) {
+        var candidates: [URL] = []
+        if let heroURL {
+            candidates.append(heroURL)
+        }
+        if let featuredImageURL {
+            candidates.append(featuredImageURL)
+        }
+        candidates.append(
+            contentsOf: inTheNewsURLs.prefix(budget.inTheNewsLimit).compactMap { $0 }
+        )
+        candidates.append(
+            contentsOf: trendingURLs.prefix(budget.trendingLimit).compactMap { $0 }
+        )
+
+        var seen = Set<URL>()
+        urls = Array(
+            candidates
+                .filter { seen.insert($0).inserted }
+                .prefix(budget.maximumURLCount)
+        )
+    }
+}
+
 /// Shared discover-feed loading state for sidebar and new-tab surfaces.
 @Observable @MainActor
 final class DiscoverFeedStore {
@@ -80,26 +131,17 @@ final class DiscoverFeedStore {
         // Warm only the first useful viewport. Offscreen modules load their
         // own artwork as they become visible instead of competing with the
         // edition's initial text and lead image.
-        let initialPrefetchBudget = 10
-        var candidates: [URL] = []
-        if let hero = feed.featuredArticle?.thumbnailURL {
-            candidates.append(hero)
-        }
-        if let featuredImageURL = feed.featuredImage?.thumbnailURL ?? feed.featuredImage?.imageURL {
-            candidates.append(featuredImageURL)
-        }
-        candidates.append(contentsOf: feed.inTheNews.prefix(4).compactMap(\.thumbnailURL))
-        candidates.append(contentsOf: feed.trending.prefix(4).compactMap(\.thumbnailURL))
-
-        var seen = Set<URL>()
-        let urls = Array(
-            candidates
-                .filter { seen.insert($0).inserted }
-                .prefix(initialPrefetchBudget)
+        let budget = DiscoverFeedThumbnailPrefetchBudget.initialViewport
+        let plan = DiscoverFeedThumbnailPrefetchPlan(
+            heroURL: feed.featuredArticle?.thumbnailURL,
+            featuredImageURL: feed.featuredImage?.thumbnailURL ?? feed.featuredImage?.imageURL,
+            inTheNewsURLs: feed.inTheNews.map(\.thumbnailURL),
+            trendingURLs: feed.trending.map(\.thumbnailURL),
+            budget: budget
         )
-        guard !urls.isEmpty else { return }
+        guard !plan.urls.isEmpty else { return }
         Task(priority: .utility) {
-            await ThumbnailPrefetcher.shared.prefetch(urls)
+            await ThumbnailPrefetcher.shared.prefetch(plan.urls)
         }
     }
 }

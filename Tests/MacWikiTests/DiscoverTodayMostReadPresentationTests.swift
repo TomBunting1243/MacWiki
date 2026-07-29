@@ -41,4 +41,10 @@ struct DiscoverTodayMostReadPresentationTests {
         ) == "No articles are ranked today.")
     }
 
+    @Test func failureActionRetriesWithAForcedRefresh() {
+        let action = DiscoverTodayMostReadPresentation.failureAction
+
+        #expect(action.kind == .tryAgain)
+        #expect(action.forceRefresh)
+    }
 }

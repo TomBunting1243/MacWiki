@@ -371,7 +371,9 @@ extension WikipediaService {
     /// "All-time" here maps to the full available Wikimedia pageviews history (since 2015-07).
     func fetchAllTimeMostRead(
         limit: Int = 36,
-        referenceDate: Date = Date()
+        referenceDate: Date = Date(),
+        forceRefresh: Bool = false,
+        fetchBudget: AllTimeMostReadFetchBudget = .standard
     ) async throws -> [AllTimeMostReadEntry] {
         let clampedLimit = AllTimeMostReadCachePolicy.clampedLimit(limit)
         guard let latestMonth = latestCompletedTopPageviewsMonth(endingAt: referenceDate) else {
@@ -379,7 +381,8 @@ extension WikipediaService {
         }
 
         let cacheKey = "all-time-\(latestMonth.year)-\(latestMonth.month)"
-        if let cached = cachedLRUValue(for: cacheKey, in: allTimeMostReadCache, order: &allTimeMostReadCacheOrder),
+        if !forceRefresh,
+           let cached = cachedLRUValue(for: cacheKey, in: allTimeMostReadCache, order: &allTimeMostReadCacheOrder),
            let reusablePrefixCount = AllTimeMostReadCachePolicy.reusablePrefixCount(
                cachedCount: cached.count,
                requestedLimit: clampedLimit
@@ -393,12 +396,13 @@ extension WikipediaService {
         var totalViewsByTitleKey: [String: Int] = [:]
         var titleByKey: [String: String] = [:]
 
-        let monthlyFetchBatchSize = 6
-        let perMonthTopLimit = 180
         var startIndex = 0
 
         while startIndex < monthKeys.count {
-            let endIndex = min(startIndex + monthlyFetchBatchSize, monthKeys.count)
+            let endIndex = min(
+                startIndex + fetchBudget.monthlyRequestBatchSize,
+                monthKeys.count
+            )
             let batch = monthKeys[startIndex..<endIndex]
 
             await withTaskGroup(of: [MonthlyTopArticle].self) { group in
@@ -407,7 +411,7 @@ extension WikipediaService {
                         await self.safeFetchMonthlyTopArticles(
                             year: month.year,
                             month: month.month,
-                            perMonthLimit: perMonthTopLimit
+                            perMonthLimit: fetchBudget.perMonthArticleLimit
                         )
                     }
                 }
@@ -445,15 +449,17 @@ extension WikipediaService {
             throw WikipediaError.noResults
         }
 
-        let summaryTargetCount = min(max(clampedLimit * 3, 80), rankedCandidates.count)
+        let summaryTargetCount = fetchBudget.summaryTargetCount(
+            requestedLimit: clampedLimit,
+            availableCandidateCount: rankedCandidates.count
+        )
         let summaryTargets = Array(rankedCandidates.prefix(summaryTargetCount))
         var orderedEntries = Array<AllTimeMostReadEntry?>(repeating: nil, count: summaryTargets.count)
 
-        let summaryFetchBatchSize = 6
         var summaryStartIndex = 0
         while summaryStartIndex < summaryTargets.count {
             let summaryEndIndex = min(
-                summaryStartIndex + summaryFetchBatchSize,
+                summaryStartIndex + fetchBudget.summaryRequestBatchSize,
                 summaryTargets.count
             )
 
