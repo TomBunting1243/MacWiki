@@ -104,4 +104,24 @@ struct MacWikiGlassPolicyTests {
             )
         )
     }
+
+    @Test func materialSurfacesShareTheGlobalAccessibilityBoundaryWithoutGlass() {
+        let standard = MacWikiGlassRuntime.materialSurfacePolicy(personalization: .standard)
+        #expect(!standard.usesNativeGlass)
+        #expect(!standard.usesOpaqueBackground)
+        #expect(standard.allowsDepth)
+
+        let reduceTransparency = MacWikiAccessibilityPersonalization(
+            reduceMotion: false,
+            reduceTransparency: true,
+            differentiateWithoutColor: false,
+            colorSchemeContrast: .standard
+        )
+        let accessible = MacWikiGlassRuntime.materialSurfacePolicy(
+            personalization: reduceTransparency
+        )
+        #expect(!accessible.usesNativeGlass)
+        #expect(accessible.usesOpaqueBackground)
+        #expect(!accessible.allowsDepth)
+    }
 }

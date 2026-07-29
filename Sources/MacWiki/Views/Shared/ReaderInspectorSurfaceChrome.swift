@@ -17,9 +17,12 @@ struct ReaderInspectorSurfacePolicy: Equatable {
         baseBorderOpacity: Double,
         baseBorderWidth: CGFloat
     ) {
-        usesOpaqueBackground =
-            personalization.reduceTransparency ||
-            personalization.colorSchemeContrast == .increased
+        // Inspector cards intentionally use material rather than interactive Liquid Glass,
+        // but their accessibility behavior must still come from the app-wide surface policy.
+        let surfacePolicy = MacWikiGlassRuntime.materialSurfacePolicy(
+            personalization: personalization
+        )
+        usesOpaqueBackground = surfacePolicy.usesOpaqueBackground
 
         if personalization.colorSchemeContrast == .increased {
             borderOpacity = max(baseBorderOpacity, 0.28)
@@ -32,7 +35,7 @@ struct ReaderInspectorSurfacePolicy: Equatable {
             borderWidth = baseBorderWidth
         }
 
-        shadowMultiplier = usesOpaqueBackground ? 0 : 1
+        shadowMultiplier = surfacePolicy.allowsDepth ? 1 : 0
     }
 }
 

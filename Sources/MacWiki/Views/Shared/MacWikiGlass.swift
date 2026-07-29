@@ -62,6 +62,18 @@ enum MacWikiGlassRuntime {
             personalization: personalization
         )
     }
+
+    /// Policy for content and transient surfaces that intentionally use system material
+    /// instead of interactive Liquid Glass while sharing the same accessibility boundary.
+    static func materialSurfacePolicy(
+        personalization: MacWikiAccessibilityPersonalization
+    ) -> SurfacePolicy {
+        surfacePolicy(
+            isEnabled: false,
+            forceLegacyFallback: false,
+            personalization: personalization
+        )
+    }
 }
 
 struct MacWikiGlassGroup<Content: View>: View {
@@ -83,5 +95,41 @@ struct MacWikiGlassGroup<Content: View>: View {
         } else {
             content
         }
+    }
+}
+
+private struct MacWikiDragPreviewSurfaceModifier: ViewModifier {
+    let cornerRadius: CGFloat
+
+    @Environment(\.macWikiAccessibilityPersonalization) private var personalization
+
+    func body(content: Content) -> some View {
+        let policy = MacWikiGlassRuntime.materialSurfacePolicy(personalization: personalization)
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+
+        content
+            .padding(8)
+            .background {
+                if policy.usesOpaqueBackground {
+                    shape.fill(Color(nsColor: .controlBackgroundColor))
+                } else {
+                    shape.fill(.regularMaterial)
+                }
+            }
+            .overlay {
+                shape.strokeBorder(
+                    Color.primary.opacity(
+                        personalization.colorSchemeContrast == .increased ? 0.28 : 0.08
+                    ),
+                    lineWidth: personalization.colorSchemeContrast == .increased ? 1 : 0.7
+                )
+            }
+    }
+}
+
+extension View {
+    /// Compact, accessibility-aware system material used only for custom drag previews.
+    func macWikiDragPreviewSurface(cornerRadius: CGFloat = 8) -> some View {
+        modifier(MacWikiDragPreviewSurfaceModifier(cornerRadius: cornerRadius))
     }
 }

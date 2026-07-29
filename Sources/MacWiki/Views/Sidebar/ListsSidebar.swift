@@ -958,8 +958,7 @@ struct ListsSidebar: View {
             )
             .draggable(list.id.uuidString) {
                 SwiftUI.Label(list.name, systemImage: list.icon)
-                    .padding(8)
-                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
+                    .macWikiDragPreviewSurface()
             }
         }
     }
@@ -1736,8 +1735,7 @@ private struct AreaRowView<ListRow: View>: View {
         .help("Drop lists or folders here to move them into \(area.name)")
         .draggable(area.id.uuidString) {
             SwiftUI.Label(area.name, systemImage: area.icon)
-                .padding(8)
-                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
+                .macWikiDragPreviewSurface()
         }
         .dropDestination(for: String.self) { items, _ in
             guard ListsSidebarAreaArticleDropPolicy.behavior(

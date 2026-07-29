@@ -1322,8 +1322,7 @@ extension DirectoryView {
                     }
                     .draggable(articleDragPayload(for: item.article, isRead: isRead)) {
                         SwiftUI.Label(item.article.title, systemImage: "doc.text")
-                            .padding(8)
-                            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
+                            .macWikiDragPreviewSurface()
                     }
                 }
             }
@@ -1428,8 +1427,7 @@ extension DirectoryView {
                     }
                     .draggable(articleDragPayload(for: article, isRead: isRead)) {
                         SwiftUI.Label(article.title, systemImage: "doc.text")
-                            .padding(8)
-                            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
+                            .macWikiDragPreviewSurface()
                     }
                 }
             }

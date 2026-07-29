@@ -161,8 +161,7 @@ struct SavedArticleRow: View {
         }
         .draggable(dragPayload) {
             SwiftUI.Label(savedArticle.title, systemImage: "doc.text")
-                .padding(8)
-                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
+                .macWikiDragPreviewSurface()
         }
     }
 }
