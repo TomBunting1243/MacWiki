@@ -63,6 +63,9 @@ private struct MainWorkspaceShell: View {
             directoryVisible: $appState.directoryColumnVisible,
             inspectorVisible: $appState.inspectorVisible,
             reduceMotion: accessibilityPersonalization.reduceMotion,
+            surfacePolicy: WorkspaceSurfacePolicy(
+                personalization: accessibilityPersonalization
+            ),
             initialListsWidth: CGFloat(sidebarWidth),
             initialDirectoryWidth: CGFloat(directoryWidth),
             initialInspectorWidth: CGFloat(inspectorWidth),

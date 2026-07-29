@@ -9,6 +9,22 @@ struct WorkspaceNavigationPaneVisibility: Equatable, Sendable {
     let inspectorVisible: Bool
 }
 
+struct WorkspaceSurfacePolicy: Equatable, Sendable {
+    let usesOpaqueBackground: Bool
+
+    static let standard = Self(usesOpaqueBackground: false)
+
+    init(usesOpaqueBackground: Bool) {
+        self.usesOpaqueBackground = usesOpaqueBackground
+    }
+
+    init(personalization: MacWikiAccessibilityPersonalization) {
+        usesOpaqueBackground =
+            personalization.reduceTransparency ||
+            personalization.colorSchemeContrast == .increased
+    }
+}
+
 /// A narrow SwiftUI/AppKit boundary for the three independently collapsible
 /// auxiliary panes. SwiftUI owns pane content; AppKit owns the semantic
 /// sidebar, content-list, Reader, and full-height Inspector split items.
@@ -28,6 +44,7 @@ struct AppKitWorkspaceNavigationSplitView<
     @Binding var inspectorVisible: Bool
 
     let reduceMotion: Bool
+    let surfacePolicy: WorkspaceSurfacePolicy
     let initialListsWidth: CGFloat
     let initialDirectoryWidth: CGFloat
     let initialInspectorWidth: CGFloat
@@ -84,6 +101,7 @@ struct AppKitWorkspaceNavigationSplitView<
             coordinator?.receiveNativeVisibility(visibility)
         }
         _ = controller.view
+        context.coordinator.applySurfacePolicy(surfacePolicy)
         context.coordinator.attachToolbar(to: controller)
         controller.setPaneVisibility(
             listsVisible: listsVisible,
@@ -118,6 +136,7 @@ struct AppKitWorkspaceNavigationSplitView<
             readerAccessoryRevision: readerAccessoryRevision
         )
         context.coordinator.updateToolbar(configuration: toolbarConfiguration)
+        context.coordinator.applySurfacePolicy(surfacePolicy)
         context.coordinator.requestVisibility(
             WorkspaceNavigationPaneVisibility(
                 listsVisible: listsVisible,
@@ -179,6 +198,7 @@ struct AppKitWorkspaceNavigationSplitView<
         private var lastReaderAccessoryRevision: String
         private var toolbarConfiguration: WorkspaceToolbarConfiguration
         private var lastRequestedVisibility: WorkspaceNavigationPaneVisibility
+        private var lastSurfacePolicy: WorkspaceSurfacePolicy?
         private var toolbarController: WorkspaceToolbarController?
 
         init(
@@ -326,6 +346,15 @@ struct AppKitWorkspaceNavigationSplitView<
             toolbarController?.update(configuration: configuration)
         }
 
+        func applySurfacePolicy(_ policy: WorkspaceSurfacePolicy) {
+            guard lastSurfacePolicy != policy else { return }
+            lastSurfacePolicy = policy
+            directoryController.applySurfacePolicy(policy)
+            inspectorController.applySurfacePolicy(policy)
+            directoryAccessoryController.applySurfacePolicy(policy)
+            readerAccessoryController.applySurfacePolicy(policy)
+        }
+
         func requestVisibility(
             _ visibility: WorkspaceNavigationPaneVisibility,
             controller: AppKitWorkspaceNavigationController,
@@ -379,12 +408,74 @@ private struct WorkspaceHostingRoot<Content: View>: View {
     }
 }
 
+/// Keeps one AppKit surface identity while accessibility personalization switches
+/// between the platform material and an explicitly opaque fallback.
+@MainActor
+final class WorkspaceMaterialSurfaceView: NSView {
+    let materialView: NSVisualEffectView
+    let opaqueBackgroundView: NSBox
+
+    private(set) var surfacePolicy: WorkspaceSurfacePolicy = .standard
+
+    init(
+        material: NSVisualEffectView.Material,
+        blendingMode: NSVisualEffectView.BlendingMode,
+        opaqueBackgroundColor: NSColor
+    ) {
+        materialView = NSVisualEffectView(frame: .zero)
+        opaqueBackgroundView = NSBox(frame: .zero)
+        super.init(frame: .zero)
+
+        materialView.material = material
+        materialView.blendingMode = blendingMode
+        materialView.state = .followsWindowActiveState
+        materialView.translatesAutoresizingMaskIntoConstraints = false
+
+        opaqueBackgroundView.boxType = .custom
+        opaqueBackgroundView.borderWidth = 0
+        opaqueBackgroundView.cornerRadius = 0
+        opaqueBackgroundView.fillColor = opaqueBackgroundColor
+        opaqueBackgroundView.isTransparent = false
+        opaqueBackgroundView.translatesAutoresizingMaskIntoConstraints = false
+
+        addSubview(opaqueBackgroundView)
+        addSubview(materialView)
+        NSLayoutConstraint.activate([
+            opaqueBackgroundView.leadingAnchor.constraint(equalTo: leadingAnchor),
+            opaqueBackgroundView.trailingAnchor.constraint(equalTo: trailingAnchor),
+            opaqueBackgroundView.topAnchor.constraint(equalTo: topAnchor),
+            opaqueBackgroundView.bottomAnchor.constraint(equalTo: bottomAnchor),
+            materialView.leadingAnchor.constraint(equalTo: leadingAnchor),
+            materialView.trailingAnchor.constraint(equalTo: trailingAnchor),
+            materialView.topAnchor.constraint(equalTo: topAnchor),
+            materialView.bottomAnchor.constraint(equalTo: bottomAnchor)
+        ])
+        applySurfacePolicy(.standard)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    func applySurfacePolicy(_ policy: WorkspaceSurfacePolicy) {
+        surfacePolicy = policy
+        opaqueBackgroundView.isHidden = !policy.usesOpaqueBackground
+        materialView.isHidden = policy.usesOpaqueBackground
+    }
+}
+
 /// The content-list pane owns one native surface beneath its split-item
 /// accessory. Discovery, Search, and library Lists can switch scroll containers
 /// without exposing the window backdrop or installing competing SwiftUI fills.
 @MainActor
 final class WorkspaceDirectoryHostingController<Content: View>: NSViewController {
     private let hostingController: NSHostingController<WorkspaceHostingRoot<Content>>
+    private let surface = WorkspaceMaterialSurfaceView(
+        material: .contentBackground,
+        blendingMode: .withinWindow,
+        opaqueBackgroundColor: .controlBackgroundColor
+    )
 
     fileprivate init(box: WorkspaceHostingBox<Content>) {
         hostingController = NSHostingController(rootView: WorkspaceHostingRoot(box: box))
@@ -397,11 +488,6 @@ final class WorkspaceDirectoryHostingController<Content: View>: NSViewController
     }
 
     override func loadView() {
-        let surface = NSVisualEffectView(frame: .zero)
-        surface.material = .contentBackground
-        surface.blendingMode = .withinWindow
-        surface.state = .followsWindowActiveState
-
         hostingController.sizingOptions = []
         hostingController.view.translatesAutoresizingMaskIntoConstraints = false
         addChild(hostingController)
@@ -413,6 +499,11 @@ final class WorkspaceDirectoryHostingController<Content: View>: NSViewController
             hostingController.view.bottomAnchor.constraint(equalTo: surface.bottomAnchor)
         ])
         view = surface
+    }
+
+    fileprivate func applySurfacePolicy(_ policy: WorkspaceSurfacePolicy) {
+        _ = view
+        surface.applySurfacePolicy(policy)
     }
 }
 
@@ -423,6 +514,11 @@ final class WorkspaceDirectoryHostingController<Content: View>: NSViewController
 @MainActor
 final class WorkspaceInspectorHostingController<Content: View>: NSViewController {
     private let hostingController: NSHostingController<WorkspaceHostingRoot<Content>>
+    private let surface = WorkspaceMaterialSurfaceView(
+        material: .sidebar,
+        blendingMode: .behindWindow,
+        opaqueBackgroundColor: .windowBackgroundColor
+    )
 
     fileprivate init(box: WorkspaceHostingBox<Content>) {
         hostingController = NSHostingController(rootView: WorkspaceHostingRoot(box: box))
@@ -435,11 +531,6 @@ final class WorkspaceInspectorHostingController<Content: View>: NSViewController
     }
 
     override func loadView() {
-        let surface = NSVisualEffectView(frame: .zero)
-        surface.material = .sidebar
-        surface.blendingMode = .behindWindow
-        surface.state = .followsWindowActiveState
-
         hostingController.sizingOptions = []
         hostingController.view.translatesAutoresizingMaskIntoConstraints = false
         addChild(hostingController)
@@ -451,6 +542,11 @@ final class WorkspaceInspectorHostingController<Content: View>: NSViewController
             hostingController.view.bottomAnchor.constraint(equalTo: surface.bottomAnchor)
         ])
         view = surface
+    }
+
+    fileprivate func applySurfacePolicy(_ policy: WorkspaceSurfacePolicy) {
+        _ = view
+        surface.applySurfacePolicy(policy)
     }
 }
 
@@ -465,6 +561,7 @@ final class WorkspaceSplitItemAccessoryController<Content: View>:
     private let height: CGFloat
     private let material: NSVisualEffectView.Material?
     private let allowsContentUnderlap: Bool
+    private var materialSurface: WorkspaceMaterialSurfaceView?
 
     fileprivate init(
         box: WorkspaceHostingBox<Content>,
@@ -492,10 +589,12 @@ final class WorkspaceSplitItemAccessoryController<Content: View>:
     override func loadView() {
         let container: NSView
         if let material {
-            let surface = NSVisualEffectView(frame: .zero)
-            surface.material = material
-            surface.blendingMode = .withinWindow
-            surface.state = .followsWindowActiveState
+            let surface = WorkspaceMaterialSurfaceView(
+                material: material,
+                blendingMode: .withinWindow,
+                opaqueBackgroundColor: .controlBackgroundColor
+            )
+            materialSurface = surface
             container = surface
         } else {
             container = NSView(frame: .zero)
@@ -512,6 +611,11 @@ final class WorkspaceSplitItemAccessoryController<Content: View>:
             container.heightAnchor.constraint(equalToConstant: height)
         ])
         view = container
+    }
+
+    fileprivate func applySurfacePolicy(_ policy: WorkspaceSurfacePolicy) {
+        _ = view
+        materialSurface?.applySurfacePolicy(policy)
     }
 }
 

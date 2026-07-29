@@ -7,6 +7,63 @@ import Testing
 @Suite(.serialized)
 @MainActor
 struct NativeWorkspaceLayoutTests {
+    @Test func workspaceSurfacePolicyMakesTransparencyAndContrastOpaque() {
+        #expect(!WorkspaceSurfacePolicy(personalization: .standard).usesOpaqueBackground)
+
+        let reduceTransparency = MacWikiAccessibilityPersonalization(
+            reduceMotion: false,
+            reduceTransparency: true,
+            differentiateWithoutColor: false,
+            colorSchemeContrast: .standard
+        )
+        #expect(
+            WorkspaceSurfacePolicy(personalization: reduceTransparency)
+                .usesOpaqueBackground
+        )
+
+        let increasedContrast = MacWikiAccessibilityPersonalization(
+            reduceMotion: false,
+            reduceTransparency: false,
+            differentiateWithoutColor: false,
+            colorSchemeContrast: .increased
+        )
+        #expect(
+            WorkspaceSurfacePolicy(personalization: increasedContrast)
+                .usesOpaqueBackground
+        )
+    }
+
+    @Test func workspaceMaterialSurfaceSwitchesInPlaceToItsOpaqueFallback() {
+        let surface = WorkspaceMaterialSurfaceView(
+            material: .sidebar,
+            blendingMode: .behindWindow,
+            opaqueBackgroundColor: .windowBackgroundColor
+        )
+        let materialIdentity = surface.materialView
+        let opaqueIdentity = surface.opaqueBackgroundView
+
+        #expect(!surface.surfacePolicy.usesOpaqueBackground)
+        #expect(!surface.materialView.isHidden)
+        #expect(surface.opaqueBackgroundView.isHidden)
+        #expect(surface.materialView.material == .sidebar)
+        #expect(surface.materialView.blendingMode == .behindWindow)
+
+        surface.applySurfacePolicy(WorkspaceSurfacePolicy(usesOpaqueBackground: true))
+
+        #expect(surface.surfacePolicy.usesOpaqueBackground)
+        #expect(surface.materialView.isHidden)
+        #expect(!surface.opaqueBackgroundView.isHidden)
+        #expect(surface.materialView === materialIdentity)
+        #expect(surface.opaqueBackgroundView === opaqueIdentity)
+
+        surface.applySurfacePolicy(.standard)
+
+        #expect(!surface.materialView.isHidden)
+        #expect(surface.opaqueBackgroundView.isHidden)
+        #expect(surface.materialView === materialIdentity)
+        #expect(surface.opaqueBackgroundView === opaqueIdentity)
+    }
+
     @Test func appStateRoundTripsEveryIndependentNavigationCombination() {
         let appState = AppState(persistenceMode: .ephemeral)
         for visibility in Self.everyAuxiliaryVisibilityCombination {
