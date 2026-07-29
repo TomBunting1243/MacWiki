@@ -16,8 +16,15 @@ extension WebView.Coordinator {
             guard let self else { return }
             defer { self.inspectorPublisher.endTableOfContentsPublish(publicationID) }
             guard let webView, self.isCurrentInspectorProjection(identity, on: webView) else { return }
-            guard error == nil,
-                  let rows = result as? [[String: Any]] else { return }
+            let rows: [[String: Any]]? = error == nil ? result as? [[String: Any]] : nil
+            let decision = WebViewInspectorProjectionSchedulePolicy.resultDecision(
+                for: .tableOfContents,
+                hasValidRows: rows != nil
+            )
+            // Invalid results leave the projection missing so a later policy
+            // step can retry without publishing a false empty projection.
+            guard decision == .publishTableOfContentsAndVisibleSection,
+                  let rows else { return }
             let items: [ArticleTableOfContentsItem] = rows.compactMap { row in
                 guard let id = row["id"] as? String,
                       let title = row["title"] as? String,
@@ -52,8 +59,13 @@ extension WebView.Coordinator {
             guard let self else { return }
             defer { self.inspectorPublisher.endReferencesPublish(publicationID) }
             guard let webView, self.isCurrentInspectorProjection(identity, on: webView) else { return }
-            guard error == nil,
-                  let rows = result as? [[String: Any]] else { return }
+            let rows: [[String: Any]]? = error == nil ? result as? [[String: Any]] : nil
+            let decision = WebViewInspectorProjectionSchedulePolicy.resultDecision(
+                for: .references,
+                hasValidRows: rows != nil
+            )
+            guard decision == .publishReferences,
+                  let rows else { return }
             let sections: [ArticleReferenceSection] = rows.compactMap { row in
                 guard let title = row["title"] as? String else { return nil }
                 let id = row["id"] as? String ?? title

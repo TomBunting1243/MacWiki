@@ -77,42 +77,30 @@ extension WebView.Coordinator {
             guard let self, let webView,
                   let projectionIdentity = self.inspectorProjectionIdentity(for: webView) else { return }
 
-            self.scheduleForCurrentWebView(after: 0.06, webView: webView) { [weak self, weak webView] in
-                guard let self, let webView,
-                      self.isCurrentInspectorProjection(projectionIdentity, on: webView) else { return }
-                self.publishTableOfContents(from: webView)
-            }
+            for step in WebViewInspectorProjectionSchedulePolicy.steps {
+                self.scheduleForCurrentWebView(after: step.delay, webView: webView) { [weak self, weak webView] in
+                    guard let self, let webView else { return }
+                    let projection = WebViewInspectorProjectionSchedulePolicy.ProjectionState(
+                        hasTableOfContentsResult: self.inspectorProjection.hasTableOfContentsResult,
+                        hasReferencesResult: self.inspectorProjection.hasReferencesResult
+                    )
+                    let requests = WebViewInspectorProjectionSchedulePolicy.requests(
+                        for: step,
+                        projection: projection,
+                        isCurrentProjection: self.isCurrentInspectorProjection(
+                            projectionIdentity,
+                            on: webView
+                        )
+                    )
 
-            self.scheduleForCurrentWebView(after: 0.24, webView: webView) { [weak self, weak webView] in
-                guard let self, let webView,
-                      self.isCurrentInspectorProjection(projectionIdentity, on: webView) else { return }
-                self.publishReferences(from: webView)
-            }
-
-            self.scheduleForCurrentWebView(after: 0.36, webView: webView) { [weak self, weak webView] in
-                guard let self, let webView,
-                      self.isCurrentInspectorProjection(projectionIdentity, on: webView) else { return }
-                if !self.inspectorProjection.hasTableOfContentsResult {
-                    self.publishTableOfContents(from: webView)
-                }
-            }
-
-            self.scheduleForCurrentWebView(after: 0.55, webView: webView) { [weak self, weak webView] in
-                guard let self, let webView,
-                      self.isCurrentInspectorProjection(projectionIdentity, on: webView) else { return }
-                if !self.inspectorProjection.hasReferencesResult {
-                    self.publishReferences(from: webView)
-                }
-            }
-
-            self.scheduleForCurrentWebView(after: 0.90, webView: webView) { [weak self, weak webView] in
-                guard let self, let webView,
-                      self.isCurrentInspectorProjection(projectionIdentity, on: webView) else { return }
-                if !self.inspectorProjection.hasTableOfContentsResult {
-                    self.publishTableOfContents(from: webView)
-                }
-                if !self.inspectorProjection.hasReferencesResult {
-                    self.publishReferences(from: webView)
+                    for request in requests {
+                        switch request {
+                        case .tableOfContents:
+                            self.publishTableOfContents(from: webView)
+                        case .references:
+                            self.publishReferences(from: webView)
+                        }
+                    }
                 }
             }
         }
