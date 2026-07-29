@@ -5,91 +5,19 @@ struct LabelArticlesView: View {
     @Environment(AppState.self) private var appState
     @Environment(\.modelContext) private var modelContext
 
-    let label: Label
     let labels: [Label]
     let allTags: [Tag]
     let allLists: [ReadingList]
-    let savedArticles: [SavedArticle]
-    let articleStates: [ArticleState]
-    let highlights: [Highlight]
-    let readFilter: DirectoryReadFilter
-    let sortMode: DirectorySupplementalSortMode
+    let visibleArticles: [SavedArticle]
+    let articleIndexes: DirectoryArticleIndexes
+    let columnState: DirectoryColumnState
     let metadataHydrator: ArticleMetadataHydrator
     let onNewLabelWithArticle: (SavedArticle) -> Void
     let onNewTagWithArticle: (Article) -> Void
 
-    @State private var localTagFilter: Tag? = nil
-    @State private var articleIndexesSnapshot = DirectoryArticleIndexes.empty
-    @State private var visibleSnapshot = LabelArticlesSnapshot.empty
-
-    private var articleIndexes: DirectoryArticleIndexes {
-        articleIndexesSnapshot
-    }
-
-    private var articleIndexesFingerprint: Int {
-        directoryArticleIndexesFingerprint(
-            articleStates: articleStates,
-            highlights: highlights,
-            savedArticles: savedArticles
-        )
-    }
-
-    private var visibleArticles: [SavedArticle] {
-        visibleSnapshot.articles
-    }
-
-    private var visibleSnapshotCandidateTitles: [String] {
-        savedArticles
-            .filter { $0.labelId == label.id }
-            .map(\.title)
-    }
-
-    private var visibleSnapshotFingerprint: Int {
-        var hasher = Hasher()
-        hasher.combine(articleIndexesFingerprint)
-        hasher.combine(label.id)
-        hasher.combine(readFilter == .unread)
-        hasher.combine(sortMode.rawValue)
-        hasher.combine(localTagFilter?.id)
-        for id in allTags.map(\.id).sorted(by: { $0.uuidString < $1.uuidString }) {
-            hasher.combine(id)
-        }
-
-        if sortMode == .articleLength {
-            for title in visibleSnapshotCandidateTitles {
-                hasher.combine(ReadStateSync.normalizedTitle(title))
-                hasher.combine(metadataHydrator.snapshot(for: title)?.wordCount)
-            }
-        }
-
-        return hasher.finalize()
-    }
-
-    private func refreshArticleIndexesSnapshot() {
-        articleIndexesSnapshot = DirectoryArticleIndexes(
-            articleStates: articleStates,
-            highlights: highlights,
-            savedArticles: savedArticles
-        )
-    }
-
-    private func refreshVisibleSnapshot() {
-        let resolvedTagFilter = localTagFilter.flatMap { filter in
-            allTags.contains(where: { $0.id == filter.id }) ? filter : nil
-        }
-        if localTagFilter != nil && resolvedTagFilter == nil {
-            localTagFilter = nil
-        }
-
-        visibleSnapshot = LabelArticlesSnapshot(
-            label: label,
-            savedArticles: savedArticles,
-            readFilter: readFilter,
-            sortMode: sortMode,
-            tagFilter: resolvedTagFilter,
-            articleIndexes: articleIndexes,
-            resolvedWordCount: resolvedWordCount(for:)
-        )
+    private var localTagFilter: Tag? {
+        get { columnState.localTagFilter }
+        nonmutating set { columnState.localTagFilter = newValue }
     }
 
     private func readingProgress(for title: String) -> Double {
@@ -106,10 +34,6 @@ struct LabelArticlesView: View {
 
     private func hydratedMetadata(for title: String) -> ArticleMetadataHydrationSnapshot? {
         metadataHydrator.snapshot(for: title)
-    }
-
-    private func resolvedWordCount(for savedArticle: SavedArticle) -> Int {
-        metadataHydrator.resolvedWordCount(for: savedArticle)
     }
 
     private var currentArticleTitleNormalized: String? {
@@ -197,14 +121,6 @@ struct LabelArticlesView: View {
                     )
                 }
             }
-        }
-        .task(id: articleIndexesFingerprint) {
-            await Task.yield()
-            refreshArticleIndexesSnapshot()
-        }
-        .task(id: visibleSnapshotFingerprint) {
-            await Task.yield()
-            refreshVisibleSnapshot()
         }
     }
 }

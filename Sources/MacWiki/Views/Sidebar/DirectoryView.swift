@@ -2,6 +2,11 @@ import SwiftUI
 import SwiftData
 
 struct DirectoryView: View {
+    private struct SnapshotRefreshIdentity: Equatable {
+        let articleIndexes: Int
+        let visibleRows: Int
+    }
+
     @Environment(AppState.self) private var appState
     @Environment(\.modelContext) private var modelContext
     @AppStorage(AppStorageKey.Recents.scope) private var recentsScope: RecentsScope = .currentTab
@@ -89,7 +94,11 @@ struct DirectoryView: View {
     }
 
     private var directoryVisibleSnapshot: DirectoryVisibleSnapshot {
-        visibleSnapshot
+        DirectorySnapshotPublication.visibleSnapshot(
+            visibleSnapshot,
+            publishedScopeKey: columnState.visibleSnapshotScopeKey,
+            requestedScopeKey: selectionResetKey
+        )
     }
 
     private var articleIndexesFingerprint: Int {
@@ -191,6 +200,14 @@ struct DirectoryView: View {
 
     private var visibleSnapshotFingerprint: Int {
         DirectoryFingerprint.visible(visibleFingerprintInputs)
+    }
+
+    private var snapshotRefreshIdentity: SnapshotRefreshIdentity? {
+        guard !isSidebarSearchPresented else { return nil }
+        return SnapshotRefreshIdentity(
+            articleIndexes: articleIndexesFingerprint,
+            visibleRows: visibleSnapshotFingerprint
+        )
     }
 
     private var accessoryCollectionsFingerprint: Int {
@@ -349,29 +366,12 @@ struct DirectoryView: View {
             return orderedVisibleSavedArticles.map { metadataHydrationRequest(for: $0) }
         }
 
-        if let label = selectedLabel {
-            return LabelArticlesSnapshot(
-                label: label,
-                savedArticles: savedArticles,
-                readFilter: supplementalReadFilter,
-                sortMode: supplementalSortMode,
-                tagFilter: localTagFilter,
-                articleIndexes: articleIndexes,
-                resolvedWordCount: resolvedWordCount(for:)
-            ).articles.map { metadataHydrationRequest(for: $0) }
+        if selectedLabel != nil {
+            return directoryVisibleSnapshot.labelArticles.map { metadataHydrationRequest(for: $0) }
         }
 
-        if let tag = selectedTag {
-            return TagArticlesSnapshot(
-                tag: tag,
-                articleStates: articleStates,
-                highlights: highlights,
-                readFilter: supplementalReadFilter,
-                sortMode: supplementalSortMode,
-                tagFilter: localTagFilter,
-                articleIndexes: articleIndexes,
-                resolvedWordCount: resolvedWordCount(for:)
-            ).articles.map { metadataHydrationRequest(for: $0) }
+        if selectedTag != nil {
+            return directoryVisibleSnapshot.tagArticles.map { metadataHydrationRequest(for: $0) }
         }
 
         if recentsScope == .currentTab,
@@ -554,14 +554,11 @@ struct DirectoryView: View {
 
     private var directoryContentSnapshots: some View {
         directoryContentRoot
-        .task(id: isSidebarSearchPresented ? nil : articleIndexesFingerprint) {
+        .task(id: snapshotRefreshIdentity) {
             guard !isSidebarSearchPresented else { return }
             await Task.yield()
+            guard !Task.isCancelled else { return }
             refreshArticleIndexesSnapshot()
-        }
-        .task(id: isSidebarSearchPresented ? nil : visibleSnapshotFingerprint) {
-            guard !isSidebarSearchPresented else { return }
-            await Task.yield()
             refreshVisibleSnapshot()
         }
         .task(id: accessoryCollectionsFingerprint) {
@@ -735,17 +732,14 @@ struct DirectoryView: View {
     private var directoryContent: some View {
         if let list = selectedList {
             selectedListSection(list)
-        } else if let label = selectedLabel {
+        } else if selectedLabel != nil {
             LabelArticlesView(
-                label: label,
                 labels: labels,
                 allTags: tags,
                 allLists: allLists,
-                savedArticles: savedArticles,
-                articleStates: articleStates,
-                highlights: highlights,
-                readFilter: supplementalReadFilter,
-                sortMode: supplementalSortMode,
+                visibleArticles: directoryVisibleSnapshot.labelArticles,
+                articleIndexes: articleIndexes,
+                columnState: columnState,
                 metadataHydrator: metadataHydrator,
                 onNewLabelWithArticle: onNewLabelWithArticle,
                 onNewTagWithArticle: onNewTagWithArticle
@@ -756,11 +750,9 @@ struct DirectoryView: View {
                 allTags: tags,
                 allLists: allLists,
                 allLabels: labels,
-                savedArticles: savedArticles,
-                articleStates: articleStates,
-                allHighlights: highlights,
-                readFilter: supplementalReadFilter,
-                sortMode: supplementalSortMode,
+                visibleArticles: directoryVisibleSnapshot.tagArticles,
+                articleIndexes: articleIndexes,
+                columnState: columnState,
                 metadataHydrator: metadataHydrator,
                 onNewLabelWithArticle: onNewLabelWithArticle,
                 onNewTagWithArticle: onNewTagWithArticle

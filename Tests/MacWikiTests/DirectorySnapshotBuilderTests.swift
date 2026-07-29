@@ -210,4 +210,125 @@ struct DirectorySnapshotBuilderTests {
         #expect(snapshot.visibleReadCount == 1)
         #expect(snapshot.visibleUnreadCount == 1)
     }
+
+    @Test func buildVisibleSnapshotPublishesTheLabelRowsItAlreadyDerived() {
+        let label = Label(name: "Research", color: .blue)
+        let tag = Tag(name: "Keep")
+        let matching = SavedArticle(title: "Matching")
+        matching.labelId = label.id
+        let filteredOut = SavedArticle(title: "Filtered Out")
+        filteredOut.labelId = label.id
+
+        let matchingState = ArticleState(
+            articleTitle: matching.title,
+            articleURL: URL(string: WikipediaURLBuilder.articleURLString(forTitle: matching.title))!
+        )
+        matchingState.tags = [tag]
+        let indexes = DirectoryArticleIndexes(
+            articleStates: [matchingState],
+            highlights: [],
+            savedArticles: [matching, filteredOut]
+        )
+
+        let snapshot = DirectorySnapshotBuilder.buildVisibleSnapshot(
+            selectedList: nil,
+            selectedLabel: label,
+            selectedTag: nil,
+            rootSelection: .recents,
+            recentsScope: .allTabs,
+            activeTabId: nil,
+            openTabs: [],
+            recentArticles: [],
+            savedArticles: [matching, filteredOut],
+            articleStates: [matchingState],
+            highlights: [],
+            localLabelFilter: nil,
+            localTagFilter: tag,
+            supplementalReadFilter: .all,
+            supplementalSortMode: .recent,
+            articleIndexes: indexes,
+            resolvedSavedArticleWordCount: { $0.wordCount ?? 0 },
+            resolvedArticleWordCount: { $0.wordCount ?? 0 }
+        )
+
+        #expect(snapshot.labelArticles.map { $0.title } == ["Matching"])
+        #expect(snapshot.tagArticles.isEmpty)
+        #expect(snapshot.visibleTitles == ["Matching"])
+    }
+
+    @Test func buildVisibleSnapshotPublishesTheTagRowsItAlreadyDerived() {
+        let tag = Tag(name: "Archive")
+        let saved = SavedArticle(title: "Saved Tagged Article")
+        let state = ArticleState(
+            articleTitle: saved.title,
+            articleURL: URL(string: WikipediaURLBuilder.articleURLString(forTitle: saved.title))!
+        )
+        state.tags = [tag]
+        let indexes = DirectoryArticleIndexes(
+            articleStates: [state],
+            highlights: [],
+            savedArticles: [saved]
+        )
+
+        let snapshot = DirectorySnapshotBuilder.buildVisibleSnapshot(
+            selectedList: nil,
+            selectedLabel: nil,
+            selectedTag: tag,
+            rootSelection: .recents,
+            recentsScope: .allTabs,
+            activeTabId: nil,
+            openTabs: [],
+            recentArticles: [],
+            savedArticles: [saved],
+            articleStates: [state],
+            highlights: [],
+            localLabelFilter: nil,
+            localTagFilter: nil,
+            supplementalReadFilter: .all,
+            supplementalSortMode: .recent,
+            articleIndexes: indexes,
+            resolvedSavedArticleWordCount: { $0.wordCount ?? 0 },
+            resolvedArticleWordCount: { $0.wordCount ?? 0 }
+        )
+
+        #expect(snapshot.labelArticles.isEmpty)
+        #expect(snapshot.tagArticles.map { $0.title } == [saved.title])
+        #expect(snapshot.visibleTitles == [saved.title])
+    }
+
+    @Test func snapshotPublicationNeverLeaksRowsAcrossDirectoryScopes() {
+        let article = Article(id: "ada", title: "Ada Lovelace")
+        let snapshot = DirectoryVisibleSnapshot(
+            visibleTitles: [article.title],
+            listArticles: [],
+            labelArticles: [],
+            tagArticles: [],
+            tabHistoryItems: [],
+            recentArticles: [article],
+            visibleReadCount: 0,
+            visibleUnreadCount: 1
+        )
+
+        #expect(
+            DirectorySnapshotPublication.visibleSnapshot(
+                snapshot,
+                publishedScopeKey: "root:recents:allTabs",
+                requestedScopeKey: "root:recents:allTabs"
+            ).visibleTitles == [article.title]
+        )
+        #expect(
+            DirectorySnapshotPublication.visibleSnapshot(
+                snapshot,
+                publishedScopeKey: "root:recents:allTabs",
+                requestedScopeKey: "label:research"
+            ).visibleTitles.isEmpty
+        )
+        #expect(
+            DirectorySnapshotPublication.visibleSnapshot(
+                snapshot,
+                publishedScopeKey: nil,
+                requestedScopeKey: "root:recents:allTabs"
+            ).visibleTitles.isEmpty
+        )
+    }
 }

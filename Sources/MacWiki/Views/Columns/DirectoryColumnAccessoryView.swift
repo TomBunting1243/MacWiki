@@ -341,10 +341,11 @@ struct DirectoryColumnAccessoryView: View {
     }
 
     private var currentVisibleSnapshot: DirectoryVisibleSnapshot {
-        guard columnState.visibleSnapshotScopeKey == snapshotScopeKey else {
-            return .empty
-        }
-        return columnState.visibleSnapshot
+        DirectorySnapshotPublication.visibleSnapshot(
+            columnState.visibleSnapshot,
+            publishedScopeKey: columnState.visibleSnapshotScopeKey,
+            requestedScopeKey: snapshotScopeKey
+        )
     }
 
     private var snapshotScopeKey: String {

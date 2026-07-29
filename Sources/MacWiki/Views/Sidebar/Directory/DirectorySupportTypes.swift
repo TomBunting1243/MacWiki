@@ -115,6 +115,8 @@ struct DirectoryVisibleSnapshot {
     static let empty = DirectoryVisibleSnapshot(
         visibleTitles: [],
         listArticles: [],
+        labelArticles: [],
+        tagArticles: [],
         tabHistoryItems: [],
         recentArticles: [],
         visibleReadCount: 0,
@@ -123,8 +125,22 @@ struct DirectoryVisibleSnapshot {
 
     let visibleTitles: [String]
     let listArticles: [SavedArticle]
+    let labelArticles: [SavedArticle]
+    let tagArticles: [Article]
     let tabHistoryItems: [HistoryItem]
     let recentArticles: [Article]
     let visibleReadCount: Int
     let visibleUnreadCount: Int
+}
+
+@MainActor
+enum DirectorySnapshotPublication {
+    static func visibleSnapshot(
+        _ snapshot: DirectoryVisibleSnapshot,
+        publishedScopeKey: String?,
+        requestedScopeKey: String
+    ) -> DirectoryVisibleSnapshot {
+        guard publishedScopeKey == requestedScopeKey else { return .empty }
+        return snapshot
+    }
 }

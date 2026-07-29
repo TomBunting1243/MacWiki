@@ -23,6 +23,8 @@ enum DirectorySnapshotBuilder {
         resolvedArticleWordCount: (Article) -> Int
     ) -> DirectoryVisibleSnapshot {
         let listArticles: [SavedArticle]
+        let labelArticles: [SavedArticle]
+        let tagArticles: [Article]
         let tabHistoryItems: [HistoryItem]
         let recentArticlesSnapshot: [Article]
         let visibleTitles: [String]
@@ -35,14 +37,14 @@ enum DirectorySnapshotBuilder {
                 articleIndexes: articleIndexes,
                 resolvedWordCount: resolvedSavedArticleWordCount
             )
+            labelArticles = []
+            tagArticles = []
             tabHistoryItems = []
             recentArticlesSnapshot = []
             visibleTitles = listArticles.map(\.title)
         } else if let selectedLabel {
             listArticles = []
-            tabHistoryItems = []
-            recentArticlesSnapshot = []
-            visibleTitles = LabelArticlesSnapshot(
+            let labelSnapshot = LabelArticlesSnapshot(
                 label: selectedLabel,
                 savedArticles: savedArticles,
                 readFilter: supplementalReadFilter,
@@ -50,12 +52,16 @@ enum DirectorySnapshotBuilder {
                 tagFilter: localTagFilter,
                 articleIndexes: articleIndexes,
                 resolvedWordCount: resolvedSavedArticleWordCount
-            ).visibleTitles
-        } else if let selectedTag {
-            listArticles = []
+            )
+            labelArticles = labelSnapshot.articles
+            tagArticles = []
             tabHistoryItems = []
             recentArticlesSnapshot = []
-            visibleTitles = TagArticlesSnapshot(
+            visibleTitles = labelSnapshot.visibleTitles
+        } else if let selectedTag {
+            listArticles = []
+            labelArticles = []
+            let tagSnapshot = TagArticlesSnapshot(
                 tag: selectedTag,
                 articleStates: articleStates,
                 highlights: highlights,
@@ -64,12 +70,18 @@ enum DirectorySnapshotBuilder {
                 tagFilter: localTagFilter,
                 articleIndexes: articleIndexes,
                 resolvedWordCount: resolvedArticleWordCount
-            ).visibleTitles
+            )
+            tagArticles = tagSnapshot.articles
+            tabHistoryItems = []
+            recentArticlesSnapshot = []
+            visibleTitles = tagSnapshot.visibleTitles
         } else if recentsScope == .currentTab,
                   rootSelection != .discover,
                   let activeTabId,
                   let tab = openTabs.first(where: { $0.id == activeTabId }) {
             listArticles = []
+            labelArticles = []
+            tagArticles = []
             tabHistoryItems = filteredTabHistoryItems(
                 for: tab,
                 localTagFilter: localTagFilter,
@@ -82,6 +94,8 @@ enum DirectorySnapshotBuilder {
             visibleTitles = tabHistoryItems.map(\.article.title)
         } else {
             listArticles = []
+            labelArticles = []
+            tagArticles = []
             tabHistoryItems = []
             recentArticlesSnapshot = filteredRecentArticles(
                 recentArticles,
@@ -124,6 +138,8 @@ enum DirectorySnapshotBuilder {
         return DirectoryVisibleSnapshot(
             visibleTitles: visibleTitles,
             listArticles: listArticles,
+            labelArticles: labelArticles,
+            tagArticles: tagArticles,
             tabHistoryItems: tabHistoryItems,
             recentArticles: recentArticlesSnapshot,
             visibleReadCount: counts.read,
