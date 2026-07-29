@@ -10,26 +10,25 @@ struct ArticleListAccessibilityModifier: ViewModifier {
     func body(content: Content) -> some View {
         if let onToggleRead {
             content
-                .accessibilityElement(children: .ignore)
+                .accessibilityElement(children: .contain)
                 .accessibilityLabel(title)
                 .accessibilityInputLabels([title])
-                .accessibilityValue("\(title), \(isRead ? "Read" : "Unread")")
-                .accessibilityHint("Open \(title). Use the context menu for read status and organization actions.")
+                .accessibilityValue(isRead ? "Read" : "Unread")
+                .accessibilityHint("Open \(title). Additional article controls and context menu actions are available.")
                 .accessibilityAddTraits(.isButton)
                 .accessibilityAction {
                     onOpen()
                 }
                 .accessibilityAction(
-                    named: Text("Toggle Read Status"),
+                    named: Text(isRead ? "Mark as Unread" : "Mark as Read"),
                     onToggleRead
                 )
         } else {
             content
-                .accessibilityElement(children: .ignore)
+                .accessibilityElement(children: .contain)
                 .accessibilityLabel(title)
                 .accessibilityInputLabels([title])
-                .accessibilityValue(title)
-                .accessibilityHint("Open \(title). Use the context menu for organization actions.")
+                .accessibilityHint("Open \(title). Additional article controls and context menu actions are available.")
                 .accessibilityAddTraits(.isButton)
                 .accessibilityAction {
                     onOpen()
