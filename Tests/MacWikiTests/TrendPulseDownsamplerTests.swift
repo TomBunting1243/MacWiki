@@ -32,6 +32,77 @@ struct TrendPulseDownsamplerTests {
         #expect(output.contains(where: { $0.id == 11 }))
     }
 
+    @Test func keyboardSelectionStartsAtTheAnchorAndMovesOnePoint() {
+        let input = points(count: 5)
+
+        #expect(
+            TrendPulseSelectionPolicy.selection(
+                from: nil,
+                anchorID: input[2].id,
+                in: input,
+                moving: .previous
+            ) == input[1].id
+        )
+        #expect(
+            TrendPulseSelectionPolicy.selection(
+                from: nil,
+                anchorID: input[2].id,
+                in: input,
+                moving: .next
+            ) == input[3].id
+        )
+    }
+
+    @Test func keyboardSelectionClampsAtEachEndpoint() {
+        let input = points(count: 5)
+
+        #expect(
+            TrendPulseSelectionPolicy.selection(
+                from: input.first?.id,
+                anchorID: nil,
+                in: input,
+                moving: .previous
+            ) == input.first?.id
+        )
+        #expect(
+            TrendPulseSelectionPolicy.selection(
+                from: input.last?.id,
+                anchorID: nil,
+                in: input,
+                moving: .next
+            ) == input.last?.id
+        )
+    }
+
+    @Test func keyboardSelectionHandlesEmptyAndMissingSelectionState() {
+        let input = points(count: 3)
+
+        #expect(
+            TrendPulseSelectionPolicy.selection(
+                from: nil,
+                anchorID: nil,
+                in: [],
+                moving: .next
+            ) == nil
+        )
+        #expect(
+            TrendPulseSelectionPolicy.selection(
+                from: 500,
+                anchorID: 400,
+                in: input,
+                moving: .next
+            ) == input[1].id
+        )
+        #expect(
+            TrendPulseSelectionPolicy.selection(
+                from: 500,
+                anchorID: 400,
+                in: input,
+                moving: .previous
+            ) == input[input.count - 2].id
+        )
+    }
+
     private func points(count: Int) -> [TrendPulsePoint] {
         (0..<count).map { index in
             TrendPulsePoint(

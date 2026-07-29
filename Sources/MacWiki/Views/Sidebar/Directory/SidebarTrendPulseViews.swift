@@ -10,6 +10,7 @@ struct TrendPulsePopoverView: View {
     @State private var isLoadingPeakDays = false
     @State private var hoveredRecentPointID: Int?
     @State private var hoveredPeakDayID: String?
+    @Environment(\.macWikiAccessibilityPersonalization) private var accessibilityPersonalization
     private enum Layout {
         static let chartHeight: CGFloat = 156
         static let chartEdgePadding: CGFloat = 10
@@ -33,6 +34,23 @@ struct TrendPulsePopoverView: View {
     }
     private var latestViewsCompact: String {
         abbreviatedViewCount(pulse.latestViews)
+    }
+
+    private var materialPolicy: MacWikiGlassRuntime.SurfacePolicy {
+        MacWikiGlassRuntime.surfacePolicy(
+            isEnabled: false,
+            forceLegacyFallback: false,
+            personalization: accessibilityPersonalization
+        )
+    }
+
+    private var selectedPointAccessibilityValue: String {
+        guard let selectedPoint else { return "No page-view data" }
+        let views = NumberFormatter.localizedString(
+            from: NSNumber(value: selectedPoint.views),
+            number: .decimal
+        )
+        return "\(selectedPoint.date.formatted(date: .long, time: .omitted)), \(views) views"
     }
     private var deltaText: String {
         ArticlePresentationFormatter.pageViewDeltaText(
@@ -279,10 +297,37 @@ struct TrendPulsePopoverView: View {
                             )
                     }
                 }
-                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .focusable()
+                .onKeyPress(.leftArrow, phases: .down) { _ in
+                    moveSelection(.previous)
+                    return .handled
+                }
+                .onKeyPress(.rightArrow, phases: .down) { _ in
+                    moveSelection(.next)
+                    return .handled
+                }
+                .accessibilityLabel("Page views over time")
+                .accessibilityValue(selectedPointAccessibilityValue)
+                .accessibilityHint("Use Left and Right Arrow keys, or adjust the chart, to inspect each day.")
+                .accessibilityAdjustableAction { direction in
+                    switch direction {
+                    case .decrement:
+                        moveSelection(.previous)
+                    case .increment:
+                        moveSelection(.next)
+                    @unknown default:
+                        break
+                    }
+                }
+                .background(chartBackground)
                 .overlay {
                     RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.8)
+                        .strokeBorder(
+                            Color.primary.opacity(
+                                accessibilityPersonalization.colorSchemeContrast == .increased ? 0.34 : 0.08
+                            ),
+                            lineWidth: accessibilityPersonalization.colorSchemeContrast == .increased ? 1 : 0.8
+                        )
                 }
 
                 Text(windowLabel)
@@ -422,6 +467,25 @@ struct TrendPulsePopoverView: View {
             abs(lhs.date.timeIntervalSince(hoveredDate)) < abs(rhs.date.timeIntervalSince(hoveredDate))
         }) {
             selectedIndex = nearest.id
+        }
+    }
+
+    private func moveSelection(_ direction: TrendPulseSelectionPolicy.Direction) {
+        selectedIndex = TrendPulseSelectionPolicy.selection(
+            from: selectedIndex,
+            anchorID: selectionAnchorPoint?.id,
+            in: fullPoints,
+            moving: direction
+        )
+    }
+
+    @ViewBuilder
+    private var chartBackground: some View {
+        let shape = RoundedRectangle(cornerRadius: 10, style: .continuous)
+        if materialPolicy.usesOpaqueBackground {
+            shape.fill(Color(nsColor: .controlBackgroundColor))
+        } else {
+            shape.fill(.regularMaterial)
         }
     }
 

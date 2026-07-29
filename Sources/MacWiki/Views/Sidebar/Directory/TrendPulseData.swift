@@ -61,3 +61,31 @@ enum TrendPulseDownsampler {
         return Array(reduced.prefix(maximumCount))
     }
 }
+
+enum TrendPulseSelectionPolicy {
+    enum Direction {
+        case previous
+        case next
+    }
+
+    static func selection(
+        from selectedID: TrendPulsePoint.ID?,
+        anchorID: TrendPulsePoint.ID?,
+        in points: [TrendPulsePoint],
+        moving direction: Direction
+    ) -> TrendPulsePoint.ID? {
+        guard !points.isEmpty else { return nil }
+
+        let currentIndex =
+            selectedID.flatMap { id in points.firstIndex(where: { $0.id == id }) } ??
+            anchorID.flatMap { id in points.firstIndex(where: { $0.id == id }) } ??
+            (direction == .previous ? points.endIndex - 1 : points.startIndex)
+
+        switch direction {
+        case .previous:
+            return points[max(points.startIndex, currentIndex - 1)].id
+        case .next:
+            return points[min(points.endIndex - 1, currentIndex + 1)].id
+        }
+    }
+}
