@@ -1,6 +1,111 @@
 import AppKit
 import SwiftUI
 
+@MainActor
+protocol SidebarPageViewsHeaderHandoffPresentation: AnyObject {
+    var sidebarPageViewsPresentationOwner: AnyObject? { get }
+    var sidebarPageViewsPresentedPopover: AnyObject? { get }
+    var isSidebarPageViewsPresentedPopoverShown: Bool { get }
+
+    func closePopoverForSidebarPageViewsHandoff()
+}
+
+/// Owns the notification ordering contract between the Time Machine popover
+/// and the page-view presenter. Its owner identity is AppKit's window in the
+/// app, while tests can exercise the same flow with ordinary object owners.
+@MainActor
+final class SidebarPageViewsHeaderHandoffCoordinator: NSObject {
+    private weak var presentation: (any SidebarPageViewsHeaderHandoffPresentation)?
+    private let notificationCenter: NotificationCenter
+    private weak var pendingOwner: AnyObject?
+    private var isObserving = true
+
+    var hasPendingHandoff: Bool {
+        pendingOwner != nil
+    }
+
+    init(
+        presentation: any SidebarPageViewsHeaderHandoffPresentation,
+        notificationCenter: NotificationCenter = .default
+    ) {
+        self.presentation = presentation
+        self.notificationCenter = notificationCenter
+        super.init()
+        notificationCenter.addObserver(
+            self,
+            selector: #selector(closeForPageViewsPresentation(_:)),
+            name: .sidebarPageViewsWillPresent,
+            object: nil
+        )
+    }
+
+    deinit {
+        notificationCenter.removeObserver(self)
+    }
+
+    func stop() {
+        guard isObserving else { return }
+        isObserving = false
+        pendingOwner = nil
+        notificationCenter.removeObserver(self)
+    }
+
+    @discardableResult
+    func popoverDidClose(_ closedPopover: AnyObject) -> Bool {
+        guard let presentation,
+              SidebarPageViewsHandoffState.ownersMatch(
+                closedPopover,
+                presentation.sidebarPageViewsPresentedPopover
+              ) else {
+            return false
+        }
+        return completePendingHandoff()
+    }
+
+    /// Finishes a handoff when teardown deliberately removes the popover's
+    /// delegate and closes it synchronously.
+    @discardableResult
+    func presentationClosedSynchronously() -> Bool {
+        completePendingHandoff()
+    }
+
+    @objc
+    private func closeForPageViewsPresentation(_ notification: Notification) {
+        guard isObserving,
+              let sourceOwner = notification.object as AnyObject?,
+              let presentation,
+              SidebarPageViewsHandoffState.ownersMatch(
+                sourceOwner,
+                presentation.sidebarPageViewsPresentationOwner
+              ) else {
+            return
+        }
+
+        guard presentation.isSidebarPageViewsPresentedPopoverShown else {
+            announcePageViewsHandoffReady(for: sourceOwner)
+            return
+        }
+
+        pendingOwner = sourceOwner
+        presentation.closePopoverForSidebarPageViewsHandoff()
+    }
+
+    @discardableResult
+    private func completePendingHandoff() -> Bool {
+        guard let pendingOwner else { return false }
+        self.pendingOwner = nil
+        announcePageViewsHandoffReady(for: pendingOwner)
+        return true
+    }
+
+    private func announcePageViewsHandoffReady(for sourceOwner: AnyObject) {
+        notificationCenter.post(
+            name: .sidebarPageViewsHandoffReady,
+            object: sourceOwner
+        )
+    }
+}
+
 /// A platform-owned momentary segmented control for Discovery's split-item
 /// accessory. AppKit owns the Time Machine popover because SwiftUI popovers do
 /// not reliably present from `NSSplitViewItemAccessoryViewController` hosts.
@@ -38,13 +143,14 @@ struct SidebarDiscoverHeaderControls<PopoverContent: View>: NSViewRepresentable 
     }
 
     static func dismantleNSView(_ nsView: NSSegmentedControl, coordinator: Coordinator) {
-        coordinator.closePopover()
+        coordinator.invalidate()
         nsView.target = nil
         nsView.action = nil
     }
 
     @MainActor
-    final class Coordinator: NSObject, NSPopoverDelegate {
+    final class Coordinator: NSObject, NSPopoverDelegate,
+        SidebarPageViewsHeaderHandoffPresentation {
         private enum Action {
             case timeMachine
             case refresh
@@ -56,20 +162,13 @@ struct SidebarDiscoverHeaderControls<PopoverContent: View>: NSViewRepresentable 
         private var popover: NSPopover?
         private var hostingController: NSHostingController<AnyView>?
         private weak var hostControl: NSSegmentedControl?
-        private weak var pendingPageViewsHandoffWindow: NSWindow?
+        private var pageViewsHandoffCoordinator: SidebarPageViewsHeaderHandoffCoordinator!
 
         override init() {
             super.init()
-            NotificationCenter.default.addObserver(
-                self,
-                selector: #selector(closeForPageViewsPresentation),
-                name: .sidebarPageViewsWillPresent,
-                object: nil
+            pageViewsHandoffCoordinator = SidebarPageViewsHeaderHandoffCoordinator(
+                presentation: self
             )
-        }
-
-        deinit {
-            NotificationCenter.default.removeObserver(self)
         }
 
         func configure(
@@ -193,38 +292,21 @@ struct SidebarDiscoverHeaderControls<PopoverContent: View>: NSViewRepresentable 
         }
 
         func closePopover() {
-            let pendingHandoffWindow = pendingPageViewsHandoffWindow
-            pendingPageViewsHandoffWindow = nil
+            let hasPendingHandoff = pageViewsHandoffCoordinator.hasPendingHandoff
             let popover = popover
             self.popover = nil
             hostingController = nil
             popover?.delegate = nil
-            if pendingHandoffWindow != nil {
+            if hasPendingHandoff {
                 // Teardown can race the delegate callback. Remove the remote
                 // popover window synchronously before releasing a waiting
                 // page-view presenter so the handoff cannot be stranded.
                 popover?.animates = false
             }
             popover?.close()
-            if let pendingHandoffWindow {
-                announcePageViewsHandoffReady(for: pendingHandoffWindow)
+            if hasPendingHandoff {
+                pageViewsHandoffCoordinator.presentationClosedSynchronously()
             }
-        }
-
-        @objc
-        private func closeForPageViewsPresentation(_ notification: Notification) {
-            guard let sourceWindow = notification.object as? NSWindow,
-                  hostControl?.window === sourceWindow else {
-                return
-            }
-
-            guard popover?.isShown == true else {
-                announcePageViewsHandoffReady(for: sourceWindow)
-                return
-            }
-
-            pendingPageViewsHandoffWindow = sourceWindow
-            popover?.close()
         }
 
         func popoverDidClose(_ notification: Notification) {
@@ -232,19 +314,30 @@ struct SidebarDiscoverHeaderControls<PopoverContent: View>: NSViewRepresentable 
                   closedPopover === popover else {
                 return
             }
+            pageViewsHandoffCoordinator.popoverDidClose(closedPopover)
             popover = nil
             hostingController = nil
-            if let sourceWindow = pendingPageViewsHandoffWindow {
-                pendingPageViewsHandoffWindow = nil
-                announcePageViewsHandoffReady(for: sourceWindow)
-            }
         }
 
-        private func announcePageViewsHandoffReady(for sourceWindow: NSWindow) {
-            NotificationCenter.default.post(
-                name: .sidebarPageViewsHandoffReady,
-                object: sourceWindow
-            )
+        func invalidate() {
+            closePopover()
+            pageViewsHandoffCoordinator.stop()
+        }
+
+        var sidebarPageViewsPresentationOwner: AnyObject? {
+            hostControl?.window
+        }
+
+        var sidebarPageViewsPresentedPopover: AnyObject? {
+            popover
+        }
+
+        var isSidebarPageViewsPresentedPopoverShown: Bool {
+            popover?.isShown == true
+        }
+
+        func closePopoverForSidebarPageViewsHandoff() {
+            popover?.close()
         }
     }
 }

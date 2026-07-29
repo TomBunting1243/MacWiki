@@ -33,6 +33,43 @@ struct SidebarPageViewsPopoverConfiguration {
     var onPulseLoaded: ((WikipediaService.TrendPulse) -> Void)? = nil
 }
 
+struct SidebarPageViewsHandoffState {
+    private var pendingOwnerID: ObjectIdentifier?
+
+    var isAwaiting: Bool {
+        pendingOwnerID != nil
+    }
+
+    @discardableResult
+    mutating func begin(owner: AnyObject) -> Bool {
+        guard pendingOwnerID == nil else { return false }
+        pendingOwnerID = ObjectIdentifier(owner)
+        return true
+    }
+
+    @discardableResult
+    mutating func complete(
+        sourceOwner: AnyObject,
+        currentControlOwner: AnyObject?
+    ) -> Bool {
+        guard Self.ownersMatch(sourceOwner, currentControlOwner),
+              pendingOwnerID == ObjectIdentifier(sourceOwner) else {
+            return false
+        }
+        pendingOwnerID = nil
+        return true
+    }
+
+    mutating func cancel() {
+        pendingOwnerID = nil
+    }
+
+    static func ownersMatch(_ lhs: AnyObject?, _ rhs: AnyObject?) -> Bool {
+        guard let lhs, let rhs else { return false }
+        return lhs === rhs
+    }
+}
+
 /// A native AppKit button and popover for Discover's sidebar statistics.
 ///
 /// Discover's rows and Time Machine live in separate AppKit hosting
@@ -72,15 +109,20 @@ struct SidebarPageViewsPopoverButton: NSViewRepresentable {
     @MainActor
     final class Coordinator: NSObject, NSPopoverDelegate {
         var parent: SidebarPageViewsPopoverButton
+        private let notificationCenter: NotificationCenter
         private var popover: NSPopover?
         private weak var presentationButton: PageViewsButton?
-        private var isAwaitingHandoff = false
+        private var handoffState = SidebarPageViewsHandoffState()
         private var activeIdentity: String?
 
-        init(parent: SidebarPageViewsPopoverButton) {
+        init(
+            parent: SidebarPageViewsPopoverButton,
+            notificationCenter: NotificationCenter = .default
+        ) {
             self.parent = parent
+            self.notificationCenter = notificationCenter
             super.init()
-            NotificationCenter.default.addObserver(
+            notificationCenter.addObserver(
                 self,
                 selector: #selector(completePresentationHandoff(_:)),
                 name: .sidebarPageViewsHandoffReady,
@@ -89,12 +131,12 @@ struct SidebarPageViewsPopoverButton: NSViewRepresentable {
         }
 
         deinit {
-            NotificationCenter.default.removeObserver(self)
+            notificationCenter.removeObserver(self)
         }
 
         @objc
         func press(_ sender: PageViewsButton) {
-            if popover?.isShown == true || isAwaitingHandoff {
+            if popover?.isShown == true || handoffState.isAwaiting {
                 closePopover(updateBinding: true)
                 return
             }
@@ -126,12 +168,12 @@ struct SidebarPageViewsPopoverButton: NSViewRepresentable {
             if let activeIdentity, activeIdentity != identity {
                 closePopover(updateBinding: false)
             }
-            guard popover == nil, !isAwaitingHandoff else { return }
+            guard popover == nil, !handoffState.isAwaiting else { return }
             requestPresentationHandoff(relativeTo: button)
         }
 
         func closePopover(updateBinding: Bool) {
-            isAwaitingHandoff = false
+            handoffState.cancel()
             let popover = popover
             self.popover = nil
             activeIdentity = nil
@@ -143,27 +185,36 @@ struct SidebarPageViewsPopoverButton: NSViewRepresentable {
         }
 
         private func requestPresentationHandoff(relativeTo button: PageViewsButton) {
-            guard !isAwaitingHandoff,
-                  let window = button.window else {
+            guard let window = button.window else {
                 return
             }
             presentationButton = button
-            isAwaitingHandoff = true
-            NotificationCenter.default.post(
+            requestPresentationHandoff(owner: window)
+        }
+
+        /// Begins the same notification-driven handoff used by the native
+        /// button. Keeping this owner-based step separate lets the ordering
+        /// contract be verified without manufacturing an AppKit window.
+        @discardableResult
+        func requestPresentationHandoff(owner: AnyObject) -> Bool {
+            guard handoffState.begin(owner: owner) else { return false }
+            notificationCenter.post(
                 name: .sidebarPageViewsWillPresent,
-                object: window
+                object: owner
             )
+            return true
         }
 
         @objc
         private func completePresentationHandoff(_ notification: Notification) {
-            guard isAwaitingHandoff,
-                  let sourceWindow = notification.object as? NSWindow,
+            guard let sourceWindow = notification.object as? NSWindow,
                   let button = presentationButton,
-                  button.window === sourceWindow else {
+                  handoffState.complete(
+                    sourceOwner: sourceWindow,
+                    currentControlOwner: button.window
+                  ) else {
                 return
             }
-            isAwaitingHandoff = false
             guard parent.configuration.isPresented.wrappedValue,
                   button.window != nil,
                   popover == nil else {

@@ -7,6 +7,16 @@ struct SidebarPageViewsPopoverPayload {
     let referenceDate: Date
 }
 
+struct SidebarPageViewsPresentationState {
+    var pendingRowKey: String?
+    var activePopover: SidebarPageViewsPopoverPayload?
+
+    mutating func dismissAll() {
+        pendingRowKey = nil
+        activePopover = nil
+    }
+}
+
 struct SidebarPageViewsPopoverContent: View {
     let title: String
     let referenceDate: Date
