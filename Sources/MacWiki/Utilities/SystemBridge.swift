@@ -29,6 +29,16 @@ enum SystemBridge {
     /// fallback covers keyboard-driven actions without creating a global
     /// Core Graphics event snapshot.
     @MainActor private static var currentModifierFlags: NSEvent.ModifierFlags {
-        NSApp.currentEvent?.modifierFlags ?? NSEvent.modifierFlags
+        resolveModifierFlags(
+            currentEvent: NSApp.currentEvent?.modifierFlags,
+            global: NSEvent.modifierFlags
+        )
+    }
+
+    static func resolveModifierFlags(
+        currentEvent: NSEvent.ModifierFlags?,
+        global: NSEvent.ModifierFlags
+    ) -> NSEvent.ModifierFlags {
+        currentEvent ?? global
     }
 }
