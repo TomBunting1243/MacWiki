@@ -2,11 +2,20 @@ import SwiftUI
 
 struct WikiHopLobbyView: View {
     @Environment(AppState.self) private var appState
+    @Environment(\.macWikiAccessibilityPersonalization) private var accessibilityPersonalization
     @State private var selectedMode: WikiHopSession.Mode = .chill
     @State private var isLoading = false
     @State private var error: String?
     
     private let service = WikipediaService.shared
+
+    private var materialPolicy: MacWikiGlassRuntime.SurfacePolicy {
+        MacWikiGlassRuntime.surfacePolicy(
+            isEnabled: false,
+            forceLegacyFallback: false,
+            personalization: accessibilityPersonalization
+        )
+    }
 
     var body: some View {
         VStack(spacing: 40) {
@@ -56,7 +65,7 @@ struct WikiHopLobbyView: View {
                     .fill(Color.accentColor.opacity(0.05))
                     .frame(width: 600, height: 600)
                     .offset(y: -200)
-                    .blur(radius: 100)
+                    .blur(radius: materialPolicy.allowsDepth ? 100 : 0)
             }
             .ignoresSafeArea()
         )
@@ -71,7 +80,11 @@ struct WikiHopLobbyView: View {
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 ))
-                .shadow(color: .accentColor.opacity(0.3), radius: 10, y: 5)
+                .shadow(
+                    color: .accentColor.opacity(materialPolicy.allowsDepth ? 0.3 : 0),
+                    radius: materialPolicy.allowsDepth ? 10 : 0,
+                    y: materialPolicy.allowsDepth ? 5 : 0
+                )
             
             Text("Wiki-Hop")
                 .font(.system(size: 42, weight: .bold, design: .rounded))
@@ -110,8 +123,27 @@ struct WikiHopLobbyView: View {
             }
         }
         .padding(24)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(rulesBackground)
+        .overlay {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .strokeBorder(
+                    Color.primary.opacity(
+                        accessibilityPersonalization.colorSchemeContrast == .increased ? 0.34 : 0.08
+                    ),
+                    lineWidth: accessibilityPersonalization.colorSchemeContrast == .increased ? 1 : 0.6
+                )
+        }
         .frame(maxWidth: 340)
+    }
+
+    @ViewBuilder
+    private var rulesBackground: some View {
+        let shape = RoundedRectangle(cornerRadius: 16, style: .continuous)
+        if materialPolicy.usesOpaqueBackground {
+            shape.fill(Color(nsColor: .controlBackgroundColor))
+        } else {
+            shape.fill(.regularMaterial)
+        }
     }
     
     private func validityRow(icon: String, text: String) -> some View {

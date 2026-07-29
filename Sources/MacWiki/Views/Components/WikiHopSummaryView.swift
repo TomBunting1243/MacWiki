@@ -3,6 +3,15 @@ import SwiftUI
 struct WikiHopSummaryView: View {
     let session: WikiHopSession
     @Environment(AppState.self) private var appState
+    @Environment(\.macWikiAccessibilityPersonalization) private var accessibilityPersonalization
+
+    private var materialPolicy: MacWikiGlassRuntime.SurfacePolicy {
+        MacWikiGlassRuntime.surfacePolicy(
+            isEnabled: false,
+            forceLegacyFallback: false,
+            personalization: accessibilityPersonalization
+        )
+    }
     
     var body: some View {
         VStack(spacing: 32) {
@@ -10,7 +19,11 @@ struct WikiHopSummaryView: View {
             Image(systemName: session.status == .completed ? "trophy.fill" : "exclamationmark.triangle.fill")
                 .font(.system(size: 72))
                 .foregroundStyle(session.status == .completed ? .yellow : .red)
-                .shadow(color: (session.status == .completed ? Color.yellow : Color.red).opacity(0.4), radius: 20)
+                .shadow(
+                    color: (session.status == .completed ? Color.yellow : Color.red)
+                        .opacity(materialPolicy.allowsDepth ? 0.4 : 0),
+                    radius: materialPolicy.allowsDepth ? 20 : 0
+                )
             
             // Title
             Text(session.status == .completed ? "Run Completed!" : "Run Failed")
@@ -49,7 +62,16 @@ struct WikiHopSummaryView: View {
                 routeRow(label: "Target", title: session.targetArticle.title, icon: "flag.checkered")
             }
             .padding(20)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .background(routeBackground)
+            .overlay {
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .strokeBorder(
+                        Color.primary.opacity(
+                            accessibilityPersonalization.colorSchemeContrast == .increased ? 0.34 : 0.08
+                        ),
+                        lineWidth: accessibilityPersonalization.colorSchemeContrast == .increased ? 1 : 0.6
+                    )
+            }
             
             // Actions
             HStack(spacing: 20) {
@@ -80,14 +102,27 @@ struct WikiHopSummaryView: View {
             }
         }
         .padding(48)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .background(summaryBackground)
         .overlay(
             RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .strokeBorder(Color.primary.opacity(0.1), lineWidth: 1)
+                .strokeBorder(
+                    Color.primary.opacity(
+                        accessibilityPersonalization.colorSchemeContrast == .increased ? 0.42 : 0.1
+                    ),
+                    lineWidth: accessibilityPersonalization.colorSchemeContrast == .increased ? 1.2 : 1
+                )
         )
-        .shadow(color: Color.black.opacity(0.2), radius: 30, y: 10)
+        .shadow(
+            color: Color.black.opacity(materialPolicy.allowsDepth ? 0.2 : 0),
+            radius: materialPolicy.allowsDepth ? 30 : 0,
+            y: materialPolicy.allowsDepth ? 10 : 0
+        )
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color.black.opacity(0.4))
+        .background(
+            materialPolicy.usesOpaqueBackground
+                ? Color(nsColor: .windowBackgroundColor)
+                : Color.black.opacity(0.4)
+        )
     }
     
     private func statItem(label: String, value: String, icon: String, fullWidth: Bool = false) -> some View {
@@ -121,6 +156,26 @@ struct WikiHopSummaryView: View {
                     .fontWeight(.medium)
             }
             Spacer()
+        }
+    }
+
+    @ViewBuilder
+    private var routeBackground: some View {
+        let shape = RoundedRectangle(cornerRadius: 16, style: .continuous)
+        if materialPolicy.usesOpaqueBackground {
+            shape.fill(Color(nsColor: .controlBackgroundColor))
+        } else {
+            shape.fill(.regularMaterial)
+        }
+    }
+
+    @ViewBuilder
+    private var summaryBackground: some View {
+        let shape = RoundedRectangle(cornerRadius: 24, style: .continuous)
+        if materialPolicy.usesOpaqueBackground {
+            shape.fill(Color(nsColor: .windowBackgroundColor))
+        } else {
+            shape.fill(.ultraThinMaterial)
         }
     }
 }
