@@ -25,8 +25,7 @@ struct DirectoryView: View {
     @State private var discoverTrendPulseStore = DiscoverTrendPulseStore()
     @State private var metadataHydrator = ArticleMetadataHydrator()
     @State private var saveScheduler = DebouncedActionScheduler()
-    @State private var pendingPageViewsRowKey: String?
-    @State private var activePageViewsPopover: SidebarPageViewsPopoverPayload?
+    @State private var pageViewsPresentation = SidebarPageViewsPresentationState()
     @State private var discoverDateLoadTask: Task<Void, Never>?
     @State private var discoverPulseRefreshGeneration = 0
 
@@ -475,7 +474,7 @@ struct DirectoryView: View {
         initialPulse: WikipediaService.TrendPulse? = nil,
         referenceDate: Date = Date()
     ) {
-        activePageViewsPopover = SidebarPageViewsPopoverPayload(
+        pageViewsPresentation.activePopover = SidebarPageViewsPopoverPayload(
             rowKey: rowKey,
             title: title,
             initialPulse: initialPulse,
@@ -485,11 +484,11 @@ struct DirectoryView: View {
 
     private func pageViewsPopoverBinding(for rowKey: String) -> Binding<Bool> {
         Binding(
-            get: { activePageViewsPopover?.rowKey == rowKey },
+            get: { pageViewsPresentation.activePopover?.rowKey == rowKey },
             set: { isPresented in
                 guard !isPresented else { return }
-                if activePageViewsPopover?.rowKey == rowKey {
-                    activePageViewsPopover = nil
+                if pageViewsPresentation.activePopover?.rowKey == rowKey {
+                    pageViewsPresentation.activePopover = nil
                 }
             }
         )
@@ -497,7 +496,7 @@ struct DirectoryView: View {
 
     @ViewBuilder
     private func pageViewsPopover(for rowKey: String) -> some View {
-        if let payload = activePageViewsPopover, payload.rowKey == rowKey {
+        if let payload = pageViewsPresentation.activePopover, payload.rowKey == rowKey {
             SidebarPageViewsPopoverContent(
                 title: payload.title,
                 referenceDate: payload.referenceDate,
@@ -603,13 +602,11 @@ struct DirectoryView: View {
         directoryContentSelectionLifecycle
         .onChange(of: selectedDiscoverDate) { _, _ in
             guard rootSelection == .discover else { return }
-            activePageViewsPopover = nil
-            pendingPageViewsRowKey = nil
+            pageViewsPresentation.dismissAll()
             queueDiscoverLoadDebounced()
         }
         .onChange(of: rootSelection) { _, newValue in
-            activePageViewsPopover = nil
-            pendingPageViewsRowKey = nil
+            pageViewsPresentation.dismissAll()
             if newValue != .discover {
                 discoverDateLoadTask?.cancel()
                 discoverTrendPulseStore.cancel()
@@ -617,8 +614,7 @@ struct DirectoryView: View {
         }
         .onDisappear {
             flushScheduledModelContextSave()
-            activePageViewsPopover = nil
-            pendingPageViewsRowKey = nil
+            pageViewsPresentation.dismissAll()
             discoverDateLoadTask?.cancel()
             discoverTrendPulseStore.cancel()
             metadataHydrator.cancel()
@@ -1037,6 +1033,36 @@ struct DirectoryView: View {
         )
     }
 
+    private func discoverArticle(from result: WikipediaService.SearchResult) -> Article {
+        Article(
+            id: result.id,
+            title: result.title,
+            description: result.description,
+            thumbnailURL: result.thumbnailURL
+        )
+    }
+
+    private func openDiscoverArticle(_ result: WikipediaService.SearchResult, inNewTab: Bool?) {
+        let article = discoverArticle(from: result)
+        let shouldOpenInNewTab = DirectoryDiscoverRowInteractionPolicy.shouldOpenInNewTab(
+            explicitPreference: inNewTab,
+            isCommandPressed: SystemBridge.isCommandPressed
+        )
+        openArticleFromPrimaryClick(article, inNewTab: shouldOpenInNewTab)
+    }
+
+    private func articleDragPayload(for article: Article, isRead: Bool) -> SavedArticleDragPayload {
+        let metadata = hydratedMetadata(for: article.title)
+        return SavedArticleDragPayload(
+            title: article.title,
+            articleDescription: metadata?.description ?? article.description,
+            extract: metadata?.extract ?? article.extract,
+            thumbnailURL: metadata?.thumbnailURL ?? article.thumbnailURL,
+            isRead: isRead,
+            wordCount: metadata?.wordCount ?? article.wordCount
+        )
+    }
+
     private func hydratedMetadata(for title: String) -> ArticleMetadataHydrationSnapshot? {
         metadataHydrator.snapshot(for: title)
     }
@@ -1202,266 +1228,38 @@ extension DirectoryView {
                     .listRowInsets(EdgeInsets(top: 3, leading: 0, bottom: 3, trailing: 0))
                 }
             }
-
-            sidebarDiscoverFeedSections(feed)
-        }
-    }
-
-    @ViewBuilder
-    private func sidebarDiscoverFeedSections(_ feed: WikipediaService.DiscoverFeed) -> some View {
-        let mostReadSelection = SidebarDiscoverMostReadPolicy.selection(from: feed)
-
-        if let featured = feed.featuredArticle {
-            Section {
-                discoverArticleRow(featured)
-            } header: {
-                SidebarDiscoverSectionHeader(title: "Featured Article", count: 1)
-            }
-        }
-
-        Section {
-            if mostReadSelection.items.isEmpty {
-                Text("Most Read is temporarily unavailable for this date.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .padding(.vertical, 4)
-            } else {
-                ForEach(mostReadSelection.items) { result in
-                    discoverArticleRow(result)
-                }
-            }
-        } header: {
-            SidebarDiscoverSectionHeader(
-                title: mostReadSelection.sectionTitle,
-                count: mostReadSelection.items.count
-            )
-        }
-
-        if !feed.newsStories.isEmpty {
-            Section {
-                ForEach(feed.newsStories.prefix(8)) { story in
-                    DiscoverStoryRow(story: story, referenceDate: discoverTrendReferenceDate) { article, inNewTab in
-                        openDiscoverArticle(article, inNewTab: inNewTab)
-                    }
-                }
-            } header: {
-                SidebarDiscoverSectionHeader(
-                    title: "News Briefing",
-                    count: min(feed.newsStories.count, 8)
-                )
-            }
-        }
-
-        if !feed.inTheNews.isEmpty {
-            Section {
-                ForEach(feed.inTheNews.prefix(12)) { result in
-                    discoverArticleRow(result)
-                }
-            } header: {
-                SidebarDiscoverSectionHeader(
-                    title: "In the News",
-                    count: min(feed.inTheNews.count, 12)
-                )
-            }
-        }
-
-        let primaryTimeline = feed.onThisDaySelected.isEmpty ? feed.onThisDay : feed.onThisDaySelected
-        if !primaryTimeline.isEmpty {
-            Section {
-                ForEach(primaryTimeline.prefix(12)) { event in
-                    DiscoverTimelineRow(event: event, referenceDate: discoverTrendReferenceDate) { article, inNewTab in
-                        openDiscoverArticle(article, inNewTab: inNewTab)
-                    }
-                }
-            } header: {
-                SidebarDiscoverSectionHeader(
-                    title: "This Day in History",
-                    count: min(primaryTimeline.count, 12)
-                )
-            }
-        }
-
-        if !feed.onThisDayBirths.isEmpty {
-            Section {
-                ForEach(feed.onThisDayBirths.prefix(8)) { event in
-                    DiscoverTimelineRow(event: event, referenceDate: discoverTrendReferenceDate) { article, inNewTab in
-                        openDiscoverArticle(article, inNewTab: inNewTab)
-                    }
-                }
-            } header: {
-                SidebarDiscoverSectionHeader(
-                    title: "Born on This Day",
-                    count: min(feed.onThisDayBirths.count, 8)
-                )
-            }
-        }
-
-        if !feed.onThisDayDeaths.isEmpty {
-            Section {
-                ForEach(feed.onThisDayDeaths.prefix(8)) { event in
-                    DiscoverTimelineRow(event: event, referenceDate: discoverTrendReferenceDate) { article, inNewTab in
-                        openDiscoverArticle(article, inNewTab: inNewTab)
-                    }
-                }
-            } header: {
-                SidebarDiscoverSectionHeader(
-                    title: "Died on This Day",
-                    count: min(feed.onThisDayDeaths.count, 8)
-                )
-            }
-        }
-
-        if !feed.holidays.isEmpty {
-            Section {
-                ForEach(feed.holidays.prefix(8)) { holiday in
-                    DiscoverHolidayListRow(holiday: holiday, referenceDate: discoverTrendReferenceDate) { article, inNewTab in
-                        openDiscoverArticle(article, inNewTab: inNewTab)
-                    }
-                }
-            } header: {
-                SidebarDiscoverSectionHeader(
-                    title: "Holidays & Observances",
-                    count: min(feed.holidays.count, 8)
-                )
-            }
-        }
-
-        if !feed.didYouKnow.isEmpty {
-            Section {
-                ForEach(feed.didYouKnow.prefix(8)) { fact in
-                    DiscoverFactRow(fact: fact, referenceDate: discoverTrendReferenceDate) { article, inNewTab in
-                        openDiscoverArticle(article, inNewTab: inNewTab)
-                    }
-                }
-            } header: {
-                SidebarDiscoverSectionHeader(
-                    title: "Did You Know?",
-                    count: min(feed.didYouKnow.count, 8)
-                )
-            }
-        }
-    }
-
-    private func discoverArticleRow(
-        _ result: WikipediaService.SearchResult
-    ) -> some View {
-        let article = discoverArticle(from: result)
-        let titleKey = ReadStateSync.normalizedTitle(article.title)
-        let rowKey = "discover:\(result.id):\(titleKey)"
-        let isRead = effectiveReadState(for: article.title, fallback: article.isRead)
-        let progress = readingProgress(for: article.title)
-        let tags = tagsForArticle(title: article.title)
-        let trendPulse = discoverTrendPulseStore.pulse(for: article.title)
-
-        return ArticleListItem(
-            accessibilityTitle: article.title,
-            isRead: isRead,
-            progress: progress,
-            isCurrent: isCurrentArticle(article.title),
-            onTap: {
-                if pendingPageViewsRowKey == rowKey {
-                    pendingPageViewsRowKey = nil
-                    return
-                }
-                openDiscoverArticle(result, inNewTab: nil)
-            }
-        ) { isHovered, label in
-            ArticleRowWithFetch(
-                article: article,
-                hydratedMetadata: hydratedMetadata(for: article.title),
-                isHovered: isHovered,
-                label: label,
-                tags: tags,
-                selectedTagId: localTagFilter?.id,
-                trendPulse: trendPulse,
-                pageViewsPresentation: SidebarPageViewsPopoverConfiguration(
-                    title: article.title,
-                    referenceDate: discoverTrendReferenceDate,
-                    initialPulse: trendPulse,
-                    style: .pulse,
-                    isPresented: pageViewsPopoverBinding(for: rowKey),
-                    onRequestPresentation: {
-                        pendingPageViewsRowKey = rowKey
-                        presentPageViewsPopover(
-                            for: article.title,
-                            rowKey: rowKey,
-                            initialPulse: trendPulse,
-                            referenceDate: discoverTrendReferenceDate
-                        )
-                        Task { @MainActor in
-                            try? await Task.sleep(nanoseconds: 700_000_000)
-                            if pendingPageViewsRowKey == rowKey {
-                                pendingPageViewsRowKey = nil
-                            }
-                        }
-                    },
-                    onPulseLoaded: { pulse in
-                        discoverTrendPulseStore.record(
-                            pulse,
-                            for: article.title,
-                            referenceDate: discoverTrendReferenceDate
-                        )
-                    }
+            DirectoryDiscoverSectionsView(
+                feed: feed,
+                discoverTrendReferenceDate: discoverTrendReferenceDate,
+                discoverTrendPulseStore: discoverTrendPulseStore,
+                columnState: columnState,
+                metadataHydrator: metadataHydrator,
+                pageViewsPresentation: $pageViewsPresentation,
+                library: DirectoryDiscoverLibrarySnapshot(
+                    labels: labels,
+                    tags: tags,
+                    lists: allLists
                 ),
-                onTagClick: { tag in
-                    localTagFilter = (localTagFilter?.id == tag.id) ? nil : tag
-                }
+                actions: DirectoryDiscoverActions(
+                    onNewLabelWithArticle: onNewLabelWithArticle,
+                    onNewTagWithArticle: onNewTagWithArticle,
+                    openSearchResult: { result, inNewTab in
+                        openDiscoverArticle(result, inNewTab: inNewTab)
+                    },
+                    pageViewsPopoverBinding: { rowKey in
+                        pageViewsPopoverBinding(for: rowKey)
+                    },
+                    presentPageViewsPopover: { title, rowKey, initialPulse, referenceDate in
+                        presentPageViewsPopover(
+                            for: title,
+                            rowKey: rowKey,
+                            initialPulse: initialPulse,
+                            referenceDate: referenceDate
+                        )
+                    }
+                )
             )
         }
-        .contextMenu {
-            ArticleContextMenuContent(
-                article: article,
-                isRead: isRead,
-                currentTags: tags,
-                allLabels: labels,
-                allTags: self.tags,
-                allLists: allLists,
-                modelContext: modelContext,
-                appState: appState,
-                onNewLabel: { draft in
-                    onNewLabelWithArticle(draft)
-                },
-                onNewTag: { draftArticle in
-                    onNewTagWithArticle(draftArticle)
-                },
-                onShowPageViews: {
-                    presentPageViewsPopover(
-                        for: article.title,
-                        rowKey: rowKey,
-                        initialPulse: trendPulse,
-                        referenceDate: discoverTrendReferenceDate
-                    )
-                }
-            )
-        }
-        .discoverContentRowSpacing()
-    }
-
-    private func discoverArticle(from result: WikipediaService.SearchResult) -> Article {
-        Article(
-            id: result.id,
-            title: result.title,
-            description: result.description,
-            thumbnailURL: result.thumbnailURL
-        )
-    }
-
-    private func articleDragPayload(for article: Article, isRead: Bool) -> SavedArticleDragPayload {
-        let metadata = hydratedMetadata(for: article.title)
-        return SavedArticleDragPayload(
-            title: article.title,
-            articleDescription: metadata?.description ?? article.description,
-            extract: metadata?.extract ?? article.extract,
-            thumbnailURL: metadata?.thumbnailURL ?? article.thumbnailURL,
-            isRead: isRead,
-            wordCount: metadata?.wordCount ?? article.wordCount
-        )
-    }
-
-    private func openDiscoverArticle(_ result: WikipediaService.SearchResult, inNewTab: Bool?) {
-        let article = discoverArticle(from: result)
-        let shouldOpenInNewTab = inNewTab ?? SystemBridge.isCommandPressed
-        openArticleFromPrimaryClick(article, inNewTab: shouldOpenInNewTab)
     }
 
     @ViewBuilder
