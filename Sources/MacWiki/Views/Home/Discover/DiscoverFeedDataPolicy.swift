@@ -389,8 +389,4 @@ extension DiscoverFeedSections {
         return hasher.finalize()
     }
 
-    var canOpenFocusedCollectionItem: Bool {
-        guard currentCollectionsKeyboardState().isActive else { return false }
-        return focusedCollectionResult != nil
-    }
 }

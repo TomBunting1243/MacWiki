@@ -33,7 +33,7 @@ struct DiscoverCollectionsKeyboardContext: Equatable {
 }
 
 enum DiscoverCollectionsKeyboardCoordinator {
-    struct FocusedSelection: Equatable {
+    struct FocusedSelection: Equatable, Hashable {
         let lane: DiscoverCollectionLane
         let index: Int
     }

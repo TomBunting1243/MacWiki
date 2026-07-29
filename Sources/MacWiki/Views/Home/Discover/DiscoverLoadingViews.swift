@@ -119,7 +119,7 @@ struct DiscoverIntroLoadingCard: View {
     }
 }
 
-enum DiscoverCollectionLane: String, CaseIterable {
+enum DiscoverCollectionLane: String, CaseIterable, Hashable {
     case mostRead
     case longest
 }

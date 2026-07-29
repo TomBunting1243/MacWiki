@@ -1,6 +1,10 @@
 import SwiftUI
 
 extension DiscoverFeedSections {
+    var isCollectionsKeyboardFocusActive: Bool {
+        focusedCollectionItem != nil
+    }
+
     func pageViewsRowKey(
         section: String,
         result: WikipediaService.SearchResult,
@@ -46,24 +50,6 @@ extension DiscoverFeedSections {
                 referenceDate: payload.referenceDate,
                 initialPulse: payload.initialPulse
             )
-        }
-    }
-
-    var focusedCollectionResult: WikipediaService.SearchResult? {
-        guard let selection = DiscoverCollectionsKeyboardCoordinator.focusedSelection(
-            in: currentCollectionsKeyboardState(),
-            context: collectionsKeyboardContext
-        ) else {
-            return nil
-        }
-
-        switch selection.lane {
-        case .mostRead:
-            guard keyboardMostReadResults.indices.contains(selection.index) else { return nil }
-            return keyboardMostReadResults[selection.index]
-        case .longest:
-            guard keyboardLongestResults.indices.contains(selection.index) else { return nil }
-            return keyboardLongestResults[selection.index]
         }
     }
 
@@ -139,14 +125,25 @@ extension DiscoverFeedSections {
         )
     }
 
-    func openFocusedCollectionItem(inNewTab: Bool) {
-        guard let result = focusedCollectionResult else { return }
-        onOpen(result, inNewTab)
+    func synchronizeCollectionsKeyboardFocus(
+        with selection: DiscoverCollectionsKeyboardCoordinator.FocusedSelection
+    ) {
+        let synchronized = DiscoverCollectionsKeyboardCoordinator.markedFocus(
+            lane: selection.lane,
+            index: selection.index,
+            state: currentCollectionsKeyboardState(),
+            context: collectionsKeyboardContext
+        )
+
+        focusedCollectionLane = synchronized.focusedLane
+        focusedMostReadRowIndex = synchronized.focusedMostReadRowIndex
+        focusedLongestRowIndex = synchronized.focusedLongestRowIndex
+        setCollectionExpansion(selection.lane, isExpanded: true)
     }
 
     func currentCollectionsKeyboardState() -> DiscoverCollectionsKeyboardState {
         DiscoverCollectionsKeyboardState(
-            isActive: isCollectionsKeyboardFocusActive,
+            isActive: focusedCollectionItem != nil,
             focusedLane: focusedCollectionLane,
             focusedMostReadRowIndex: focusedMostReadRowIndex,
             focusedLongestRowIndex: focusedLongestRowIndex
@@ -154,18 +151,46 @@ extension DiscoverFeedSections {
     }
 
     func applyCollectionsKeyboardState(_ state: DiscoverCollectionsKeyboardState) {
-        isCollectionsKeyboardFocusActive = state.isActive
+        collectionFocusRequestGeneration &+= 1
+        let requestGeneration = collectionFocusRequestGeneration
         focusedCollectionLane = state.focusedLane
         focusedMostReadRowIndex = state.focusedMostReadRowIndex
         focusedLongestRowIndex = state.focusedLongestRowIndex
 
         if state.isActive {
+            let requiresExpansion: Bool
             switch state.focusedLane {
             case .mostRead:
+                requiresExpansion = !isMostReadCollectionExpanded
                 isMostReadCollectionExpanded = true
             case .longest:
+                requiresExpansion = !isLongestReadsCollectionExpanded
                 isLongestReadsCollectionExpanded = true
             }
+
+            let target = DiscoverCollectionsKeyboardCoordinator.focusedSelection(
+                in: state,
+                context: collectionsKeyboardContext
+            )
+
+            guard requiresExpansion else {
+                focusedCollectionItem = target
+                return
+            }
+
+            Task { @MainActor in
+                await Task.yield()
+                guard collectionFocusRequestGeneration == requestGeneration,
+                      !isSearchFieldFocused,
+                      focusedCollectionLane == state.focusedLane,
+                      focusedMostReadRowIndex == state.focusedMostReadRowIndex,
+                      focusedLongestRowIndex == state.focusedLongestRowIndex else {
+                    return
+                }
+                focusedCollectionItem = target
+            }
+        } else {
+            focusedCollectionItem = nil
         }
     }
 }

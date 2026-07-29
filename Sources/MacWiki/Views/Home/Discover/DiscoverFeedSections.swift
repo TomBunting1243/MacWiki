@@ -14,10 +14,11 @@ struct DiscoverFeedSections: View {
     @Environment(\.macWikiAccessibilityPersonalization.reduceMotion) var reduceMotion
     @State var editionModel = DiscoverEditionModel()
     @State var activePageViewsPopover: DiscoverPageViewsPopoverPayload?
-    @State var isCollectionsKeyboardFocusActive = false
+    @FocusState var focusedCollectionItem: DiscoverCollectionsKeyboardCoordinator.FocusedSelection?
     @State var focusedCollectionLane: DiscoverCollectionLane = .mostRead
     @State var focusedMostReadRowIndex = 0
     @State var focusedLongestRowIndex = 0
+    @State var collectionFocusRequestGeneration = 0
     @State var isTodayMostReadExpanded = true
     @State var isMostReadCollectionExpanded = false
     @State var isLongestReadsCollectionExpanded = false
@@ -38,6 +39,13 @@ struct DiscoverFeedSections: View {
         .onChange(of: collectionsFocusDataKey) { _, _ in
             normalizeCollectionsKeyboardFocus()
         }
+        .onChange(of: focusedCollectionItem) { _, selection in
+            guard let selection else {
+                collectionFocusRequestGeneration &+= 1
+                return
+            }
+            synchronizeCollectionsKeyboardFocus(with: selection)
+        }
         .onChange(of: isSearchFieldFocused) { _, focused in
             if focused {
                 applyCollectionsKeyboardState(
@@ -47,18 +55,6 @@ struct DiscoverFeedSections: View {
         }
         .onMoveCommand { direction in
             moveCollectionsFocus(direction)
-        }
-        .onKeyPress(.return, phases: .down) { keyPress in
-            guard isCollectionsKeyboardFocusActive,
-                  canOpenFocusedCollectionItem,
-                  !isSearchFieldFocused,
-                  activePageViewsPopover == nil else {
-                return .ignored
-            }
-            openFocusedCollectionItem(
-                inNewTab: keyPress.modifiers.contains(.command)
-            )
-            return .handled
         }
         .onExitCommand {
             applyCollectionsKeyboardState(

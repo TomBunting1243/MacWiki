@@ -36,6 +36,10 @@ extension DiscoverFeedSections {
                         },
                         onOpen: onOpen
                     )
+                    .focused(
+                        $focusedCollectionItem,
+                        equals: .init(lane: .mostRead, index: index)
+                    )
                     .contextMenu {
                         discoverContextMenu(for: result) {
                             presentPageViewsPopover(
@@ -88,6 +92,10 @@ extension DiscoverFeedSections {
                             },
                             onOpen: onOpen
                         )
+                        .focused(
+                            $focusedCollectionItem,
+                            equals: .init(lane: .longest, index: index)
+                        )
                         .contextMenu {
                             discoverContextMenu(for: result) {
                                 presentPageViewsPopover(for: result, rowKey: rowKey)
@@ -112,6 +120,10 @@ extension DiscoverFeedSections {
                             markCollectionsFocus(lane: .longest, index: index)
                         },
                         onOpen: onOpen
+                    )
+                    .focused(
+                        $focusedCollectionItem,
+                        equals: .init(lane: .longest, index: index)
                     )
                     .contextMenu {
                         discoverContextMenu(for: entry.result) {
