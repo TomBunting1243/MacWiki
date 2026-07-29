@@ -1,23 +1,130 @@
 import Foundation
 import SwiftUI
 import Testing
+import WebKit
 
 @testable import MacWiki
 
+@MainActor
+@Suite(.serialized)
 struct ReaderImageLoadingPolicyTests {
-    @Test func webKitOwnsLazyImageSchedulingWithoutAPrewarmScheduler() throws {
-        let script = try source("Sources/MacWiki/Resources/WebView.js")
+    @Test func initialPreparationFrontloadsThreeImagesBeforeIdleWork() async throws {
+        let fixture = try await makeFixture(
+            html: imageDocument(count: 8),
+            capturesIdleWork: true
+        )
 
-        #expect(!script.contains("IntersectionObserver"))
-        #expect(!script.localizedCaseInsensitiveContains("prewarm"))
-        #expect(!script.contains("setAttribute('loading'"))
-        #expect(!script.contains("setAttribute('fetchpriority'"))
-        #expect(script.contains("options.maxPrepImages || 240"))
-        #expect(script.contains("options.syncFrontload || 3"))
-        #expect(script.contains("window.requestIdleCallback(runChunk"))
+        try await fixture.waitUntil(
+            "document.querySelectorAll('[data-macwiki-layout-reserved=\"1\"]').length === 3",
+            attempts: 200
+        )
+
+        let initialState = try #require(
+            try await fixture.webView.evaluateJavaScript(
+                """
+                ({
+                  prepared: document.querySelectorAll('[data-macwiki-layout-reserved="1"]').length,
+                  pendingIdleWork: window.__macwikiIdleCallbacks.length
+                })
+                """
+            ) as? [String: Any]
+        )
+
+        #expect((initialState["prepared"] as? NSNumber)?.intValue == 3)
+        #expect((initialState["pendingIdleWork"] as? NSNumber)?.intValue == 1)
     }
 
-    @MainActor
+    @Test func idleContinuationFinishesOnlyTheBoundedLargeDocumentSet() async throws {
+        let fixture = try await makeFixture(
+            html: imageDocument(count: 250),
+            capturesIdleWork: true
+        )
+
+        try await fixture.waitUntil(
+            "window.__macwikiIdleCallbacks.length === 1",
+            attempts: 200
+        )
+        try await drainIdleWork(in: fixture)
+
+        let completedState = try #require(
+            try await fixture.webView.evaluateJavaScript(
+                """
+                ({
+                  prepared: document.querySelectorAll('[data-macwiki-layout-reserved="1"]').length,
+                  skeletons: document.querySelectorAll('[data-macwiki-image-skeleton="1"]').length,
+                  untouched: Array.from(document.images)
+                    .filter(function (image) { return image.dataset.macwikiLayoutReserved !== '1'; })
+                    .length,
+                  pendingIdleWork: window.__macwikiIdleCallbacks.length
+                })
+                """
+            ) as? [String: Any]
+        )
+
+        #expect((completedState["prepared"] as? NSNumber)?.intValue == 220)
+        #expect((completedState["skeletons"] as? NSNumber)?.intValue == 48)
+        #expect((completedState["untouched"] as? NSNumber)?.intValue == 30)
+        #expect((completedState["pendingIdleWork"] as? NSNumber)?.intValue == 0)
+    }
+
+    @Test func runtimePreparationPreservesNativeLoadingAndFetchPriorityHints() async throws {
+        let fixture = try await makeFixture(
+            html: """
+            <!doctype html><html><body>
+              <img id="automatic" width="200" height="100">
+              <img id="deferred" width="200" height="100" loading="lazy" fetchpriority="low">
+              <img id="priority" width="200" height="100" loading="eager" fetchpriority="high">
+              <img id="fourth" width="200" height="100" loading="lazy">
+            </body></html>
+            """,
+            capturesIdleWork: true,
+            beforeReaderScript: """
+            window.__macwikiFetchHintMutations = [];
+            window.__macwikiFetchHintObserver = new MutationObserver(function (records) {
+              records.forEach(function (record) {
+                window.__macwikiFetchHintMutations.push({
+                  id: record.target.id,
+                  attribute: record.attributeName
+                });
+              });
+            });
+            window.__macwikiFetchHintObserver.observe(document.body, {
+              attributes: true,
+              subtree: true,
+              attributeFilter: ['loading', 'fetchpriority']
+            });
+            """
+        )
+
+        try await fixture.waitUntil(
+            "window.__macwikiIdleCallbacks.length === 1",
+            attempts: 200
+        )
+        try await drainIdleWork(in: fixture)
+
+        let hintsWerePreserved = try await fixture.webView.evaluateJavaScript(
+            """
+            (function () {
+              var automatic = document.querySelector('#automatic');
+              var deferred = document.querySelector('#deferred');
+              var priority = document.querySelector('#priority');
+              var fourth = document.querySelector('#fourth');
+              return window.__macwikiFetchHintMutations.length === 0 &&
+                !automatic.hasAttribute('loading') &&
+                !automatic.hasAttribute('fetchpriority') &&
+                deferred.getAttribute('loading') === 'lazy' &&
+                deferred.getAttribute('fetchpriority') === 'low' &&
+                priority.getAttribute('loading') === 'eager' &&
+                priority.getAttribute('fetchpriority') === 'high' &&
+                fourth.getAttribute('loading') === 'lazy' &&
+                !fourth.hasAttribute('fetchpriority');
+            })()
+            """
+        ) as? Bool
+
+        #expect(hintsWerePreserved == true)
+    }
+
     @Test func initialDocumentHintsOnlyPrioritizeTheFirstThreeImages() throws {
         let html = """
         <html><body>
@@ -82,17 +189,38 @@ struct ReaderImageLoadingPolicyTests {
         #expect(fifth.contains(#"fetchpriority="high""#))
     }
 
-    @Test func unknownDimensionImagesNeverReceiveSyntheticSkeletons() throws {
-        let script = try source("Sources/MacWiki/Resources/WebView.js")
-        let stylesheet = try source("Sources/MacWiki/Resources/Reader.css")
-        let unknownDimensionComment = try #require(
-            script.range(of: "Unknown dimensions cannot reserve space")
+    @Test func unknownDimensionImagesNeverReceiveSyntheticSkeletons() async throws {
+        let fixture = try await makeFixture(
+            html: """
+            <!doctype html><html><body>
+              <img id="unknown">
+              <img id="known" width="200" height="100">
+            </body></html>
+            """
         )
-        let followingSource = script[unknownDimensionComment.lowerBound...]
 
-        #expect(followingSource.contains("return false;"))
-        #expect(script.contains("if (!shouldUseImageSkeleton(image)) return;"))
-        #expect(!stylesheet.contains("data-macwiki-image-skeleton=\"0\""))
+        try await fixture.waitUntil(
+            "document.querySelector('#known').dataset.macwikiFadePrepared === '1'",
+            attempts: 200
+        )
+
+        let imageState = try #require(
+            try await fixture.webView.evaluateJavaScript(
+                """
+                ({
+                  unknownWasVisited: document.querySelector('#unknown').dataset.macwikiLayoutReserved === '1',
+                  unknownHasFade: document.querySelector('#unknown').dataset.macwikiFadePrepared === '1',
+                  unknownHasSkeleton: document.querySelector('#unknown').dataset.macwikiImageSkeleton === '1',
+                  knownHasSkeleton: document.querySelector('#known').dataset.macwikiImageSkeleton === '1'
+                })
+                """
+            ) as? [String: Any]
+        )
+
+        #expect(imageState["unknownWasVisited"] as? Bool == true)
+        #expect(imageState["unknownHasFade"] as? Bool == false)
+        #expect(imageState["unknownHasSkeleton"] as? Bool == false)
+        #expect(imageState["knownHasSkeleton"] as? Bool == true)
     }
 
     private func imageTag(withID id: String, in html: String) throws -> String {
@@ -107,14 +235,82 @@ struct ReaderImageLoadingPolicyTests {
         return String(html[swiftRange])
     }
 
-    private func source(_ relativePath: String) throws -> String {
-        let repositoryRoot = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-        return try String(
-            contentsOf: repositoryRoot.appending(path: relativePath),
-            encoding: .utf8
+    private func imageDocument(count: Int) -> String {
+        let images = (0..<count)
+            .map { #"<img id="image-\#($0)" width="200" height="100">"# }
+            .joined(separator: "\n")
+        return "<!doctype html><html><body>\(images)</body></html>"
+    }
+
+    private func makeFixture(
+        html: String,
+        capturesIdleWork: Bool = false,
+        beforeReaderScript: String? = nil
+    ) async throws -> ReaderWebKitHarness {
+        let fixtureID = UUID().uuidString
+        let fixtureMarker = """
+        <script>
+          document.documentElement.dataset.macwikiImageFixture = '\(fixtureID)';
+        </script>
+        """
+        let markedHTML = html.replacingOccurrences(
+            of: "</body>",
+            with: fixtureMarker + "</body>",
+            options: [.caseInsensitive]
         )
+        let fixture = ReaderWebKitHarness(
+            size: CGSize(width: 640, height: 700),
+            injectReaderStyle: false,
+            injectWebViewScript: false
+        )
+        try await fixture.loadHTML(markedHTML)
+        try await fixture.waitUntil(
+            """
+            document.readyState === 'complete' &&
+              document.documentElement.dataset.macwikiImageFixture === '\(fixtureID)'
+            """,
+            attempts: 200
+        )
+        if capturesIdleWork {
+            _ = try await fixture.webView.evaluateJavaScript(
+                """
+                window.__macwikiIdleCallbacks = [];
+                window.requestIdleCallback = function (callback, options) {
+                  window.__macwikiIdleCallbacks.push({ callback: callback, options: options || {} });
+                  return window.__macwikiIdleCallbacks.length;
+                };
+                window.cancelIdleCallback = function () {};
+                true;
+                """
+            )
+        }
+        if let beforeReaderScript {
+            _ = try await fixture.webView.evaluateJavaScript(beforeReaderScript + "\ntrue;")
+        }
+        _ = try await fixture.webView.evaluateJavaScript(WebViewResources.scriptSource)
+        return fixture
+    }
+
+    private func drainIdleWork(in fixture: ReaderWebKitHarness) async throws {
+        for _ in 0..<16 {
+            let didRunCallback = try await fixture.evaluateBool(
+                """
+                (function () {
+                  var pending = window.__macwikiIdleCallbacks.shift();
+                  if (!pending) return false;
+                  pending.callback({
+                    didTimeout: false,
+                    timeRemaining: function () { return 50; }
+                  });
+                  return true;
+                })()
+                """
+            )
+            if !didRunCallback {
+                return
+            }
+        }
+
+        Issue.record("Reader image preparation did not exhaust its idle work")
     }
 }
