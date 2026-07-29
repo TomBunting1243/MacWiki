@@ -8,6 +8,10 @@ struct HighlightRehydrateBarView: View {
 
     @Environment(\.macWikiAccessibilityPersonalization) private var accessibilityPersonalization
 
+    private var surfacePolicy: AppLoadingSurfacePolicy {
+        AppLoadingSurfacePolicy(personalization: accessibilityPersonalization)
+    }
+
     private var statusText: String {
         if isRefreshing {
             return "Refreshing article"
@@ -55,7 +59,7 @@ struct HighlightRehydrateBarView: View {
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
         .background {
-            if accessibilityPersonalization.reduceTransparency {
+            if surfacePolicy.usesOpaqueBackground {
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
                     .fill(Color(nsColor: .controlBackgroundColor))
             } else {
@@ -82,16 +86,16 @@ struct HighlightRehydrateBarView: View {
                     Color.primary.opacity(
                         accessibilityPersonalization.colorSchemeContrast == .increased ? 0.28 : 0.12
                     ),
-                    lineWidth: accessibilityPersonalization.colorSchemeContrast == .increased ? 1.2 : 0.8
+                    lineWidth: surfacePolicy.statusBorderWidth
                 )
         }
         .shadow(
-            color: .black.opacity(accessibilityPersonalization.reduceTransparency ? 0 : 0.18),
+            color: .black.opacity(0.18 * surfacePolicy.shadowMultiplier),
             radius: 14,
             y: 6
         )
         .shadow(
-            color: .black.opacity(accessibilityPersonalization.reduceTransparency ? 0 : 0.08),
+            color: .black.opacity(0.08 * surfacePolicy.shadowMultiplier),
             radius: 4,
             y: 2
         )

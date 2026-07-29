@@ -6,11 +6,12 @@ import Testing
 
 @MainActor
 struct AppLoadingSystemTests {
-    @Test func accessibilityPolicySelectsOpaqueBackgroundsAndStrongerBorders() {
+    @Test func accessibilityPolicySelectsOpaqueBackgroundsWithoutDepthAndStrongerBorders() {
         let standard = AppLoadingSurfacePolicy(personalization: .standard)
         #expect(!standard.usesOpaqueBackground)
         #expect(standard.statusBorderWidth == 0.8)
         #expect(standard.surfaceBorderWidth == 0.9)
+        #expect(standard.shadowMultiplier == 1)
 
         let reduceTransparency = AppLoadingSurfacePolicy(
             personalization: MacWikiAccessibilityPersonalization(
@@ -23,6 +24,7 @@ struct AppLoadingSystemTests {
         #expect(reduceTransparency.usesOpaqueBackground)
         #expect(reduceTransparency.statusBorderWidth == 0.8)
         #expect(reduceTransparency.surfaceBorderWidth == 0.9)
+        #expect(reduceTransparency.shadowMultiplier == 0)
 
         let increasedContrast = AppLoadingSurfacePolicy(
             personalization: MacWikiAccessibilityPersonalization(
@@ -32,9 +34,24 @@ struct AppLoadingSystemTests {
                 colorSchemeContrast: .increased
             )
         )
-        #expect(!increasedContrast.usesOpaqueBackground)
+        #expect(increasedContrast.usesOpaqueBackground)
         #expect(increasedContrast.statusBorderWidth == 1.2)
         #expect(increasedContrast.surfaceBorderWidth == 1.4)
+        #expect(increasedContrast.shadowMultiplier == 0)
+    }
+
+    @Test func reduceMotionDoesNotAlterSurfaceAppearancePolicy() {
+        let reduceMotion = MacWikiAccessibilityPersonalization(
+            reduceMotion: true,
+            reduceTransparency: false,
+            differentiateWithoutColor: false,
+            colorSchemeContrast: .standard
+        )
+
+        #expect(
+            AppLoadingSurfacePolicy(personalization: reduceMotion) ==
+                AppLoadingSurfacePolicy(personalization: .standard)
+        )
     }
 
     @Test func activityMarkRendersANativeProgressIndicator() throws {

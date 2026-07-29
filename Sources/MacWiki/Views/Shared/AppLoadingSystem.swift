@@ -19,9 +19,17 @@ struct AppLoadingSurfacePolicy: Equatable {
     let usesOpaqueBackground: Bool
     let statusBorderWidth: CGFloat
     let surfaceBorderWidth: CGFloat
+    let shadowMultiplier: Double
 
     init(personalization: MacWikiAccessibilityPersonalization) {
-        usesOpaqueBackground = personalization.reduceTransparency
+        let materialPolicy = MacWikiGlassRuntime.surfacePolicy(
+            isEnabled: false,
+            forceLegacyFallback: false,
+            personalization: personalization
+        )
+
+        usesOpaqueBackground = materialPolicy.usesOpaqueBackground
+        shadowMultiplier = materialPolicy.allowsDepth ? 1 : 0
         if personalization.colorSchemeContrast == .increased {
             statusBorderWidth = 1.2
             surfaceBorderWidth = 1.4
