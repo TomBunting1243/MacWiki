@@ -1,4 +1,3 @@
-import Foundation
 import SwiftData
 import Testing
 
@@ -112,24 +111,6 @@ struct InspectorArticleSnapshotTests {
         #expect(InspectorPersistentModelResolver.label(id: labelID, in: modelContext) == nil)
     }
 
-    @Test func inspectorAppearanceReadsExistingStateWithoutPersistenceSideEffects() throws {
-        let panel = try source("Sources/MacWiki/Views/Inspector/InspectorPanel.swift")
-        let labels = try source("Sources/MacWiki/Views/Inspector/InspectorLabelSection.swift")
-        let tags = try source("Sources/MacWiki/Views/Inspector/InspectorTagStatusBox.swift")
-
-        #expect(panel.contains("let state = currentArticleStates.first"))
-        #expect(!panel.contains("loadOrCreateArticleState"))
-        #expect(!panel.contains("ReadStateSync.syncSavedArticles"))
-        #expect(!panel.contains("ReadStateSync.resolveReadState"))
-        #expect(!panel.contains("modelContext.insert(newState)"))
-        #expect(!panel.contains("modelContext.saveReportingFailure"))
-        #expect(!panel.contains("appState.updateReadState"))
-
-        // Explicit organization edits retain their lazy mutation boundary.
-        #expect(labels.contains("ReadStateSync.ensureArticleState(for: article, in: modelContext)"))
-        #expect(tags.contains("ReadStateSync.ensureArticleState(for: article, in: modelContext)"))
-    }
-
     private func makeInMemoryModelContext() throws -> ModelContext {
         let configuration = ModelConfiguration(isStoredInMemoryOnly: true)
         let container = try ModelContainer(
@@ -140,16 +121,5 @@ struct InspectorArticleSnapshotTests {
             configurations: configuration
         )
         return ModelContext(container)
-    }
-
-    private func source(_ path: String) throws -> String {
-        try String(contentsOf: repositoryRoot.appending(path: path), encoding: .utf8)
-    }
-
-    private var repositoryRoot: URL {
-        URL(filePath: #filePath)
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
     }
 }

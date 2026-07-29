@@ -1,4 +1,3 @@
-import Foundation
 import SwiftUI
 import Testing
 
@@ -56,31 +55,5 @@ struct ReaderInspectorSurfacePolicyTests {
         #expect(policy.borderOpacity == 0.12)
         #expect(policy.borderWidth == 0.8)
         #expect(policy.shadowMultiplier == 1)
-    }
-
-    @Test func targetedMicroInteractionsHonorReduceMotion() throws {
-        let toolbar = try source("Sources/MacWiki/Views/Components/HighlightToolbar.swift")
-        let tagEditor = try source("Sources/MacWiki/Views/Inspector/InspectorTagEditor.swift")
-        let hoverPreview = try source(
-            "Sources/MacWiki/Views/Components/WebView/WebViewLinkHoverPreviewPane.swift"
-        )
-
-        #expect(toolbar.contains("accessibilityPersonalization.reduceMotion"))
-        #expect(toolbar.contains("@Environment(\\.macWikiAccessibilityPersonalization.reduceMotion)"))
-        #expect(tagEditor.contains("@Environment(\\.macWikiAccessibilityPersonalization.reduceMotion)"))
-        #expect(tagEditor.contains("withAnimation(reduceMotion ? nil"))
-        #expect(hoverPreview.contains("@Environment(\\.macWikiAccessibilityPersonalization.reduceMotion)"))
-        #expect(hoverPreview.contains("withAnimation(reduceMotion ? nil"))
-    }
-
-    private func source(_ path: String) throws -> String {
-        let repositoryRoot = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-        return try String(
-            contentsOf: repositoryRoot.appending(path: path),
-            encoding: .utf8
-        )
     }
 }

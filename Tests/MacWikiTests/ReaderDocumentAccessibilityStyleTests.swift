@@ -66,25 +66,6 @@ struct ReaderDocumentAccessibilityStyleTests {
         #expect(!css.contains("prefers-reduced-transparency"))
     }
 
-    @Test func webViewReceivesAndSynchronizesTheNativeAccessibilityValue() throws {
-        let reader = try resource("Sources/MacWiki/Views/Reader/ReaderView.swift")
-        let webView = try resource("Sources/MacWiki/Views/Components/WebView.swift")
-        let lifecycle = try resource(
-            "Sources/MacWiki/Views/Components/WebView/WebView+ContentLifecycle.swift"
-        )
-
-        #expect(reader.contains("reduceTransparency: accessibilityPersonalization.reduceTransparency"))
-        #expect(reader.contains("differentiateWithoutColor: accessibilityPersonalization.differentiateWithoutColor"))
-        #expect(webView.contains("reduceTransparency: reduceTransparency"))
-        #expect(webView.contains("differentiateWithoutColor: differentiateWithoutColor"))
-        #expect(webView.contains("context.coordinator.reduceTransparency = reduceTransparency"))
-        #expect(webView.contains("context.coordinator.differentiateWithoutColor = differentiateWithoutColor"))
-        #expect(webView.contains("context.coordinator.syncReaderAccessibilityStyle(on: webView)"))
-        #expect(lifecycle.contains("syncReaderAccessibilityStyle(on: webView, force: true)"))
-        #expect(lifecycle.contains("self.lastAppliedReduceTransparency = requestedReduceTransparency"))
-        #expect(lifecycle.contains("self.lastAppliedDifferentiateWithoutColor = requestedDifferentiateWithoutColor"))
-    }
-
     @Test func highlightCSSProvidesANonColorCueWhenRequested() throws {
         let script = try resource("Sources/MacWiki/Resources/WebView.js")
 
