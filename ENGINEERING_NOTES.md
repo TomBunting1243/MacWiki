@@ -7,12 +7,12 @@ When this note disagrees with the app, a current test, a clean package manifest,
 ## Current checkpoint
 
 - Integration branch: `codex/internal-beta-xcode27-integration`
-- Current implementation checkpoint before this note: `70caa81` (`test: migrate surface regressions to behavior`)
-- Clean packaged base: Candidate 140 at `85c09af`
-- Current source is eight commits beyond Candidate 140 and does not yet have a matching package.
+- Current implementation checkpoint before this note: `b8b59ca` (`refactor: centralize sidebar selection state`)
+- Clean packaged base: Candidate 141 at `b8b59caa092781874219d67a0f41ab2fed177597`
+- Exact package: `dist/MacWiki-1.0-internal.141-build141-20260729-142857.app`
 - Release decision: **NOT READY**
 
-Candidate 140 remains historical evidence only. Do not launch, screenshot, or describe it as though it contains the current integration changes.
+Candidate 141 is the only package that contains the current integration changes. It has complete deterministic preflight evidence but no fresh whole-app rendered acceptance yet.
 
 ## Standing engineering rules
 
@@ -70,30 +70,27 @@ Candidate 140 remains historical evidence only. Do not launch, screenshot, or de
 
 ## Integrated hardening after Candidate 140
 
-- `ac3cd52` defers reused-reader reveal publication without delaying ordinary WebKit callbacks.
-- `7e145ce` makes library and highlight mutations rollback-and-report transactional.
-- `e0b714f` centralizes accessible Liquid Glass policy and keeps the container hierarchy stable.
-- `e1bdf9f` extracts directory snapshot fingerprinting and avoids irrelevant observable-state dependencies.
-- `915736c` separates deterministic networking coverage from genuinely live Wikipedia integration.
-- `febf78b` removes the 2,294-line beta source-shape mega-suite while preserving runtime and release-safety contracts.
-- `70e5f9f` makes the clean internal-beta preflight deterministic.
-- `70caa81` migrates a second Reader, Discover, workspace, Settings, and loading-system test slice to direct behavior.
+- Persistence and WebKit/resource behavior are tested through real seams instead of production-source string scans; the former 2,294-line beta source-shape suite is gone.
+- Network-owned behavior is deterministic while live Wikipedia checks remain explicitly advisory.
+- Reader resource loading, scrolling, image timing, Discover status/load/popover handoff, Settings behavior, workspace interaction, and native chrome now have direct behavioral coverage.
+- Glass and material surfaces share one Reduce Transparency/Increase Contrast policy, including drag previews, Wiki Hop, status surfaces, Reader highlights, Inspector states, and trend charts.
+- Discover selection follows native focus; article rows retain independent accessibility controls; charts are keyboard operable; color-dependent states also expose shape, text, or pattern.
+- Directory snapshot publication and cancellable lifecycle work have one coordinator, and folder hover expansion is bound to row lifetime.
+- Lists sidebar selection canonicalization now has one window-local coordinator for native multiselection, external selection precedence, accessibility repeat activation, and deletion pruning.
 
 ## Verified evidence at this checkpoint
 
-- Candidate 139 has the latest complete packaged Reader/Inspector/shell journey.
-- Candidate 140 passed its clean nine-stage preflight, package provenance, signing, minimum-OS/SDK checks, and exact tab underlap/reorder/overflow journey.
-- Candidate 140's Reader journey was interrupted and has no final passing report.
-- Current integrated source passed 502 Swift Testing tests across 97 suites plus six XCTest tests with live Wikipedia tests skipped.
-- Current maintainability gate passes with zero errors and nine advisories.
+- Candidate 139 retains the latest complete packaged Reader/Inspector/shell journey; its visual observation was not preserved as a durable PNG set.
+- Candidate 140 passed its clean nine-stage preflight and exact tab underlap/reorder/overflow journey; its Reader journey was interrupted and has no final passing report.
+- Candidate 141 passed the complete clean nine-stage preflight from exact source `b8b59caa`: Debug and Release builds, 534 Swift Testing tests in 100 suites plus six XCTest tests, maintainability, shell syntax, redacted secret scan, provenance, ad-hoc signing, and packaging.
+- Candidate 141 records Xcode 27.0, SDK 27.0, binary minimum macOS 26.0, executable SHA-256 `2bdb05b615c2e45fb94489249a215d2f7d702041ae8d5761bfb8be7b2c7386ec`, app-tree SHA-256 `c68ec9fd2fd077b2e87d1ac0c24c2e4bdd07d11aae35517e472e1ce2dcab6726`, and ZIP SHA-256 `8950c1caf8a9e361e8c1a62f7720fb53617f783aabb71cc970d59ae2668bd412`.
+- Current maintainability gate passes with zero errors and ten advisories.
 - Official Xcode 27 MCP evidence exists historically through Candidate 132. A fresh official-Xcode build and full test record is still required for the current integration when that tool is exposed.
 
 ## Work still required
 
-- Continue replacing remaining production-Swift source scans with real seams or rendered acceptance. Do not bulk-delete genuine behavior that lacks a replacement.
-- Run the clean nine-stage preflight and create a new provenance-bound candidate from current source.
-- Run whole-app Computer Use and accessibility QA on that exact candidate, including every window and pane, loading semantics, hover/focus states, resizing, compact recovery, Reduce Motion, Reduce Transparency, Increase Contrast, and VoiceOver order/actions.
-- Reconcile `INTERNAL_BETA_QUALITY_PROGRAM.md` through Candidates 136–140 and the next integrated candidate.
+- Run whole-app Computer Use and accessibility QA on exact Candidate 141, including every window and pane, loading semantics, hover/focus states, resizing, compact recovery, Reduce Motion, Reduce Transparency, Increase Contrast, and VoiceOver order/actions.
+- Reconcile `INTERNAL_BETA_QUALITY_PROGRAM.md` through Candidates 136–141.
 - Update Jack's casual-reader release log and Project Indy operational notes with current evidence and limitations.
 - Reconcile stale architecture, Readwise, Inspector, and UI-language documentation against current product behavior.
 - Address maintainability advisories incrementally where extraction improves ownership, invalidation, testability, or performance. Line count alone is not authorization for a risky rewrite.
