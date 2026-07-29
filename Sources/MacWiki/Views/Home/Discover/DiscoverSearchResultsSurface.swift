@@ -14,20 +14,17 @@ struct DiscoverSearchResultsSurface: View {
         "discover-search-result:\(result.id):\(ReadStateSync.normalizedTitle(result.title))"
     }
 
-    private var statusSubtitle: String {
-        let count = searchCoordinator.searchResults.count
-        if searchCoordinator.isLoading {
-            return count == 0 ? "Searching Wikipedia" : "\(count) found · Updating"
-        }
-        if searchCoordinator.errorMessage != nil && count == 0 {
-            return "Search unavailable"
-        }
-        return "\(count) \(count == 1 ? "match" : "matches")"
+    private var statusPresentation: DiscoverSearchStatusPresentation {
+        DiscoverSearchStatusPresentation(
+            resultCount: searchCoordinator.searchResults.count,
+            isLoading: searchCoordinator.isLoading,
+            hasError: searchCoordinator.errorMessage != nil
+        )
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            DiscoverSectionHeader(title: "Search Results", subtitle: statusSubtitle)
+            DiscoverSectionHeader(title: "Search Results", subtitle: statusPresentation.subtitle)
             if searchCoordinator.isLoading && searchCoordinator.searchResults.isEmpty {
                 AppLoadingListPlaceholder(
                     title: "Searching Wikipedia",

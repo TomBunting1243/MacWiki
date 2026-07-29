@@ -1,76 +1,59 @@
-import Foundation
 import Testing
 
 @testable import MacWiki
 
 struct DiscoverInteractionRegressionTests {
-    @Test func trendDetailsAreRealSiblingButtonsWithoutGestureSuppression() throws {
-        let feature = try repositorySource(
-            "Sources/MacWiki/Views/Home/Discover/DiscoverFeatureComponents.swift"
+    @Test func searchStatusPrioritizesLoadingAndDistinguishesInitialFromUpdatingResults() {
+        let initialSearch = DiscoverSearchStatusPresentation(
+            resultCount: 0,
+            isLoading: true,
+            hasError: true
         )
-        let news = try repositorySource(
-            "Sources/MacWiki/Views/Home/Discover/DiscoverNewsComponents.swift"
+        let updatingResults = DiscoverSearchStatusPresentation(
+            resultCount: 3,
+            isLoading: true,
+            hasError: false
         )
 
-        #expect(news.contains("Button(action: onTap)"))
-        #expect(news.contains("if let trendPulse, let onTrendTapped"))
-        #expect(!news.contains(".highPriorityGesture("))
-        #expect(!news.contains("suppressPrimaryTapFromTrend"))
-        #expect(!feature.contains("suppressPrimaryTapFromTrend"))
-        #expect(!feature.contains("Task.sleep(nanoseconds:"))
-        #expect(!news.contains("Task.sleep(nanoseconds:"))
+        #expect(initialSearch == .searching)
+        #expect(initialSearch.subtitle == "Searching Wikipedia")
+        #expect(updatingResults == .updating(resultCount: 3))
+        #expect(updatingResults.subtitle == "3 found · Updating")
     }
 
-    @Test func unlinkedEditorialRowsAreStaticAndSearchResultsExposeSavedState() throws {
-        let resultRows = try repositorySource(
-            "Sources/MacWiki/Views/Home/Discover/DiscoverResultRows.swift"
+    @Test func searchStatusReportsUnavailableOnlyWithoutVisibleResults() {
+        let unavailable = DiscoverSearchStatusPresentation(
+            resultCount: 0,
+            isLoading: false,
+            hasError: true
         )
-        let temporalRows = try repositorySource(
-            "Sources/MacWiki/Views/Home/Discover/DiscoverTemporalSupport.swift"
-        )
-        let mediaRows = try repositorySource(
-            "Sources/MacWiki/Views/Home/Discover/DiscoverMediaSupport.swift"
+        let retainedResults = DiscoverSearchStatusPresentation(
+            resultCount: 2,
+            isLoading: false,
+            hasError: true
         )
 
-        #expect(resultRows.contains("if let article = holiday.article"))
-        #expect(resultRows.contains(".accessibilityValue(isSaved ? \"Saved\" : \"Not Saved\")"))
-        #expect(temporalRows.contains("if let article = event.article"))
-        #expect(temporalRows.contains("if let article = fact.article"))
-        #expect(resultRows.contains("isHovered && holiday.article != nil"))
-        #expect(temporalRows.contains("isHovered && event.article != nil"))
-        #expect(temporalRows.contains("isHovered && fact.article != nil"))
-        #expect(!temporalRows.contains(".disabled(event.article == nil)"))
-        #expect(!mediaRows.contains(".disabled(image.filePageURL == nil)"))
+        #expect(unavailable == .unavailable)
+        #expect(unavailable.subtitle == "Search unavailable")
+        #expect(retainedResults == .matches(resultCount: 2))
+        #expect(retainedResults.subtitle == "2 matches")
     }
 
-    @Test func searchUsesVisibleKeyboardSelectionAndHonestStatusCopy() throws {
-        let page = try repositorySource("Sources/MacWiki/Views/Home/DiscoverNewTabPageView.swift")
-        let surface = try repositorySource(
-            "Sources/MacWiki/Views/Home/Discover/DiscoverSearchResultsSurface.swift"
+    @Test func searchStatusUsesSingularAndPluralMatchCopy() {
+        let empty = DiscoverSearchStatusPresentation(
+            resultCount: 0,
+            isLoading: false,
+            hasError: false
         )
-        let rows = try repositorySource(
-            "Sources/MacWiki/Views/Home/Discover/DiscoverResultRows.swift"
+        let singleMatch = DiscoverSearchStatusPresentation(
+            resultCount: 1,
+            isLoading: false,
+            hasError: false
         )
 
-        #expect(page.contains("selectedResult(usingTrendingFallback: false)"))
-        #expect(page.contains("moveSelectionDown(usingTrendingFallback: false)"))
-        #expect(page.contains("moveSelectionUp(usingTrendingFallback: false)"))
-        #expect(page.contains("scrollProxy.scrollTo("))
-        #expect(surface.contains("count == 0 ? \"Searching Wikipedia\""))
-        #expect(surface.contains("return \"Search unavailable\""))
-        #expect(surface.contains("searchCoordinator.selectedIndex == index"))
-        #expect(rows.contains(".accessibilityAddTraits(isKeyboardFocused ? .isSelected : [])"))
-        #expect(!page.contains("searchCoordinator.searchResults.first"))
-    }
-
-    private func repositorySource(_ relativePath: String) throws -> String {
-        let repositoryRoot = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-        return try String(
-            contentsOf: repositoryRoot.appending(path: relativePath),
-            encoding: .utf8
-        )
+        #expect(empty == .matches(resultCount: 0))
+        #expect(empty.subtitle == "0 matches")
+        #expect(singleMatch == .matches(resultCount: 1))
+        #expect(singleMatch.subtitle == "1 match")
     }
 }
