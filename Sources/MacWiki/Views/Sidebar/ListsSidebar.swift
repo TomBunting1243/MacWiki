@@ -1623,7 +1623,6 @@ private struct AreaRowView<ListRow: View>: View {
 
     @State private var isCollectionDropTargeted = false
     @State private var isArticleDropTargeted = false
-    @State private var articleExpansionTask: Task<Void, Never>?
 
     private var deleteTargetAreaIDs: Set<UUID> {
         if selectedAreaIDs.contains(area.id) && selectedAreaIDs.count > 1 {
@@ -1784,19 +1783,15 @@ private struct AreaRowView<ListRow: View>: View {
                 isExpanded: area.isExpanded
             ) == .accept
         } isTargeted: { targeted in
-            handleArticleHoverChange(targeted)
+            isArticleDropTargeted = targeted
         }
-        .onDisappear {
-            articleExpansionTask?.cancel()
+        .task(id: isArticleDropTargeted) {
+            await expandForArticleHoverIfNeeded()
         }
     }
 
-    private func handleArticleHoverChange(_ targeted: Bool) {
-        isArticleDropTargeted = targeted
-        articleExpansionTask?.cancel()
-        articleExpansionTask = nil
-
-        guard targeted else { return }
+    private func expandForArticleHoverIfNeeded() async {
+        guard isArticleDropTargeted else { return }
         guard case .expandAfterDelay(let delay) = ListsSidebarAreaArticleDropPolicy.behavior(
             for: .articleHover,
             isExpanded: area.isExpanded
@@ -1804,22 +1799,20 @@ private struct AreaRowView<ListRow: View>: View {
             return
         }
 
-        articleExpansionTask = Task { @MainActor in
-            do {
-                try await Task.sleep(for: delay)
-            } catch {
-                return
-            }
+        do {
+            try await Task.sleep(for: delay)
+        } catch {
+            return
+        }
 
-            guard !Task.isCancelled else { return }
-            guard isArticleDropTargeted, !area.isExpanded else { return }
+        guard !Task.isCancelled else { return }
+        guard isArticleDropTargeted, !area.isExpanded else { return }
 
-            if reduceMotion {
+        if reduceMotion {
+            onExpansionChange(area, true)
+        } else {
+            withAnimation(.easeOut(duration: 0.18)) {
                 onExpansionChange(area, true)
-            } else {
-                withAnimation(.easeOut(duration: 0.18)) {
-                    onExpansionChange(area, true)
-                }
             }
         }
     }
