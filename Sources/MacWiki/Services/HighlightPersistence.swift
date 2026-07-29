@@ -1,10 +1,10 @@
+import Foundation
 import SwiftData
 
-/// Owns the transactional boundary for creating Reader highlights.
+/// Owns the transactional boundary for creating and updating Reader highlights.
 ///
-/// Both the floating selection toolbar and the native WebView context menu create the same
-/// model. Keeping that work here prevents either UI surface from publishing optimistic state
-/// before SwiftData confirms the highlight was saved.
+/// Reader highlighting has multiple UI surfaces. Keeping their mutations here prevents any of
+/// them from publishing optimistic state before SwiftData confirms the highlight was saved.
 @MainActor
 enum HighlightPersistence {
     static func create(
@@ -32,5 +32,16 @@ enum HighlightPersistence {
             return nil
         }
         return highlight
+    }
+
+    @discardableResult
+    static func updateColor(
+        of highlight: Highlight,
+        to color: HighlightColor,
+        in modelContext: ModelContext
+    ) -> Bool {
+        highlight.color = color
+        highlight.updatedAt = Date()
+        return modelContext.saveReportingFailure(operation: "change the highlight color")
     }
 }

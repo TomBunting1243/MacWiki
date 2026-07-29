@@ -235,9 +235,11 @@ struct HighlightRowView: View {
                 Button {
                     withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2)) {
                         guard let model = resolvedHighlight() else { return }
-                        model.color = color
-                        model.updatedAt = Date()
-                        modelContext.saveReportingFailure(operation: #function)
+                        guard HighlightPersistence.updateColor(
+                            of: model,
+                            to: color,
+                            in: modelContext
+                        ) else { return }
                         appState.pendingHighlightColorChange = AppState.HighlightColorChangeRequest(
                             id: highlight.id,
                             cssColor: color.cssColor

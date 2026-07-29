@@ -433,18 +433,22 @@ extension WebView.Coordinator {
         appState?.inspectorVisible = true
     }
 
-    func updateHighlightColor(highlightID: UUID, color: HighlightColor) {
-        guard let modelContext else { return }
-        guard let highlight = highlights.first(where: { $0.id == highlightID }) else { return }
-        guard highlight.color != color else { return }
+    @discardableResult
+    func updateHighlightColor(highlightID: UUID, color: HighlightColor) -> Bool {
+        guard let modelContext else { return false }
+        guard let highlight = highlights.first(where: { $0.id == highlightID }) else { return false }
+        guard highlight.color != color else { return true }
 
-        highlight.color = color
-        highlight.updatedAt = Date()
-        modelContext.saveReportingFailure(operation: #function)
+        guard HighlightPersistence.updateColor(
+            of: highlight,
+            to: color,
+            in: modelContext
+        ) else { return false }
         appState?.pendingHighlightColorChange = AppState.HighlightColorChangeRequest(
             id: highlightID,
             cssColor: color.cssColor
         )
+        return true
     }
 
     func deleteHighlight(highlightID: UUID) {
