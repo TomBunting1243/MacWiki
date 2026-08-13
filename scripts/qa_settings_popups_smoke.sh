@@ -692,9 +692,16 @@ delay(0.15);
 exactKeystroke('w', { using: 'command down' }, win);
 for (let attempt = 0; attempt < 30 && settingsWindow(); attempt += 1) delay(0.1);
 if (settingsWindow()) throw new Error('Command-W did not close the separate Settings window');
-if (!app.windows().some(window => {
-  try { return String(window.name()) === 'MacWiki'; } catch (e) { return false; }
-})) {
+const remainingWindows = app.windows();
+if (remainingWindows.length !== 1) {
+  throw new Error(`Closing Settings left ${remainingWindows.length} application windows instead of the one main workspace`);
+}
+const remainingElements = [];
+collectElements(remainingWindows[0], remainingElements);
+const remainingRoles = new Set(remainingElements.map(element => {
+  try { return String(element.role()); } catch (e) { return ''; }
+}));
+if (!remainingRoles.has('AXSplitGroup') || !remainingRoles.has('AXToolbar')) {
   throw new Error('Closing Settings also closed or replaced the main MacWiki window');
 }
 
