@@ -59,6 +59,19 @@ struct ContentView: View {
         .focusedSceneValue(\.macWikiInspectorCommandsAvailable, true)
         .focusedSceneValue(\.macWikiCommandCapabilities, .mainWorkspace)
         .focusedSceneValue(\.macWikiCommandModelContext, modelContext)
+        .background {
+            WorkspaceCloseShortcutBridge(
+                disposition: {
+                    WorkspaceCloseShortcutDisposition.resolve(
+                        hasActiveTab: appState.activeTabId != nil,
+                        navigationLocked: appState.isWikiHopNavigationLocked
+                    )
+                },
+                closeTab: appState.closeActiveTab
+            )
+            .frame(width: 0, height: 0)
+            .accessibilityHidden(true)
+        }
         .frame(
             minWidth: MainWindowLayout.minimumWindowWidth,
             minHeight: MainWindowLayout.minimumContentHeight

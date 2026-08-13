@@ -37,6 +37,27 @@ struct NativeDesignRegressionTests {
         )
     }
 
+    @Test func workspaceCloseShortcutDefersToTheCorrectNativeOwner() {
+        #expect(
+            WorkspaceCloseShortcutDisposition.resolve(
+                hasActiveTab: false,
+                navigationLocked: false
+            ) == .closeWindow
+        )
+        #expect(
+            WorkspaceCloseShortcutDisposition.resolve(
+                hasActiveTab: true,
+                navigationLocked: false
+            ) == .closeTab
+        )
+        #expect(
+            WorkspaceCloseShortcutDisposition.resolve(
+                hasActiveTab: true,
+                navigationLocked: true
+            ) == .ignore
+        )
+    }
+
     @Test func currentEventModifiersTakePrecedenceOverGlobalModifiers() {
         let flags = SystemBridge.resolveModifierFlags(
             currentEvent: [.command, .option],
