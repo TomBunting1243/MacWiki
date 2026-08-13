@@ -107,6 +107,68 @@ struct SettingsHelpText: View {
     }
 }
 
+struct AccessibleSettingsToggle: NSViewRepresentable {
+    let title: String
+    @Binding var isOn: Bool
+    let identifier: String?
+
+    init(
+        _ title: String,
+        isOn: Binding<Bool>,
+        identifier: String? = nil
+    ) {
+        self.title = title
+        _isOn = isOn
+        self.identifier = identifier
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(isOn: $isOn)
+    }
+
+    func makeNSView(context: Context) -> NSButton {
+        let button = NSButton(
+            checkboxWithTitle: title,
+            target: context.coordinator,
+            action: #selector(Coordinator.valueChanged(_:))
+        )
+        configure(button, coordinator: context.coordinator)
+        return button
+    }
+
+    func updateNSView(_ button: NSButton, context: Context) {
+        configure(button, coordinator: context.coordinator)
+    }
+
+    func configure(_ button: NSButton, coordinator: Coordinator) {
+        coordinator.isOn = $isOn
+        button.title = title
+        button.allowsMixedState = false
+        button.state = isOn ? .on : .off
+        if let identifier {
+            button.identifier = NSUserInterfaceItemIdentifier(identifier)
+        } else {
+            button.identifier = nil
+        }
+        button.setAccessibilityTitle(title)
+        button.setAccessibilityLabel(title)
+        button.setAccessibilityRole(.checkBox)
+    }
+
+    @MainActor
+    final class Coordinator: NSObject {
+        var isOn: Binding<Bool>
+
+        init(isOn: Binding<Bool>) {
+            self.isOn = isOn
+        }
+
+        @objc func valueChanged(_ sender: NSButton) {
+            isOn.wrappedValue = sender.state == .on
+        }
+    }
+}
+
 struct AccessibleActionButton: NSViewRepresentable {
     let title: String
     let isDestructive: Bool

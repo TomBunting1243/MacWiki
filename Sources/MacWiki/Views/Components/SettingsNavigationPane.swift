@@ -14,9 +14,11 @@ struct SettingsNavigationPane: View {
             systemImage: section.systemImage
         ) {
             SettingsGroup("Discover", systemImage: "safari") {
-                Toggle("Hide Sidebar Time Machine", isOn: $discoverSidebarTimeMachineHidden)
-                    .accessibilityLabel("Hide Sidebar Time Machine")
-                    .accessibilityIdentifier("settings.navigation.hideSidebarTimeMachine")
+                AccessibleSettingsToggle(
+                    "Hide Sidebar Time Machine",
+                    isOn: $discoverSidebarTimeMachineHidden,
+                    identifier: "settings.navigation.hideSidebarTimeMachine"
+                )
 
                 SettingsHelpText("Discover opens its full editorial page. List Contents can remain visible as a compact companion edition.")
             }

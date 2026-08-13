@@ -1,4 +1,5 @@
 import AppKit
+import SwiftUI
 import Testing
 
 @testable import MacWiki
@@ -61,5 +62,33 @@ struct SettingsControlBehaviorTests {
 
         coordinator.performAction()
         #expect(invocationCount == 1)
+    }
+
+    @Test func accessibleSettingsToggleUsesNativeTitleValueAndIdentifier() {
+        var isOn = true
+        let binding = Binding(
+            get: { isOn },
+            set: { isOn = $0 }
+        )
+        let control = AccessibleSettingsToggle(
+            "Hide Sidebar Time Machine",
+            isOn: binding,
+            identifier: "settings.navigation.hideSidebarTimeMachine"
+        )
+        let coordinator = control.makeCoordinator()
+        let button = NSButton()
+
+        control.configure(button, coordinator: coordinator)
+
+        #expect(button.title == "Hide Sidebar Time Machine")
+        #expect(button.state == .on)
+        #expect(button.identifier?.rawValue == "settings.navigation.hideSidebarTimeMachine")
+        #expect(button.accessibilityRole() == .checkBox)
+        #expect(button.accessibilityTitle() == "Hide Sidebar Time Machine")
+        #expect(button.accessibilityLabel() == "Hide Sidebar Time Machine")
+
+        button.state = .off
+        coordinator.valueChanged(button)
+        #expect(!isOn)
     }
 }

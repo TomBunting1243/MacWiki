@@ -19,19 +19,19 @@ struct SettingsChromePane: View {
             systemImage: section.systemImage
         ) {
             SettingsGroup("Window Surfaces", systemImage: "sparkles.rectangle.stack") {
-                Toggle("Liquid Glass Chrome", isOn: $liquidGlassChrome)
+                AccessibleSettingsToggle("Liquid Glass Chrome", isOn: $liquidGlassChrome)
                 SettingsHelpText("Use translucent Liquid Glass treatment for custom reader tabs, floating overlays, and top chrome.")
 
-                Toggle("Use Legacy Glass Fallbacks", isOn: $forceLegacyGlassFallback)
+                AccessibleSettingsToggle("Use Legacy Glass Fallbacks", isOn: $forceLegacyGlassFallback)
                 SettingsHelpText("Disable macOS 26 glass APIs and render the older material-based fallback path instead.")
             }
 
             SettingsGroup("Tab Accompaniments", systemImage: "rectangle.stack.badge.plus") {
-                Toggle("Saved Marker", isOn: $showSavedTabMarker)
-                Toggle("Highlight Marker", isOn: $showHighlightTabMarker)
-                Toggle("Read Marker", isOn: $showReadTabMarker)
-                Toggle("Reading Progress Rail", isOn: $showTabProgressTrack)
-                Toggle("Active Tab Depth", isOn: $showTabActiveDepth)
+                AccessibleSettingsToggle("Saved Marker", isOn: $showSavedTabMarker)
+                AccessibleSettingsToggle("Highlight Marker", isOn: $showHighlightTabMarker)
+                AccessibleSettingsToggle("Read Marker", isOn: $showReadTabMarker)
+                AccessibleSettingsToggle("Reading Progress Rail", isOn: $showTabProgressTrack)
+                AccessibleSettingsToggle("Active Tab Depth", isOn: $showTabActiveDepth)
 
                 SettingsHelpText("These power-user cues keep saved, highlighted, read, and reading-position state visible across the reader tab strip, including inactive tabs.")
             }

@@ -69,7 +69,7 @@ struct SettingsLibraryPane: View {
 
                 SettingsHelpText(highlightMarkerDescription(for: highlightMarkerStyle))
 
-                Toggle("Wrap Highlight Header", isOn: $highlightHeaderWrap)
+                AccessibleSettingsToggle("Wrap Highlight Header", isOn: $highlightHeaderWrap)
                 SettingsHelpText("Long highlight section titles can wrap instead of being clipped.")
             }
         }

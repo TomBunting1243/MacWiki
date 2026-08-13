@@ -477,10 +477,10 @@ try {
 }
 
 const paneContracts = [
+  ['Navigation', ['Discover', 'Hide Sidebar Time Machine', 'Recents', 'Recents Shows']],
   ['Advanced', ['Advanced', 'Experimental features, cache maintenance', 'In-Memory', 'Disk', 'Pinned on Disk', 'Performance samples appear here']],
   ['Reading', ['Font', 'Font Size', 'Line Height', 'Paragraph Spacing', 'Content Width', 'Side Margin', 'Heading Scale', 'Immediate Reveal']],
   ['Library', ['Sidebar Sort', 'Default Save List', 'Label Display', 'Highlight Marker']],
-  ['Navigation', ['Discover', 'Hide Sidebar Time Machine', 'Recents', 'Recents Shows']],
   ['Chrome', ['Chrome', 'Use translucent Liquid Glass treatment']]
 ];
 for (const [title, expectedStrings] of paneContracts) {
