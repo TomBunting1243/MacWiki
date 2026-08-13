@@ -331,52 +331,51 @@ struct WebView: NSViewRepresentable {
         context.coordinator.syncNativeHighlightMenuMode(on: webView)
         context.coordinator.syncReaderAccessibilityStyle(on: webView)
 
-        // Process all pending actions (don't early-return so multiple can be handled)
-        var didProcessPendingAction = false
+        var pendingActionArbitrator = WebViewPendingActionArbitrator(
+            isContentLoadInFlight: context.coordinator.isContentLoadInFlight,
+            canRunDocumentJavaScript: context.coordinator.canRunDocumentJavaScript(on: webView),
+            loadedDocumentMatchesCurrentRevision:
+                context.coordinator.lastLoadedArticleTitle == articleTitle &&
+                context.coordinator.lastLoadedHTMLSignature == contentRevision
+        )
 
         // Apply a color selected from the native highlight popover to the current WebView selection.
         if let pending = appState?.pendingImmediateHighlight,
-           !context.coordinator.isContentLoadInFlight,
-           context.coordinator.canRunDocumentJavaScript(on: webView) {
+           pendingActionArbitrator.canPerformDocumentJavaScriptAction {
             let script = "window.highlightCurrentSelection('\(pending.id.uuidString)', '\(pending.cssColor)');"
             webView.evaluateJavaScript(script)
             DispatchQueue.main.async {
                 self.appState?.pendingImmediateHighlight = nil
             }
             context.coordinator.lastAppliedHighlightIds.insert(pending.id)
-            didProcessPendingAction = true
+            pendingActionArbitrator.record(.documentInteraction)
         }
 
         // Apply pending highlight color change in WebView
         if let pending = appState?.pendingHighlightColorChange,
-           !context.coordinator.isContentLoadInFlight,
-           context.coordinator.canRunDocumentJavaScript(on: webView) {
+           pendingActionArbitrator.canPerformDocumentJavaScriptAction {
             let script = "window.updateHighlightColor('\(pending.id.uuidString)', '\(pending.cssColor)');"
             webView.evaluateJavaScript(script)
             DispatchQueue.main.async {
                 self.appState?.pendingHighlightColorChange = nil
             }
-            didProcessPendingAction = true
+            pendingActionArbitrator.record(.documentInteraction)
         }
 
         // Scroll to a specific highlight
         if let pending = appState?.pendingHighlightScroll,
-           !context.coordinator.isContentLoadInFlight,
-           context.coordinator.canRunDocumentJavaScript(on: webView) {
+           pendingActionArbitrator.canPerformDocumentJavaScriptAction {
             let script = "window.scrollToHighlight('\(pending.uuidString)');"
             webView.evaluateJavaScript(script)
             DispatchQueue.main.async {
                 self.appState?.pendingHighlightScroll = nil
             }
-            didProcessPendingAction = true
+            pendingActionArbitrator.record(.documentInteraction)
         }
 
         // Scroll to a specific heading from Table of Contents
         if let sectionId = appState?.pendingTableOfContentsScrollTarget,
-           !context.coordinator.isContentLoadInFlight,
-           context.coordinator.canRunDocumentJavaScript(on: webView),
-           context.coordinator.lastLoadedArticleTitle == articleTitle,
-           context.coordinator.lastLoadedHTMLSignature == contentRevision,
+           pendingActionArbitrator.canPerformTableOfContentsScroll,
            let request = context.coordinator.tableOfContentsScrollRequestTracker.begin(
                sectionID: sectionId,
                articleTitle: articleTitle,
@@ -423,25 +422,32 @@ struct WebView: NSViewRepresentable {
                     appState?.pendingTableOfContentsScrollTarget = nil
                 }
             }
-            didProcessPendingAction = true
+            pendingActionArbitrator.record(.documentInteraction)
         }
 
         // In-page find (Search on Page).
-        if let pending = appState?.pendingFindOnPageRequest,
-           pending.tabID == tabID {
+        if let pending = appState?.pendingFindOnPageRequest {
             let coordinator = context.coordinator
             let trimmedQuery = pending.query.trimmingCharacters(in: .whitespacesAndNewlines)
+            let findAction = pendingActionArbitrator.findAction(
+                pendingTabID: pending.tabID,
+                activeTabID: tabID,
+                hasRequestInFlight: coordinator.hasFindRequestInFlight(),
+                shouldDefer: coordinator.shouldDeferFindRequest(on: webView),
+                trimmedQueryIsEmpty: trimmedQuery.isEmpty
+            )
 
-            if coordinator.hasFindRequestInFlight() {
+            switch findAction {
+            case .ignore, .deferUntilDocumentReady:
+                break
+            case .queueBehindInFlightRequest:
                 coordinator.queueFindRequest(pending)
                 DispatchQueue.main.async {
                     guard self.appState?.pendingFindOnPageRequest?.requestID == pending.requestID else { return }
                     self.appState?.pendingFindOnPageRequest = nil
                 }
-                didProcessPendingAction = true
-            } else if coordinator.shouldDeferFindRequest(on: webView) {
-                // Keep the request pending until WebKit is stable for find operations.
-            } else if trimmedQuery.isEmpty {
+                pendingActionArbitrator.record(.stateOnly)
+            case .clearSelection:
                 // Best-effort clear: remove any active selection/focus state tied to find.
                 webView.evaluateJavaScript("window.getSelection().removeAllRanges();")
                 DispatchQueue.main.async {
@@ -450,8 +456,8 @@ struct WebView: NSViewRepresentable {
                     self.appState?.currentFindOnPageRequestID = nil
                     self.appState?.pendingFindOnPageRequest = nil
                 }
-                didProcessPendingAction = true
-            } else {
+                pendingActionArbitrator.record(.documentInteraction)
+            case .execute:
                 let configuration = WKFindConfiguration()
                 configuration.caseSensitive = false
                 configuration.wraps = true
@@ -514,17 +520,22 @@ struct WebView: NSViewRepresentable {
                 DispatchQueue.main.async {
                     self.appState?.pendingFindOnPageRequest = nil
                 }
-                didProcessPendingAction = true
+                pendingActionArbitrator.record(.documentInteraction)
             }
         }
 
-        let hasPendingRehydrate = appState?.pendingHighlightRehydrate != nil
-        if didProcessPendingAction && !hasPendingRehydrate { return }
+        switch pendingActionArbitrator.continuation(
+            hasPendingHighlightRehydrate: appState?.pendingHighlightRehydrate != nil
+        ) {
+        case .stop:
+            return
+        case .attemptHighlightRehydrate, .continueDocumentUpdate:
+            break
+        }
 
         // Retry rehydrating a stale highlight
         if let pending = appState?.pendingHighlightRehydrate,
-           !context.coordinator.isContentLoadInFlight,
-           context.coordinator.canRunDocumentJavaScript(on: webView) {
+           pendingActionArbitrator.canAttemptHighlightRehydrate {
             let payload: [String: Any] = [
                 "id": pending.id.uuidString,
                 "text": pending.text,
