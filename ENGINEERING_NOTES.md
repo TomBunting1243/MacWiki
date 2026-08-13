@@ -6,7 +6,7 @@ When this note disagrees with the app, a current test, a clean package manifest,
 
 ## Current checkpoint
 
-- Continuation branch: `codex/internal-beta-xcode27-continuation`
+- Integration branch: `codex/internal-beta-xcode27-integration` (fast-forwarded through evidence commit `709c0df`)
 - Current implementation checkpoint before this note: `6ba6e1f` (`refactor: arbitrate reader web actions`)
 - Clean packaged base: Candidate 142 at `6ba6e1fc31a780ab9506badb2b6583710cff040e`
 - Exact package: `/private/tmp/macwiki-internal-beta-142/dist/MacWiki-1.0-internal.142-build142-20260812-184200.app`
@@ -92,7 +92,6 @@ Candidate 142 is the only package that contains the WebView pending-action arbit
 ## Work still required
 
 - Complete the remaining whole-app Candidate 142 interface matrix, including secondary windows, every loading/empty/error state, hover/focus states, compact and wide resizing, Reduce Motion, Reduce Transparency, Increase Contrast, and spoken VoiceOver order/actions.
-- Reconcile the Candidate 142 continuation commit onto the durable integration branch without overwriting the preserved historical worktree state.
 - Update Jack's casual-reader release log and Project Indy operational notes with current evidence and limitations.
 - Reconcile stale architecture, Readwise, Inspector, and UI-language documentation against current product behavior.
 - Address maintainability advisories incrementally where extraction improves ownership, invalidation, testability, or performance. Line count alone is not authorization for a risky rewrite.
