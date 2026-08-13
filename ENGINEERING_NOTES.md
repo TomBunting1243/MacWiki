@@ -6,13 +6,13 @@ When this note disagrees with the app, a current test, a clean package manifest,
 
 ## Current checkpoint
 
-- Integration branch: `codex/internal-beta-xcode27-integration`
-- Current implementation checkpoint before this note: `b8b59ca` (`refactor: centralize sidebar selection state`)
-- Clean packaged base: Candidate 141 at `b8b59caa092781874219d67a0f41ab2fed177597`
-- Exact package: `dist/MacWiki-1.0-internal.141-build141-20260729-142857.app`
+- Continuation branch: `codex/internal-beta-xcode27-continuation`
+- Current implementation checkpoint before this note: `6ba6e1f` (`refactor: arbitrate reader web actions`)
+- Clean packaged base: Candidate 142 at `6ba6e1fc31a780ab9506badb2b6583710cff040e`
+- Exact package: `/private/tmp/macwiki-internal-beta-142/dist/MacWiki-1.0-internal.142-build142-20260812-184200.app`
 - Release decision: **NOT READY**
 
-Candidate 141 is the only package that contains the current integration changes. It has complete deterministic preflight evidence but no fresh whole-app rendered acceptance yet.
+Candidate 142 is the only package that contains the WebView pending-action arbitration extraction. It has complete deterministic preflight evidence plus focused exact-package Reader/Inspector and Computer Use evidence. Whole-app rendered closure, current official-Xcode evidence, spoken VoiceOver, real macOS 26, and current performance coverage remain open.
 
 ## Standing engineering rules
 
@@ -77,20 +77,22 @@ Candidate 141 is the only package that contains the current integration changes.
 - Discover selection follows native focus; article rows retain independent accessibility controls; charts are keyboard operable; color-dependent states also expose shape, text, or pattern.
 - Directory snapshot publication and cancellable lifecycle work have one coordinator, and folder hover expansion is bound to row lifetime.
 - Lists sidebar selection canonicalization now has one window-local coordinator for native multiselection, external selection precedence, accessibility repeat activation, and deletion pruning.
+- Reader one-shot WebView commands now share a pure arbitration policy for document readiness and update continuation. Queued find state no longer suppresses an unrelated document reload or sync, while all `WKWebView` side effects remain in the representable.
 
 ## Verified evidence at this checkpoint
 
 - Candidate 139 retains the latest complete packaged Reader/Inspector/shell journey; its visual observation was not preserved as a durable PNG set.
 - Candidate 140 passed its clean nine-stage preflight and exact tab underlap/reorder/overflow journey; its Reader journey was interrupted and has no final passing report.
-- Candidate 141 passed the complete clean nine-stage preflight from exact source `b8b59caa`: Debug and Release builds, 534 Swift Testing tests in 100 suites plus six XCTest tests, maintainability, shell syntax, redacted secret scan, provenance, ad-hoc signing, and packaging.
-- Candidate 141 records Xcode 27.0, SDK 27.0, binary minimum macOS 26.0, executable SHA-256 `2bdb05b615c2e45fb94489249a215d2f7d702041ae8d5761bfb8be7b2c7386ec`, app-tree SHA-256 `c68ec9fd2fd077b2e87d1ac0c24c2e4bdd07d11aae35517e472e1ce2dcab6726`, and ZIP SHA-256 `8950c1caf8a9e361e8c1a62f7720fb53617f783aabb71cc970d59ae2668bd412`.
+- Candidate 142 passed the complete clean nine-stage preflight from exact source `6ba6e1f`: Debug and Release builds, 547 Swift Testing tests in 101 suites plus six XCTest tests, maintainability, shell syntax, redacted secret scan, provenance, ad-hoc signing, and packaging.
+- Candidate 142 records Xcode 27.0, SDK 27.0, binary minimum macOS 26.0, packaged executable SHA-256 `f33ae5c18c65c9d386462245d3d7845a7d46c8b26d1548eea67335077986b399`, app-tree SHA-256 `069394d2bc108cee0fc5e421e22c0ec7889896907c980c58c21a3974e127b882`, and ZIP SHA-256 `b5b7bb006fed26736a127e9c733d91a00cdf932f6da9fd2e8362c3e1db4c5e83`.
+- Exact Candidate 142 passed the isolated Reader/Inspector accessibility journey: four native panes, all eight auxiliary visibility states, 20 Lists/List Contents cycles, 12 rapid Inspector-mode cycles, six Inspector hide/restore cycles, one interrupted transition, one native Find UI, Contents navigation, Page Views, and read-state mutation. A fresh Computer Use pass preserved Reader, Find, pane-state, and offline Discover screenshots; no fatal, assertion, crash, or `AttributeGraph` diagnostic was found, and the exact candidate process was cleaned up.
 - Current maintainability gate passes with zero errors and ten advisories.
 - Official Xcode 27 MCP evidence exists historically through Candidate 132. A fresh official-Xcode build and full test record is still required for the current integration when that tool is exposed.
 
 ## Work still required
 
-- Run whole-app Computer Use and accessibility QA on exact Candidate 141, including every window and pane, loading semantics, hover/focus states, resizing, compact recovery, Reduce Motion, Reduce Transparency, Increase Contrast, and VoiceOver order/actions.
-- Reconcile `INTERNAL_BETA_QUALITY_PROGRAM.md` through Candidates 136–141.
+- Complete the remaining whole-app Candidate 142 interface matrix, including secondary windows, every loading/empty/error state, hover/focus states, compact and wide resizing, Reduce Motion, Reduce Transparency, Increase Contrast, and spoken VoiceOver order/actions.
+- Reconcile the Candidate 142 continuation commit onto the durable integration branch without overwriting the preserved historical worktree state.
 - Update Jack's casual-reader release log and Project Indy operational notes with current evidence and limitations.
 - Reconcile stale architecture, Readwise, Inspector, and UI-language documentation against current product behavior.
 - Address maintainability advisories incrementally where extraction improves ownership, invalidation, testability, or performance. Line count alone is not authorization for a risky rewrite.
