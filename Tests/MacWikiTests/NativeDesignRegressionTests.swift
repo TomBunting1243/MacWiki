@@ -19,17 +19,20 @@ struct NativeDesignRegressionTests {
     @Test func closeCommandHasOneSceneAppropriateOwner() {
         #expect(
             !MacWikiCloseCommandPolicy.usesNativeWindowClose(
-                for: .mainWorkspace
+                for: .mainWorkspace,
+                hasActiveTab: true
             )
         )
         #expect(
             MacWikiCloseCommandPolicy.usesNativeWindowClose(
-                for: .articleWindow
+                for: .mainWorkspace,
+                hasActiveTab: false
             )
         )
         #expect(
             MacWikiCloseCommandPolicy.usesNativeWindowClose(
-                for: []
+                for: .articleWindow,
+                hasActiveTab: true
             )
         )
     }

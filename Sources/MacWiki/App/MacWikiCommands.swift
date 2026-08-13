@@ -23,9 +23,10 @@ struct MacWikiCommandCapabilities: OptionSet, Sendable {
 
 enum MacWikiCloseCommandPolicy {
     static func usesNativeWindowClose(
-        for capabilities: MacWikiCommandCapabilities
+        for capabilities: MacWikiCommandCapabilities,
+        hasActiveTab: Bool
     ) -> Bool {
-        !capabilities.contains(.tabs)
+        !capabilities.contains(.tabs) || !hasActiveTab
     }
 }
 
@@ -71,23 +72,22 @@ struct MacWikiCommands: Commands {
         // Replace it with the scene-appropriate close action so Command-W has
         // exactly one native File-menu owner in every window role.
         CommandGroup(replacing: .saveItem) {
-            if !MacWikiCloseCommandPolicy.usesNativeWindowClose(
-                for: commandCapabilities
-            ) {
-                Button("Close Tab") {
+            Button("Close") {
+                if MacWikiCloseCommandPolicy.usesNativeWindowClose(
+                    for: commandCapabilities,
+                    hasActiveTab: appState.activeTabId != nil
+                ) {
+                    NSApp.keyWindow?.performClose(nil)
+                } else {
                     appState.closeActiveTab()
                 }
-                .keyboardShortcut("w", modifiers: .command)
-                .disabled(
-                    appState.activeTabId == nil
-                        || appState.isWikiHopNavigationLocked
-                )
-            } else {
-                Button("Close Window") {
-                    NSApp.keyWindow?.performClose(nil)
-                }
-                .keyboardShortcut("w", modifiers: .command)
             }
+            .keyboardShortcut("w", modifiers: .command)
+            .disabled(
+                supports(.tabs)
+                    && appState.activeTabId != nil
+                    && appState.isWikiHopNavigationLocked
+            )
         }
 
         SidebarCommands()

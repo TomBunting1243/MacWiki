@@ -174,17 +174,20 @@ func pressKey(_ keyCode: CGKeyCode, flags: CGEventFlags) throws {
 }
 
 func switchAndMeasure(in application: AXUIElement, flags: CGEventFlags) throws -> Double {
-    let beforeTabs = tabElements(in: application)
-    guard let before = activeIndex(in: beforeTabs) else { throw TabNavigationError.activeTabMissing }
-    let startedAt = DispatchTime.now().uptimeNanoseconds
-    try pressKey(48, flags: flags)
-    let deadline = Date().addingTimeInterval(3)
-    while Date() < deadline {
-        let afterTabs = tabElements(in: application)
-        if let after = activeIndex(in: afterTabs), after != before {
-            return Double(DispatchTime.now().uptimeNanoseconds - startedAt) / 1_000_000
+    for _ in 0..<2 {
+        let beforeTabs = tabElements(in: application)
+        guard let before = activeIndex(in: beforeTabs) else { throw TabNavigationError.activeTabMissing }
+        let startedAt = DispatchTime.now().uptimeNanoseconds
+        try pressKey(48, flags: flags)
+        let deadline = Date().addingTimeInterval(2)
+        while Date() < deadline {
+            let afterTabs = tabElements(in: application)
+            if let after = activeIndex(in: afterTabs), after != before {
+                return Double(DispatchTime.now().uptimeNanoseconds - startedAt) / 1_000_000
+            }
+            Thread.sleep(forTimeInterval: 0.01)
         }
-        Thread.sleep(forTimeInterval: 0.01)
+        Thread.sleep(forTimeInterval: 0.1)
     }
     throw TabNavigationError.selectionUnchanged
 }
@@ -212,6 +215,10 @@ do {
     let closedTabs = try waitForTabCount(createdTabs.count - 1, in: application, timeout: 5)
     try pressKey(17, flags: [.maskCommand, .maskShift])
     let reopenedTabs = try waitForTabCount(createdTabs.count, in: application, timeout: 5)
+    fputs(
+        "tab-close-checkpoint: created=\(createdTabs.count) closed=\(closedTabs.count) reopened=\(reopenedTabs.count)\n",
+        stderr
+    )
 
     var durations: [Double] = []
     for _ in 0..<2 {
