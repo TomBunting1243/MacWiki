@@ -168,8 +168,6 @@ observations.states.push(windowSnapshot('initial'))
 for (const [menuName, itemName, expectedCharacter] of [
   ['MacWiki', 'Settings…', ','],
   ['Tabs', 'New Tab', 'T'],
-  ['Tabs', 'Close Tab', 'W'],
-  ['Tabs', 'Reopen Closed Tab', 'T'],
   ['Edit', 'Search Wikipedia', 'K'],
   ['Edit', 'Find in Page', 'F'],
   ['View', 'Toggle Inspector', 'I'],
@@ -190,7 +188,7 @@ assert(enabled('MacWiki', 'Settings…'), 'Settings must be enabled')
 assert(enabled('Library', 'New Reading List'), 'New Reading List must be enabled')
 assert(enabled('Library', 'New Folder'), 'New Folder must be enabled')
 assert(enabled('Tabs', 'New Tab'), 'New Tab must be enabled')
-assert(!enabled('Tabs', 'Close Tab'), 'Close Tab must be disabled without an open tab')
+assert(!enabled('File', 'Close Tab'), 'Close Tab must be disabled without an open tab')
 assert(!enabled('Tabs', 'Reopen Closed Tab'), 'Reopen Closed Tab must be disabled before a tab closes')
 assert(!enabled('Article', 'Save Article…'), 'Save Article must be disabled without an article')
 assert(!enabled('Article', 'Add to List…'), 'Add to List must be disabled without an active tab')
@@ -201,20 +199,22 @@ assert(enabled('View', 'Toggle Inspector'), 'Toggle Inspector must be enabled')
 assertDocumentReaderCommandsDisabled('with an empty workspace')
 
 menuItem('Tabs', 'New Tab').click()
-waitUntil(() => enabled('Tabs', 'Close Tab'), 'Close Tab did not enable after New Tab')
+waitUntil(() => enabled('File', 'Close Tab'), 'Close Tab did not enable after New Tab')
+assert(commandCharacter('File', 'Close Tab') === 'W', 'Enabled Close Tab did not publish Command-W')
 assert(enabled('Article', 'Add to List…'), 'Add to List did not enable for an active tab')
 assert(enabled('Tabs', 'Next Tab'), 'Next Tab did not enable for an open tab')
 assert(enabled('Tabs', 'Previous Tab'), 'Previous Tab did not enable for an open tab')
 assertDocumentReaderCommandsDisabled('with a tab but no article')
 observations.states.push(windowSnapshot('tab-open'))
 
-menuItem('Tabs', 'Close Tab').click()
+menuItem('File', 'Close Tab').click()
 waitUntil(() => enabled('Tabs', 'Reopen Closed Tab'), 'Reopen Closed Tab did not enable after Close Tab')
-assert(!enabled('Tabs', 'Close Tab'), 'Close Tab stayed enabled after the final tab closed')
+assert(commandCharacter('Tabs', 'Reopen Closed Tab') === 'T', 'Enabled Reopen Closed Tab did not publish Command-Shift-T')
+assert(!enabled('File', 'Close Tab'), 'Close Tab stayed enabled after the final tab closed')
 observations.states.push(windowSnapshot('tab-closed'))
 
 menuItem('Tabs', 'Reopen Closed Tab').click()
-waitUntil(() => enabled('Tabs', 'Close Tab'), 'Close Tab did not re-enable after Reopen Closed Tab')
+waitUntil(() => enabled('File', 'Close Tab'), 'Close Tab did not re-enable after Reopen Closed Tab')
 observations.states.push(windowSnapshot('tab-reopened'))
 
 menuItem('View', 'Enter Full Screen').click()

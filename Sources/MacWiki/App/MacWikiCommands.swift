@@ -68,12 +68,21 @@ struct MacWikiCommands: Commands {
         }
 
         // SwiftUI's standard save-item group owns Command-W for Close Window.
-        // The tabbed workspace instead assigns that shortcut to Close Tab in
-        // the Tabs menu, so keep exactly one shortcut owner for each scene.
+        // Replace it with the scene-appropriate close action so Command-W has
+        // exactly one native File-menu owner in every window role.
         CommandGroup(replacing: .saveItem) {
-            if MacWikiCloseCommandPolicy.usesNativeWindowClose(
+            if !MacWikiCloseCommandPolicy.usesNativeWindowClose(
                 for: commandCapabilities
             ) {
+                Button("Close Tab") {
+                    appState.closeActiveTab()
+                }
+                .keyboardShortcut("w", modifiers: .command)
+                .disabled(
+                    appState.activeTabId == nil
+                        || appState.isWikiHopNavigationLocked
+                )
+            } else {
                 Button("Close Window") {
                     NSApp.keyWindow?.performClose(nil)
                 }
@@ -262,16 +271,6 @@ struct MacWikiCommands: Commands {
             .keyboardShortcut("t", modifiers: .command)
             .disabled(
                 !supports(.tabs)
-                    || appState.isWikiHopNavigationLocked
-            )
-
-            Button("Close Tab") {
-                appState.closeActiveTab()
-            }
-            .keyboardShortcut("w", modifiers: .command)
-            .disabled(
-                !supports(.tabs)
-                    || appState.activeTabId == nil
                     || appState.isWikiHopNavigationLocked
             )
 

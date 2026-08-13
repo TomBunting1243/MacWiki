@@ -206,6 +206,13 @@ do {
     }
     let createdTabs = try waitForTabCount(initialCount + 3, in: application, timeout: 5)
 
+    // Prove the destructive shortcut contract before performance sampling so
+    // a missed switch event can never mask a Close Window regression.
+    try pressKey(13, flags: .maskCommand)
+    let closedTabs = try waitForTabCount(createdTabs.count - 1, in: application, timeout: 5)
+    try pressKey(17, flags: [.maskCommand, .maskShift])
+    let reopenedTabs = try waitForTabCount(createdTabs.count, in: application, timeout: 5)
+
     var durations: [Double] = []
     for _ in 0..<2 {
         durations.append(try switchAndMeasure(in: application, flags: .maskControl))
@@ -213,11 +220,6 @@ do {
     for _ in 0..<2 {
         durations.append(try switchAndMeasure(in: application, flags: [.maskControl, .maskShift]))
     }
-
-    try pressKey(13, flags: .maskCommand)
-    let closedTabs = try waitForTabCount(createdTabs.count - 1, in: application, timeout: 5)
-    try pressKey(17, flags: [.maskCommand, .maskShift])
-    let reopenedTabs = try waitForTabCount(createdTabs.count, in: application, timeout: 5)
 
     let result = TabNavigationResult(
         initialCount: initialCount,
