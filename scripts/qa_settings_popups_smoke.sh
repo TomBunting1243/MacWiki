@@ -62,18 +62,19 @@ if (matchingProcesses.length !== 1) {
 const app = matchingProcesses[0];
 
 function assertExactTargetFrontmost(targetWindow = null) {
-  const exactProcesses = se.processes.whose({ unixId: appPid })();
-  if (exactProcesses.length !== 1) {
-    throw new Error(`verified app PID disappeared before global input: ${appPid}`);
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const exactProcesses = se.processes.whose({ unixId: appPid })();
+    if (exactProcesses.length !== 1) {
+      throw new Error(`verified app PID disappeared before global input: ${appPid}`);
+    }
+    app.frontmost = true;
+    if (targetWindow) {
+      try { targetWindow.actions.byName('AXRaise').perform(); } catch (e) {}
+    }
+    delay(0.1);
+    if (Boolean(app.frontmost())) return;
   }
-  app.frontmost = true;
-  if (targetWindow) {
-    try { targetWindow.actions.byName('AXRaise').perform(); } catch (e) {}
-  }
-  delay(0.08);
-  if (!Boolean(app.frontmost())) {
-    throw new Error(`verified app PID is not frontmost before global input: ${appPid}`);
-  }
+  throw new Error(`verified app PID is not frontmost before global input: ${appPid}`);
 }
 
 function exactKeyCode(keyCode, targetWindow = null) {
@@ -88,23 +89,14 @@ function exactKeystroke(character, modifiers, targetWindow = null) {
 
 function settingsWindow() {
   const windows = app.windows();
+  const settingsTitles = new Set(['reading', 'library', 'navigation', 'chrome', 'advanced']);
   for (const w of windows) {
     let name = '';
     try { name = w.name(); } catch (e) {}
     const normalizedName = String(name).toLowerCase();
-    if (normalizedName.includes('settings') || ['reading', 'library', 'navigation', 'chrome', 'advanced'].includes(normalizedName)) {
+    if (normalizedName.includes('settings') || settingsTitles.has(normalizedName)) {
       return w;
     }
-  }
-  if (windows.length > 1) {
-    for (const w of windows) {
-      let name = '';
-      try { name = String(w.name()); } catch (e) {}
-      if (name !== 'MacWiki') {
-        return w;
-      }
-    }
-    return windows[0];
   }
   return null;
 }
@@ -254,15 +246,34 @@ function pressSettingsTab(title) {
         for (let attempt = 0; attempt < 20; attempt += 1) {
           delay(0.1);
           const refreshed = settingsWindow();
-          let windowName = '';
-          try { windowName = String(refreshed.name()); } catch (e) {}
-          if (windowName.toLowerCase() === title.toLowerCase()) return refreshed;
+          if (refreshed && settingsTabIsSelected(title, refreshed)) return refreshed;
         }
       }
     }
     delay(0.1);
   }
   throw new Error(`Settings tab did not become active: ${title}`);
+}
+
+function settingsTabIsSelected(title, window) {
+  let windowName = '';
+  try { windowName = String(window.name()); } catch (e) {}
+  if (windowName.toLowerCase() === title.toLowerCase()) return true;
+
+  const elements = [];
+  collectElements(window, elements);
+  const tab = elements.find(element => {
+    let role = '';
+    try { role = String(element.role()); } catch (e) {}
+    return role === 'AXRadioButton' && elementStrings(element).includes(title);
+  });
+  if (!tab) return false;
+  try {
+    const value = String(tab.value()).toLowerCase();
+    return value === '1' || value === 'true' || value === 'selected';
+  } catch (e) {
+    return false;
+  }
 }
 
 function auditSettingsPane(title, expectedStrings) {
@@ -283,9 +294,7 @@ function auditSettingsPane(title, expectedStrings) {
       delay(0.2);
       continue;
     }
-    let currentWindowName = '';
-    try { currentWindowName = String(currentWindow.name()).toLowerCase(); } catch (e) {}
-    if (currentWindowName !== title.toLowerCase()) {
+    if (!settingsTabIsSelected(title, currentWindow)) {
       pressSettingsTab(title);
       delay(0.25);
       continue;
