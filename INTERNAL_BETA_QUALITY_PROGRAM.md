@@ -273,7 +273,7 @@ Baseline records below were consolidated at `2026-07-10T01:32:43Z` by the Codex 
 
 | Item | Current value | Status |
 |---|---|---|
-| Goal worktree / active integration workspace | `/Users/tombunting/.codex/worktrees/internal-beta-xcode27/MacWiki`; staging continuation `/private/tmp/macwiki-internal-beta-142` | PASS current boundary — the durable integration branch is being advanced to Candidate 146 evidence; the exact package commit `aabdc88` is preserved unchanged in history; the original checkout remains untouched |
+| Goal worktree / active integration workspace | `/Users/tombunting/.codex/worktrees/internal-beta-xcode27/MacWiki`; staging continuation `/private/tmp/macwiki-internal-beta-142` | PASS current boundary — the durable integration branch fast-forwarded to Candidate 146 evidence commit `01378e8`; the exact package commit `aabdc88` is preserved unchanged in history; the original checkout remains untouched |
 | Goal branch / latest code milestone | `codex/internal-beta-xcode27-integration`; latest app-affecting commit `aabdc884294e696228338f4b3eca0b8ea77484c6`; newest package `1.0-internal.146` at the exact app commit. Its BuildInfo truthfully records the continuation branch used at package time. | PASS current clean source/package boundary — PKG-037 is the current package checkpoint and QA-019/UI-065 are its focused tab and rendered evidence. Candidate 132 remains the latest official `xcode-tools` checkpoint under TEST-018. |
 | Original worktree | `/Users/tombunting/Developer/MacWiki`; pre-existing release-doc edits preserved and excluded | PASS boundary — ENV-001 |
 | Xcode / SDK / Swift | Xcode 27.0 (27A5218g), macOS SDK 27.0, Swift 6.4 | PASS inventory — ENV-003/ENV-004 |
