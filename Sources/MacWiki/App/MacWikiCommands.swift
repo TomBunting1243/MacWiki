@@ -21,6 +21,14 @@ struct MacWikiCommandCapabilities: OptionSet, Sendable {
     static let articleWindow: Self = [.reader, .inspector]
 }
 
+enum MacWikiCloseCommandPolicy {
+    static func usesNativeWindowClose(
+        for capabilities: MacWikiCommandCapabilities
+    ) -> Bool {
+        !capabilities.contains(.tabs)
+    }
+}
+
 extension FocusedValues {
     @Entry var macWikiCommandAppState: AppState?
     @Entry var macWikiInspectorCommandsAvailable: Bool?
@@ -56,6 +64,20 @@ struct MacWikiCommands: Commands {
         CommandGroup(replacing: .appInfo) {
             Button("About MacWiki") {
                 showAboutPanel()
+            }
+        }
+
+        // SwiftUI's standard save-item group owns Command-W for Close Window.
+        // The tabbed workspace instead assigns that shortcut to Close Tab in
+        // the Tabs menu, so keep exactly one shortcut owner for each scene.
+        CommandGroup(replacing: .saveItem) {
+            if MacWikiCloseCommandPolicy.usesNativeWindowClose(
+                for: commandCapabilities
+            ) {
+                Button("Close Window") {
+                    NSApp.keyWindow?.performClose(nil)
+                }
+                .keyboardShortcut("w", modifiers: .command)
             }
         }
 

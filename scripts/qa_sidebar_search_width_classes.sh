@@ -309,8 +309,8 @@ on run argv
     tell application appName to activate
     tell application "System Events"
         tell process appName
-            if exists menu item "Search Wikipedia" of menu "File" of menu bar item "File" of menu bar 1 then
-                click menu item "Search Wikipedia" of menu "File" of menu bar item "File" of menu bar 1
+            if exists menu item "Search Wikipedia" of menu "Edit" of menu bar item "Edit" of menu bar 1 then
+                click menu item "Search Wikipedia" of menu "Edit" of menu bar item "Edit" of menu bar 1
                 return
             end if
         end tell

@@ -94,21 +94,28 @@ function currentWindow() {
 function menuItem(menuName, itemName) {
   const stop = Date.now() + 5000
   while (Date.now() < stop) {
-    try {
-      const menuBars = currentProcess().menuBars()
-      if (menuBars.length === 0) throw new Error('menu bar unavailable')
-      const menuBarItems = menuBars[0].menuBarItems.whose({ name: menuName })()
-      if (menuBarItems.length !== 1) throw new Error(`menu unavailable: ${menuName}`)
-      const menus = menuBarItems[0].menus()
-      if (menus.length === 0) throw new Error(`menu contents unavailable: ${menuName}`)
-      const items = menus[0].menuItems.whose({ name: itemName })()
-      // SwiftUI exposes both native shortcut variants for Next/Previous Tab
-      // with the same visible title. Either item represents the same action.
-      if (items.length > 0) return items[0]
-    } catch (_) {}
+    const item = menuItemIfPresent(menuName, itemName)
+    if (item !== null) return item
     delay(0.1)
   }
   throw new Error(`menu item unavailable: ${menuName} → ${itemName}`)
+}
+
+function menuItemIfPresent(menuName, itemName) {
+  try {
+    const menuBars = currentProcess().menuBars()
+    if (menuBars.length === 0) return null
+    const menuBarItems = menuBars[0].menuBarItems.whose({ name: menuName })()
+    if (menuBarItems.length !== 1) return null
+    const menus = menuBarItems[0].menus()
+    if (menus.length === 0) return null
+    const items = menus[0].menuItems.whose({ name: itemName })()
+    // SwiftUI exposes both native shortcut variants for Next/Previous Tab
+    // with the same visible title. Either item represents the same action.
+    return items.length > 0 ? items[0] : null
+  } catch (_) {
+    return null
+  }
 }
 
 function enabled(menuName, itemName) {
@@ -160,9 +167,9 @@ observations.states.push(windowSnapshot('initial'))
 
 for (const [menuName, itemName, expectedCharacter] of [
   ['MacWiki', 'Settings…', ','],
-  ['File', 'New Tab', 'T'],
-  ['File', 'Close Tab', 'W'],
-  ['File', 'Reopen Closed Tab', 'T'],
+  ['Tabs', 'New Tab', 'T'],
+  ['Tabs', 'Close Tab', 'W'],
+  ['Tabs', 'Reopen Closed Tab', 'T'],
   ['Edit', 'Search Wikipedia', 'K'],
   ['Edit', 'Find in Page', 'F'],
   ['View', 'Toggle Inspector', 'I'],
@@ -180,33 +187,34 @@ for (const [menuName, itemName, expectedCharacter] of [
 
 assert(enabled('MacWiki', 'About MacWiki'), 'About MacWiki must be enabled')
 assert(enabled('MacWiki', 'Settings…'), 'Settings must be enabled')
-assert(enabled('File', 'New Reading List'), 'New Reading List must be enabled')
-assert(enabled('File', 'New Folder'), 'New Folder must be enabled')
-assert(enabled('File', 'New Tab'), 'New Tab must be enabled')
-assert(!enabled('File', 'Close Tab'), 'Close Tab must be disabled without an open tab')
-assert(!enabled('File', 'Reopen Closed Tab'), 'Reopen Closed Tab must be disabled before a tab closes')
-assert(!enabled('File', 'Save Article...'), 'Save Article must be disabled without an article')
-assert(!enabled('Edit', 'Add to List...'), 'Add to List must be disabled without an active tab')
+assert(enabled('Library', 'New Reading List'), 'New Reading List must be enabled')
+assert(enabled('Library', 'New Folder'), 'New Folder must be enabled')
+assert(enabled('Tabs', 'New Tab'), 'New Tab must be enabled')
+assert(!enabled('Tabs', 'Close Tab'), 'Close Tab must be disabled without an open tab')
+assert(!enabled('Tabs', 'Reopen Closed Tab'), 'Reopen Closed Tab must be disabled before a tab closes')
+assert(!enabled('Article', 'Save Article…'), 'Save Article must be disabled without an article')
+assert(!enabled('Article', 'Add to List…'), 'Add to List must be disabled without an active tab')
+assert(menuItemIfPresent('File', 'Close Window') === null, 'Tabbed workspace must not expose a competing Close Window command')
 assert(enabled('Edit', 'Search Wikipedia'), 'Search Wikipedia must be enabled')
 assert(!enabled('Edit', 'Find in Page'), 'Find in Page must be disabled without an article')
 assert(enabled('View', 'Toggle Inspector'), 'Toggle Inspector must be enabled')
 assertDocumentReaderCommandsDisabled('with an empty workspace')
 
-menuItem('File', 'New Tab').click()
-waitUntil(() => enabled('File', 'Close Tab'), 'Close Tab did not enable after New Tab')
-assert(enabled('Edit', 'Add to List...'), 'Add to List did not enable for an active tab')
+menuItem('Tabs', 'New Tab').click()
+waitUntil(() => enabled('Tabs', 'Close Tab'), 'Close Tab did not enable after New Tab')
+assert(enabled('Article', 'Add to List…'), 'Add to List did not enable for an active tab')
 assert(enabled('Tabs', 'Next Tab'), 'Next Tab did not enable for an open tab')
 assert(enabled('Tabs', 'Previous Tab'), 'Previous Tab did not enable for an open tab')
 assertDocumentReaderCommandsDisabled('with a tab but no article')
 observations.states.push(windowSnapshot('tab-open'))
 
-menuItem('File', 'Close Tab').click()
-waitUntil(() => enabled('File', 'Reopen Closed Tab'), 'Reopen Closed Tab did not enable after Close Tab')
-assert(!enabled('File', 'Close Tab'), 'Close Tab stayed enabled after the final tab closed')
+menuItem('Tabs', 'Close Tab').click()
+waitUntil(() => enabled('Tabs', 'Reopen Closed Tab'), 'Reopen Closed Tab did not enable after Close Tab')
+assert(!enabled('Tabs', 'Close Tab'), 'Close Tab stayed enabled after the final tab closed')
 observations.states.push(windowSnapshot('tab-closed'))
 
-menuItem('File', 'Reopen Closed Tab').click()
-waitUntil(() => enabled('File', 'Close Tab'), 'Close Tab did not re-enable after Reopen Closed Tab')
+menuItem('Tabs', 'Reopen Closed Tab').click()
+waitUntil(() => enabled('Tabs', 'Close Tab'), 'Close Tab did not re-enable after Reopen Closed Tab')
 observations.states.push(windowSnapshot('tab-reopened'))
 
 menuItem('View', 'Enter Full Screen').click()

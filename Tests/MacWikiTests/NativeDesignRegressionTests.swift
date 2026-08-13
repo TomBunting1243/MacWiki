@@ -16,6 +16,24 @@ struct NativeDesignRegressionTests {
         #expect(!MacWikiCommandCapabilities.articleWindow.contains(.libraryOrganization))
     }
 
+    @Test func closeCommandHasOneSceneAppropriateOwner() {
+        #expect(
+            !MacWikiCloseCommandPolicy.usesNativeWindowClose(
+                for: .mainWorkspace
+            )
+        )
+        #expect(
+            MacWikiCloseCommandPolicy.usesNativeWindowClose(
+                for: .articleWindow
+            )
+        )
+        #expect(
+            MacWikiCloseCommandPolicy.usesNativeWindowClose(
+                for: []
+            )
+        )
+    }
+
     @Test func currentEventModifiersTakePrecedenceOverGlobalModifiers() {
         let flags = SystemBridge.resolveModifierFlags(
             currentEvent: [.command, .option],

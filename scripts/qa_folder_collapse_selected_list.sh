@@ -231,8 +231,8 @@ on createEntity(appName, windowIndex, menuItemNames, entityName)
     tell application "System Events"
         tell process appName
             repeat with candidateName in menuItemNames
-                if exists menu item (candidateName as text) of menu "File" of menu bar item "File" of menu bar 1 then
-                    click menu item (candidateName as text) of menu "File" of menu bar item "File" of menu bar 1
+                if exists menu item (candidateName as text) of menu "Library" of menu bar item "Library" of menu bar 1 then
+                    click menu item (candidateName as text) of menu "Library" of menu bar item "Library" of menu bar 1
                     set selectedMenuItemName to (candidateName as text)
                     exit repeat
                 end if
@@ -241,7 +241,7 @@ on createEntity(appName, windowIndex, menuItemNames, entityName)
     end tell
 
     if selectedMenuItemName is missing value then
-        error "No matching menu item found in File menu"
+        error "No matching menu item found in Library menu"
     end if
 
     set deadline to (current date) + 8
