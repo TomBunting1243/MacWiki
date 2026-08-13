@@ -7,12 +7,12 @@ When this note disagrees with the app, a current test, a clean package manifest,
 ## Current checkpoint
 
 - Integration branch: `codex/internal-beta-xcode27-integration` (fast-forwarded through Candidate 146 evidence commit `feb7489` before this checkpoint)
-- Current implementation checkpoint: `91eb50e` (`fix: use native settings checkboxes`)
-- Clean packaged base: Candidate 148 at `91eb50e8e93ab3150339b3d710c89a9ab826133f`
-- Exact package: `/private/tmp/macwiki-internal-beta-142/dist/MacWiki-1.0-internal.148-build148-20260812-203013.app`
+- Current implementation checkpoint: `91eb50e` (`fix: use native settings checkboxes`), with final harness and checkpoint documentation through `2374924`
+- Clean packaged base: Candidate 149 at `2374924f77673c0ca89f75223ff33db96d2f93d3`
+- Exact package: `/private/tmp/macwiki-internal-beta-142/dist/MacWiki-1.0-internal.149-build149-20260812-203933.app`
 - Release decision: **NOT READY**
 
-Candidate 148 contains the WebView pending-action arbitration extraction, the native workspace-local Command-W repair, and a narrow AppKit checkbox boundary for every visible Settings toggle. Candidate 147 proved that an explicit SwiftUI accessibility label still produced a checkbox with no native title element or description; Candidate 148 gives the controls real AppKit titles, values, identifiers, and actions. It has complete deterministic preflight evidence and exact packaged Settings acceptance. Candidate 146 remains the latest exact evidence for the unchanged Reader/Inspector, tab, window-lifecycle, personalization, About, and offline-recovery surfaces. Whole-app rendered closure, current official-Xcode evidence, spoken VoiceOver, and real macOS 26 remain open.
+Candidate 149 contains the WebView pending-action arbitration extraction, the native workspace-local Command-W repair, and a narrow AppKit checkbox boundary for every visible Settings toggle. Candidate 147 proved that an explicit SwiftUI accessibility label still produced a checkbox with no native title element or description; Candidate 148 fixed the controls; Candidate 149 repackages the same executable with the final Settings harness inside the clean source manifest. The controls now have real AppKit titles, values, identifiers, and actions. Candidate 149 has complete deterministic preflight evidence and exact packaged Settings acceptance. Candidate 146 remains the latest exact evidence for the unchanged Reader/Inspector, tab, window-lifecycle, personalization, About, and offline-recovery surfaces. Whole-app rendered closure, current official-Xcode evidence, spoken VoiceOver, and real macOS 26 remain open.
 
 ## Standing engineering rules
 
@@ -91,14 +91,14 @@ Candidate 148 contains the WebView pending-action arbitration extraction, the na
 - Exact Candidate 146 also reran the complete Reader/Inspector journey successfully: four panes, all eight auxiliary states, 20 leading-pane cycles, 12 rapid Inspector-mode cycles, six hide/restore cycles plus one interruption, stable Reader identity and toolbar geometry, Find, Contents, Page Views, read state, and 900-point recovery in isolated state.
 - Exact Candidate 146 Reader-open performance passes the committed host budgets: one cold reveal at 2,278 ms versus 3,500 ms, five warm reveals at 625–966 ms, warm p50 677 ms, and warm p95 931.2 ms versus 2,500 ms.
 - Exact Candidate 146 also passes About/provenance, five accessibility-personalization profiles plus decoded visual comparison, native main-window minimize/reopen/red-close lifecycle, and deterministic Discover/Search/Reader offline-retry journeys. The unchanged shell and network recovery paths remain valid beneath Candidate 148's Settings-only product delta.
-- Candidate 148 passed the complete clean nine-stage preflight from exact source `91eb50e`: 550 Swift Testing tests in 101 suites plus six XCTest tests, zero failures, zero maintainability errors/ten advisories, Xcode/SDK 27, binary minimum macOS 26.0, strict ad-hoc signing, and exact package hashes.
-- Exact Candidate 148 Settings acceptance passed all five panes, six native labeled/value-bearing sliders, two popup mutation/restore cycles, both destructive-confirmation Escape cancellations, document-command scoping, and Command-W closing only the separate Settings window. Every visible Settings toggle now uses the same native AppKit accessibility boundary instead of relying on a dropped SwiftUI label.
+- Candidate 149 passed the complete clean nine-stage preflight from exact source `2374924`: 550 Swift Testing tests in 101 suites plus six XCTest tests, zero failures, zero maintainability errors/ten advisories, Xcode/SDK 27, binary minimum macOS 26.0, strict ad-hoc signing, and exact package hashes.
+- Exact Candidate 149 Settings acceptance passed all five panes, six native labeled/value-bearing sliders, two popup mutation/restore cycles, both destructive-confirmation Escape cancellations, document-command scoping, and Command-W closing only the separate Settings window. Every visible Settings toggle now uses the same native AppKit accessibility boundary instead of relying on a dropped SwiftUI label.
 - Current maintainability gate passes with zero errors and ten advisories.
 - Official Xcode 27 MCP evidence exists historically through Candidate 132. A fresh official-Xcode build and full test record is still required for the current integration when that tool is exposed.
 
 ## Work still required
 
-- Complete the remaining whole-app Candidate 148 interface matrix, including the unresolved live Search-to-secondary-window rerun, every loading/empty/error state, hover/focus states, compact and wide resizing, Reduce Motion, and spoken VoiceOver order/actions. Candidate 146 already refreshed Reduce Transparency, Increase Contrast, and deterministic offline recovery for the unchanged surfaces.
+- Complete the remaining whole-app Candidate 149 interface matrix, including the unresolved live Search-to-secondary-window rerun, every loading/empty/error state, hover/focus states, compact and wide resizing, Reduce Motion, and spoken VoiceOver order/actions. Candidate 146 already refreshed Reduce Transparency, Increase Contrast, and deterministic offline recovery for the unchanged surfaces.
 - Update Jack's casual-reader release log and Project Indy operational notes with current evidence and limitations.
 - Reconcile stale architecture, Readwise, Inspector, and UI-language documentation against current product behavior.
 - Address maintainability advisories incrementally where extraction improves ownership, invalidation, testability, or performance. Line count alone is not authorization for a risky rewrite.
