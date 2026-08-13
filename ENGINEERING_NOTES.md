@@ -8,11 +8,11 @@ When this note disagrees with the app, a current test, a clean package manifest,
 
 - Integration branch: `codex/internal-beta-xcode27-integration` (fast-forwarded through evidence commit `709c0df`)
 - Current implementation checkpoint before this note: `6ba6e1f` (`refactor: arbitrate reader web actions`)
-- Clean packaged base: Candidate 142 at `6ba6e1fc31a780ab9506badb2b6583710cff040e`
+- Clean packaged base: Candidate 146 at `aabdc884294e696228338f4b3eca0b8ea77484c6`
 - Exact package: `/private/tmp/macwiki-internal-beta-142/dist/MacWiki-1.0-internal.142-build142-20260812-184200.app`
 - Release decision: **NOT READY**
 
-Candidate 142 is the only package that contains the WebView pending-action arbitration extraction. It has complete deterministic preflight evidence plus focused exact-package Reader/Inspector and Computer Use evidence. Whole-app rendered closure, current official-Xcode evidence, spoken VoiceOver, real macOS 26, and current performance coverage remain open.
+Candidate 146 contains the WebView pending-action arbitration extraction plus the native workspace-local Command-W repair. It has complete deterministic preflight evidence, focused exact-package Reader/Inspector evidence inherited from the unchanged shell, fresh Computer Use rendering, and an exact packaged tab create/close/reopen/switch pass. Whole-app rendered closure, current official-Xcode evidence, spoken VoiceOver, and real macOS 26 remain open.
 
 ## Standing engineering rules
 
@@ -86,12 +86,14 @@ Candidate 142 is the only package that contains the WebView pending-action arbit
 - Candidate 142 passed the complete clean nine-stage preflight from exact source `6ba6e1f`: Debug and Release builds, 547 Swift Testing tests in 101 suites plus six XCTest tests, maintainability, shell syntax, redacted secret scan, provenance, ad-hoc signing, and packaging.
 - Candidate 142 records Xcode 27.0, SDK 27.0, binary minimum macOS 26.0, packaged executable SHA-256 `f33ae5c18c65c9d386462245d3d7845a7d46c8b26d1548eea67335077986b399`, app-tree SHA-256 `069394d2bc108cee0fc5e421e22c0ec7889896907c980c58c21a3974e127b882`, and ZIP SHA-256 `b5b7bb006fed26736a127e9c733d91a00cdf932f6da9fd2e8362c3e1db4c5e83`.
 - Exact Candidate 142 passed the isolated Reader/Inspector accessibility journey: four native panes, all eight auxiliary visibility states, 20 Lists/List Contents cycles, 12 rapid Inspector-mode cycles, six Inspector hide/restore cycles, one interrupted transition, one native Find UI, Contents navigation, Page Views, and read-state mutation. A fresh Computer Use pass preserved Reader, Find, pane-state, and offline Discover screenshots; no fatal, assertion, crash, or `AttributeGraph` diagnostic was found, and the exact candidate process was cleaned up.
+- Candidate 146 passed the complete clean nine-stage preflight from exact source `aabdc88`: Debug and Release builds, 549 Swift Testing tests in 101 suites plus six XCTest tests, maintainability, shell syntax, redacted secret scan, provenance, ad-hoc signing, and packaging. Its exact package creates three tabs, reduces them to two with Command-W without closing the workspace window, restores three with Command-Shift-T, and completes four next/previous switch timings between 507.2 and 563.3 ms.
+- Command-W now has one scene-aware File command plus a main-workspace-local native event boundary. A workspace with an active tab closes that tab; a locked tab consumes the shortcut; an empty workspace and separate windows keep native window-close behavior. The monitor is scoped to the attached key window and consumes only unmodified Command-W.
 - Current maintainability gate passes with zero errors and ten advisories.
 - Official Xcode 27 MCP evidence exists historically through Candidate 132. A fresh official-Xcode build and full test record is still required for the current integration when that tool is exposed.
 
 ## Work still required
 
-- Complete the remaining whole-app Candidate 142 interface matrix, including secondary windows, every loading/empty/error state, hover/focus states, compact and wide resizing, Reduce Motion, Reduce Transparency, Increase Contrast, and spoken VoiceOver order/actions.
+- Complete the remaining whole-app Candidate 146 interface matrix, including secondary windows, every loading/empty/error state, hover/focus states, compact and wide resizing, Reduce Motion, Reduce Transparency, Increase Contrast, and spoken VoiceOver order/actions.
 - Update Jack's casual-reader release log and Project Indy operational notes with current evidence and limitations.
 - Reconcile stale architecture, Readwise, Inspector, and UI-language documentation against current product behavior.
 - Address maintainability advisories incrementally where extraction improves ownership, invalidation, testability, or performance. Line count alone is not authorization for a risky rewrite.
