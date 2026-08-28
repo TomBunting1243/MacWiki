@@ -32,6 +32,21 @@ Articles do not exist in isolation. The Inspector surfaces metadata, references,
 
 MacWiki is only worth building if it feels alive in motion. Reader scrolling and table-of-contents navigation should feel fluid enough that the interface disappears and the reading flow remains intact. Safari on the same Mac is the baseline to meet or beat.
 
+## An Experiment in Building with AI
+
+MacWiki is also a record of sustained human–AI collaboration on a real native application. AI agents have helped explore unfamiliar APIs, implement features, investigate regressions, write tests, and maintain the project's technical documentation. Product direction, scope, acceptance criteria, and final judgment remain human-owned.
+
+The interesting part is not that AI produced code. It is the control system around that work:
+
+- Product intent lives in explicit vision and specification documents rather than in chat history.
+- Behavioral tests and real-app checks are preferred over assertions about source-code shape.
+- Accessibility, persistence safety, and perceived performance are release requirements.
+- Experimental changes are recorded as small, inspectable commits instead of one generated code drop.
+- Documentation distinguishes current behavior from planned features; Readwise sync, for example, is deliberately described as deferred rather than implemented.
+- AI-generated changes are expected to survive build, test, review, and evidence gates before they are treated as complete.
+
+Read [AI_COLLABORATION.md](AI_COLLABORATION.md) for the working method, representative examples, and lessons from the experiment.
+
 ## Requirements
 
 - macOS 26.0+
