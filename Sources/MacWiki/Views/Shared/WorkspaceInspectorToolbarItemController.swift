@@ -34,9 +34,14 @@ final class WorkspaceInspectorToolbarItemController: NSObject {
         item.toolTip = "Choose Inspector View"
         item.controlRepresentation = .expanded
         item.visibilityPriority = .high
+        // Xcode 26's macOS SDK cannot resolve this macOS 27 symbol even behind
+        // a runtime availability check. Keep the richer role when compiling
+        // with the Swift 6.3 / macOS 27 toolchain while retaining Xcode 26 CI.
+        #if compiler(>=6.3)
         if #available(macOS 27, *) {
             item.role = .tabs
         }
+        #endif
         toolbarItem = item
         return item
     }
