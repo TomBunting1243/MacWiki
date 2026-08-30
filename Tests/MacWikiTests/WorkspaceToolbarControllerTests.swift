@@ -46,11 +46,9 @@ struct WorkspaceToolbarControllerTests {
         #expect(inspectorModes.selectionMode == .selectOne)
         #expect(inspectorModes.selectedIndex == 0)
         #expect(inspectorModes.subitems.map(\.label) == InspectorMode.allCases.map(\.rawValue))
-        #if compiler(>=6.3)
         if #available(macOS 27, *) {
-            #expect(inspectorModes.role == .tabs)
+            #expect(inspectorModes.value(forKey: "role") as? Int == 1)
         }
-        #endif
 
         for item in toolbar.items where WorkspaceToolbarLayout.readerItemIdentifiers.contains(item.itemIdentifier)
                 && item.itemIdentifier != .toggleInspector {
