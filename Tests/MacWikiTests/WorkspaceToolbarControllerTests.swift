@@ -47,7 +47,7 @@ struct WorkspaceToolbarControllerTests {
         #expect(inspectorModes.selectedIndex == 0)
         #expect(inspectorModes.subitems.map(\.label) == InspectorMode.allCases.map(\.rawValue))
         if #available(macOS 27, *) {
-            #expect(inspectorModes.role == .tabs)
+            #expect(inspectorModes.value(forKey: "role") as? Int == 1)
         }
 
         for item in toolbar.items where WorkspaceToolbarLayout.readerItemIdentifiers.contains(item.itemIdentifier)

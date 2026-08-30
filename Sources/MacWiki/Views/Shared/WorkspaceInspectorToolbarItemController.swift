@@ -34,8 +34,11 @@ final class WorkspaceInspectorToolbarItemController: NSObject {
         item.toolTip = "Choose Inspector View"
         item.controlRepresentation = .expanded
         item.visibilityPriority = .high
+        // Xcode 26 cannot resolve the macOS 27 `role` property at compile time.
+        // AppKit exposes it to Objective-C, so KVC lets an Xcode 26 build adopt
+        // the tab role when that same binary runs on macOS 27.
         if #available(macOS 27, *) {
-            item.role = .tabs
+            item.setValue(1, forKey: "role")
         }
         toolbarItem = item
         return item

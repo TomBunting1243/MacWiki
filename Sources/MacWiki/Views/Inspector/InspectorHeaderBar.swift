@@ -25,15 +25,9 @@ struct InspectorHeaderBar: View {
             }
     }
 
-    @ViewBuilder
     private var inspectorModePicker: some View {
-        if #available(macOS 27, *) {
-            picker
-                .pickerStyle(.tabs)
-        } else {
-            picker
-                .pickerStyle(.segmented)
-        }
+        picker
+            .pickerStyle(.segmented)
     }
 
     private var picker: some View {
