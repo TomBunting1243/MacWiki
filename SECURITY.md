@@ -19,7 +19,7 @@ Preferred path:
 
 Fallback:
 
-- Contact the maintainer directly via GitHub: [@tombunting](https://github.com/tombunting)
+- Contact the maintainer directly via GitHub: [@TomBunting1243](https://github.com/TomBunting1243)
 
 Please include:
 

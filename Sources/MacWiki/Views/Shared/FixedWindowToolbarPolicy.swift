@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 
 /// SwiftUI owns every toolbar item. This narrow AppKit boundary only disables
-/// toolbar editing for the fixed internal-beta layout; it never inserts,
+/// toolbar editing for the fixed workspace layout; it never inserts,
 /// removes, reorders, or tracks an item.
 struct FixedWindowToolbarPolicy: NSViewRepresentable {
     func makeNSView(context: Context) -> FixedWindowToolbarPolicyView {

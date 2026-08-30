@@ -10,6 +10,16 @@ Wikipedia on the web is cluttered, disconnected from a reader's research workflo
 - **Enables comparison:** Tabs and multiple windows support deep research across articles.
 - **Keeps work available:** Save articles and reading lists locally for later.
 
+## Screenshots
+
+![MacWiki's four-column workspace showing Recents, a Wikipedia article, and the Inspector](Documentation/Screenshots/workspace-overview.png)
+
+| Focused Reader and Contents | Time Machine discovery |
+| --- | --- |
+| ![A focused Wikipedia reading view with the Inspector contents outline](Documentation/Screenshots/focused-reader.png) | ![MacWiki Discover showing the Time Machine interface](Documentation/Screenshots/time-machine.png) |
+| **Page-view trends** | **Research workspace** |
+| ![A page-view trend popover over the Discover and Reader workspace](Documentation/Screenshots/pageviews-popover.png) | Tabs, reading history, metadata, references, and article navigation remain available in one native workspace. |
+
 ## Design Philosophy
 
 ### Apple-native feel
@@ -32,25 +42,14 @@ Articles do not exist in isolation. The Inspector surfaces metadata, references,
 
 MacWiki is only worth building if it feels alive in motion. Reader scrolling and table-of-contents navigation should feel fluid enough that the interface disappears and the reading flow remains intact. Safari on the same Mac is the baseline to meet or beat.
 
-## An Experiment in Building with AI
+## Built with AI
 
-MacWiki is also a record of sustained human–AI collaboration on a real native application. AI agents have helped explore unfamiliar APIs, implement features, investigate regressions, write tests, and maintain the project's technical documentation. Product direction, scope, acceptance criteria, and final judgment remain human-owned.
-
-The interesting part is not that AI produced code. It is the control system around that work:
-
-- Product intent lives in explicit vision and specification documents rather than in chat history.
-- Behavioral tests and real-app checks are preferred over assertions about source-code shape.
-- Accessibility, persistence safety, and perceived performance are release requirements.
-- Experimental changes are recorded as small, inspectable commits instead of one generated code drop.
-- Documentation distinguishes current behavior from planned features; Readwise sync, for example, is deliberately described as deferred rather than implemented.
-- AI-generated changes are expected to survive build, test, review, and evidence gates before they are treated as complete.
-
-Read [AI_COLLABORATION.md](AI_COLLABORATION.md) for the working method, representative examples, and lessons from the experiment.
+MacWiki was developed through sustained human–AI collaboration across product design, native implementation, debugging, accessibility, and test coverage. The commit history shows that work evolving through small, reviewable iterations.
 
 ## Requirements
 
 - macOS 26.0+
-- Xcode 27 (for the official Xcode Tools MCP sign-off and IDE diagnostics)
+- Xcode 26 or newer
 - Swift 6.2+
 
 MacWiki intentionally targets macOS 26 and newer so the app can lean on the current SwiftUI, AppKit, and Liquid Glass system behavior without carrying older-system compatibility branches.
@@ -67,23 +66,6 @@ swift build
 # Run the app
 .build/debug/MacWiki
 ```
-
-## Internal Beta Quality Program
-
-The active readiness contract is `INTERNAL_BETA_QUALITY_PROGRAM.md`. It requires
-traceable clean candidates, exhaustive interface and journey evidence, isolated
-test data, accessibility and Liquid Glass review, and final official Xcode 27 MCP
-verification.
-
-Run the CLI-backed gates and create a traceable ad-hoc package with:
-
-```bash
-./scripts/internal_beta_preflight.sh
-```
-
-This command is a documented fallback, not a substitute for the official Xcode
-27 MCP evidence required by the quality program. The former public-beta matrix,
-checklist, and release automation are retained only as explicitly retired history.
 
 ## Project Structure
 
