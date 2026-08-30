@@ -28,6 +28,6 @@ Repeated or severe violations may result in temporary or permanent bans from pro
 
 ## Reporting
 
-If you experience or witness unacceptable behavior, contact the project maintainer through GitHub at [@tombunting](https://github.com/tombunting).
+If you experience or witness unacceptable behavior, contact the project maintainer through GitHub at [@TomBunting1243](https://github.com/TomBunting1243).
 
 When possible, include links, screenshots, and context so maintainers can respond quickly and fairly.

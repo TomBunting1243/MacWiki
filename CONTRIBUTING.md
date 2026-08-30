@@ -23,14 +23,6 @@ swift build
 swift test
 ```
 
-## Local-only files
-
-The repository intentionally excludes local machine and agent files:
-
-- `.agent/`
-- `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `ANTIGRAVITY.md`
-- `.build/`, `.swiftpm/`, cache/profiler outputs
-
 ## Conduct
 
 Please be respectful and collaborative. See [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).

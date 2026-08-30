@@ -32,7 +32,7 @@ jobs:
       - name: Test (Xcode 26 compatible, no network)
         run: >-
           swift test
-          --skip 'LibraryResetServiceTests|HighlightPersistenceTests|WebViewHighlightRehydrateTests|ReaderStateTests|QAProcessSafetyShellTests|ReaderScrollBehaviorRegressionTests|NativeWorkspaceLayoutTests'
+          --skip 'LibraryResetServiceTests|HighlightPersistenceTests|WebViewHighlightRehydrateTests|ReaderStateTests|ReaderScrollBehaviorRegressionTests|NativeWorkspaceLayoutTests'
         env:
           MACWIKI_SKIP_NETWORK_TESTS: "1"
 
@@ -42,7 +42,7 @@ jobs:
         continue-on-error: true
         run: >-
           swift test
-          --skip 'LibraryResetServiceTests|HighlightPersistenceTests|WebViewHighlightRehydrateTests|ReaderStateTests|QAProcessSafetyShellTests|ReaderScrollBehaviorRegressionTests|NativeWorkspaceLayoutTests'
+          --skip 'LibraryResetServiceTests|HighlightPersistenceTests|WebViewHighlightRehydrateTests|ReaderStateTests|ReaderScrollBehaviorRegressionTests|NativeWorkspaceLayoutTests'
 
       - name: Maintainability Check (Advisory)
         continue-on-error: true

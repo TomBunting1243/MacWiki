@@ -304,7 +304,7 @@ actor WikipediaService {
     // executable, where Bundle.main carries no Info.plist.
     let userAgent: String = {
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0"
-        return "MacWiki/\(version) (https://github.com/tombunting/MacWiki)"
+        return "MacWiki/\(version) (https://github.com/TomBunting1243/MacWiki)"
     }()
     let fileManager: FileManager
     let requestLoader: RequestLoader

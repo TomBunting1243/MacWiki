@@ -105,7 +105,7 @@ struct MacWikiApp: App {
         let shellLayoutMigrationKey = "mainWindow.shellLayoutVersion"
         let currentShellLayoutVersion = 15
 
-        // Search is now a single sidebar-resident surface. Drop the retired overlay preference.
+        // Search is now a single sidebar-resident surface. Drop the legacy overlay preference.
         defaults.removeObject(forKey: AppStorageKey.Search.presentationMode)
 
         if defaults.integer(forKey: shellLayoutMigrationKey) < currentShellLayoutVersion {
@@ -208,19 +208,19 @@ struct MacWikiApp: App {
         credits.append(NSAttributedString(string: "Project: ", attributes: bodyAttributes))
         credits.append(Self.linkString(
             "GitHub Repository",
-            url: "https://github.com/tombunting/MacWiki",
+            url: "https://github.com/TomBunting1243/MacWiki",
             baseAttributes: linkAttributes
         ))
         credits.append(NSAttributedString(string: "\nLicense: ", attributes: bodyAttributes))
         credits.append(Self.linkString(
             "Apache-2.0",
-            url: "https://github.com/tombunting/MacWiki/blob/main/LICENSE",
+            url: "https://github.com/TomBunting1243/MacWiki/blob/main/LICENSE",
             baseAttributes: linkAttributes
         ))
         credits.append(NSAttributedString(string: "\nTrademark: ", attributes: bodyAttributes))
         credits.append(Self.linkString(
             "MacWiki Trademark",
-            url: "https://github.com/tombunting/MacWiki/blob/main/TRADEMARK.md",
+            url: "https://github.com/TomBunting1243/MacWiki/blob/main/TRADEMARK.md",
             baseAttributes: linkAttributes
         ))
 

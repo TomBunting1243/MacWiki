@@ -176,7 +176,7 @@ struct WikipediaServiceTests {
         let request = try #require(await transport.recordedRequests().first)
         let userAgent = request.value(forHTTPHeaderField: "User-Agent")
         #expect(userAgent?.hasPrefix("MacWiki/") == true)
-        #expect(userAgent?.contains("(https://github.com/tombunting/MacWiki)") == true)
+        #expect(userAgent?.contains("(https://github.com/TomBunting1243/MacWiki)") == true)
         #expect(request.value(forHTTPHeaderField: "Accept") == "application/json")
     }
 
