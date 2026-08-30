@@ -98,6 +98,10 @@ MacWiki/
 └── Tests/             # Unit tests
 ```
 
+## Related AI Experiment
+
+The companion [Obsidian Election Research Workspace](https://github.com/TomBunting1243/obsidian-election-research-workspace) shows the same human–AI working method in a different medium: a source-aware research dashboard extracted into a reusable starter vault with synthetic fixtures, schema validation, and accessibility contracts.
+
 ## Open Source
 
 MacWiki is open source primarily so people can clone it, modify it, and build their own versions.
